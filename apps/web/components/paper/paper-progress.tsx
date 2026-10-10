@@ -42,28 +42,33 @@ const NOW: Partial<Record<PaperStage["stage"], string>> = {
 };
 
 /**
- * Follows a paper from its page: asks `/api/papers/<cid>` every 5 s until a final stage,
- * and keeps asking through a stage that could not be read. Once published, shows the
- * record and how to verify it. Shows and asks by the CID's canonical spelling, the one the
- * signature covers, whatever spelling the address has.
+ * Follows a paper from its page, starting from the view the server read (`PaperLoader`):
+ * unless that view is final, asks `/api/papers/<cid>` every 5 s until a final stage, and
+ * keeps asking through a stage that could not be read. Once published, shows the record and
+ * how to verify it. Shows and asks by the CID's canonical spelling, the one the signature
+ * covers, whatever spelling the address has.
  */
 export function PaperProgress({
   cid: given,
   contextGraph,
   eventId,
+  initial,
   resubmitted = false,
 }: {
   cid: string;
   /** The context graph this environment publishes to, which the signature covers. */
   contextGraph: string;
   eventId: string | undefined;
+  /** Where the paper stood when the server read it. */
+  initial: PaperView;
   /** The visitor just submitted a paper that was already published. */
   resubmitted?: boolean;
 }) {
   const cid = canonicalCid(given) ?? given;
-  const [view, setView] = useState<PaperView | undefined>();
+  const [view, setView] = useState<PaperView>(initial);
 
   useEffect(() => {
+    if (isFinal(initial)) return;
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const query = eventId ? `?event=${encodeURIComponent(eventId)}` : "";
@@ -79,31 +84,19 @@ export function PaperProgress({
       setView(next);
       if (!isFinal(next)) timer = setTimeout(() => void poll(), POLL_MS);
     };
-    void poll();
+    timer = setTimeout(() => void poll(), POLL_MS);
     return () => {
       stopped = true;
       clearTimeout(timer);
     };
-  }, [cid, eventId]);
+  }, [cid, eventId, initial]);
 
-  const record = view?.stage === "published" ? view.record : undefined;
+  const record = view.stage === "published" ? view.record : undefined;
   const trail = (
     <Breadcrumbs
       items={[{ label: "Papers", href: "/papers" }, { label: record?.title ?? shorten(cid) }]}
     />
   );
-
-  if (!view) {
-    return (
-      <div className="grid gap-6">
-        {trail}
-        <div aria-busy className="grid gap-4">
-          <div className="h-9 w-56 animate-pulse rounded-xl bg-surface-strong" />
-          <div className="h-64 animate-pulse rounded-2xl bg-surface-strong" />
-        </div>
-      </div>
-    );
-  }
 
   const pill =
     view.stage === "published"

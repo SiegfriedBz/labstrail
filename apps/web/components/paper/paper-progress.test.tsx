@@ -5,6 +5,20 @@ import { PaperProgress } from "./paper-progress.tsx";
 
 const CID = "bafybeias652m2pfpmuaeze4dxmtcjvfwvr7dsteumagdd2vwaqrbkjokxu";
 const GRAPH = "0xd701ed157232ad5e14bc4134a8d10d64d86f13b3/verisci-staging";
+const PUBLISHED: PaperView = {
+  stage: "published",
+  ual: "did:dkg:base:84532/0xd701ed157232ad5e14bc4134a8d10d64d86f13b3/6",
+  record: {
+    title: "Screening VP1 of deformed wing virus",
+    authors: ["Di Liu"],
+    pdf: `ipfs://${CID}`,
+    submitter: "0x9a17ec95e96f8a7c40b7ac1411e8a844c7bf9111",
+    signature: "0xefa5",
+    deadline: "1791639162",
+    signatureCheck: "valid",
+    publisher: "0xd701ed157232ad5e14bc4134a8d10d64d86f13b3",
+  },
+};
 
 /** Answers each poll with the next view, repeating the last one. */
 function serve(views: PaperView[]) {
@@ -26,6 +40,10 @@ async function advance(ms: number) {
   });
 }
 
+const current = () =>
+  screen.getByRole("navigation", { name: "Breadcrumb" }).querySelector('[aria-current="page"]')
+    ?.textContent;
+
 describe("PaperProgress", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -37,24 +55,43 @@ describe("PaperProgress", () => {
     vi.unstubAllGlobals();
   });
 
-  it("asks every 5 s with the event id until a final stage, then stops", async () => {
-    const urls = serve([
-      { stage: "reading" },
-      { stage: "minting" },
-      { stage: "refused", reason: "no-title" },
-    ]);
+  it("starts from the server's view, then asks every 5 s with the event id until a final stage", async () => {
+    const urls = serve([{ stage: "minting" }, { stage: "refused", reason: "no-title" }]);
 
-    render(<PaperProgress cid={CID} contextGraph={GRAPH} eventId="01M4K5BC7RA0P4XR2YJQ6BNCJ9" />);
+    render(
+      <PaperProgress
+        cid={CID}
+        contextGraph={GRAPH}
+        eventId="01M4K5BC7RA0P4XR2YJQ6BNCJ9"
+        initial={{ stage: "reading" }}
+      />,
+    );
     await advance(0);
-    expect(urls).toEqual([`/api/papers/${CID}?event=01M4K5BC7RA0P4XR2YJQ6BNCJ9`]);
+    expect(urls).toEqual([]);
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Reading your paper");
 
     await advance(5000);
+    expect(urls).toEqual([`/api/papers/${CID}?event=01M4K5BC7RA0P4XR2YJQ6BNCJ9`]);
     await advance(5000);
-    expect(urls).toHaveLength(3);
+    expect(urls).toHaveLength(2);
     expect(screen.getByRole("alert").textContent).toMatch(/title/);
 
     await advance(30_000);
-    expect(urls).toHaveLength(3);
+    expect(urls).toHaveLength(2);
+  });
+
+  it("asks nothing when the server's view is already final", async () => {
+    const urls = serve([{ stage: "reading" }]);
+
+    render(
+      <PaperProgress cid={CID} contextGraph={GRAPH} eventId={undefined} initial={PUBLISHED} />,
+    );
+    await advance(30_000);
+
+    expect(urls).toEqual([]);
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
+      "Screening VP1 of deformed wing virus",
+    );
   });
 
   it("keeps asking while the answer cannot be read, and shows it", async () => {
@@ -64,8 +101,15 @@ describe("PaperProgress", () => {
     );
     const fetchMock = vi.mocked(globalThis.fetch);
 
-    render(<PaperProgress cid={CID} contextGraph={GRAPH} eventId={undefined} />);
-    await advance(0);
+    render(
+      <PaperProgress
+        cid={CID}
+        contextGraph={GRAPH}
+        eventId={undefined}
+        initial={{ stage: "unavailable" }}
+      />,
+    );
+    await advance(5000);
     await advance(5000);
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -76,41 +120,35 @@ describe("PaperProgress", () => {
     const urls = serve([{ stage: "minting" }]);
     const v0 = "QmPZ9gcCEpqKTo6aq61g2nXGUhM4iCL3ewB6LDXZCtioEB";
 
-    render(<PaperProgress cid={v0} contextGraph={GRAPH} eventId={undefined} />);
-    await advance(0);
+    render(
+      <PaperProgress
+        cid={v0}
+        contextGraph={GRAPH}
+        eventId={undefined}
+        initial={{ stage: "minting" }}
+      />,
+    );
+    await advance(5000);
 
     expect(urls[0]).toMatch(/^\/api\/papers\/bafy/);
     expect(screen.queryByText(v0)).toBeNull();
   });
 
   it("leads back to the papers list, naming the paper by its short CID, then by its title", async () => {
-    serve([
-      {
-        stage: "published",
-        ual: "did:dkg:base:84532/0xd701ed157232ad5e14bc4134a8d10d64d86f13b3/6",
-        record: {
-          title: "Screening VP1 of deformed wing virus",
-          authors: ["Di Liu"],
-          pdf: `ipfs://${CID}`,
-          submitter: "0x9a17ec95e96f8a7c40b7ac1411e8a844c7bf9111",
-          signature: "0xefa5",
-          deadline: "1791639162",
-          signatureCheck: "valid",
-          publisher: "0xd701ed157232ad5e14bc4134a8d10d64d86f13b3",
-        },
-      },
-    ]);
+    serve([PUBLISHED]);
 
-    render(<PaperProgress cid={CID} contextGraph={GRAPH} eventId={undefined} />);
-    const crumbs = () => screen.getByRole("navigation", { name: "Breadcrumb" });
+    render(
+      <PaperProgress
+        cid={CID}
+        contextGraph={GRAPH}
+        eventId={undefined}
+        initial={{ stage: "minting" }}
+      />,
+    );
     expect(screen.getByRole("link", { name: "Papers" }).getAttribute("href")).toBe("/papers");
-    expect(crumbs().querySelector('[aria-current="page"]')?.textContent).toBe(
-      "bafybeias652m2…rbkjokxu",
-    );
+    expect(current()).toBe("bafybeias652m2…rbkjokxu");
 
-    await advance(0);
-    expect(crumbs().querySelector('[aria-current="page"]')?.textContent).toBe(
-      "Screening VP1 of deformed wing virus",
-    );
+    await advance(5000);
+    expect(current()).toBe("Screening VP1 of deformed wing virus");
   });
 });
