@@ -20,9 +20,12 @@ function ConnectedWalletButton() {
     <button
       type="button"
       onClick={() => void open()}
-      className="rounded-xl bg-accent px-3.5 py-2 text-sm font-medium text-accent-ink transition hover:brightness-110 active:scale-[0.98]"
+      aria-label="Connect wallet"
+      className="whitespace-nowrap rounded-xl bg-accent px-3.5 py-2 text-sm font-medium text-accent-ink transition hover:brightness-110 active:scale-[0.98]"
     >
-      Connect wallet
+      {/* A phone's header also holds the logo and two links: the short label keeps one line. */}
+      <span className="sm:hidden">Connect</span>
+      <span className="hidden sm:inline">Connect wallet</span>
     </button>
   );
 }

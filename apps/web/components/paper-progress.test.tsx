@@ -82,4 +82,35 @@ describe("PaperProgress", () => {
     expect(urls[0]).toMatch(/^\/api\/papers\/bafy/);
     expect(screen.queryByText(v0)).toBeNull();
   });
+
+  it("leads back to the papers list, naming the paper by its short CID, then by its title", async () => {
+    serve([
+      {
+        stage: "published",
+        ual: "did:dkg:base:84532/0xd701ed157232ad5e14bc4134a8d10d64d86f13b3/6",
+        record: {
+          title: "Screening VP1 of deformed wing virus",
+          authors: ["Di Liu"],
+          pdf: `ipfs://${CID}`,
+          submitter: "0x9a17ec95e96f8a7c40b7ac1411e8a844c7bf9111",
+          signature: "0xefa5",
+          deadline: "1791639162",
+          signatureCheck: "valid",
+          publisher: "0xd701ed157232ad5e14bc4134a8d10d64d86f13b3",
+        },
+      },
+    ]);
+
+    render(<PaperProgress cid={CID} contextGraph={GRAPH} eventId={undefined} />);
+    const crumbs = () => screen.getByRole("navigation", { name: "Breadcrumb" });
+    expect(screen.getByRole("link", { name: "Papers" }).getAttribute("href")).toBe("/papers");
+    expect(crumbs().querySelector('[aria-current="page"]')?.textContent).toBe(
+      "bafybeias652m2…rbkjokxu",
+    );
+
+    await advance(0);
+    expect(crumbs().querySelector('[aria-current="page"]')?.textContent).toBe(
+      "Screening VP1 of deformed wing virus",
+    );
+  });
 });

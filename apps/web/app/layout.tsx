@@ -4,8 +4,8 @@ import { Martian_Mono, Sora } from "next/font/google";
 import Link from "next/link";
 import { connection } from "next/server";
 import type { ReactNode } from "react";
+import { HeaderNav } from "../components/header-nav.tsx";
 import { Logo } from "../components/logo.tsx";
-import { NavLink } from "../components/nav-link.tsx";
 import { Providers } from "../components/providers.tsx";
 import { SiteFooter } from "../components/site-footer.tsx";
 import { WalletButton } from "../components/wallet-button.tsx";
@@ -50,7 +50,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                 <Logo />
               </Link>
               <nav className="flex items-center gap-3 sm:gap-6">
-                <NavLink href="/publish">Publish</NavLink>
+                <HeaderNav />
                 <WalletButton />
               </nav>
             </div>
