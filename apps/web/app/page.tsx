@@ -12,7 +12,9 @@ import {
 import Link from "next/link";
 import { Suspense } from "react";
 import { ChainDemo } from "../components/home/chain-demo.tsx";
-import { LatestPapers, LatestPapersSkeleton } from "../components/home/latest-papers.tsx";
+import { LatestPapers } from "../components/home/latest-papers.tsx";
+import { PapersTableSkeleton } from "../components/papers/papers-table-skeleton.tsx";
+import { LATEST_PAPERS } from "../lib/papers.ts";
 
 const HOW = [
   {
@@ -137,7 +139,7 @@ export default function Home() {
             The newest records on the knowledge graph. Open one to check who submitted it.
           </p>
         </div>
-        <Suspense fallback={<LatestPapersSkeleton />}>
+        <Suspense fallback={<PapersTableSkeleton rows={LATEST_PAPERS} />}>
           <LatestPapers />
         </Suspense>
       </section>

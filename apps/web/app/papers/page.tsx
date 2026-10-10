@@ -1,17 +1,10 @@
-import { getUploadService } from "@verisci/workflows";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
-import { Pager } from "../../components/papers/pager.tsx";
-import { PapersTable } from "../../components/papers/papers-table.tsx";
-import {
-  PAPERS_PER_PAGE,
-  type PapersView,
-  pageHref,
-  papersView,
-  parsePageParam,
-} from "../../lib/papers.ts";
+import { Suspense } from "react";
+import { PapersResults } from "../../components/papers/papers-results.tsx";
+import { PapersTableSkeleton } from "../../components/papers/papers-table-skeleton.tsx";
+import { PAPERS_PER_PAGE, parsePageParam } from "../../lib/papers.ts";
 
 type SearchParams = Promise<{ page?: string | string[] }>;
 
@@ -29,18 +22,15 @@ export async function generateMetadata({
 
 /**
  * Every paper published in this environment, newest first, one page per URL
- * (`/papers?page=N`): the server reads only that page from the DKG. A page that is not a
- * positive whole number, or past the last, answers 404.
+ * (`/papers?page=N`): the server reads only that page from the DKG. The heading shows at
+ * once and a skeleton of the table until the page arrives; keyed by page, so moving to
+ * another page shows the skeleton again. A page that is not a positive whole number answers
+ * 404 before anything streams.
  */
 export default async function PapersPage({ searchParams }: { searchParams: SearchParams }) {
   await connection();
   const page = parsePageParam((await searchParams).page);
   if (page === undefined) notFound();
-  const view = papersView(
-    await getUploadService().listPapers({ page, pageSize: PAPERS_PER_PAGE }),
-    page,
-  );
-  if (view.kind === "not-found") notFound();
 
   return (
     <div className="grid gap-8">
@@ -51,54 +41,17 @@ export default async function PapersPage({ searchParams }: { searchParams: Searc
           its record and check who submitted it.
         </p>
       </header>
-      <PapersBody view={view} page={page} />
+      <Suspense
+        key={page}
+        fallback={
+          <div className="grid gap-6">
+            <div className="h-5 w-40 animate-pulse rounded-md bg-surface-strong" />
+            <PapersTableSkeleton rows={Math.min(PAPERS_PER_PAGE, 8)} />
+          </div>
+        }
+      >
+        <PapersResults page={page} />
+      </Suspense>
     </div>
   );
-}
-
-function PapersBody({ view, page }: { view: PapersView; page: number }) {
-  switch (view.kind) {
-    case "list":
-      return (
-        <div className="grid gap-6">
-          <p className="text-sm text-muted">
-            {view.lastPage > 1
-              ? `${papersCount(view.total)} · page ${page} of ${view.lastPage}`
-              : papersCount(view.total)}
-          </p>
-          <div className="glass rounded-2xl px-2 sm:px-4">
-            <PapersTable papers={view.papers} />
-          </div>
-          <Pager page={page} lastPage={view.lastPage} />
-        </div>
-      );
-    case "empty":
-      return (
-        <p className="glass rounded-2xl p-5 leading-relaxed text-muted">
-          No paper is published yet.{" "}
-          <Link href="/publish" className="font-medium text-accent hover:underline">
-            Publish the first one
-          </Link>
-        </p>
-      );
-    case "unavailable":
-      return (
-        <p role="alert" className="glass rounded-2xl p-5 leading-relaxed text-muted">
-          The list can't be loaded right now: the DKG node didn't answer.{" "}
-          <Link href={pageHref(page)} className="font-medium text-accent hover:underline">
-            Try again
-          </Link>
-        </p>
-      );
-    default:
-      return (
-        <p role="alert" className="glass rounded-2xl p-5 leading-relaxed text-muted">
-          The DKG node answered, but the list couldn't be read. Try again later.
-        </p>
-      );
-  }
-}
-
-function papersCount(total: number): string {
-  return total === 1 ? "1 paper" : `${total} papers`;
 }

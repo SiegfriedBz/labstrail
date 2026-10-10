@@ -50,18 +50,3 @@ export async function LatestPapers() {
     </div>
   );
 }
-
-/** What the block shows while the node answers: rows shaped like the table's. */
-export function LatestPapersSkeleton() {
-  return (
-    <div aria-busy className="glass grid gap-px overflow-hidden rounded-2xl p-2 sm:p-4">
-      {Array.from({ length: 3 }, (_, index) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: placeholder rows with nothing else to key on
-        <div key={index} className="grid gap-2 border-b border-line px-3 py-4 last:border-0">
-          <div className="h-4 w-3/4 animate-pulse rounded-md bg-surface-strong" />
-          <div className="h-3 w-1/2 animate-pulse rounded-md bg-surface-strong" />
-        </div>
-      ))}
-    </div>
-  );
-}
