@@ -20,8 +20,9 @@ Status: early. VeriSci is a rebuild of an earlier prototype,
 Base Sepolia. This repo starts again from clean foundations (monorepo, tooling,
 CI), and its ADRs and domain facts record what the prototype taught us. The first
 user-facing feature is the upload page: connect a wallet, publish a PDF, follow it until it
-is minted, then verify its record (signature, token, UAL, CID) from the paper's page. Rating
-comes next. The repo, its packages and the EIP-712 domain keep the lowercase name `verisci`.
+is minted, then verify its record (signature, token, UAL, CID) from the paper's page. Every
+published paper is listed at `/papers`, newest first, read a page at a time from the DKG.
+Rating comes next. The repo, its packages and the EIP-712 domain keep the lowercase name `verisci`.
 Everything runs on testnets.
 
 ## How it works

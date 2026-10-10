@@ -35,6 +35,15 @@ Next.js 16 App Router app. See `README.md` here for scripts and status.
   plain props; client components never import `@verisci/workflows` at runtime (types only).
 - Reads the page polls are route handlers, not server actions: Next runs server actions
   one at a time per client.
+- A page reads the node on the server, in an async component inside `Suspense` with a
+  skeleton shaped like the result (`PapersResults`, `PaperLoader`); what is known already
+  shows in the skeleton. Check a 404 before the boundary when you can: `notFound()` inside it
+  gives a 200 with `noindex`, since the response is already streaming.
+- Tables are TanStack Table v9 over shadcn's table (`components/ui/table.tsx`): the server
+  sorts and pages, columns and features are module constants (`papers-columns.tsx`), and
+  rows arrive as props. Strings a server component needs from a client file go in a plain
+  module (`components/paper/labels.ts`): a `"use client"` file's exports reach the server
+  as client references.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

@@ -350,6 +350,14 @@ Observed on Next.js 16.3.8.
   wagmi's connectors reach Coinbase's SDK, whose lazily imported `@x402/*` packages are
   optional peers; `next build` fails on them until `turbopack.resolveAlias` points them at a
   module declaring the imported names (`apps/web/next.config.ts`).
+- **A response's status is sent with its first streamed chunk** (Next.js docs,
+  `03-api-reference/04-functions/not-found.md`, 16.3.8): `notFound()` inside a `Suspense`
+  boundary renders the not-found page as a 200 with `noindex`, a soft 404; a real 404 needs
+  the check before any `await` that suspends or any `Suspense` boundary. Seen on `/papers`
+  (2026-10-10): `?page=0` answered 404, a page past the last 200 with `noindex`.
+- **Everything a `"use client"` file exports reaches a server component as a client
+  reference**, not its value, so a string or constant the server needs lives in a plain
+  module (`apps/web/components/paper/labels.ts`).
 
 ## Tooling
 
@@ -371,5 +379,9 @@ a fact names another tool.
   object it is given (`process.env` by default), so `defineEnv` passes a copy; `extends`
   merges presets without validating them again; `skipValidation` returns the whole runtime
   env, secrets included, with no defaults.
+- **Tailwind v4 puts utilities in a cascade layer, and unlayered CSS beats any layer**
+  (Tailwind 4.3.3, 2026-10-10): `apps/web/app/globals.css`'s `li { text-wrap: pretty }` beat
+  `truncate` on an `li`, which wrapped instead of cutting the text. Put the utility on a
+  child element, or put the global rule in `@layer base`.
 - **Zod 4 reports a missing enum value as "Invalid option".** Give the schema its own
   `error` callback when "required" is what is actually wrong.
