@@ -23,7 +23,10 @@ export default async function PaperPage({
   const { event, already } = await searchParams;
   const eventId = typeof event === "string" ? event : undefined;
   return (
-    <Suspense key={`${cid}:${eventId ?? ""}`} fallback={<PaperSkeleton cid={cid} />}>
+    <Suspense
+      key={`${cid}:${eventId ?? ""}`}
+      fallback={<PaperSkeleton cid={cid} following={eventId !== undefined} />}
+    >
       <PaperLoader cid={cid} eventId={eventId} resubmitted={already === "1"} />
     </Suspense>
   );

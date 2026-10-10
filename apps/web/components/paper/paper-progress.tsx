@@ -11,6 +11,7 @@ import { shorten } from "../../lib/shorten.ts";
 import type { PaperView } from "../../lib/upload-actions.ts";
 import { Breadcrumbs } from "../site/breadcrumbs.tsx";
 import { CopyValue } from "./copy-value.tsx";
+import { PUBLISH_PANEL_LABELS, PUBLISH_PANEL_TITLE } from "./labels.ts";
 import { ProgressChain } from "./progress-chain.tsx";
 import { VerifyPanel } from "./verify-panel.tsx";
 
@@ -144,16 +145,16 @@ export function PaperProgress({
           <aside className="glass grid content-start gap-5 rounded-2xl p-5 sm:p-6">
             {NOW[view.stage] && (
               <div className="grid gap-1">
-                <h2 className="text-sm font-semibold">What's happening now</h2>
+                <h2 className="text-sm font-semibold">{PUBLISH_PANEL_TITLE}</h2>
                 <p className="text-sm leading-relaxed text-muted">{NOW[view.stage]}</p>
               </div>
             )}
             <dl className="grid gap-5">
               {view.stage === "published" && (
-                <CopyValue label="Knowledge Asset (UAL)" value={view.ual} head={22} />
+                <CopyValue label={PUBLISH_PANEL_LABELS.ual} value={view.ual} head={22} />
               )}
-              <CopyValue label="PDF (CID)" value={cid} href={ipfsUrl(cid)} />
-              <CopyValue label="IPFS link" value={`ipfs://${cid}`} />
+              <CopyValue label={PUBLISH_PANEL_LABELS.pdf} value={cid} href={ipfsUrl(cid)} />
+              <CopyValue label={PUBLISH_PANEL_LABELS.ipfs} value={`ipfs://${cid}`} />
             </dl>
           </aside>
         )}
