@@ -260,3 +260,30 @@ describe("readPaper on a minted paper", () => {
     expect((await createUploadService(env(), uploadIo).readPaper(CID)).record).toBeUndefined();
   });
 });
+
+describe("listPapers", () => {
+  it("lists a page from the node, in this graph, with the total", async () => {
+    const asked: { sparql: string; contextGraphId: string }[] = [];
+    const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      if (!String(input).endsWith("/api/query")) return new Response("unexpected", { status: 500 });
+      const body = JSON.parse(String(init?.body)) as { sparql: string; contextGraphId: string };
+      asked.push(body);
+      return Response.json({
+        result: {
+          bindings: body.sparql.startsWith("SELECT (COUNT")
+            ? [{ total: '"0"^^<http://www.w3.org/2001/XMLSchema#integer>' }]
+            : [],
+        },
+      });
+    }) as typeof globalThis.fetch;
+    const service = createUploadService(env(), { ...io().uploadIo, fetch });
+
+    expect(await service.listPapers({ page: 1, pageSize: 20 })).toEqual({
+      ok: true,
+      total: 0,
+      papers: [],
+    });
+    expect(asked.map((request) => request.contextGraphId)).toEqual([GRAPH, GRAPH]);
+    expect(asked[0]?.sparql).toContain(`GRAPH <did:dkg:context-graph:${GRAPH}/_meta>`);
+  });
+});

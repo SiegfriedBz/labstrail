@@ -232,7 +232,7 @@ TypeScript source, with no build step; Next.js compiles them through
 | [`packages/core`](packages/core/README.md) | Domain logic, no IO | none |
 | [`packages/dkg`](packages/dkg/README.md) | DKG adapter | core, env |
 | [`packages/contracts`](packages/contracts/README.md) | Solidity contracts and their TypeScript side | core, env |
-| [`packages/workflows`](packages/workflows/README.md) | Inngest workflows and the upload page's calls | core, env, dkg, contracts |
+| [`packages/workflows`](packages/workflows/README.md) | Inngest workflows and the pages' calls | core, env, dkg, contracts |
 | [`infra/rpc-proxy`](infra/rpc-proxy/README.md) | JSON-RPC proxy run on the DKG node server | none |
 
 Each workspace may only import the workspaces it declares. pnpm does not

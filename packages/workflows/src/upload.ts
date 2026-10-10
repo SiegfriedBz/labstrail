@@ -6,10 +6,17 @@ import {
   parseUal,
   targetKaName,
 } from "@verisci/core";
-import { type AssetResult, createDkgClient, type DkgFailure } from "@verisci/dkg";
+import { type AssetResult, createDkgClient } from "@verisci/dkg";
 import { createPublicClient, http } from "viem";
 import { baseSepolia } from "viem/chains";
 import { inngest } from "./inngest.ts";
+import {
+  listPapers,
+  type PaperListResult,
+  queryProblem,
+  type SignatureCheck,
+  signatureCheck,
+} from "./papers.ts";
 import { createUploadUrl, deleteFile, findPublicFile, type UploadUrlResult } from "./pinata.ts";
 import {
   PUBLISH_SETTINGS,
@@ -45,7 +52,7 @@ export interface PublishedRecord extends Omit<PaperRecord, "deadline"> {
   /** The signed deadline, in Unix seconds, as a decimal string (JSON has no bigint). */
   readonly deadline: string;
   /** Whether the signature is the submitter's, checked when read: `unknown` if the chain did not answer. */
-  readonly signatureCheck: "valid" | "invalid" | "unknown";
+  readonly signatureCheck: SignatureCheck;
   /** The UAL's author, which the asset's token is minted to: our DKG node's agent address. */
   readonly publisher: string | undefined;
 }
@@ -67,7 +74,10 @@ export interface PaperStatus {
   readonly failure?: PublishFailure;
 }
 
-/** What the upload page calls, built from the workflows' settings (ADR 0003, ADR 0010). */
+/**
+ * What the site's pages call, built from the workflows' settings (ADR 0003, ADR 0010): the
+ * upload page's calls, the paper page's read, and the papers list.
+ */
 export interface UploadService {
   /** This environment's context graph id, in the spelling a submission signs. */
   readonly contextGraph: string;
@@ -77,6 +87,11 @@ export interface UploadService {
   submitPaper(input: unknown, limiter: SubmitLimiter): Promise<SubmitResult>;
   /** The paper's Target KA state, its record once minted, and, given the event id, its publish run. */
   readPaper(cid: string, eventId?: string): Promise<PaperStatus>;
+  /** One page of this graph's published papers, newest mint first, with the total ({@link listPapers}). */
+  listPapers(options: {
+    readonly page: number;
+    readonly pageSize: number;
+  }): Promise<PaperListResult>;
 }
 
 /** The IO {@link createUploadService} uses; tests pass fakes. */
@@ -87,7 +102,7 @@ export interface UploadIo {
   readonly now: () => number;
 }
 
-/** Builds the upload page's calls from validated settings. */
+/** Builds the pages' calls from validated settings. */
 export function createUploadService(env: WorkflowsEnv, io: UploadIo): UploadService {
   const pinata = { jwt: env.PINATA_JWT, fetch: io.fetch, timeoutMs: PAGE_TIMEOUT_MS };
   const chain = createPublicClient({ chain: baseSepolia, transport: http(env.CHAIN_RPC_URL) });
@@ -119,7 +134,7 @@ export function createUploadService(env: WorkflowsEnv, io: UploadIo): UploadServ
     const sparql = paperRecordQuery(cid);
     if (!sparql) return { ok: false, reason: "unreadable" };
     const answer = await dkg.query(sparql);
-    if (!answer.ok) return { ok: false, reason: passing(answer) ? "unavailable" : "unreadable" };
+    if (!answer.ok) return { ok: false, reason: queryProblem(answer) };
     const record = parsePaperRecord(cid, answer.bindings);
     if (!record) return { ok: false, reason: "unreadable" };
     const matches = await signatureMatches(
@@ -132,7 +147,7 @@ export function createUploadService(env: WorkflowsEnv, io: UploadIo): UploadServ
       record: {
         ...record,
         deadline: record.deadline.toString(),
-        signatureCheck: matches === "unreachable" ? "unknown" : matches ? "valid" : "invalid",
+        signatureCheck: signatureCheck(matches),
         publisher: parsed.ok ? parsed.ual.address : undefined,
       },
     };
@@ -184,26 +199,15 @@ export function createUploadService(env: WorkflowsEnv, io: UploadIo): UploadServ
         ? { asset, run, record: read.record }
         : { asset, run, recordProblem: read.reason };
     },
+    listPapers: (options) =>
+      listPapers(options, { contextGraph: env.DKG_CONTEXT_GRAPH, query: dkg.query, chain }),
   };
-}
-
-/**
- * Whether a failed query may pass: no answer, a retry asked for, too many requests or a
- * server error.
- */
-function passing(failure: DkgFailure): boolean {
-  return (
-    failure.reason === "unreachable" ||
-    failure.reason === "retry-later" ||
-    failure.status === 429 ||
-    (failure.status !== undefined && failure.status >= 500)
-  );
 }
 
 let service: UploadService | undefined;
 
 /**
- * The upload page's calls, built on first use from `process.env` (they throw `EnvError`
+ * The pages' calls, built on first use from `process.env` (they throw `EnvError`
  * when a setting is bad, which a deployed server catches at start). Events go through
  * verisci's Inngest client.
  */

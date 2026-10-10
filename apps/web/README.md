@@ -38,7 +38,7 @@ picker gives none, by the `%PDF-` it must start with) or is over 30 MB, before s
 upload URL. It then uploads the PDF straight to Pinata, canonicalizes the CID it answers,
 and has the wallet sign `{ cid, contextGraph, deadline }` with a deadline 10 minutes ahead.
 The work itself is `@verisci/workflows`' `getUploadService()`
-([`packages/workflows`](../../packages/workflows/README.md#the-upload-pages-calls)).
+([`packages/workflows`](../../packages/workflows/README.md#the-pages-calls)).
 
 Limits (`lib/limits.ts`): 10 upload URLs per connection (IP) and 5 submissions per signing
 address, each per rolling day, in Upstash; in memory with `APP_ENV=local` and no Upstash
