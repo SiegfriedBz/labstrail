@@ -2,9 +2,9 @@ import { CheckCircle, Question, XCircle } from "@phosphor-icons/react/dist/ssr";
 import { createColumnHelper, tableFeatures } from "@tanstack/react-table";
 import type { PaperSummary, SignatureCheck } from "@verisci/workflows";
 import Link from "next/link";
-import { addressUrl } from "../lib/explorer.ts";
-import { authorsLine, formatPublished, signatureLabel } from "../lib/papers.ts";
-import { shorten } from "../lib/shorten.ts";
+import { addressUrl } from "../../lib/explorer.ts";
+import { authorsLine, formatPublished, signatureLabel } from "../../lib/papers.ts";
+import { shorten } from "../../lib/shorten.ts";
 
 /*
  * The papers table's columns. They depend on nothing at render time, so they live at module

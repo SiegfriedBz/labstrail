@@ -1,8 +1,8 @@
 import { ArrowSquareOut } from "@phosphor-icons/react/dist/ssr";
 import { ORIGINTRAIL_CONTRACTS } from "@verisci/core";
 import Link from "next/link";
-import { addressUrl } from "../lib/explorer.ts";
-import { shorten } from "../lib/shorten.ts";
+import { addressUrl } from "../../lib/explorer.ts";
+import { shorten } from "../../lib/shorten.ts";
 import { Logo } from "./logo.tsx";
 
 /** Base Sepolia, where every environment runs until mainnet (ADR 0015). */

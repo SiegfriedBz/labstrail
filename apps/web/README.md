@@ -47,7 +47,7 @@ rather than letting requests through.
 
 ### The paper page
 
-`components/paper-progress.tsx` asks `/api/papers/<cid>` every 5 s and stops on a final
+`components/paper/paper-progress.tsx` asks `/api/papers/<cid>` every 5 s and stops on a final
 stage; it shows and asks by the CID's canonical spelling, the one the signature covers,
 whatever spelling the address has. `lib/progress.ts` (`paperProgress`, pure) maps the
 asset's state on the node, the run Inngest started for the event, and why that run stopped
@@ -97,12 +97,21 @@ stateDiagram-v2
   ([ADR 0021](../../docs/adr/0021-server-reads-return-typed-results.md)).
 
 Once published, the page shows the record (title, authors, DOI) and a "Verify it
-yourself" panel (`components/verify-panel.tsx`): the signature checked when read, the
+yourself" panel (`components/paper/verify-panel.tsx`): the signature checked when read, the
 submitter, the signature, its deadline and the context graph, the EIP-712 domain and type
 to check it with, the agent address the asset is minted to (our node, the UAL's author),
 the asset's ERC-721 token in OriginTrail's `DKGKnowledgeAssets` (`lib/explorer.ts` →
 `assetTokenUrl`), the UAL, and the PDF's CID, linked through Pinata's public gateway
 (`ipfsUrl`; ipfs.io no longer serves files). Addresses and the token link to Basescan.
+
+## Code layout
+
+- `app/`: the pages, the route handlers and the server actions.
+- `lib/`: each flow's logic, pure or with its IO passed in, tested in unit tests.
+- `components/`, grouped by area: `site` (the shell every page shares: logo, header links,
+  footer, breadcrumbs), `wallet` (the wallet providers and button), `home`, `papers` (the
+  papers list), `paper` (one paper's page), `publish`, and `ui` (shadcn primitives,
+  restyled with the app's tokens). Tests sit next to their component.
 
 ## Design
 
@@ -120,11 +129,11 @@ A dark lab instrument with a web3 edge, in Tailwind CSS v4 (`app/globals.css`):
   breathes; all of it stops for visitors who ask for reduced motion.
 - Every page works from 360 px wide, one column on phones, and the page clips any overflow.
   On-chain values show in short form with a copy button.
-- The product name is VeriSci; its mark (`components/logo.tsx`, and `app/icon.svg` for the
+- The product name is VeriSci; its mark (`components/site/logo.tsx`, and `app/icon.svg` for the
   tab) is a check drawn as three linked graph nodes.
 - Keyboard users get a skip link and one accent focus ring; the header marks the current
   page.
-- The footer (`components/site-footer.tsx`) lists the contracts on Base Sepolia, linked on
+- The footer (`components/site/site-footer.tsx`) lists the contracts on Base Sepolia, linked on
   Basescan: OriginTrail's `DKGKnowledgeAssets` and `KnowledgeAssetsLifecycle`
   (`ORIGINTRAIL_CONTRACTS` from `@verisci/core`), and this environment's RatingController
   from `@verisci/contracts` (`local` shows staging's).

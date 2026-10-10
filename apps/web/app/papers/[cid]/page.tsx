@@ -1,7 +1,7 @@
 import { getUploadService } from "@verisci/workflows";
 import type { Metadata } from "next";
 import { connection } from "next/server";
-import { PaperProgress } from "../../../components/paper-progress.tsx";
+import { PaperProgress } from "../../../components/paper/paper-progress.tsx";
 
 export const metadata: Metadata = { title: "Paper · VeriSci" };
 

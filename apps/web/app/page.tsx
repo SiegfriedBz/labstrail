@@ -11,8 +11,8 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
 import { Suspense } from "react";
-import { ChainDemo } from "../components/chain-demo.tsx";
-import { LatestPapers, LatestPapersSkeleton } from "../components/latest-papers.tsx";
+import { ChainDemo } from "../components/home/chain-demo.tsx";
+import { LatestPapers, LatestPapersSkeleton } from "../components/home/latest-papers.tsx";
 
 const HOW = [
   {

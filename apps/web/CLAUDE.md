@@ -16,6 +16,11 @@ Next.js 16 App Router app. See `README.md` here for scripts and status.
   ([ADR 0021](../../docs/adr/0021-server-reads-return-typed-results.md)).
 - Inngest functions live in `@verisci/workflows`; `web` only serves them
   ([ADR 0003](../../docs/adr/0003-inngest-functions-live-in-workflows.md)).
+- Components are grouped by area: `components/site` (the shell every page shares: logo,
+  header links, footer, breadcrumbs), `wallet` (providers and button), `home`, `papers`
+  (the list), `paper` (one paper's page), `publish`, and `ui` (shadcn primitives, restyled
+  with `globals.css`'s tokens). A component another area reuses stays in its own area; a
+  test sits next to its component.
 - Playwright end-to-end tests come in a later plan; until then, cover logic in unit tests.
   Put a flow's logic in `lib/` with its IO passed in (`publishFile`, `paperProgress`,
   `requestUploadUrl`), and keep components and `app/actions.ts` thin.

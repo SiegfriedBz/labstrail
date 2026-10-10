@@ -1,6 +1,6 @@
 import { CaretLeft, CaretRight } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
-import { pageHref, pageLinks } from "../lib/papers.ts";
+import { pageHref, pageLinks } from "../../lib/papers.ts";
 
 const STEP =
   "inline-flex h-9 items-center gap-1 rounded-lg px-3 text-sm text-muted transition-colors hover:bg-surface-strong hover:text-ink";

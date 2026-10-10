@@ -2,7 +2,7 @@
 
 import { ArrowSquareOut, Check, Copy } from "@phosphor-icons/react";
 import { useState } from "react";
-import { shorten } from "../lib/shorten.ts";
+import { shorten } from "../../lib/shorten.ts";
 
 /** A labelled on-chain value in short form, with a button that copies it in full. */
 export function CopyValue({

@@ -1,6 +1,6 @@
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { PaperView } from "../lib/upload-actions.ts";
+import type { PaperView } from "../../lib/upload-actions.ts";
 import { PaperProgress } from "./paper-progress.tsx";
 
 const CID = "bafybeias652m2pfpmuaeze4dxmtcjvfwvr7dsteumagdd2vwaqrbkjokxu";

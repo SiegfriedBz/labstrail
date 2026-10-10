@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
-import { Pager } from "../../components/pager.tsx";
-import { PapersTable } from "../../components/papers-table.tsx";
+import { Pager } from "../../components/papers/pager.tsx";
+import { PapersTable } from "../../components/papers/papers-table.tsx";
 import {
   PAPERS_PER_PAGE,
   type PapersView,

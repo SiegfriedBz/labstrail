@@ -6,7 +6,7 @@ import {
   submissionTypedData,
 } from "@verisci/core";
 import type { PublishedRecord } from "@verisci/workflows";
-import { addressUrl, assetTokenUrl, ipfsUrl } from "../lib/explorer.ts";
+import { addressUrl, assetTokenUrl, ipfsUrl } from "../../lib/explorer.ts";
 import { CopyValue } from "./copy-value.tsx";
 
 /** The signature's EIP-712 domain and type, as `@verisci/core`'s `submissionTypedData` builds them. */

@@ -2,8 +2,8 @@
 
 import { useTable } from "@tanstack/react-table";
 import type { PaperSummary } from "@verisci/workflows";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table.tsx";
 import { PAPER_COLUMN, paperColumns, paperFeatures } from "./papers-columns.tsx";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table.tsx";
 
 /** Columns past the paper's own show from `md`; below it, the paper's cell carries them. */
 const WIDE_ONLY = "hidden md:table-cell";

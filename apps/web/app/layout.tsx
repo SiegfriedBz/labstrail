@@ -4,11 +4,11 @@ import { Martian_Mono, Sora } from "next/font/google";
 import Link from "next/link";
 import { connection } from "next/server";
 import type { ReactNode } from "react";
-import { HeaderNav } from "../components/header-nav.tsx";
-import { Logo } from "../components/logo.tsx";
-import { Providers } from "../components/providers.tsx";
-import { SiteFooter } from "../components/site-footer.tsx";
-import { WalletButton } from "../components/wallet-button.tsx";
+import { HeaderNav } from "../components/site/header-nav.tsx";
+import { Logo } from "../components/site/logo.tsx";
+import { SiteFooter } from "../components/site/site-footer.tsx";
+import { Providers } from "../components/wallet/providers.tsx";
+import { WalletButton } from "../components/wallet/wallet-button.tsx";
 import { createWebEnv } from "../lib/web-env.ts";
 import "./globals.css";
 

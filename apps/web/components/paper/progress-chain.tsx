@@ -1,5 +1,5 @@
 import { Check, X } from "@phosphor-icons/react/dist/ssr";
-import type { PaperStage } from "../lib/progress.ts";
+import type { PaperStage } from "../../lib/progress.ts";
 
 /** Each step, and the layer it acts on: the record off-chain, or the asset on-chain. */
 const STEPS: readonly { label: string; layer?: "off-chain" | "on-chain"; detail: string }[] = [
