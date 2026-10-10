@@ -86,7 +86,7 @@ export function parsePaperRecord(
 }
 
 /** The text of a quoted literal (`"a\"b"`, `"7"^^<…>`, `"x"@en`); a bare IRI unchanged. */
-function unquote(term: string): string {
+export function unquote(term: string): string {
   const match = /^"((?:[^"\\]|\\.)*)"(?:\^\^<[^>]*>|@[a-zA-Z-]+)?$/s.exec(term);
   if (!match) return term;
   return (match[1] ?? "").replace(/\\(.)/gs, (_, char: string) =>

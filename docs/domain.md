@@ -32,6 +32,11 @@ edge`, testnet), Base Sepolia.
 - **Context graph ids** are the full `<agent address>/<name>`. A bare name refers to a
   different, local graph, so queries with it silently return nothing (`POST /api/query`
   with `verisci-staging` returned no rows on 10.0.22, 2026-10-09).
+- **A context graph id is case-sensitive in queries** (10.0.22, 2026-10-10): with the
+  address in lowercase in `contextGraphId` and in the query, `/api/query` answered 200 with
+  no rows, reading another, empty graph; a `GRAPH` IRI spelled in another case than
+  `contextGraphId` answered 400 "Scoped query violation". The node spells the address in
+  its EIP-55 checksum form (`0xD701…13B3`).
 - **Asset names are scoped per context graph and per writing agent** (OriginTrail/dkg,
   checked at `74a515e`, 2026-10-07): a name is stored at
   `did:dkg:context-graph:<graph id>/assertion/<agent address>/<name>`
@@ -61,6 +66,23 @@ edge`, testnet), Base Sepolia.
   call, so a UAL being present does not mean minted: read `state`
   ([ADR 0007](adr/0007-all-writes-converge.md)). `GET …/{name}/wm/quads` returns the
   draft's quads.
+- **`/api/query` with `contextGraphId` and no `view` reads minted content only** (10.0.22,
+  read in the daemon's `dkg-query/dist/dkg-query-engine.js`, 2026-10-10): the graph's data
+  graph and its per-asset verifiable-memory graphs (`…/_verifiable_memory/<author>/<n>`).
+  Shared memory is read only with `includeSharedMemory: true`.
+- **A graph's `_meta` graph indexes its assets** (10.0.22, 2026-10-10), and a query scoped to
+  the graph can read it as `GRAPH <did:dkg:context-graph:<graph id>/_meta>`. With `dkg:` for
+  `http://dkg.io/ontology/`:
+  - each asset name, at `did:dkg:context-graph:<graph id>/assertion/<agent address>/<name>`,
+    has `dkg:memoryLayer` (`"VM"` once minted), `dkg:kaUal`, `dkg:publishedAtBlock`,
+    `dkg:publishedAtTx` (the mint's transaction) and `dkg:assertionFinalizedAt` (when it was
+    sealed);
+  - each UAL has `dkg:publishedAt`, the mint's date-time.
+- **A query that mixes `GRAPH <…/_meta>` with default-graph patterns returns no rows**
+  (10.0.22, 2026-10-10): the content patterns go in `GRAPH ?g { … }`, which binds the data or
+  verifiable-memory graph. `ORDER BY`, `LIMIT`/`OFFSET`, `COUNT(DISTINCT …)`, `GROUP BY`,
+  subqueries, `VALUES` and `BIND(IRI(CONCAT(…)))` work; an offset past the end answers 200
+  with no rows. The papers list relies on these (`packages/core` → Target KAs).
 - **A KA passes through three memory layers on 10.0.22:** a working-memory draft (`wm`:
   create, write, finalize), shared memory (`swm/share`, acknowledged by peers), then
   verifiable memory (`vm/publish`, the mint). `dkg ka create --share` runs the first two
@@ -118,6 +140,7 @@ edge`, testnet), Base Sepolia.
   (written by `dkg init` on 10.0.16; on 10.0.22, 2026-10-09, by the first `dkg start`,
   with the agent key), valid for every graph on the node; there are no tokens scoped per
   graph, so whoever holds it can write every environment's graph ([ADR 0005](adr/0005-staging-and-production-are-isolated.md)).
+  On 10.0.22 the file starts with a comment line; the token is its second line.
 - **Every context graph must be listed** under `contextGraphs` in the node's
   `~/.dkg/config.json`, or the node stops serving it after a restart.
 - **A new graph reports `authority-resolution-failed` for up to about 20 minutes** (10.0.16).
