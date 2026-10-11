@@ -179,20 +179,27 @@ describe("readPaper on a minted paper", () => {
             }
           : { p: t.predicate, o: t.object };
       });
-    const fetch = (async (input: string | URL | Request) => {
+    const asked: string[] = [];
+    const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input);
-      if (url.includes("/api/query")) return Response.json({ result: { bindings } });
+      if (url.includes("/api/query")) {
+        asked.push((JSON.parse(String(init?.body)) as { sparql: string }).sparql);
+        return Response.json({ result: { bindings } });
+      }
       return Response.json({ state: "published", publishedUal: MINTED, reservedUal: MINTED });
     }) as typeof globalThis.fetch;
-    return { fetch, signer };
+    return { fetch, signer, asked };
   }
 
   it("reads the record back, checks its signature, and names the publisher", async () => {
-    const { fetch, signer } = await mintedNode();
+    const { fetch, signer, asked } = await mintedNode();
     const service = createUploadService(env(), { ...io().uploadIo, fetch });
 
     const { record } = await service.readPaper(CID);
 
+    expect(asked[0]).toContain(
+      `GRAPH <did:dkg:context-graph:${GRAPH}/_verifiable_memory/0xd701ed157232ad5e14bc4134a8d10d64d86f13b3/6>`,
+    );
     expect(record).toMatchObject({
       title: "Screening VP1",
       authors: ["Di Liu", "Yuting Xiao"],

@@ -83,6 +83,17 @@ edge`, testnet), Base Sepolia.
   verifiable-memory graph. `ORDER BY`, `LIMIT`/`OFFSET`, `COUNT(DISTINCT …)`, `GROUP BY`,
   subqueries, `VALUES` and `BIND(IRI(CONCAT(…)))` work; an offset past the end answers 200
   with no rows. The papers list relies on these (`packages/core` → Target KAs).
+- **Each minted asset's triples sit in a graph of their own** (10.0.22, 2026-10-10):
+  `did:dkg:context-graph:<graph id>/_verifiable_memory/<address>/<number>`, from the UAL's
+  lowercase address and number, while its `_meta` path,
+  `…/assertion/<agent address>/<name>`, keeps the graph id's EIP-55 spelling. Another node
+  may add assets to an open graph (`docs/node-host.md`), and a query reads every author's
+  graphs, so our reads keep to assets under our agent and read each from its own graph.
+- **How the node lets a query name `?g`** (10.0.22, 2026-10-10): `FILTER(STR(?g) = …)` after
+  the `GRAPH ?g` block and a top-level `VALUES (?x ?g) { … }` work; a `BIND(… AS ?g)` before
+  the block answers 400 (`expected OPTIONAL`), and a `GRAPH ?g` inside a subquery answers
+  400 "Scoped query violation: GRAPH variables inside nested SELECT subqueries cannot be
+  constrained safely". `GRAPH <iri> { … }` naming one asset's graph works on its own.
 - **A KA passes through three memory layers on 10.0.22:** a working-memory draft (`wm`:
   create, write, finalize), shared memory (`swm/share`, acknowledged by peers), then
   verifiable memory (`vm/publish`, the mint). `dkg ka create --share` runs the first two

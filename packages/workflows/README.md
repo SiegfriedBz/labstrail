@@ -30,9 +30,9 @@ server (`APP_ENV` other than `local`) checks them when it starts, through
 | `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY` | Inngest's keys, required unless `APP_ENV` is `local`: the SDK reads them itself, and the signing key also reads runs for the upload page. Secret |
 | `VERCEL_GIT_COMMIT_REF` | Set by Vercel: on staging, the branch, which names the Inngest branch environment runs are read from |
 
-`DKG_CONTEXT_GRAPH` must spell its address in EIP-55 checksum case, as the node lists it:
-a query with the address in another case reads another, empty graph, so the papers list
-would show none (`docs/domain.md` → DKG).
+`DKG_CONTEXT_GRAPH` must spell its address in EIP-55 checksum case, as the node lists it
+(`@verisci/dkg`'s rule): a query with the address in another case reads another, empty
+graph, so the papers list would show none (`docs/domain.md` → DKG).
 
 With `APP_ENV=local` the Inngest client sends events to the local dev server and the
 upload page reads runs there, with no keys.
@@ -124,8 +124,8 @@ papers list:
   the run.
 - **`readPaper(cid, eventId?)`** reads the Target KA's state on the node and, given the
   event id, the run Inngest started for it (REST, from the dev server locally). Once the KA
-  is minted, it also reads the record back (SPARQL through the node: title, authors, DOI,
-  PDF link, submitter, signature, deadline), checks the signature against the submitter as
+  is minted, it also reads the record back from the asset's own graph (SPARQL through the
+  node: title, authors, DOI, PDF link, submitter, signature, deadline), checks the signature against the submitter as
   the run does, without the deadline rule, and gives the agent address the asset is minted
   to (`publisher`: the UAL's author, our node). A failed run's status carries `failure`,
   the reason its error names; a minted paper whose record cannot be shown carries
@@ -135,15 +135,19 @@ papers list:
   output comes from the dev server's GraphQL API, since its REST read answers it empty.
 - **`listPapers({ page, pageSize })`** reads one page of this graph's published papers,
   newest mint first, from the node, with no database
-  ([ADR 0035](../../docs/adr/0035-limits-are-the-apps-only-state.md)). It asks for the page
-  and the total at once, then for the page's first three authors and author counts
-  (`packages/core` → Target KAs), then checks each signature as `readPaper` does. It returns
+  ([ADR 0035](../../docs/adr/0035-limits-are-the-apps-only-state.md)): only Target KAs our
+  node minted, each read from its own asset's graph (`packages/core` → Target KAs). It asks
+  for the page, with each paper's author count, and the total at once, then for the page's
+  first three authors, then checks each signature as `readPaper` does; a check that waits on
+  the chain for more than 3 s shows as `unknown`, so a slow RPC never holds the page. It returns
   `{ ok: true, total, papers }`, each paper's `PaperSummary` with its CID, UAL, mint date,
   title, first authors, author count, submitter and signature check; a page past the last
   has no papers. A node that does not answer, asks to retry, or answers 429 or a server error
-  gives `unavailable`; a refused query, or a count that does not parse, gives `unreadable`. A
-  page or page size that is not a positive integer, or a page size over 50, throws a
-  `RangeError`.
+  gives `unavailable`; a refused query, a count that does not parse, or a page whose rows
+  all fail to parse gives `unreadable`
+  ([ADR 0021](../../docs/adr/0021-server-reads-return-typed-results.md)). A page or page size
+  that is not a positive integer, a page size over 50, or a page whose offset is not a safe
+  integer throws a `RangeError`.
 
 ## Running a publish locally
 

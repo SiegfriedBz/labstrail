@@ -15,7 +15,6 @@ export {
   type OriginTrailContracts,
 } from "./origintrail.ts";
 export {
-  type PaperAuthors,
   type PaperListing,
   paperAuthorsQuery,
   paperCountQuery,

@@ -11,6 +11,11 @@ import {
 import type { QueryBinding } from "./paper-record.ts";
 
 const GRAPH = "0xD701ed157232ad5E14BC4134a8D10D64D86f13B3/verisci-staging";
+/** The graph's agent, our node: in the graph id's spelling, and in a UAL's. */
+const AGENT = "0xD701ed157232ad5E14BC4134a8D10D64D86f13B3";
+const AGENT_LOWER = AGENT.toLowerCase();
+/** Where the node keeps a minted asset's triples (`docs/domain.md` → DKG). */
+const ASSET_GRAPHS = `did:dkg:context-graph:${GRAPH}/_verifiable_memory/`;
 const FIRST = "bafybeihwexgn2z6ffhokgkcu55hyrq6pc4v2pnkdvpj6nc63durj4q6b6m";
 const SECOND = "bafybeihhkeyxcad3cuj42gvhpsh67tiagkwfxbjgjsx7m3tidbkknkifcy";
 /** The first CID in its CIDv0 spelling: the same file, not the canonical spelling. */
@@ -28,15 +33,26 @@ describe("paperListQuery", () => {
   it("reads the graph's _meta for minted Target KAs only", () => {
     expect(query).toContain(`GRAPH <did:dkg:context-graph:${GRAPH}/_meta>`);
     expect(query).toContain('<http://dkg.io/ontology/memoryLayer> "VM"');
-    expect(query).toContain(`"did:dkg:context-graph:${GRAPH}/assertion/"`);
-    expect(query).toContain('"/verisci-tka-"');
   });
 
-  it("takes each paper's fields from GRAPH ?g, not from the default graph", () => {
+  it("keeps only the Target KAs our node named and minted, the graph's agent", () => {
+    expect(query).toContain(
+      `FILTER(STRSTARTS(STR(?asset), "did:dkg:context-graph:${GRAPH}/assertion/${AGENT}/verisci-tka-"))`,
+    );
+    expect(query).toContain(`FILTER(STRBEFORE(STRAFTER(STR(?ka), "/"), "/") = "${AGENT_LOWER}")`);
+  });
+
+  it("takes each paper's fields from its own asset's graph, never another's", () => {
     expect(query).toMatch(/GRAPH \?g \{\s*\?paper a <http:\/\/schema\.org\/ScholarlyArticle>/);
     for (const field of ["submitter", "signature", "deadline"]) {
       expect(query).toContain(`<urn:verisci:${field}>`);
     }
+    expect(query).toContain(`FILTER(STR(?g) = CONCAT("${ASSET_GRAPHS}", STRAFTER(STR(?ka), "/")))`);
+  });
+
+  it("counts each paper's authors in that graph", () => {
+    expect(query).toContain("OPTIONAL { ?paper <http://schema.org/author> ?author . }");
+    expect(query).toContain("(COUNT(DISTINCT ?author) AS ?authorCount)");
   });
 
   it("orders by the mint's date, newest first, then by paper, and reads one page", () => {
@@ -63,10 +79,13 @@ describe("paperListQuery", () => {
 });
 
 describe("paperCountQuery", () => {
-  it("counts the papers the page query picks, with the same patterns", () => {
+  it("counts the papers the page query picks, with the same patterns but the authors", () => {
     const count = paperCountQuery(GRAPH);
     expect(count).toMatch(/^SELECT \(COUNT\(DISTINCT \?paper\) AS \?total\)/);
-    expect(where(count)).toBe(where(paperListQuery(GRAPH, { limit: 1, offset: 0 })));
+    expect(count).not.toContain("?author");
+    expect(where(count)).toBe(
+      where(paperListQuery(GRAPH, { limit: 1, offset: 0 })).replace(/\n\s*OPTIONAL \{[^}]*\}/, ""),
+    );
   });
 
   it("gives no query for a graph id that is not a full one", () => {
@@ -75,28 +94,46 @@ describe("paperCountQuery", () => {
 });
 
 describe("paperAuthorsQuery", () => {
-  it("asks for the page's papers' first authors by position, and their count", () => {
-    const query = paperAuthorsQuery([FIRST, SECOND], 3) ?? "";
-    expect(query).toContain(`<urn:verisci:paper:${FIRST}> <urn:verisci:paper:${SECOND}>`);
-    expect(query).toContain("COUNT(DISTINCT ?author) AS ?authorCount");
+  const papers = [
+    { cid: FIRST, ual: `did:dkg:base:84532/${AGENT_LOWER}/9` },
+    { cid: SECOND, ual: `did:dkg:base:84532/${AGENT_LOWER}/8` },
+  ] as const;
+
+  it("asks for each paper's first authors by position, in its own asset's graph", () => {
+    const query = paperAuthorsQuery(GRAPH, papers, 3) ?? "";
+    expect(query).toContain(
+      `VALUES (?paper ?g) { (<urn:verisci:paper:${FIRST}> <${ASSET_GRAPHS}${AGENT_LOWER}/9>) (<urn:verisci:paper:${SECOND}> <${ASSET_GRAPHS}${AGENT_LOWER}/8>) }`,
+    );
+    expect(query).toMatch(/GRAPH \?g \{\s*\?paper <http:\/\/schema\.org\/author> \?listed/);
     expect(query).toContain("<http://schema.org/position> ?authorPosition");
     expect(query).toContain("FILTER(?authorPosition <= 3)");
   });
 
-  it("puts only canonical CIDs in the query", () => {
-    const query = paperAuthorsQuery([FIRST, V0, `${SECOND}> } #`], 3) ?? "";
+  it("puts only canonical CIDs and UALs that parse in the query", () => {
+    const query =
+      paperAuthorsQuery(
+        GRAPH,
+        [
+          papers[0],
+          { cid: V0, ual: papers[1].ual },
+          { cid: `${SECOND}> } #`, ual: papers[1].ual },
+          { cid: SECOND, ual: "did:dkg:base:84532/0xnope/8" },
+        ],
+        3,
+      ) ?? "";
     expect(query).toContain(`<urn:verisci:paper:${FIRST}>`);
     expect(query).not.toContain(V0);
     expect(query).not.toContain(SECOND);
   });
 
   it.each([
-    ["no CIDs", [], 3],
-    ["no canonical CID", [V0], 3],
-    ["no author asked for", [FIRST], 0],
-    ["a fractional count", [FIRST], 2.5],
-  ])("gives no query for %s", (_, cids, first) => {
-    expect(paperAuthorsQuery(cids, first)).toBeUndefined();
+    ["no papers", GRAPH, [], 3],
+    ["no canonical CID", GRAPH, [{ cid: V0, ual: papers[0].ual }], 3],
+    ["a graph id that is not a full one", "verisci-staging", papers, 3],
+    ["no author asked for", GRAPH, papers, 0],
+    ["a fractional count", GRAPH, papers, 2.5],
+  ])("gives no query for %s", (_, graph, listed, first) => {
+    expect(paperAuthorsQuery(graph, listed, first)).toBeUndefined();
   });
 });
 
@@ -112,6 +149,7 @@ describe("parsePaperListing", () => {
         submitter: "0x9a17ec95e96f8a7c40b7ac1411e8a844c7bf9111",
         signature: pageRows[0].signature.slice(1, -1),
         deadline: 1_791_645_808n,
+        authorCount: 10,
       },
       {
         cid: SECOND,
@@ -121,6 +159,7 @@ describe("parsePaperListing", () => {
         submitter: "0x9a17ec95e96f8a7c40b7ac1411e8a844c7bf9111",
         signature: pageRows[1].signature.slice(1, -1),
         deadline: 1_791_643_203n,
+        authorCount: 0,
       },
     ]);
   });
@@ -147,6 +186,7 @@ describe("parsePaperListing", () => {
     ["no title", { ...pageRows[0], title: '""' }],
     ["no submitter", { paper: pageRows[0].paper, ual: pageRows[0].ual }],
     ["a deadline that is not a number", { ...pageRows[0], deadline: '"soon"' }],
+    ["an author count that is not a number", { ...pageRows[0], authorCount: '"some"' }],
   ])("leaves out a row with %s", (_, row) => {
     expect(parsePaperListing([row, pageRows[1]]).map((paper) => paper.cid)).toEqual([SECOND]);
   });
@@ -168,12 +208,13 @@ describe("parsePaperCount", () => {
 });
 
 describe("parsePaperAuthors", () => {
-  it("gives each paper's first authors in position order, and its author count", () => {
+  it("gives each paper's first authors in position order", () => {
     const authors = parsePaperAuthors([...authorRows].reverse());
-    expect(authors.get(FIRST)).toEqual({
-      first: ["Alexander W Bruce", "Rebecca Collier", "Martina Bohuslavová"],
-      count: 10,
-    });
+    expect(authors.get(FIRST)).toEqual([
+      "Alexander W Bruce",
+      "Rebecca Collier",
+      "Martina Bohuslavová",
+    ]);
     expect(authors.has(SECOND)).toBe(false);
   });
 
@@ -183,14 +224,9 @@ describe("parsePaperAuthors", () => {
       row,
       { ...row, paper: "urn:other:x" },
       { ...row, authorName: "" },
-      { paper: row.paper, authorName: '"No Position"', authorCount: row.authorCount },
+      { paper: row.paper, authorName: '"No Position"' },
     ]);
     expect([...authors.keys()]).toEqual([FIRST]);
-    expect(authors.get(FIRST)).toEqual({ first: ["Alexander W Bruce"], count: 10 });
-  });
-
-  it("counts at least the names it read when the count does not parse", () => {
-    const [row] = authorRows;
-    expect(parsePaperAuthors([{ ...row, authorCount: '"?"' }]).get(FIRST)?.count).toBe(1);
+    expect(authors.get(FIRST)).toEqual(["Alexander W Bruce"]);
   });
 });

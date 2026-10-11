@@ -1,7 +1,7 @@
 import { submissionTypedData } from "@verisci/core";
 import type { DkgFailure, QueryResult } from "@verisci/dkg";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { listPapers, type PaperListDeps } from "./papers.ts";
 
 const GRAPH = "0xD701ed157232ad5E14BC4134a8D10D64D86f13B3/verisci-staging";
@@ -13,7 +13,7 @@ const signer = privateKeyToAccount(generatePrivateKey());
 const stranger = privateKeyToAccount(generatePrivateKey());
 
 /** A page row as the node answers it, signed by `by` over this graph. */
-async function pageRow(cid: string, n: number, by = signer) {
+async function pageRow(cid: string, n: number, by = signer, authorCount = cid === FIRST ? 10 : 0) {
   const signature = await by.signTypedData(
     submissionTypedData({ cid, contextGraph: GRAPH, deadline: DEADLINE }),
   );
@@ -25,6 +25,7 @@ async function pageRow(cid: string, n: number, by = signer) {
     submitter: `"${signer.address.toLowerCase()}"`,
     signature: `"${signature}"`,
     deadline: `"${DEADLINE}"${INTEGER}`,
+    authorCount: `"${authorCount}"${INTEGER}`,
   };
 }
 
@@ -33,7 +34,6 @@ const authorRows = ["Alexander W Bruce", "Rebecca Collier", "Martina BohuslavovÃ
     paper: `urn:verisci:paper:${FIRST}`,
     authorName: `"${name}"`,
     authorPosition: `"${index + 1}"${INTEGER}`,
-    authorCount: `"10"${INTEGER}`,
   }),
 );
 
@@ -46,7 +46,7 @@ function node(answers: { page: Answer; count: Answer; authors?: Answer }) {
     asked.push(sparql);
     const answer = sparql.startsWith("SELECT (COUNT")
       ? answers.count
-      : sparql.includes("?authorCount")
+      : sparql.includes("VALUES (?paper ?g)")
         ? (answers.authors ?? rows(authorRows))
         : answers.page;
     return typeof answer === "function" ? answer() : answer;
@@ -73,6 +73,10 @@ const chainDown: PaperListDeps["chain"] = {
 };
 
 describe("listPapers", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("asks for the count and the page at once, then the page's first authors", async () => {
     let release = () => {};
     const bothAsked = new Promise<void>((resolve) => {
@@ -98,7 +102,10 @@ describe("listPapers", () => {
     expect(asked).toHaveLength(3);
     expect(asked[0]).toMatch(/LIMIT 2 OFFSET 2$/);
     expect(asked[1]).toMatch(/^SELECT \(COUNT/);
-    expect(asked[2]).toContain(`<urn:verisci:paper:${FIRST}> <urn:verisci:paper:${SECOND}>`);
+    expect(asked[2]).toContain(
+      `(<urn:verisci:paper:${FIRST}> <did:dkg:context-graph:${GRAPH}/_verifiable_memory/0xd701ed157232ad5e14bc4134a8d10d64d86f13b3/9>)`,
+    );
+    expect(asked[2]).toContain(`<urn:verisci:paper:${SECOND}>`);
     expect(asked[2]).toContain("FILTER(?authorPosition <= 3)");
     expect(result).toEqual({
       ok: true,
@@ -141,6 +148,39 @@ describe("listPapers", () => {
 
     expect(await checks(chainUp)).toEqual(["valid", "invalid"]);
     expect(await checks(chainDown)).toEqual(["valid", "unknown"]);
+  });
+
+  it("shows a signature as not checked when the chain takes more than 3 s to answer", async () => {
+    const page = rows([await pageRow(FIRST, 9), await pageRow(SECOND, 8, stranger)]);
+    const hanging: PaperListDeps["chain"] = {
+      verifyTypedData: () => new Promise(() => {}),
+      getBlockNumber: () => new Promise(() => {}),
+    };
+    vi.useFakeTimers();
+
+    const listed = listPapers(
+      { page: 1, pageSize: 20 },
+      { contextGraph: GRAPH, query: node({ page, count: total(2) }).query, chain: hanging },
+    );
+    await vi.advanceTimersByTimeAsync(3000);
+    const result = await listed;
+
+    expect(result.ok ? result.papers.map((paper) => paper.signatureCheck) : result).toEqual([
+      "valid",
+      "unknown",
+    ]);
+  });
+
+  it("says the list is unreadable when the node answers rows but none can be read", async () => {
+    const { query, asked } = node({
+      page: rows([{ paper: "urn:other:x", ual: "did:dkg:base:84532/0xnope/1" }]),
+      count: total(5),
+    });
+
+    expect(
+      await listPapers({ page: 1, pageSize: 20 }, { contextGraph: GRAPH, query, chain: chainUp }),
+    ).toEqual({ ok: false, reason: "unreadable" });
+    expect(asked).toHaveLength(2);
   });
 
   it("gives no papers, with the total, for a page past the last, and asks for no authors", async () => {

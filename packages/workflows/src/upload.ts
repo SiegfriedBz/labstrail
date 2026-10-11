@@ -131,7 +131,7 @@ export function createUploadService(env: WorkflowsEnv, io: UploadIo): UploadServ
     | { readonly ok: true; readonly record: PublishedRecord }
     | { readonly ok: false; readonly reason: "unavailable" | "unreadable" }
   > {
-    const sparql = paperRecordQuery(cid);
+    const sparql = paperRecordQuery(cid, env.DKG_CONTEXT_GRAPH, ual);
     if (!sparql) return { ok: false, reason: "unreadable" };
     const answer = await dkg.query(sparql);
     if (!answer.ok) return { ok: false, reason: queryProblem(answer) };

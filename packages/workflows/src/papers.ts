@@ -14,6 +14,8 @@ import { signatureMatches, type VerifyOptions } from "./publish/verify-submissio
 const MAX_PAGE_SIZE = 50;
 /** How many of each paper's authors the list shows by name. */
 const FIRST_AUTHORS = 3;
+/** How long the list waits on the chain for one signature before showing it as not checked. */
+const CHECK_TIMEOUT_MS = 3000;
 
 /** A published paper as the papers list shows it. */
 export interface PaperSummary {
@@ -60,11 +62,13 @@ export interface PaperListDeps {
 
 /**
  * One page of the graph's published papers, newest mint first, with the total
- * (`docs/domain.md` → DKG): the page and the count are asked at once, then the page's first
- * authors, then each signature is checked as the paper's page checks it. A page past the
- * last gives no papers and the total. Throws a `RangeError` for a page or page size that is
- * not a positive integer, or a page size over 50: a bug in the caller, not an expected
- * failure.
+ * (`docs/domain.md` → DKG): only Target KAs our node minted, each read from its own asset's
+ * graph. The page and the count are asked at once, then the page's first authors, then each
+ * signature is checked as the paper's page checks it; a check that waits on the chain for
+ * more than 3 s shows as `unknown`. A page past the last gives no papers and the total; an
+ * answer with rows of which none can be read is `unreadable`. Throws a `RangeError` for a
+ * page or page size that is not a positive integer, a page size over 50, or a page whose
+ * offset is not a safe integer: a bug in the caller, not an expected failure.
  */
 export async function listPapers(
   options: { readonly page: number; readonly pageSize: number },
@@ -85,11 +89,14 @@ export async function listPapers(
   const total = parsePaperCount(counted.bindings);
   if (total === undefined) return { ok: false, reason: "unreadable" };
   const listings = parsePaperListing(listed.bindings);
-  const authorsQuery = paperAuthorsQuery(
-    listings.map((listing) => listing.cid),
-    FIRST_AUTHORS,
-  );
-  if (!authorsQuery) return { ok: true, total, papers: [] };
+  // Rows of which none can be read are a broken answer, not an empty page (ADR 0021).
+  if (listings.length === 0) {
+    return listed.bindings.length === 0
+      ? { ok: true, total, papers: [] }
+      : { ok: false, reason: "unreadable" };
+  }
+  const authorsQuery = paperAuthorsQuery(deps.contextGraph, listings, FIRST_AUTHORS);
+  if (!authorsQuery) return { ok: false, reason: "unreadable" };
 
   const answered = await deps.query(authorsQuery);
   if (!answered.ok) return { ok: false, reason: queryProblem(answered) };
@@ -97,15 +104,17 @@ export async function listPapers(
   const contextGraph = canonicalContextGraph(deps.contextGraph);
   const papers = await Promise.all(
     listings.map(async (listing): Promise<PaperSummary> => {
-      const byline = authors.get(listing.cid);
-      const matches = await signatureMatches({ ...listing, contextGraph }, deps.chain);
+      const matches = await within(
+        CHECK_TIMEOUT_MS,
+        signatureMatches({ ...listing, contextGraph }, deps.chain),
+      );
       return {
         cid: listing.cid,
         ual: listing.ual,
         publishedAt: listing.publishedAt,
         title: listing.title,
-        authors: byline?.first ?? [],
-        authorCount: byline?.count ?? 0,
+        authors: authors.get(listing.cid) ?? [],
+        authorCount: listing.authorCount,
         submitter: listing.submitter,
         signatureCheck: signatureCheck(matches),
       };
@@ -130,6 +139,22 @@ export function queryProblem(failure: DkgFailure): QueryProblem {
 /** A signature check from `signatureMatches`: `unreachable` (the chain did not answer) is `unknown`. */
 export function signatureCheck(matches: boolean | "unreachable"): SignatureCheck {
   return matches === "unreachable" ? "unknown" : matches ? "valid" : "invalid";
+}
+
+/** What `check` answers, or `unreachable` when it takes more than `ms`. */
+async function within(
+  ms: number,
+  check: Promise<boolean | "unreachable">,
+): Promise<boolean | "unreachable"> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<"unreachable">((resolve) => {
+    timer = setTimeout(() => resolve("unreachable"), ms);
+  });
+  try {
+    return await Promise.race([check, late]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function positive(value: number): boolean {

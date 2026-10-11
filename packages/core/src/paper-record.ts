@@ -1,3 +1,4 @@
+import { assetGraphIri } from "./asset-graph.ts";
 import { canonicalCid } from "./cid.ts";
 import { VERISCI_NS } from "./target-ka.ts";
 
@@ -24,15 +25,23 @@ const SCHEMA = "http://schema.org/";
 const DOI_PREFIX = "https://doi.org/";
 
 /**
- * The SPARQL query that reads a paper's Target KA: each of its triples, with each author's
- * name and position. Only a canonical CID is put in the query; anything else gives
- * `undefined`.
+ * The SPARQL query that reads a paper's Target KA, minted as `ual` in `contextGraph`: each of
+ * its triples, with each author's name and position, from that asset's own graph only, so
+ * another asset's triples about the same paper never mix in. `undefined` for a CID that is
+ * not canonical, a graph id that is not a full one, or a UAL that does not parse.
  */
-export function paperRecordQuery(cid: string): string | undefined {
-  if (canonicalCid(cid) !== cid) return undefined;
+export function paperRecordQuery(
+  cid: string,
+  contextGraph: string,
+  ual: string,
+): string | undefined {
+  const graph = assetGraphIri(contextGraph, ual);
+  if (canonicalCid(cid) !== cid || !graph) return undefined;
   return `SELECT ?p ?o ?authorName ?authorPosition WHERE {
-  <${VERISCI_NS}paper:${cid}> ?p ?o .
-  OPTIONAL { ?o <${SCHEMA}name> ?authorName . ?o <${SCHEMA}position> ?authorPosition . }
+  GRAPH <${graph}> {
+    <${VERISCI_NS}paper:${cid}> ?p ?o .
+    OPTIONAL { ?o <${SCHEMA}name> ?authorName . ?o <${SCHEMA}position> ?authorPosition . }
+  }
 }`;
 }
 
