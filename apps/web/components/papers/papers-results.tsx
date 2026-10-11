@@ -36,7 +36,7 @@ export async function PapersResults({ page }: { page: number }) {
       return (
         <p className="glass rounded-2xl p-5 leading-relaxed text-muted">
           No paper is published yet.{" "}
-          <Link href="/publish" className="font-medium text-accent hover:underline">
+          <Link href="/publish" className="link">
             Publish the first one
           </Link>
         </p>
@@ -47,7 +47,7 @@ export async function PapersResults({ page }: { page: number }) {
       return (
         <p role="alert" className="glass rounded-2xl p-5 leading-relaxed text-muted">
           The list can't be loaded right now: the DKG node didn't answer.{" "}
-          <Link href={pageHref(page)} className="font-medium text-accent hover:underline">
+          <Link href={pageHref(page)} className="link">
             Try again
           </Link>
         </p>

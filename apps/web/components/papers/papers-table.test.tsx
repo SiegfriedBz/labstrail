@@ -72,6 +72,13 @@ describe("PapersTable", () => {
     ).toContain(FIRST.publishedAt);
   });
 
+  it("lays out a row's phone meta line without separators, so a wrap leaves none dangling", () => {
+    render(<PapersTable papers={[FIRST]} />);
+    const [row] = screen.getAllByRole("row").slice(1) as HTMLElement[];
+
+    expect(row?.textContent).not.toMatch(/[·•|]/);
+  });
+
   it("words a signature that does not match", () => {
     render(<PapersTable papers={[{ ...FIRST, signatureCheck: "invalid" }]} />);
 

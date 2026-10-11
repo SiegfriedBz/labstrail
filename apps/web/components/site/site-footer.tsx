@@ -66,7 +66,7 @@ export function SiteFooter({ ratingController }: { ratingController: string | un
           <p className="w-fit rounded-md border border-line px-2.5 py-1 font-mono text-xs text-muted">
             Base Sepolia testnet · chain {CHAIN_ID}
           </p>
-          <Link href="/publish" className="w-fit text-sm font-medium text-accent hover:underline">
+          <Link href="/publish" className="link w-fit text-sm">
             Publish a paper
           </Link>
         </div>
@@ -79,9 +79,7 @@ export function SiteFooter({ ratingController }: { ratingController: string | un
             {rows.map((row) => (
               <li
                 key={row.address}
-                className={`grid gap-2 px-4 py-3.5 sm:px-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-6 ${
-                  row.soon ? "opacity-70" : ""
-                }`}
+                className="grid gap-2 px-4 py-3.5 sm:px-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-6"
               >
                 <span className="grid min-w-0 gap-1">
                   <span className="flex min-w-0 flex-wrap items-center gap-2">
@@ -107,7 +105,7 @@ export function SiteFooter({ ratingController }: { ratingController: string | un
                   href={addressUrl(row.address)}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex w-fit items-center gap-1.5 font-mono text-xs text-accent hover:underline"
+                  className="inline-flex w-fit items-center gap-1.5 font-mono text-xs text-muted transition-colors hover:text-accent-2"
                 >
                   {shorten(row.address, 8, 6)}
                   <ArrowSquareOut size={12} />

@@ -7,8 +7,10 @@ import type { ReactNode } from "react";
 import { HeaderNav } from "../components/site/header-nav.tsx";
 import { Logo } from "../components/site/logo.tsx";
 import { SiteFooter } from "../components/site/site-footer.tsx";
+import { ThemeToggle } from "../components/site/theme-toggle.tsx";
 import { Providers } from "../components/wallet/providers.tsx";
 import { WalletButton } from "../components/wallet/wallet-button.tsx";
+import { THEME_SCRIPT } from "../lib/theme.ts";
 import { createWebEnv } from "../lib/web-env.ts";
 import "./globals.css";
 
@@ -26,17 +28,28 @@ export const metadata: Metadata = {
 };
 
 /**
- * The shell: header with the wallet button, then the page. Rendered per request, so the
- * Reown project id is read from the server's settings, never inlined at build time.
+ * The shell: header with the theme and wallet buttons, then the page. Rendered per request,
+ * so the Reown project id is read from the server's settings, never inlined at build time.
+ * The theme is set in `<head>` before the first paint (`THEME_SCRIPT`).
  */
 export default async function RootLayout({ children }: { children: ReactNode }) {
   await connection();
   const { APP_ENV, REOWN_PROJECT_ID } = createWebEnv();
   const ratingController = currentRatingController(APP_ENV);
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable} overflow-x-clip`}>
-      <body className="relative min-h-[100dvh] overflow-x-hidden font-sans antialiased">
-        <div aria-hidden className="bench pointer-events-none absolute inset-x-0 top-0 h-[720px]" />
+    // THEME_SCRIPT sets data-theme before the first paint, so React finds another value there.
+    <html
+      lang="en"
+      data-theme="light"
+      suppressHydrationWarning
+      className={`${sans.variable} ${mono.variable} overflow-x-clip`}
+    >
+      <head>
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: our own constant, which must run before the first paint */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
+      <body className="relative min-h-[100dvh] overflow-x-clip font-sans antialiased">
+        <div aria-hidden className="bench pointer-events-none absolute inset-x-0 top-0 h-[900px]" />
         <a
           href="#main"
           className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-30 focus:rounded-lg focus:bg-accent focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-accent-ink"
@@ -49,8 +62,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
               <Link href="/" aria-label="VeriSci home">
                 <Logo />
               </Link>
-              <nav className="flex items-center gap-3 sm:gap-6">
+              <nav className="flex items-center gap-2.5 sm:gap-5">
                 <HeaderNav />
+                <ThemeToggle />
                 <WalletButton />
               </nav>
             </div>

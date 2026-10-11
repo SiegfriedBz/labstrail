@@ -29,7 +29,7 @@ export async function LatestPapers() {
     return (
       <p className="glass rounded-2xl p-5 text-sm leading-relaxed text-muted">
         No paper is published yet.{" "}
-        <Link href="/publish" className="font-medium text-accent hover:underline">
+        <Link href="/publish" className="link">
           Publish the first one
         </Link>
       </p>
@@ -40,10 +40,7 @@ export async function LatestPapers() {
       <div className="glass rounded-2xl px-2 sm:px-4">
         <PapersTable papers={result.papers} label="Latest published papers" />
       </div>
-      <Link
-        href="/papers"
-        className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-accent hover:underline"
-      >
+      <Link href="/papers" className="link inline-flex w-fit items-center gap-1.5 text-sm">
         {result.total > 1 ? `All ${result.total} papers` : "All papers"}
         <ArrowRight aria-hidden size={14} weight="bold" />
       </Link>

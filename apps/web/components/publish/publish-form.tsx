@@ -136,7 +136,8 @@ function PublishFlow({ contextGraph, maxBytes, signatureLifetimeS }: PublishSett
             <span className="grid size-14 place-items-center rounded-2xl bg-accent-soft text-accent">
               <FilePdf size={30} />
             </span>
-            <p className="max-w-full truncate font-medium">{file.name}</p>
+            {/* A span: globals.css's `p { text-wrap: pretty }` would undo `truncate`. */}
+            <span className="block max-w-full truncate font-medium">{file.name}</span>
             <p className="step-active rounded-xl bg-accent-soft px-3 py-1 text-sm text-accent">
               {PHASE_TEXT[phase]}
             </p>

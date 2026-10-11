@@ -4,8 +4,9 @@ import { baseSepolia } from "@reown/appkit/networks";
 import { createAppKit } from "@reown/appkit/react";
 import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createContext, type ReactNode, useContext, useState } from "react";
+import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
 import { WagmiProvider } from "wagmi";
+import { useTheme } from "../site/theme-toggle.tsx";
 
 const WalletReady = createContext(false);
 
@@ -15,6 +16,7 @@ export function useWalletReady(): boolean {
 }
 
 let adapter: WagmiAdapter | undefined;
+let appKit: ReturnType<typeof createAppKit> | undefined;
 
 /**
  * Builds the wagmi adapter and the AppKit window once per page load, on Base Sepolia
@@ -24,7 +26,7 @@ let adapter: WagmiAdapter | undefined;
 function walletAdapter(projectId: string): WagmiAdapter {
   if (adapter) return adapter;
   adapter = new WagmiAdapter({ projectId, networks: [baseSepolia], ssr: true });
-  createAppKit({
+  appKit = createAppKit({
     adapters: [adapter],
     projectId,
     networks: [baseSepolia],
@@ -36,6 +38,11 @@ function walletAdapter(projectId: string): WagmiAdapter {
       icons: [],
     },
     features: { analytics: false },
+    // The page's theme, which THEME_SCRIPT set before the first paint; AppKitTheme follows its changes.
+    themeMode:
+      typeof document !== "undefined" && document.documentElement.dataset.theme === "dark"
+        ? "dark"
+        : "light",
     themeVariables: {
       // AppKit writes white text on its accent: the darker emerald keeps the contrast.
       "--apkt-accent": "var(--accent-deep)",
@@ -63,8 +70,20 @@ export function Providers({
   return (
     <WagmiProvider config={walletAdapter(projectId).wagmiConfig}>
       <QueryClientProvider client={queryClient}>
-        <WalletReady value={true}>{children}</WalletReady>
+        <WalletReady value={true}>
+          <AppKitTheme />
+          {children}
+        </WalletReady>
       </QueryClientProvider>
     </WagmiProvider>
   );
+}
+
+/** Keeps AppKit's window in the page's theme when the visitor switches it. */
+function AppKitTheme() {
+  const theme = useTheme();
+  useEffect(() => {
+    appKit?.setThemeMode(theme);
+  }, [theme]);
+  return null;
 }

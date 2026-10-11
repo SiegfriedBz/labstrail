@@ -9,6 +9,15 @@ export const VERIFY_TITLE = "Verify it yourself";
 /** The line under `VERIFY_TITLE`. */
 export const VERIFY_INTRO = "These values are public. You can check each one without trusting us.";
 
+/**
+ * `VerifyPanel`'s two groups: what the submitter signed (submitter to context graph), then
+ * where the asset lives (publisher to PDF).
+ */
+export const VERIFY_GROUPS = {
+  submission: "The submission",
+  asset: "The asset",
+} as const;
+
 /** `VerifyPanel`'s fields, in the order it shows them. */
 export const VERIFY_LABELS = {
   submitter: "Submitted by",
