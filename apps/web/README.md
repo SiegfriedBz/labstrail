@@ -36,7 +36,7 @@ Pinata upload URL within the connection's daily limit, and `submitPaper(input)` 
 signed submission and starts its publish run within the address's daily limit
 ([ADR 0035](../../docs/adr/0035-limits-are-the-apps-only-state.md)). The browser
 (`lib/publish-flow.ts`) first refuses a file that is not a PDF (by its type, or, when the
-picker gives none, by the `%PDF-` it must start with) or is over 30 MB, before spending an
+picker gives none, by the `%PDF-` it must start with) or is over 15 MB, before spending an
 upload URL. It then uploads the PDF straight to Pinata, canonicalizes the CID it answers,
 and has the wallet sign `{ cid, contextGraph, deadline }` with a deadline 10 minutes ahead.
 The work itself is `@verisci/workflows`' `getUploadService()`

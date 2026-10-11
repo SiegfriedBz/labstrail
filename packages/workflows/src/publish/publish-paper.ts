@@ -1,4 +1,10 @@
-import { type PaperMetadata, type Triple, targetKaName, targetKaQuads } from "@verisci/core";
+import {
+  MAX_PDF_BYTES,
+  type PaperMetadata,
+  type Triple,
+  targetKaName,
+  targetKaQuads,
+} from "@verisci/core";
 import type { DkgClient, DkgFailure } from "@verisci/dkg";
 import { type Inngest, NonRetriableError } from "inngest";
 import type { SubmissionRefusal, VerifiedSubmission, VerifyResult } from "./verify-submission.ts";
@@ -9,7 +15,7 @@ export const PAPER_SUBMITTED = "verisci/paper.submitted";
 /** The publish run's limits (ADR 0008, ADR 0009). */
 export const PUBLISH_SETTINGS = {
   /** Largest PDF read from the gateway. */
-  maxPdfBytes: 30 * 1024 * 1024,
+  maxPdfBytes: MAX_PDF_BYTES,
   /** How long `startMint` listens for the node's answer. */
   listenMs: 10_000,
   pollInterval: "30s",

@@ -97,7 +97,7 @@ starts nothing. Its steps:
    stored or minted keeps its first submitter.
 3. **read-paper**: fetches the PDF through the gateway and has GROBID parse its header, in
    one step, so the PDF's bytes are never a step output. A file that is not a PDF, is over
-   30 MB, that GROBID cannot parse (204, a 4xx other than 401, 403, 408 and 429, or an
+   15 MB, that GROBID cannot parse (204, a 4xx other than 401, 403, 408 and 429, or an
    answer that is not well-formed TEI) or that has no readable title ends the run, refused.
    GROBID's 401 and 403 fail the run; 408 and 429 are retried. A DOI is kept only if it
    looks like one.
@@ -266,13 +266,13 @@ Errors logged with a fixed tag (`oracle-at-fee-cap`, `oracle-conflict`, `oracle-
 papers list:
 
 - **`createUploadUrl()`** signs a Pinata upload URL, valid 5 minutes, for one file of at most
-  30 MB detected as `application/pdf`, pinned with `cid_version` `v1` like `publish-pdf`, so
+  15 MB detected as `application/pdf`, pinned with `cid_version` `v1` like `publish-pdf`, so
   one PDF keeps one CID (`docs/domain.md` → IPFS).
 - **`submitPaper(input, limiter)`** checks a signed `{ cid, contextGraph, deadline,
   submitter, signature }` as the run does. A PDF whose Target KA is already minted starts
   nothing and counts nothing: the result gives its UAL instead of an event id. Otherwise it
   checks the submitter's limit (`rate-limited`), then the file pinned under that CID on
-  Pinata's public network (`not-pinned` when there is none). A file over 30 MB or not a PDF
+  Pinata's public network (`not-pinned` when there is none). A file over 15 MB or not a PDF
   is refused (`too-large`, `not-a-pdf`). A file that is not a PDF is also unpinned when its
   Target KA is known missing; a PDF stays pinned, since every environment shares Pinata's
   one file per CID and their size limits may differ

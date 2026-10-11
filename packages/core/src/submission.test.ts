@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { submissionTypedData } from "./submission.ts";
+import { MAX_PDF_BYTES, submissionTypedData } from "./submission.ts";
+
+describe("MAX_PDF_BYTES", () => {
+  it("is 15 MB", () => {
+    expect(MAX_PDF_BYTES).toBe(15 * 1024 * 1024);
+  });
+});
 
 const CID = "bafkreigh2akiscaildcqabsyg3dfr6chu3fgpregiymsck7e7aqa4s52zy";
 const GRAPH = "0xd701ed157232ad5e14bc4134a8d10d64d86f13b3/verisci-staging";

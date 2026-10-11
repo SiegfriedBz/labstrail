@@ -76,6 +76,7 @@ export {
 } from "./scorer.ts";
 export {
   canonicalContextGraph,
+  MAX_PDF_BYTES,
   SUBMISSION_DOMAIN,
   type SubmissionMessage,
   submissionTypedData,

@@ -1,6 +1,7 @@
 import type { RatingRequestState, ReadOracleResult, ReadRequestResult } from "@verisci/contracts";
 import {
   classifyTarget,
+  MAX_PDF_BYTES,
   type PaperText,
   paperPdfQuery,
   parseRating,
@@ -25,8 +26,8 @@ import type { ScoreFailureResult, ScoreResult } from "./scorer.ts";
 export const RATING_SETTINGS = {
   /** The Gemini model that scores, on the free tier (ADR 0018). */
   model: "gemini-3.8-flash",
-  /** The largest PDF read, the publish run's limit. */
-  maxPdfBytes: 30 * 1024 * 1024,
+  /** The largest PDF read: the largest one verisci publishes. */
+  maxPdfBytes: MAX_PDF_BYTES,
   /** How long the gateway gets to give the PDF. */
   pdfTimeoutMs: 60_000,
   /** The longest paper text the scorer reads, about 40,000 tokens (`preparePaperText`). */
