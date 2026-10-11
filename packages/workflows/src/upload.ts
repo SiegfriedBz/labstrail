@@ -66,8 +66,9 @@ export interface PaperStatus {
   readonly record?: PublishedRecord;
   /**
    * Why a minted paper has no record: the node did not answer the query, asked to retry,
-   * answered 429 or a server error (`unavailable`, worth asking again), or refused it or
-   * answered none that parses (`unreadable`) (ADR 0021).
+   * answered 429 or a server error (`unavailable`, worth asking again); or it refused it,
+   * answered none that parses, or the asset's UAL names another agent than our node, which
+   * is never queried (`unreadable`) (ADR 0021).
    */
   readonly recordProblem?: "unavailable" | "unreadable";
   /** Why the run stopped, when it failed with a reason it names. */

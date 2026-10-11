@@ -70,7 +70,8 @@ shaped like the table (`components/papers/papers-table-skeleton.tsx`).
   the node answers (`docs/domain.md` → Next.js).
 - A node that does not answer says the list can't be loaded, with a link to try again; an
   answer that can't be read (a refused query, or a page the total covers with no readable
-  row) says so, without the link. On the home page only that block says either
+  row) says so, without the link. On the home page, the latest papers block says it can't
+  load them in either case, and only that block
   ([ADR 0021](../../docs/adr/0021-server-reads-return-typed-results.md)).
 
 ### The paper page

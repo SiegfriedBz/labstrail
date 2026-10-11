@@ -32,8 +32,8 @@ const PUBLISHED_DAY = new Intl.DateTimeFormat("en-GB", {
 /**
  * The page `?page=` asks for: 1 when absent, a positive whole number in its one spelling,
  * or `undefined` for anything else, a repeated `page` included, or a page so far out that
- * page × `PAPERS_PER_PAGE` is past `Number.MAX_SAFE_INTEGER`, which `listPapers` could not
- * count exactly (the page answers 404).
+ * page × `PAPERS_PER_PAGE` is past `Number.MAX_SAFE_INTEGER`, so the offset `listPapers`
+ * computes is always a safe integer (the page answers 404).
  */
 export function parsePageParam(value: string | string[] | undefined): number | undefined {
   if (value === undefined) return 1;

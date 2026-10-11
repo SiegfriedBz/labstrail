@@ -14,7 +14,7 @@ import { signatureMatches, type VerifyOptions } from "./publish/verify-submissio
 const MAX_PAGE_SIZE = 50;
 /** How many of each paper's authors the list shows by name. */
 const FIRST_AUTHORS = 3;
-/** How long the list waits on the chain for one signature before showing it as not checked. */
+/** How long a page (the list, a paper's) waits on the chain for one signature check. */
 const CHECK_TIMEOUT_MS = 3000;
 
 /** A published paper as the papers list shows it. */
@@ -41,8 +41,9 @@ export type SignatureCheck = "valid" | "invalid" | "unknown";
 
 /**
  * One page of the papers list with the total, or why it cannot be shown: `unavailable` when
- * the node did not answer (worth asking again), `unreadable` when it refused a query or
- * answered one that does not parse (ADR 0021).
+ * the node did not answer (worth asking again), `unreadable` when it refused a query,
+ * answered one that does not parse, or gave no readable row for a page the total covers
+ * (ADR 0021).
  */
 export type PaperListResult =
   | { readonly ok: true; readonly total: number; readonly papers: readonly PaperSummary[] }
@@ -147,7 +148,7 @@ export async function checkSignature(
 }
 
 /** A signature check from `signatureMatches`: `unreachable` (the chain did not answer) is `unknown`. */
-export function signatureCheck(matches: boolean | "unreachable"): SignatureCheck {
+function signatureCheck(matches: boolean | "unreachable"): SignatureCheck {
   return matches === "unreachable" ? "unknown" : matches ? "valid" : "invalid";
 }
 
