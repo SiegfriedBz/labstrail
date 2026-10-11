@@ -5,11 +5,14 @@
 
 ## Context
 
-Phase 1 scores a Target KA by machine. The previous repo used one Gemini model at temperature 0 over the KA's triples, as a rough scorer to prove the pipeline, not a calibrated signal. The model will change; what downstream code relies on should not.
+Phase 1 scores a paper by machine. The first scorer judged the Target KA's triples (title, abstract, authors), which show little of what a reader checks: the methods, data, results and statements sit in the paper's body. Published reporting checklists say what a paper of each kind of study should report. The model will change; what downstream code relies on should not.
 
 ## Decision
 
-- The scorer reads the target KA's triples, capped at a configured number, and returns `{ score, rationale, observed, missing }`: `score` an integer from 0 to 100, `rationale` text, `observed` and `missing` the signals it found and did not find.
+- The scorer reads the paper itself: the text of the PDF its Target KA links ([0010](0010-pdf-to-target-ka-pipeline.md)), cut to a configured length.
+- In one request, the model says whether the paper is in VeriSci's field ([0037](0037-verisci-rates-life-science-and-health-papers.md)) and which kind of study it is, and answers each check of that kind of study's checklist (shown, partly shown, missing, or not applicable for a check that may not apply), quoting the passage that shows it.
+- Code computes the score from those answers: a point for each check shown, half a point for each partly shown, over the checks that apply. An answer whose quote is not in the paper's text counts as missing. The model never gives the number.
+- The scorer returns `{ score, rationale, studyType, checks }`: `score` an integer from 0 to 100, `rationale` text, `studyType` the kind of study, `checks` each check's answer and quote.
 - Its output is schema-validated; anything else fails the step instead of reaching the chain.
 - A hosted model is not deterministic, even at temperature 0, so the score is computed once, persisted in the R-KA, and read back by every retry.
 - The R-KA records the model and prompt version. The model and provider are configuration; a better scorer is recorded in this ADR.
@@ -19,10 +22,14 @@ Phase 1 scores a Target KA by machine. The previous repo used one Gemini model a
 
 - Changing the model touches no other code.
 - The on-chain score always equals the score in the R-KA.
-- This ADR guarantees the score's shape, not its quality. The target's content is untrusted input to the model.
-- On the free tier, Google may use prompts and answers to improve its products; the scorer sends only a published record, which is public already. The free tier's rate limits bound how many papers are scored a day.
+- The same answers always give the same score, and each point can be traced to a quote in the paper. The score measures how completely a paper reports its work, not whether its findings are right.
+- This ADR guarantees the score's shape, not its quality. The paper's text is untrusted input to the model; a quote the model makes up earns nothing.
+- On the free tier, Google may use prompts and answers to improve its products; the scorer sends only a published paper, which is public already. The free tier's daily limit bounds how many papers are scored a day, at one request per rating.
+- A paper is read through the pinning gateway, so the gateway must be up to rate one.
+- An R-KA written before the checklists holds the first scorer's output, eight signals `observed` or `missing`; its score still reads back.
 
 ## History
 
 - 2026-10-07: corrected where a better scorer is recorded, to match the rule that a choice on a topic an ADR covers goes into that ADR.
 - 2026-10-11: the scorer is Gemini `gemini-3.8-flash` on the free tier, since VeriSci pays for every rating and Claude's API has no free tier (rating run plan, user's choice).
+- 2026-10-11: the scorer reads the paper's full text, answers its kind of study's checklist with quotes, and code computes the score; the output becomes `{ score, rationale, studyType, checks }`, since the record alone showed little of what a reader checks (scorer v2 plan, user's choice).
