@@ -1,7 +1,8 @@
 # @verisci/contracts
 
 Solidity contracts built with Foundry, and the TypeScript bindings the other
-workspaces import: the typed ABI and the deployed addresses of each environment.
+workspaces import: the typed ABI, the deployed addresses of each environment, reads of a
+rating request and of the contract's oracle, and the calldata of the oracle's calls.
 
 Status: `RatingController` v2 is implemented and tested. Deployed addresses are
 recorded in `deployments/base-sepolia.json`.

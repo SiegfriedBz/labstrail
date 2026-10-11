@@ -21,8 +21,9 @@ edge`, testnet), Base Sepolia.
   - `did:dkg:base:{chainId}/{DKGKnowledgeAssets address}/{kaId}`: the older form, for ids
     with no author bits. OriginTrail's docs still show only this one.
 
-  A UAL parser accepts both and never assumes the middle segment is our node: a target
-  published elsewhere ([ADR 0011](adr/0011-a-rating-is-a-separate-r-ka.md)) may use either.
+  A UAL parser accepts both and never assumes the middle segment is our node: a rating
+  request may name either, and the rating run rates only our node's papers
+  ([ADR 0011](adr/0011-a-rating-is-a-separate-r-ka.md)).
 - **Canonical UAL spelling** (OriginTrail/dkg `packages/core/src/ka-ual-identity.ts`,
   checked at `74a515e`, 2026-10-06): lowercase address and chain namespace, decimal numbers
   with no leading zero; the chain part may be namespaced with several colons, and the chain
@@ -70,6 +71,10 @@ edge`, testnet), Base Sepolia.
   read in the daemon's `dkg-query/dist/dkg-query-engine.js`, 2026-10-10): the graph's data
   graph and its per-asset verifiable-memory graphs (`…/_verifiable_memory/<author>/<n>`).
   Shared memory is read only with `includeSharedMemory: true`.
+- **A query naming an asset graph that does not exist is refused, not empty** (10.0.22, local
+  node, 2026-10-11): `GRAPH <…/_verifiable_memory/<agent>/999>` answers 400 "Scoped query
+  violation: GRAPH <…> is outside the allowed graph set". To ask whether an asset exists,
+  query `_meta` instead (`publishedPaperQuery`), which answers 200 with no rows.
 - **A graph's `_meta` graph indexes its assets** (10.0.22, 2026-10-10), and a query scoped to
   the graph can read it as `GRAPH <did:dkg:context-graph:<graph id>/_meta>`. With `dkg:` for
   `http://dkg.io/ontology/`:

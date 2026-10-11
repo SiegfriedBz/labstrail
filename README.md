@@ -184,24 +184,30 @@ sequenceDiagram
   C-->>W: Phase1Requested(requestId, …) via Alchemy
   W->>R: event keyed on requestId
   R->>C: read the request and the contract's oracle
-  Note over R: Stop if settled, or if the oracle is not this deployment's key.<br/>A target another node minted waits: its graph is unknown.
-  R->>R: R-KA name from requestId
-  R->>N: read R-KA state by name
-  alt invalid target, or past the maximum age without a minted R-KA
-    R->>O: cancel(requestId, reason)
-    O->>C: cancelRequest(requestId, reason)
+  Note over R: Stop if settled, or if the oracle is not this deployment's key.
+  alt not a paper verisci published (by its UAL)
+    R->>O: cancel(requestId, invalid target)
+    O->>C: cancelRequest(requestId, invalid target)
   else otherwise
-    opt nothing stored
-      R->>N: read the target's triples
-      R->>R: score them once (Gemini)
-      R->>N: store the R-KA
+    R->>R: R-KA name from requestId
+    R->>N: read R-KA state by name
+    alt past the maximum age, and no R-KA minted (a stored one is polled 10 minutes first)
+      R->>O: cancel(requestId, expired)
+      O->>C: cancelRequest(requestId, expired)
+    else otherwise
+      opt nothing stored
+        R->>N: is the target one of our published papers? (if not: cancel, invalid target)
+        R->>N: read the target's triples
+        R->>R: score them once (Gemini)
+        R->>N: store the R-KA
+      end
+      opt not minted yet (a draft is shared first)
+        R->>N: mint and poll until minted
+      end
+      R->>N: read the score back from the minted R-KA
+      R->>O: fulfil(requestId, score, rKaUal)
+      O->>C: fulfilPhase1(requestId, score, rKaUal), then check the receipt
     end
-    opt not minted yet (a draft is shared first)
-      R->>N: mint and poll until minted
-    end
-    R->>N: read the score back from the minted R-KA
-    R->>O: fulfil(requestId, score, rKaUal)
-    O->>C: fulfilPhase1(requestId, score, rKaUal), then check the receipt
   end
   Note over C,O: The oracle function re-reads the request and sends nothing if it is already settled.
   Note over C,R: A cron reconciler pages through pendingRequestIds(offset, limit)<br/>on every contract of the environment, past ones included,<br/>and restarts the run of any stuck request.

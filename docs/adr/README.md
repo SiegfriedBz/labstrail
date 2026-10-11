@@ -55,7 +55,7 @@ A PDF becomes a Target KA.
 
 | ADR | Decision |
 | --- | --- |
-| [0011. A rating is a separate R-KA, linked by schema:about](0011-a-rating-is-a-separate-r-ka.md) | Each rating is its own R-KA pointing at the paper; the paper is never modified |
+| [0011. A rating is a separate R-KA, linked by schema:about](0011-a-rating-is-a-separate-r-ka.md) | Each rating is its own R-KA pointing at the paper; the paper is never modified; only papers verisci published are rated |
 | [0012. Ratings evolve in three phases, each settled by the oracle](0012-three-phases-settled-by-the-oracle.md) | Machine score, human review, wet-lab; the oracle records every phase's score |
 | [0013. A paper can have several ratings](0013-several-ratings-per-paper.md) | A rating is identified by its request id and its R-KA's UAL |
 | [0014. The contract owns scores, the DKG owns content](0014-contract-owns-scores-dkg-owns-content.md) | The UI shows the contract's score and flags a gap with the DKG |
@@ -105,7 +105,6 @@ Not decided yet. Each becomes an ADR in the plan that first needs the answer; th
 | Where do alerts go? | One chat-bot channel behind a single `notify()`, fed by a scheduled check (wallet balances, orphans, age of the oldest pending request) and an uptime check on the node's `/api/status`. | intake and recovery plan |
 | Who may request phases 2 and 3? | Anyone, not only the phase-1 requester. Whoever requests, our node writes the R-KA update, since it owns the R-KA ([0012](0012-three-phases-settled-by-the-oracle.md)). Also open: whether a later phase's request gets its own id or reuses the rating's. | phase-2 plan |
 | Where does phases 2 and 3's human input wait before the oracle scores it? | None yet: on the DKG, as a draft the node holds, or in a store of the app's own, which would amend [0035](0035-limits-are-the-apps-only-state.md) ([0012](0012-three-phases-settled-by-the-oracle.md)). | phase-2 plan |
-| How does a rating run find the context graph of a target VeriSci did not publish? | The rating request names it next to the target's UAL, since a UAL alone does not name its graph ([0011](0011-a-rating-is-a-separate-r-ka.md)); check first whether a later DKG release resolves a UAL to its graph. | a later rating plan |
 | Who holds the DKG node's credential? | Caddy keeps the daemon's admin token on the host and checks one credential per environment, so each can be revoked alone. The `-prod` guard stays ([0005](0005-staging-and-production-are-isolated.md)). | node server plan |
 
 ## Adding an ADR

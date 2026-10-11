@@ -12,8 +12,9 @@ with `authority-resolution-failed` is often a chain-read problem there, not in t
 package (`docs/domain.md` → DKG).
 
 Status: a client to read an asset's state, store it, start its mint, and run a SPARQL
-query (`query`), which reads a published paper's record back and lists the published
-papers (a page, the count and the page's first authors).
+query (`query`), which reads a published paper's record back, lists the published papers
+(a page, the count and the page's first authors), and, in a rating run, reads a target's
+triples and a rating back.
 
 ## Depends on
 

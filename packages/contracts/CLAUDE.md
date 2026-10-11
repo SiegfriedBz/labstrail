@@ -38,6 +38,7 @@ layout, toolchain versions and commands.
   working; the owner pauses and unpauses, and transfers ownership in two steps with no
   renounce), 0028 (deployed addresses are committed) and 0030 (owner and oracle are
   different addresses). `HelperConfig` and `resolveDeployments` follow 0005 (staging,
-  production and local). The NatSpec still cites two ADR numbers since folded
+  production and local); the local config deploys, on Anvil, the contract local rating runs
+  use (0036). The NatSpec still cites two ADR numbers since folded
   (`docs/adr/README.md` → Folded ADRs): it changes at the next redeploy, so the source
   stays the one verified on Basescan. See [`docs/adr/`](../../docs/adr/README.md).
