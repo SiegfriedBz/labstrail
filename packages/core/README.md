@@ -11,14 +11,15 @@ Status: shared constants, UAL parsing, asset names, a Target KA's content and su
 reading a paper's record back (`paperRecordQuery`, `parsePaperRecord`), listing published
 papers a page at a time (`paperListQuery` and its parsers), OriginTrail's
 contracts with the token behind a UAL (`ORIGINTRAIL_CONTRACTS`, `knowledgeAssetToken`), and a
-rating's content: the phase-1 scorer's prompt and output check, the R-KA's triples, and the
-queries that read a target and a rating back.
+rating's content: a paper's text prepared for the scorer, each study type's checklist, the
+scorer's prompt and the check of its answer, the score, the R-KA's triples, and the queries
+that find a target's PDF and read a rating back.
 
 ## Depends on
 
 The `multiformats` library, to parse CIDs, `@xmldom/xmldom`, to read TEI, Zod, to check the
-scorer's output, and no other workspace. pnpm does not hoist undeclared workspace packages, so an import of another
-`@verisci/*` package fails to typecheck.
+scorer's answers, and no other workspace. pnpm does not hoist undeclared workspace packages,
+so an import of another `@verisci/*` package fails to typecheck.
 
 ## API
 
@@ -53,10 +54,14 @@ scorer's output, and no other workspace. pnpm does not hoist undeclared workspac
 | `Triple`, `PaperSubmission`, `VERISCI_NS` | One triple as the DKG node takes it, the submitter's address, signature and deadline, and the `urn:verisci:` prefix |
 | `classifyTarget(targetUal, contextGraph)`, `TargetClass` | How a rating run treats a target: `ours` (canonical, on Base Sepolia, minted by our node), or `invalid` (does not parse, not canonical, another chain, another publisher, or the older UAL form), which is cancelled |
 | `publishedPaperQuery(contextGraph, ual)` | The SPARQL that finds one UAL among the graph's published papers, with the papers list's patterns: one row for a paper our node published, none otherwise (an R-KA included); `undefined` for a UAL that is not canonical or a graph id that is not a full one |
-| `targetTriplesQuery(contextGraph, ual, limit)`, `triplesFromBindings(bindings)` | The SPARQL reading up to `limit` triples of an asset our node minted, from its own graph, in a stable order (`undefined` for another author, a malformed graph id or a limit that is not a positive safe integer), and the `Triple`s in its rows |
-| `PHASE1_SIGNALS`, `Phase1Signal`, `SCORER_PROMPT_VERSION` | The signals the phase-1 scorer looks for, with their wording, and the prompt's version |
-| `scorerPrompt(triples)`, `SCORER_OUTPUT_SCHEMA` | The scorer's system and user text for a target's triples, and the JSON Schema its answer must match |
-| `parseScorerOutput(text)`, `ScorerOutput` | The scorer's answer checked: `{ ok: true, output }`, or `{ ok: false }` for anything else |
+| `paperPdfQuery(contextGraph, ual)`, `pdfCidOf(bindings)` | The SPARQL reading the `schema:url` of a paper our node minted, from its own graph (`undefined` for another author or a malformed graph id), and the canonical CID of the `ipfs://` PDF it links, or `undefined` |
+| `triplesFromBindings(bindings)` | The `Triple`s in the rows of a `SELECT ?s ?p ?o` |
+| `preparePaperText(pages, maxChars)`, `PaperText`, `PreparePaperResult` | A paper's text from its PDF's pages, cleaned and fitted to `maxChars` (the reference list left out first, then the end cut, marked `[…]`), or `no-text` for pages holding almost no letters |
+| `normalizeForQuote(text)`, `quoteFound(normalizedText, quote)` | The text a quote is matched against (no accents, lowercase, letters and digits only), and whether a quote is made of up to three passages of the paper, each long enough to show something |
+| `STUDY_TYPES`, `StudyType`, `CHECKS`, `CheckId`, `Check`, `checklistOf(type)` | The eight kinds of study the scorer tells apart, with the checklist each draws on, what each check asks, and a study type's checks in prompt order, each `required` or `conditional` |
+| `scorerPrompt(paper)`, `SCORER_OUTPUT_SCHEMA` | The scorer's system and user text for a paper, one request per paper, and the JSON Schema its answer must match |
+| `parseScorerAnswer(text)`, `ScorerAnswer`, `FIELDS`, `Field`, `CHECK_ANSWERS`, `CheckAnswer`, `CheckResult` | The scorer's answer checked: the field (`life-sciences` or `outside`), the study type and a reason, and for a paper in the field every check of its study type once, `shown`, `partly`, `missing` or `not-applicable`, each with a quote of at most 300 characters, and a rationale |
+| `scoreChecks(paper, answer)`, `ScorerOutput`, `SCORER_PROMPT_VERSION` | The score code computes from the scorer's answer, with each check as it counted (and what the model claimed for a check it could not count), and the version of the prompt, checklists and scoring, `2` |
 | `rKaQuads(rating)`, `RatingContent` | The `Triple`s of a rating's R-KA |
 | `ratingQuery(contextGraph, rKaUal)`, `parseRating(bindings)`, `RatingRecord` | The SPARQL reading a minted R-KA from its own graph, and the rating from its rows, or `undefined` when its target or phase-1 score is missing or out of range |
 
@@ -145,33 +150,60 @@ A rating is its own Knowledge Asset, the R-KA, linked to the KA it rates
 ([ADR 0011](../../docs/adr/0011-a-rating-is-a-separate-r-ka.md)) and named from its phase-1
 request id (Asset names above).
 
-- **Targets:** only papers verisci published are rated
-  ([ADR 0011](../../docs/adr/0011-a-rating-is-a-separate-r-ka.md)). `classifyTarget` decides
-  what a rating run does with a request's target UAL: one that does not parse, is not in the
-  canonical spelling `normalizeUal` writes
+- **Targets:** only papers verisci published, in its field, are rated
+  ([ADR 0011](../../docs/adr/0011-a-rating-is-a-separate-r-ka.md),
+  [ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)).
+  `classifyTarget` decides what a rating run does with a request's target UAL: one that does
+  not parse, is not in the canonical spelling `normalizeUal` writes
   ([ADR 0031](../../docs/adr/0031-uals-are-normalized-before-the-contract.md)), names another
   chain than Base Sepolia or another publisher is cancelled by the oracle, and
   `publishedPaperQuery` checks that one of ours is a published paper, not an R-KA.
-  `targetTriplesQuery` then reads its triples.
-- **Scoring:** `scorerPrompt` asks the model how well the record lets a reader check the work,
-  guided by eight signals: a claim, methods, data, results, limitations, data or code
-  availability, an identifier and named authors. The record is untrusted text, so the prompt
-  tells the model to treat it as data. `parseScorerOutput` accepts only an integer score from
-  0 to 100, a rationale of 1 to 2,000 characters, and each signal exactly once across
-  `observed` and `missing`
-  ([ADR 0018](../../docs/adr/0018-phase-1-scorer-output-contract.md)).
+  `paperPdfQuery` and `pdfCidOf` then find the PDF it links.
+- **The paper's text:** `preparePaperText` takes the text of each of the PDF's pages: it trims
+  each line, drops lines holding only a number (line and page numbers), joins a lowercase word
+  hyphenated across a line break, and collapses runs of spaces and blank lines. A text over
+  the cap loses its reference list first, from a "References" heading to the next statement or
+  methods heading, then is cut at a word boundary.
+- **The scorer's request:** `scorerPrompt` asks the model, in one request, for the paper's
+  field, `life-sciences` or `outside`, and its study type: `randomized-trial`,
+  `observational`, `animal`, `lab`, `systematic-review`, `narrative-review`, `computational`
+  or `other`. For a paper in the field, it then answers each check of that study type
+  (`checklistOf`): the type's own, drawn from CONSORT 2025, STROBE, ARRIVE 2.0, MDAR,
+  PRISMA 2020, SANRA or DOME and worded in our own words, then data and code availability,
+  funding, competing interests, ethics and limitations. Each answer is `shown`, `partly`,
+  `missing`, or `not-applicable` for a check marked as one that may not apply, with the
+  passage that shows it; a statement that a check does not apply counts as `shown`. The
+  paper is untrusted text, so the prompt tells the model to treat it as data.
+- **The score:** `scoreChecks` computes it
+  ([ADR 0018](../../docs/adr/0018-phase-1-scorer-output-contract.md)): `shown` earns 1 point,
+  `partly` half, `missing` none, and the score is `round(100 × points / applicable checks)`,
+  rounding half up. A conditional check that does not apply leaves the count; a required one
+  counts as `missing`. A `shown` or `partly` answer whose quote `quoteFound` does not find in
+  the paper counts as `missing`, so every point rests on the paper's own words; such a check
+  keeps what the model claimed (`claimed`), so the record tells "the paper does not say it"
+  from "the model quoted something the paper does not hold". The way the
+  expectations depend on the kind of study, and the credit for a statement that a check does
+  not apply, follow the Rigor and Transparency Index (Menke et al., iScience 2020; JMIR 2022).
 - **Triples:** the subject is `urn:verisci:rating:<request id>`, typed `schema:Review`, with
   `schema:about` (the target's UAL), `urn:verisci:requestId`, `urn:verisci:contract`
   (`eip155:<chain id>:<address>`) and `schema:reviewRating` pointing at the phase-1 node,
   `urn:verisci:rating:<request id>/phase/1`. That node is a `schema:Rating` with
   `urn:verisci:phase` 1, `schema:ratingValue`, `schema:worstRating` 0 and
   `schema:bestRating` 100 (`xsd:integer` literals), the rationale as
-  `schema:ratingExplanation`, one `urn:verisci:observed` or `urn:verisci:missing` literal per
-  signal, `urn:verisci:model` and `urn:verisci:promptVersion`. Later phases add their own
-  `…/phase/<n>` node to the same R-KA
+  `schema:ratingExplanation`, `urn:verisci:studyType`, `urn:verisci:model`,
+  `urn:verisci:promptVersion` and `urn:verisci:textShortened` (`xsd:boolean`: the paper's text
+  was cut to fit), and one `urn:verisci:check` per check, pointing at `…/phase/1/check/<id>`,
+  which holds `urn:verisci:checkId`, `urn:verisci:answer`, and when they apply
+  `urn:verisci:quote`, `urn:verisci:claimedAnswer` and `urn:verisci:claimedQuote`. Later phases add their own `…/phase/<n>` node to the same R-KA
   ([ADR 0012](../../docs/adr/0012-three-phases-settled-by-the-oracle.md)).
+- **The version:** `SCORER_PROMPT_VERSION` names the prompt, the checklists and the scoring
+  together, and every R-KA records it with the model. A test fingerprints all three, so a
+  change to any of them fails until the version is raised; a version merged into `develop` is
+  never changed again.
 - **Reading back:** `ratingQuery` and `parseRating` read the score from the minted R-KA, so
-  the score the oracle records always equals the score in the R-KA.
+  the score the oracle records always equals the score in the R-KA. An R-KA from the first
+  scorer, which judged eight signals over the paper's record (`urn:verisci:observed` and
+  `urn:verisci:missing`), reads back with its score, no study type and no checks.
 
 ## Scripts
 

@@ -274,6 +274,28 @@ Observed on `lfoppiano/grobid:0.9.1-crf`, 2026-10-09, except where a fact cites 
   listed "Google Brain" and "Google Research" among the ten authors, and found no DOI
   (the arXiv PDF prints none). A Target KA carries what GROBID read
   ([ADR 0010](adr/0010-pdf-to-target-ka-pipeline.md)).
+- **`POST /api/processFulltextDocument` drops statements printed beside a paper's first page**
+  (2026-10-11): on a PLOS ONE trial (e0269224, 12 pages, 11 s), the TEI held the body's
+  sections as flat `div`s, each with its `head`, and the funding and data availability
+  statements as `div type="funding"` and `div type="availability"` under `back`, but no
+  trace of its "Competing interests" line. The scorer reads a PDF's text with unpdf instead
+  (below).
+
+## PDF text
+
+Observed with unpdf 1.8.1 (a build of pdf.js with no worker), 2026-10-11.
+
+- **It reads a paper's text, page by page, in well under a second:** a 12-page PLOS ONE PDF
+  gave about 34,000 characters in 0.4 s, every statement beside the first page included.
+- **It writes some accents apart from their letters,** as the PDF draws them: `Sante´`,
+  `Franc¸ois`, `Je´re´mie`. A quote in which the model writes `Santé` matches only once
+  accents are dropped (`packages/core` → Ratings).
+- **It gives the page's text in the order the PDF draws it:** on PLOS pages the first page's
+  sidebar (citation, editor, data availability, funding, competing interests) comes in
+  pieces between the abstract's lines, so one statement can be split by text from another
+  column. A line break inside a word keeps its hyphen (`Institu-` / `tional`).
+- **Some PDFs make it print a font warning** (`Warning: TT: undefined function: 5`) on the
+  console; the text is still read.
 
 ## Gemini
 
@@ -285,6 +307,19 @@ score the same day (plan 021).
   improve its products ([ADR 0018](adr/0018-phase-1-scorer-output-contract.md)).
 - **Rate limits are not published:** each account sees its own in Google AI Studio
   (`aistudio.google.com/rate-limit`). A 429 means one was hit.
+- **The free tier allows 20 `gemini-3.8-flash` requests a day per project** (2026-10-11): the
+  21st answered 429 `RESOURCE_EXHAUSTED`, with a `QuotaFailure` naming
+  `GenerateRequestsPerDayPerProjectPerModel-FreeTier`, `quotaValue: "20"`, and a
+  `RetryInfo` delay running to midnight Pacific time. Any 429 body says which quota was hit.
+- **The quota belongs to the Google Cloud project, not the key:** every key of a project shares
+  it. Google's API terms forbid getting around a documented limit ("You agree to, and will not
+  attempt to circumvent, such limitations", `developers.google.com/terms`, read 2026-10-11),
+  so more keys or projects are not a way to more free requests; Google's consent or a paid
+  tier is.
+- **The paid tier** (pricing page, read 2026-10-11): `gemini-3.8-flash` costs $0.75 per
+  million input tokens and $3.75 per million output tokens, thinking tokens included, through
+  2026-12-31, and twice that from 2027-01-01. Prompts and answers on the paid tier are not
+  used to improve Google's products.
 - **`POST https://generativelanguage.googleapis.com/v1beta/models/<model>:generateContent`,**
   key in the `x-goog-api-key` header, with `generationConfig.responseMimeType:
   "application/json"` and `responseJsonSchema` (a JSON Schema: `integer` with `minimum` and
@@ -294,6 +329,12 @@ score the same day (plan 021).
   Base Sepolia included.
 - The docs also show a newer `/v1beta/interactions` endpoint with a `response_format` field;
   `generateContent` is not marked deprecated.
+- **`gemini-3.8-flash` thinks before it answers by default,** which sets its pace (scorer v2,
+  2026-10-11): a one-line prompt took 6 to 7 s; classifying a paper from its first 8,000
+  characters about 20 s; answering a trial's 15 checks over its 62,000 characters about
+  100 s. Its answers carry a `thoughtSignature` beside the text, and some gave no
+  `modelVersion`. On the free tier, some calls failed within seconds and succeeded when
+  tried again 30 s later.
 
 ## Chain
 

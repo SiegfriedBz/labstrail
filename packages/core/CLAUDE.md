@@ -13,4 +13,4 @@ Pure domain logic. See `README.md` here.
   `multiformats/cid`, `multiformats/bases/*` and `multiformats/hashes/digest`;
   `multiformats/hashes/sha1` and `multiformats/hashes/sha2` load `node:crypto`. From
   `@xmldom/xmldom` (pure JS, no dependencies), core uses `DOMParser`. From `zod`, core uses
-  its schemas, to check the scorer's output (`parseScorerOutput`).
+  its schemas, to check the scorer's answers (`parseClassifierOutput`, `parseJudgeOutput`).

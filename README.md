@@ -2,18 +2,23 @@
 
 [![CI](https://github.com/SiegfriedBz/verisci/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/SiegfriedBz/verisci/actions/workflows/ci.yml)
 
-VeriSci gives scientific papers an open quality rating that anyone can request,
-read and verify.
+VeriSci gives life-science and health papers an open quality rating that anyone can
+request, read and verify
+([ADR 0037](docs/adr/0037-verisci-rates-life-science-and-health-papers.md)).
 
 ## Why
 
 How much to trust a paper is usually inferred from where it was published, and
-the reviews behind that judgement are rarely public. VeriSci attaches the
-rating to the paper itself, in the open: each rating is a public record on the
-OriginTrail Decentralized Knowledge Graph (DKG), and its score is written on
-chain, so neither can be quietly changed. A rating starts as a rough machine
-score and is meant to grow stronger through human review and, later, wet-lab
-replication ([ADR 0012](docs/adr/0012-three-phases-settled-by-the-oracle.md)).
+the reviews behind that judgement are rarely public. Yet many published results
+cannot be repeated: in a 2016 Nature survey of more than 1,500 researchers, more
+than 70% had tried and failed to reproduce another scientist's experiments
+(Baker, *Nature* 533, 452–454). VeriSci attaches the rating to the paper itself,
+in the open: each rating is a public record on the OriginTrail Decentralized
+Knowledge Graph (DKG), and its score is written on chain, so neither can be
+quietly changed. A rating starts as a machine score of how completely the paper
+reports what others need to reproduce its work, and is meant to grow stronger
+through human review and, later, wet-lab replication
+([ADR 0012](docs/adr/0012-three-phases-settled-by-the-oracle.md)).
 
 Status: early. VeriSci is a rebuild of an earlier prototype,
 `desci-rating-dapp`, which ran both flows (publish a paper, rate it) end to end on
@@ -42,9 +47,12 @@ Built:
   oracle wallets and limit stores (production's graph and store come with its first app
   deployment); the DKG node, the Reown project and the pinning account are shared
   ([ADR 0005](docs/adr/0005-staging-and-production-are-isolated.md)).
-- **A requested paper is rated.** A rating run scores the paper once with an LLM, our
-  DKG node publishes the rating as its own Rating KA (R-KA), and the oracle records the
-  score on the contract ([ADR 0011](docs/adr/0011-a-rating-is-a-separate-r-ka.md),
+- **A requested paper is rated.** A rating run reads the paper's text, has an LLM answer
+  the reporting checklist of its kind of study (a trial, an animal study, a review…) with
+  quotes, and computes the score from those answers, once: it measures whether the paper
+  gives what others need to check and reproduce its work, not whether the work is right; our DKG node publishes the
+  rating as its own Rating KA (R-KA), and the oracle records the score on the contract
+  ([ADR 0011](docs/adr/0011-a-rating-is-a-separate-r-ka.md),
   [ADR 0014](docs/adr/0014-contract-owns-scores-dkg-owns-content.md),
   [ADR 0018](docs/adr/0018-phase-1-scorer-output-contract.md)). Locally, it runs
   against a contract on Anvil ([ADR 0036](docs/adr/0036-local-rating-runs-use-anvil.md)).
@@ -197,8 +205,10 @@ sequenceDiagram
       O->>C: cancelRequest(requestId, expired)
     else otherwise
       opt nothing stored
-        R->>N: read the target's triples
-        R->>R: score them once (Gemini)
+        R->>N: find the PDF the target links
+        R->>R: read its text; one Gemini request gives its field, study type and checks, with quotes
+        Note over R,O: Outside the life sciences and health, or no readable text:<br/>cancel(requestId, invalid target), and stop.
+        R->>R: check the quotes against the paper, compute the score
         R->>N: store the R-KA
       end
       opt not minted yet (a draft is shared first)
@@ -229,7 +239,9 @@ records is always the one read back from the minted R-KA
 ([ADR 0018](docs/adr/0018-phase-1-scorer-output-contract.md)); a target that is
 not a paper verisci published is cancelled
 ([ADR 0011](docs/adr/0011-a-rating-is-a-separate-r-ka.md)), as is a UAL not in
-canonical form ([ADR 0031](docs/adr/0031-uals-are-normalized-before-the-contract.md)). The
+canonical form ([ADR 0031](docs/adr/0031-uals-are-normalized-before-the-contract.md)) and a
+paper outside the life sciences and health
+([ADR 0037](docs/adr/0037-verisci-rates-life-science-and-health-papers.md)). The
 contract's calls and events are documented in the
 [`@verisci/contracts` README](packages/contracts/README.md).
 

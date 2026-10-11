@@ -16,7 +16,8 @@ Inngest workflows that combine `core` logic with the `dkg` and `contracts` adapt
   also applies: a rating is its own R-KA (0011), phases settled by the oracle (0012), the
   contract owns scores and the DKG content (0014), requests free and throttled on testnet
   (0015), the R-KA named from the request id (0016), events taken at least once (0017), a
-  fix is a redeploy, so past contracts are still served (0023), canonical UALs (0031).
+  fix is a redeploy, so past contracts are still served (0023), canonical UALs (0031),
+  only life-science and health papers rated (0037).
   See [`docs/adr/`](../../docs/adr/README.md).
 - Workflow logic takes its step tools and adapters as arguments (`PublishSteps`,
   `PublishDeps`, `RatingSteps`, `RatingDeps`, `OracleSteps`, `OracleChain`), so tests run
