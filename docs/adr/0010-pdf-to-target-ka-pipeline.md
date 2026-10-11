@@ -28,8 +28,8 @@ Papers enter verisci as PDFs and must become Target KAs. Parsing and the DKG wri
 
 - 2026-10-09: metadata is read from GROBID's structured output by code, not extracted by an LLM, so the same PDF always gives the same KA at no cost per paper (publish plan).
 - 2026-10-09: a later submitter of a PDF already stored or minted is not recorded; the KA keeps its first submitter (publish plan).
-- 2026-10-11: rating is open to papers verisci published, not to any KA (ADR 0011, rating run review).
 - 2026-10-10: corrected: the second pin of each PDF is no longer tied to the publish plan, which did not add it; a later plan does.
 - 2026-10-10: corrected: the list of metadata fields moved to `packages/core` (README → Target KAs), a mechanic rather than the decision (ADR sweep).
 - 2026-10-10: a retry starts again from what the node holds, so a paper is read and parsed again when its store failed before anything was stored, rather than no earlier stage being redone; the code always worked this way, and a re-read costs seconds on a rare retry (README audit, user's choice).
 - 2026-10-10: a file that fails the server's check is unpinned only if it is not a PDF and no asset points at it, so an environment with a stricter size limit never unpins a PDF another one published; this ADR did not say when a file is unpinned (branch review, user's choice).
+- 2026-10-11: rating is open to papers verisci published, not to any KA (ADR 0011, rating run review).
