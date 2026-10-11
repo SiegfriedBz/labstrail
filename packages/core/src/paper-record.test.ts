@@ -56,6 +56,12 @@ describe("paperRecordQuery", () => {
     ["a CID that is not canonical", "x> } DROP ALL { <y", GRAPH, UAL],
     ["a graph id that is not a full one", CID, "verisci-staging", UAL],
     ["a UAL that does not parse", CID, GRAPH, "did:dkg:base:84532/0xnope/6"],
+    [
+      "a UAL another agent minted",
+      CID,
+      GRAPH,
+      "did:dkg:base:84532/0x1111111111111111111111111111111111111111/6",
+    ],
   ])("refuses to build a query for %s", (_, cid, graph, ual) => {
     expect(paperRecordQuery(cid, graph, ual)).toBeUndefined();
   });

@@ -13,15 +13,17 @@ export function contextGraphIri(contextGraph: string): string | undefined {
 }
 
 /**
- * The graph holding a minted asset's triples,
+ * The graph holding the triples of an asset our node minted,
  * `<context graph IRI>/_verifiable_memory/<UAL address>/<UAL number>`, or `undefined` when
- * the graph id or the UAL is malformed. Reading an asset there, rather than across graphs,
- * keeps another asset's triples about the same subject out (`docs/domain.md` → DKG).
+ * the graph id or the UAL is malformed, or the UAL's author is not the graph's agent (our
+ * node, which created the graph). Reading an asset there, rather than across graphs, keeps
+ * another asset's triples about the same subject out (`docs/domain.md` → DKG).
  */
 export function assetGraphIri(contextGraph: string, ual: string): string | undefined {
   const graph = contextGraphIri(contextGraph);
   const parsed = parseUal(ual);
-  return graph && parsed.ok
+  const agent = contextGraph.slice(0, contextGraph.indexOf("/")).toLowerCase();
+  return graph && parsed.ok && parsed.ual.address === agent
     ? `${graph}/_verifiable_memory/${parsed.ual.address}/${parsed.ual.id}`
     : undefined;
 }

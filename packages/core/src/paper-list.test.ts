@@ -109,7 +109,7 @@ describe("paperAuthorsQuery", () => {
     expect(query).toContain("FILTER(?authorPosition <= 3)");
   });
 
-  it("puts only canonical CIDs and UALs that parse in the query", () => {
+  it("puts only canonical CIDs and UALs our node minted in the query", () => {
     const query =
       paperAuthorsQuery(
         GRAPH,
@@ -118,6 +118,7 @@ describe("paperAuthorsQuery", () => {
           { cid: V0, ual: papers[1].ual },
           { cid: `${SECOND}> } #`, ual: papers[1].ual },
           { cid: SECOND, ual: "did:dkg:base:84532/0xnope/8" },
+          { cid: SECOND, ual: "did:dkg:base:84532/0x1111111111111111111111111111111111111111/8" },
         ],
         3,
       ) ?? "";

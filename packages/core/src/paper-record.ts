@@ -28,7 +28,8 @@ const DOI_PREFIX = "https://doi.org/";
  * The SPARQL query that reads a paper's Target KA, minted as `ual` in `contextGraph`: each of
  * its triples, with each author's name and position, from that asset's own graph only, so
  * another asset's triples about the same paper never mix in. `undefined` for a CID that is
- * not canonical, a graph id that is not a full one, or a UAL that does not parse.
+ * not canonical, a graph id that is not a full one, or a UAL that does not parse or that
+ * another agent than the graph's minted.
  */
 export function paperRecordQuery(
   cid: string,

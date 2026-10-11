@@ -247,6 +247,22 @@ describe("readPaper on a minted paper", () => {
     }
   });
 
+  it("says the record is unreadable when another agent minted the asset, and reads nothing", async () => {
+    const foreign = "did:dkg:base:84532/0x1111111111111111111111111111111111111111/6";
+    const queries: string[] = [];
+    const fetch = (async (input: string | URL | Request) => {
+      if (String(input).includes("/api/query")) {
+        queries.push(String(input));
+        return Response.json({ result: { bindings: [] } });
+      }
+      return Response.json({ state: "published", publishedUal: foreign, reservedUal: foreign });
+    }) as typeof globalThis.fetch;
+    const service = createUploadService(env(), { ...io().uploadIo, fetch });
+
+    expect((await service.readPaper(CID)).recordProblem).toBe("unreadable");
+    expect(queries).toEqual([]);
+  });
+
   it("says the record is unreadable when the node answers no usable record", async () => {
     const empty = (async (input: string | URL | Request) =>
       String(input).includes("/api/query")

@@ -95,7 +95,7 @@ export function paperCountQuery(contextGraph: string): string | undefined {
 /**
  * The SPARQL query for the first `first` authors of each listed paper, by position, each read
  * from its own asset's graph (from its UAL), read by {@link parsePaperAuthors}. Only papers
- * with a canonical CID and a UAL that parses go in; `undefined` when none is left, for a graph
+ * with a canonical CID and a UAL the graph's agent minted go in; `undefined` when none is left, for a graph
  * id that is not a full one, or when `first` is not a positive integer.
  */
 export function paperAuthorsQuery(
