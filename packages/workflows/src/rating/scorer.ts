@@ -1,19 +1,15 @@
 import {
-  CLASSIFIER_OUTPUT_SCHEMA,
-  type Classification,
-  classifierPrompt,
-  judgeOutputSchema,
-  judgePrompt,
   type PaperText,
-  parseClassifierOutput,
-  parseJudgeOutput,
+  parseScorerAnswer,
+  SCORER_OUTPUT_SCHEMA,
+  type ScorerAnswer,
   type ScorerOutput,
-  type StudyType,
   scoreChecks,
+  scorerPrompt,
 } from "@verisci/core";
 import { z } from "zod";
 
-/** How the scorer reaches Gemini, for one call. */
+/** How the scorer reaches Gemini. */
 export interface ScorerOptions {
   /** A Gemini API key. Secret. */
   readonly apiKey: string;
@@ -31,21 +27,35 @@ export interface ScorerOptions {
  */
 export type ScoreFailure = "rate-limited" | "refused" | "unreachable" | "invalid-output";
 
-/** A call that did not answer; a `refused` one carries Gemini's HTTP status. */
+/** A call that did not answer, with Gemini's HTTP status when it answered with an error. */
 export type ScoreFailureResult = {
   readonly ok: false;
   readonly reason: ScoreFailure;
   readonly status?: number;
 };
 
-/** The result of {@link classifyPaper}. */
-export type ClassifyResult =
-  | { readonly ok: true; readonly output: Classification; readonly model: string }
+/** The result of {@link askScorer}: Gemini's answer, checked, its quotes not yet checked. */
+export type AskResult =
+  | { readonly ok: true; readonly answer: ScorerAnswer; readonly model: string }
   | ScoreFailureResult;
 
-/** The result of {@link judgePaper}: the score as `scoreChecks` computed it. */
-export type JudgeResult =
-  | { readonly ok: true; readonly output: ScorerOutput; readonly model: string }
+/**
+ * The result of {@link scorePaper}: a paper in the field with its score, as `scoreChecks`
+ * computed it, or a paper outside the field (ADR 0037) with the reason Gemini gave.
+ */
+export type ScoreResult =
+  | {
+      readonly ok: true;
+      readonly field: "life-sciences";
+      readonly output: ScorerOutput;
+      readonly model: string;
+    }
+  | {
+      readonly ok: true;
+      readonly field: "outside";
+      readonly reason: string;
+      readonly model: string;
+    }
   | ScoreFailureResult;
 
 const API = "https://generativelanguage.googleapis.com/v1beta/models";
@@ -69,41 +79,35 @@ const answer = z.object({
 });
 
 /**
- * Asks Gemini which field a paper is in and what kind of study it is (ADRs 0018, 0037): the
- * prompt from `classifierPrompt`, temperature 0, JSON output held to `CLASSIFIER_OUTPUT_SCHEMA`
- * and checked again with `parseClassifierOutput`. Returns the classification and the model
- * version Gemini reports. Never throws; a failure carries neither the key nor Gemini's text.
+ * Asks Gemini, in one request, for a paper's field and kind of study and, for a paper in the
+ * field, the answer to each check of its study type, with quotes (ADRs 0018, 0037): the prompt
+ * from `scorerPrompt`, temperature 0, JSON output held to `SCORER_OUTPUT_SCHEMA` and checked
+ * again with `parseScorerAnswer`. Returns the answer, its quotes not yet checked against the
+ * paper, and the model version Gemini reports. Never throws; a failure carries neither the key
+ * nor Gemini's text.
  */
-export async function classifyPaper(
-  paper: PaperText,
-  options: ScorerOptions,
-): Promise<ClassifyResult> {
-  const answer = await generate(classifierPrompt(paper), CLASSIFIER_OUTPUT_SCHEMA, options);
+export async function askScorer(paper: PaperText, options: ScorerOptions): Promise<AskResult> {
+  const answer = await generate(scorerPrompt(paper), SCORER_OUTPUT_SCHEMA, options);
   if (!answer.ok) return answer;
-  const parsed = parseClassifierOutput(answer.text);
+  const parsed = parseScorerAnswer(answer.text);
   return parsed.ok
-    ? { ok: true, output: parsed.output, model: answer.model }
+    ? { ok: true, answer: parsed.answer, model: answer.model }
     : { ok: false, reason: "invalid-output" };
 }
 
 /**
- * Asks Gemini to answer each check of `type`'s checklist for a paper, with quotes (ADR 0018):
- * the prompt from `judgePrompt`, temperature 0, JSON output held to `judgeOutputSchema(type)`
- * and checked again with `parseJudgeOutput`; `scoreChecks` then checks the quotes and computes
- * the score, so nothing else reaches the chain. Returns the output and the model version
- * Gemini reports. Never throws; a failure carries neither the key nor Gemini's text.
+ * Scores a paper with one Gemini request ({@link askScorer}): a paper outside the field comes
+ * back with Gemini's reason; one in the field is scored by `scoreChecks`, which checks each
+ * quote against the paper and computes the score, so nothing else reaches the chain.
+ * Never throws.
  */
-export async function judgePaper(
-  paper: PaperText,
-  type: StudyType,
-  options: ScorerOptions,
-): Promise<JudgeResult> {
-  const answer = await generate(judgePrompt(paper, type), judgeOutputSchema(type), options);
-  if (!answer.ok) return answer;
-  const parsed = parseJudgeOutput(answer.text, type);
-  return parsed.ok
-    ? { ok: true, output: scoreChecks(paper, type, parsed.output), model: answer.model }
-    : { ok: false, reason: "invalid-output" };
+export async function scorePaper(paper: PaperText, options: ScorerOptions): Promise<ScoreResult> {
+  const asked = await askScorer(paper, options);
+  if (!asked.ok) return asked;
+  const { answer, model } = asked;
+  return answer.field === "outside"
+    ? { ok: true, field: "outside", reason: answer.reason, model }
+    : { ok: true, field: "life-sciences", output: scoreChecks(paper, answer), model };
 }
 
 /** One `generateContent` call: the answer's text, leaving out thoughts, and the model version. */
@@ -135,10 +139,7 @@ async function generate(
   }
   if (!response.ok) {
     await response.body?.cancel();
-    const reason = failureOf(response.status);
-    return reason === "refused"
-      ? { ok: false, reason, status: response.status }
-      : { ok: false, reason };
+    return { ok: false, reason: failureOf(response.status), status: response.status };
   }
 
   let body: unknown;

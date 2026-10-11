@@ -12,7 +12,7 @@ import { createOracleTransaction, ORACLE_SETTINGS, type OracleChain } from "./ra
 import { createOracleChain } from "./rating/oracle-chain.ts";
 import { readPaperText } from "./rating/paper-text.ts";
 import { createRatePaper, RATING_SETTINGS, type RatingDeps } from "./rating/rate-paper.ts";
-import { classifyPaper, judgePaper } from "./rating/scorer.ts";
+import { scorePaper } from "./rating/scorer.ts";
 import { createRatingEnv, type RatingEnv, servesRating } from "./rating-env.ts";
 import { createWorkflowsEnv } from "./workflows-env.ts";
 
@@ -102,11 +102,6 @@ let ratingDeps: RatingDeps | undefined;
 function getRatingDeps(): RatingDeps {
   if (ratingDeps) return ratingDeps;
   const { env, chain, chainId, contracts } = getRatingChain();
-  const gemini = {
-    apiKey: env.GEMINI_API_KEY,
-    model: RATING_SETTINGS.model,
-    fetch: (input: string | URL | Request, init?: RequestInit) => fetch(input, init),
-  };
   ratingDeps = {
     contracts,
     oracle: chain.account,
@@ -128,10 +123,13 @@ function getRatingDeps(): RatingDeps {
         timeoutMs: RATING_SETTINGS.pdfTimeoutMs,
         maxChars: RATING_SETTINGS.maxTextChars,
       }),
-    classify: (paper) =>
-      classifyPaper(paper, { ...gemini, timeoutMs: RATING_SETTINGS.classifierTimeoutMs }),
-    judge: (paper, type) =>
-      judgePaper(paper, type, { ...gemini, timeoutMs: RATING_SETTINGS.judgeTimeoutMs }),
+    score: (paper) =>
+      scorePaper(paper, {
+        apiKey: env.GEMINI_API_KEY,
+        model: RATING_SETTINGS.model,
+        fetch: (input: string | URL | Request, init?: RequestInit) => fetch(input, init),
+        timeoutMs: RATING_SETTINGS.scorerTimeoutMs,
+      }),
   };
   return ratingDeps;
 }

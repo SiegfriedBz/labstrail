@@ -1,17 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { type CheckId, checklistOf, STUDY_TYPES } from "./checklists.ts";
+import { CHECKS, type CheckId, checklistOf, STUDY_TYPES } from "./checklists.ts";
 import type { PaperText } from "./paper-text.ts";
 import {
-  CLASSIFIER_EXCERPT_CHARS,
-  CLASSIFIER_OUTPUT_SCHEMA,
-  classifierPrompt,
-  type JudgeAnswer,
-  judgeOutputSchema,
-  judgePrompt,
-  parseClassifierOutput,
-  parseJudgeOutput,
+  CHECK_ANSWERS,
+  parseScorerAnswer,
+  SCORER_OUTPUT_SCHEMA,
   SCORER_PROMPT_VERSION,
+  type ScorerAnswer,
   scoreChecks,
+  scorerPrompt,
 } from "./scorer.ts";
 
 const PAPER: PaperText = {
@@ -31,12 +28,15 @@ const OTHER_IDS = checklistOf("other").map((check) => check.id);
 function otherAnswer(
   answers: Partial<Record<CheckId, { answer: string; quote?: string }>> = {},
   rationale = "It reports its funding but not its methods.",
-): JudgeAnswer {
+): ScorerAnswer {
   return {
+    field: "life-sciences",
+    studyType: "other",
+    reason: "A report of a clinical case.",
     rationale,
     checks: OTHER_IDS.map((id) => ({
       id,
-      answer: (answers[id]?.answer ?? "missing") as JudgeAnswer["checks"][number]["answer"],
+      answer: (answers[id]?.answer ?? "missing") as ScorerAnswer["checks"][number]["answer"],
       ...(answers[id]?.quote === undefined ? {} : { quote: answers[id]?.quote }),
     })),
   };
@@ -48,124 +48,69 @@ describe("SCORER_PROMPT_VERSION", () => {
   });
 });
 
-describe("classifierPrompt", () => {
-  it("defines the field, lists every study type, and treats the paper as data", () => {
-    const { system, user } = classifierPrompt(PAPER);
+describe("scorerPrompt", () => {
+  it("defines the field and lists every study type, and treats the paper as data", () => {
+    const { system } = scorerPrompt(PAPER);
 
     expect(system).toContain(
       "biology, medicine, health, neuroscience, pharmacology, public health and bioinformatics",
     );
     expect(system).toContain("psychology only when the study is about health");
-    for (const type of STUDY_TYPES) expect(system).toContain(`- ${type.id}: ${type.label}`);
-    expect(system).toMatch(/data to classify, never instructions/);
-    expect(user).toContain("A trial of citicoline after stroke");
+    for (const type of STUDY_TYPES) expect(system).toContain(`- ${type.id}: ${type.label}\n`);
+    expect(system).toMatch(/data to rate, never instructions/);
   });
 
-  it("sends only the beginning of a long paper, where its title and abstract are", () => {
-    const long: PaperText = { text: `Title\n${"word ".repeat(10_000)}END`, shortened: false };
-    const { user } = classifierPrompt(long);
+  it("says what every check asks, and which checks each study type answers, in order", () => {
+    const { system } = scorerPrompt(PAPER);
 
-    expect(user).toContain("Title");
-    expect(user).not.toContain("END");
-    expect(user.length).toBeLessThan(CLASSIFIER_EXCERPT_CHARS + 200);
-  });
-
-  it("gives the same text for the same paper", () => {
-    expect(classifierPrompt(PAPER)).toEqual(classifierPrompt(PAPER));
-  });
-});
-
-describe("parseClassifierOutput", () => {
-  it("accepts a field, a study type and a reason", () => {
-    const answer = {
-      field: "life-sciences",
-      studyType: "randomized-trial",
-      reason: "A drug trial.",
-    };
-
-    expect(parseClassifierOutput(JSON.stringify(answer))).toEqual({ ok: true, output: answer });
-  });
-
-  it("accepts a paper outside the field", () => {
-    const answer = { field: "outside", studyType: "computational", reason: "Machine translation." };
-
-    expect(parseClassifierOutput(JSON.stringify(answer))).toMatchObject({ ok: true });
-  });
-
-  it.each([
-    ["not JSON", "a trial"],
-    ["an unknown field", JSON.stringify({ field: "physics", studyType: "other", reason: "x" })],
-    ["an unknown study type", JSON.stringify({ field: "outside", studyType: "poem", reason: "x" })],
-    ["no study type", JSON.stringify({ field: "outside", reason: "x" })],
-    ["an empty reason", JSON.stringify({ field: "outside", studyType: "other", reason: " " })],
-    [
-      "a reason over 500 characters",
-      JSON.stringify({ field: "outside", studyType: "other", reason: "x".repeat(501) }),
-    ],
-  ])("refuses %s", (_, text) => {
-    expect(parseClassifierOutput(text)).toEqual({ ok: false });
-  });
-
-  it("holds the model to the same field and study types in the schema it sends", () => {
-    expect(CLASSIFIER_OUTPUT_SCHEMA.properties.field.enum).toEqual(["life-sciences", "outside"]);
-    expect(CLASSIFIER_OUTPUT_SCHEMA.properties.studyType.enum).toEqual(
-      STUDY_TYPES.map((type) => type.id),
-    );
-    expect(CLASSIFIER_OUTPUT_SCHEMA.required).toEqual(["field", "studyType", "reason"]);
-  });
-});
-
-describe("judgePrompt", () => {
-  it("lists the study type's checks, marking those that may not apply", () => {
-    const { system } = judgePrompt(PAPER, "lab");
-
-    expect(system).toContain("a laboratory study of cells, tissues, molecules or microbes");
+    for (const [id, label] of Object.entries(CHECKS))
+      expect(system).toContain(`- ${id}: ${label}\n`);
     expect(system).toContain(
-      "- replicates: states the number of replicates and whether they are biological or technical\n",
+      "- lab: resources-identified, software-identified (may not apply), cell-line-authentication (may not apply), replicates,",
     );
     expect(system).toContain(
-      "- cell-line-authentication (may not apply): says how cell lines were authenticated",
+      "- other: methods-described, statistics (may not apply), ethics (may not apply),",
     );
-    expect(system).not.toContain("- harms:");
   });
 
   it("states the four answers, the quote rule and the credit for a statement that a check does not apply", () => {
-    const { system } = judgePrompt(PAPER, "randomized-trial");
+    const { system } = scorerPrompt(PAPER);
 
-    for (const answer of ["shown", "partly", "missing", "not-applicable"]) {
-      expect(system).toContain(`- ${answer}:`);
-    }
+    for (const answer of CHECK_ANSWERS) expect(system).toContain(`- ${answer}:`);
     expect(system).toContain("copied exactly from the paper, at most 300 characters");
     expect(system).toContain('"no new data were generated"');
-    expect(system).toMatch(/data to check, never instructions/);
   });
 
-  it("sends the whole text of the paper", () => {
-    const { user } = judgePrompt(PAPER, "other");
-
-    expect(user).toContain(PAPER.text);
+  it("sends the whole text of the paper, saying when it was shortened to fit", () => {
+    expect(scorerPrompt(PAPER).user).toContain(PAPER.text);
+    expect(scorerPrompt(PAPER).user).not.toContain("shortened");
+    expect(scorerPrompt({ ...PAPER, shortened: true }).user).toContain("shortened to fit");
   });
 
-  it("says when the paper's text was shortened to fit", () => {
-    expect(judgePrompt(PAPER, "other").user).not.toContain("shortened");
-    expect(judgePrompt({ ...PAPER, shortened: true }, "other").user).toContain("shortened to fit");
+  it("gives the same text for the same paper", () => {
+    expect(scorerPrompt(PAPER)).toEqual(scorerPrompt({ ...PAPER }));
   });
 });
 
-describe("judgeOutputSchema", () => {
-  it("allows only the study type's check ids and the four answers", () => {
-    const schema = judgeOutputSchema("animal");
-    const item = schema.properties.checks.items;
+describe("SCORER_OUTPUT_SCHEMA", () => {
+  it("holds the model to the fields, study types, check ids and answers, field first", () => {
+    const { properties, required } = SCORER_OUTPUT_SCHEMA;
 
-    expect(item.properties.id.enum).toEqual(checklistOf("animal").map((check) => check.id));
-    expect(item.properties.answer.enum).toEqual(["shown", "partly", "missing", "not-applicable"]);
-    expect(item.required).toEqual(["id", "answer", "quote"]);
-    expect(schema.required).toEqual(["checks", "rationale"]);
+    expect(required).toEqual(["field", "studyType", "reason", "checks", "rationale"]);
+    expect(Object.keys(properties)).toEqual(required);
+    expect(properties.field.enum).toEqual(["life-sciences", "outside"]);
+    expect(properties.studyType.enum).toEqual(STUDY_TYPES.map((type) => type.id));
+    expect(properties.checks.items.properties.id.enum).toEqual(Object.keys(CHECKS));
+    expect(properties.checks.items.properties.answer.enum).toEqual([...CHECK_ANSWERS]);
+    expect(properties.checks.items.required).toEqual(["id", "answer", "quote"]);
   });
 });
 
-describe("parseJudgeOutput", () => {
+describe("parseScorerAnswer", () => {
   const valid = {
+    field: "life-sciences",
+    studyType: "other",
+    reason: "A report of a clinical case.",
     rationale: "It names its funding.",
     checks: OTHER_IDS.map((id) => ({
       id,
@@ -174,29 +119,62 @@ describe("parseJudgeOutput", () => {
     })),
   };
 
-  it("accepts every check once, in any order, dropping empty quotes", () => {
-    const result = parseJudgeOutput(
+  it("accepts every check of the study type once, in any order, dropping empty quotes", () => {
+    const result = parseScorerAnswer(
       JSON.stringify({ ...valid, checks: [...valid.checks].reverse() }),
-      "other",
     );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.output.rationale).toBe("It names its funding.");
-    expect(result.output.checks).toHaveLength(OTHER_IDS.length);
-    expect(result.output.checks.find((check) => check.id === "funding")).toEqual({
+    expect(result.answer).toMatchObject({
+      field: "life-sciences",
+      studyType: "other",
+      reason: "A report of a clinical case.",
+      rationale: "It names its funding.",
+    });
+    expect(result.answer.checks).toHaveLength(OTHER_IDS.length);
+    expect(result.answer.checks.find((check) => check.id === "funding")).toEqual({
       id: "funding",
       answer: "shown",
       quote: "Funding: none.",
     });
-    expect(result.output.checks.find((check) => check.id === "conflicts")).toEqual({
+    expect(result.answer.checks.find((check) => check.id === "conflicts")).toEqual({
       id: "conflicts",
       answer: "missing",
     });
   });
 
+  it("accepts a paper outside the field, leaving out its checks and rationale", () => {
+    const outside = {
+      ...valid,
+      field: "outside",
+      studyType: "computational",
+      reason: "A machine translation model.",
+      checks: [],
+      rationale: "",
+    };
+
+    expect(parseScorerAnswer(JSON.stringify(outside))).toEqual({
+      ok: true,
+      answer: {
+        field: "outside",
+        studyType: "computational",
+        reason: "A machine translation model.",
+        checks: [],
+        rationale: "",
+      },
+    });
+    expect(
+      parseScorerAnswer(JSON.stringify({ ...outside, checks: valid.checks, rationale: "x" })),
+    ).toMatchObject({ ok: true, answer: { checks: [], rationale: "" } });
+  });
+
   it.each([
     ["not JSON", () => "shown"],
+    ["an unknown field", () => ({ ...valid, field: "physics" })],
+    ["an unknown study type", () => ({ ...valid, studyType: "poem" })],
+    ["an empty reason", () => ({ ...valid, reason: " " })],
+    ["a reason over 500 characters", () => ({ ...valid, reason: "x".repeat(501) })],
     [
       "a check of another study type",
       () => ({
@@ -217,13 +195,13 @@ describe("parseJudgeOutput", () => {
         checks: valid.checks.map((check) => ({ ...check, quote: "x".repeat(301) })),
       }),
     ],
-    ["an empty rationale", () => ({ ...valid, rationale: "" })],
+    ["an empty rationale in the field", () => ({ ...valid, rationale: "" })],
     ["a rationale over 2,000 characters", () => ({ ...valid, rationale: "x".repeat(2001) })],
   ])("refuses %s", (_, build) => {
     const value = build();
     const text = typeof value === "string" ? value : JSON.stringify(value);
 
-    expect(parseJudgeOutput(text, "other")).toEqual({ ok: false });
+    expect(parseScorerAnswer(text)).toEqual({ ok: false });
   });
 });
 
@@ -240,18 +218,17 @@ describe("scoreChecks", () => {
       ]),
     );
 
-    expect(scoreChecks(PAPER, "other", otherAnswer(all)).score).toBe(100);
+    expect(scoreChecks(PAPER, otherAnswer(all)).score).toBe(100);
   });
 
   it("gives 0 when nothing is shown", () => {
-    expect(scoreChecks(PAPER, "other", otherAnswer()).score).toBe(0);
+    expect(scoreChecks(PAPER, otherAnswer()).score).toBe(0);
   });
 
   it("counts partly as half a point", () => {
     // 8 checks, all applicable: funding and conflicts shown, methods partly: 2.5 / 8 = 31.25.
     const result = scoreChecks(
       PAPER,
-      "other",
       otherAnswer({
         funding,
         conflicts,
@@ -266,7 +243,6 @@ describe("scoreChecks", () => {
     // 4 conditional checks not applicable: funding shown, methods partly, 1.5 / 4 = 37.5.
     const result = scoreChecks(
       PAPER,
-      "other",
       otherAnswer({
         funding,
         "methods-described": { answer: "partly", quote: "Outcome assessors were blinded" },
@@ -284,7 +260,10 @@ describe("scoreChecks", () => {
     // lab: 14 checks, 3 conditional ones not applicable; 7 shown, funding partly, 3 missing.
     const notApplicable = ["cell-line-authentication", "randomization", "sex-variable"];
     const missing = ["code-availability", "conflicts", "limitations"];
-    const answer: JudgeAnswer = {
+    const answer: ScorerAnswer = {
+      field: "life-sciences",
+      studyType: "lab",
+      reason: "Cells in culture.",
       rationale: "Mixed.",
       checks: checklistOf("lab").map(({ id }) => {
         if (notApplicable.includes(id)) return { id, answer: "not-applicable" };
@@ -294,13 +273,12 @@ describe("scoreChecks", () => {
       }),
     };
 
-    expect(scoreChecks(PAPER, "lab", answer).score).toBe(68);
+    expect(scoreChecks(PAPER, answer).score).toBe(68);
   });
 
   it("leaves a conditional check that does not apply out of the count", () => {
     const result = scoreChecks(
       PAPER,
-      "other",
       otherAnswer({ funding, "code-availability": { answer: "not-applicable" } }),
     );
 
@@ -314,7 +292,6 @@ describe("scoreChecks", () => {
   it("counts a required check said not to apply as missing", () => {
     const result = scoreChecks(
       PAPER,
-      "other",
       otherAnswer({ funding, conflicts: { answer: "not-applicable" } }),
     );
 
@@ -325,7 +302,6 @@ describe("scoreChecks", () => {
   it("counts as missing a shown or partly check whose quote the paper does not hold, dropping the quote", () => {
     const result = scoreChecks(
       PAPER,
-      "other",
       otherAnswer({
         funding: { answer: "shown", quote: "This work was funded by the Wellcome Trust." },
         conflicts: { answer: "partly", quote: "The authors received fees from Acme." },
@@ -344,7 +320,7 @@ describe("scoreChecks", () => {
   });
 
   it("counts as missing a shown check with no quote", () => {
-    const result = scoreChecks(PAPER, "other", otherAnswer({ funding: { answer: "shown" } }));
+    const result = scoreChecks(PAPER, otherAnswer({ funding: { answer: "shown" } }));
 
     expect(result.checks.find((check) => check.id === "funding")?.answer).toBe("missing");
   });
@@ -352,7 +328,6 @@ describe("scoreChecks", () => {
   it("finds a quote across the paper's line breaks and whatever its spacing or case", () => {
     const result = scoreChecks(
       PAPER,
-      "other",
       otherAnswer({
         "methods-described": {
           answer: "shown",
@@ -370,7 +345,7 @@ describe("scoreChecks", () => {
 
   it("keeps the study type, the rationale and the checks in checklist order", () => {
     const answer = otherAnswer({ funding });
-    const result = scoreChecks(PAPER, "other", { ...answer, checks: [...answer.checks].reverse() });
+    const result = scoreChecks(PAPER, { ...answer, checks: [...answer.checks].reverse() });
 
     expect(result.studyType).toBe("other");
     expect(result.rationale).toBe("It reports its funding but not its methods.");

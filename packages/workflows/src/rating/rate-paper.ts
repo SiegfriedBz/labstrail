@@ -1,6 +1,5 @@
 import type { RatingRequestState, ReadOracleResult, ReadRequestResult } from "@verisci/contracts";
 import {
-  type Classification,
   classifyTarget,
   type PaperText,
   paperPdfQuery,
@@ -12,7 +11,6 @@ import {
   rKaQuads,
   SCORER_PROMPT_VERSION,
   type ScorerOutput,
-  type StudyType,
 } from "@verisci/core";
 import type { DkgClient, DkgFailure } from "@verisci/dkg";
 import { type Inngest, type InngestFunction, NonRetriableError } from "inngest";
@@ -21,11 +19,11 @@ import { z } from "zod";
 import { RATING_REQUESTED } from "./events.ts";
 import type { OracleInput, OracleLogger, OracleResult } from "./oracle.ts";
 import type { ReadPaperTextResult } from "./paper-text.ts";
-import type { ClassifyResult, JudgeResult, ScoreFailureResult } from "./scorer.ts";
+import type { ScoreFailureResult, ScoreResult } from "./scorer.ts";
 
 /** The rating run's settings (ADRs 0008, 0009, 0015, 0018, 0020). */
 export const RATING_SETTINGS = {
-  /** The Gemini model that classifies and judges, on the free tier (ADR 0018). */
+  /** The Gemini model that scores, on the free tier (ADR 0018). */
   model: "gemini-3.8-flash",
   /** The largest PDF read, the publish run's limit. */
   maxPdfBytes: 30 * 1024 * 1024,
@@ -33,10 +31,11 @@ export const RATING_SETTINGS = {
   pdfTimeoutMs: 60_000,
   /** The longest paper text the scorer reads, about 40,000 tokens (`preparePaperText`). */
   maxTextChars: 150_000,
-  /** How long Gemini gets to classify a paper. */
-  classifierTimeoutMs: 60_000,
-  /** How long Gemini gets to answer a paper's checks, inside a step's 300 s on Vercel. */
-  judgeTimeoutMs: 180_000,
+  /**
+   * How long Gemini gets to score a paper: it took about 100 s on a 60,000-character trial
+   * (`docs/domain.md` → Gemini), inside a step's 300 s on Vercel.
+   */
+  scorerTimeoutMs: 240_000,
   /**
    * Past this, a request is fulfilled only if its R-KA is minted, else cancelled (ADR 0020).
    * It must exceed the reconciler's threshold and interval plus `finishTimeout`.
@@ -52,7 +51,7 @@ export const RATING_SETTINGS = {
   /**
    * A run's whole budget, enforced by Inngest. It covers the slowest run, about 150 minutes:
    * up to 8 minutes to read the request and 14 to find the target, 5 attempts of up to 17
-   * minutes each (finding and reading the paper, classifying and judging it, a mint and 10
+   * minutes each (finding and reading the paper, scoring it, a mint and 10
    * minutes of polls), 2 minutes between attempts, and the oracle's 35 minutes.
    */
   finishTimeout: "180m",
@@ -129,10 +128,8 @@ export interface RatingDeps {
   readonly dkg: Pick<DkgClient, "readAsset" | "storeAsset" | "startMint" | "query" | "checkGraph">;
   /** The text of the PDF a paper links, by its CID (`readPaperText`). */
   readPaper(cid: string): Promise<ReadPaperTextResult>;
-  /** The paper's field and study type (`classifyPaper`). */
-  classify(paper: PaperText): Promise<ClassifyResult>;
-  /** The answers to its study type's checks, and the score (`judgePaper`). */
-  judge(paper: PaperText, type: StudyType): Promise<JudgeResult>;
+  /** The paper's field, and for a paper in the field its score (`scorePaper`). */
+  score(paper: PaperText): Promise<ScoreResult>;
 }
 
 const eventSchema = z.object({
@@ -182,8 +179,8 @@ export function ratingFailureReason(output: unknown): RatingFailure | undefined 
  *    papers (`find-target`);
  * 3. the R-KA is read: minted is fulfilled; stored is minted at once (ADR 0008); a draft is
  *    shared, then minted; missing is scored once, stored and minted. Scoring finds the paper's
- *    PDF link (`find-pdf`), reads its text (`read-paper`), has Gemini classify it
- *    (`classify`), then answer its study type's checks (`judge`), each done once per run; a
+ *    PDF link (`find-pdf`), reads its text (`read-paper`), and has Gemini classify it and answer
+ *    its study type's checks in one request (`score`), each done once per run; a
  *    paper outside the field (ADR 0037), with no PDF link, or whose PDF cannot be read, is
  *    cancelled `invalid-target` before anything is stored;
  * 4. the score is always read back from the minted R-KA, so the chain records the R-KA's;
@@ -193,7 +190,7 @@ export function ratingFailureReason(output: unknown): RatingFailure | undefined 
  * Fulfil and cancel go through the oracle function (ADR 0019). A failure worth a retry waits
  * `retryWait` and starts a new attempt from the R-KA's read (ADR 0009); a mint not seen after
  * `pollsPerMint` polls is started again. A part of the score that came back (the link, the
- * text, the classification, the judged checks) is never asked for again.
+ * text, the score) is never asked for again.
  */
 export async function runRating(
   data: unknown,
@@ -273,7 +270,6 @@ interface RunContext {
   /** Each part of the score once it came back, kept across attempts so it is never redone. */
   cid?: string;
   paper?: PaperText;
-  classification?: Classification;
   scored?: { readonly output: ScorerOutput; readonly model: string };
 }
 
@@ -372,8 +368,8 @@ async function rateOnce(attempt: number, run: RunContext): Promise<Attempt> {
 }
 
 /**
- * The score, from an earlier attempt or from the scorer: the paper's PDF link, its text, its
- * classification, then the judged checks, each step skipped once its result is in.
+ * The score, from an earlier attempt or from the scorer: the paper's PDF link, its text, then
+ * its score, each step skipped once its result is in.
  */
 async function score(
   attempt: number,
@@ -397,16 +393,10 @@ async function score(
     run.paper = read.paper;
   }
   const { paper } = run;
-  if (!run.classification) {
-    const classified = await step.run(`classify-${attempt}`, () => deps.classify(paper));
-    if (!classified.ok) return geminiFailed(classified);
-    if (classified.output.field === "outside") return { kind: "invalid-target" };
-    run.classification = classified.output;
-  }
-  const { studyType } = run.classification;
-  const judged = await step.run(`judge-${attempt}`, () => deps.judge(paper, studyType));
-  if (!judged.ok) return geminiFailed(judged);
-  run.scored = { output: judged.output, model: judged.model };
+  const scored = await step.run(`score-${attempt}`, () => deps.score(paper));
+  if (!scored.ok) return geminiFailed(scored);
+  if (scored.field === "outside") return { kind: "invalid-target" };
+  run.scored = { output: scored.output, model: scored.model };
   return run.scored;
 }
 
@@ -434,7 +424,11 @@ function geminiFailed(result: ScoreFailureResult): Attempt {
         failure: "setup",
         reason: `Gemini refused the request (HTTP ${result.status}): check GEMINI_API_KEY and the model`,
       }
-    : { kind: "retry", failure: "scorer-unavailable", reason: `scorer ${result.reason}` };
+    : {
+        kind: "retry",
+        failure: "scorer-unavailable",
+        reason: `scorer ${result.reason}${result.status ? ` (HTTP ${result.status})` : ""}`,
+      };
 }
 
 /** Polls the R-KA's state; its UAL once minted, a failure, or `undefined` after every poll. */
