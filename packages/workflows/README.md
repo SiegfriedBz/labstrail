@@ -141,9 +141,9 @@ is left ([ADR 0007](../../docs/adr/0007-all-writes-converge.md)):
    chain than Base Sepolia, or names another publisher is cancelled `invalid-target` at once.
    Then **find-target** asks the node whether the target is one of its published papers
    (`publishedPaperQuery`), and cancels `invalid-target` when the node answers that it is not
-   (a wrong number, or an R-KA), whatever the request's age. A node that dropped the graph
-   answers every query with no rows, so an empty answer counts only after **check-graph**
-   confirms the node serves the graph; otherwise the run fails `setup` and cancels nothing. A
+   (a wrong number, or an R-KA), whatever the request's age. The node answers a query on a
+   graph it does not hold with no rows (`docs/domain.md` → DKG), so an empty answer counts
+   only after **check-graph** confirms the node serves the graph; otherwise the run fails `setup` and cancels nothing. A
    node that does not answer is asked again every 2 minutes, up to 5 times, then the run
    fails `node-unreachable`.
 3. **read-rka:** the R-KA `verisci-rka-<request id>`. Minted goes to the read-back. Stored is

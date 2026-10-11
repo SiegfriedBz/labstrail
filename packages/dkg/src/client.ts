@@ -55,8 +55,10 @@ export interface DkgClient {
   query(sparql: string): Promise<QueryResult>;
   /**
    * Whether the node serves the graph: `ok` when it lists it as subscribed, `graph-not-served`
-   * when it does not. A node that dropped the graph answers every `query` with no rows, so a
-   * caller checks this before reading an empty answer as "nothing there".
+   * when it does not, or a failure (`unreachable`, `unauthorized`, `unexpected`) when the list
+   * cannot be read. The node answers a `query` on a graph it does not hold with no rows
+   * (`docs/domain.md` → DKG), so a caller checks this before reading an empty answer as
+   * "nothing there". Asked each time, never remembered: a node restart can drop the graph.
    */
   checkGraph(): Promise<{ readonly ok: true } | DkgFailure>;
 }
@@ -83,16 +85,13 @@ export function createDkgClient(config: DkgClientConfig): DkgClient {
     return toAssetState(reply.body) ?? { ok: false, reason: "unexpected", status: reply.status };
   }
 
-  /**
-   * True when the node lists the graph as subscribed; a failure when the list cannot be read.
-   * Asked on every 404, never remembered: a node restart can drop the graph at any time.
-   */
   async function checkGraph(): Promise<{ readonly ok: true } | DkgFailure> {
     const served = await isGraphServed();
     if (served === true) return { ok: true };
     return served === false ? { ok: false, reason: "graph-not-served" } : served;
   }
 
+  /** True when the node lists the graph as subscribed; a failure when the list cannot be read. */
   async function isGraphServed(): Promise<boolean | DkgFailure> {
     const reply = await send(connection, "GET", "/api/context-graph/list", { timeoutMs });
     if (reply.kind !== "answer" || !isSuccess(reply)) return toFailure(reply);

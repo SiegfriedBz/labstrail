@@ -274,8 +274,8 @@ async function readRequest(
 
 /**
  * True when our node lists `ual` among the papers it published (ADR 0011), false when it
- * answers that it does not. A node that dropped the graph answers every query with no rows,
- * so an empty answer counts only once the node confirms it serves the graph. A node that
+ * answers that it does not. The node answers a query on a graph it does not hold with no rows
+ * (`docs/domain.md` → DKG), so an empty answer counts only once it confirms it serves the graph. A node that
  * does not answer is asked again every `retryWait`; neither is ever taken for a missing paper.
  */
 async function findTarget(ual: string, step: RatingSteps, deps: RatingDeps): Promise<boolean> {
