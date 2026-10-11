@@ -10,6 +10,7 @@ import { isFinal, type PaperStage } from "../../lib/progress.ts";
 import { shorten } from "../../lib/shorten.ts";
 import type { PaperView } from "../../lib/upload-actions.ts";
 import { Breadcrumbs } from "../site/breadcrumbs.tsx";
+import { Abstract } from "./abstract.tsx";
 import { CopyValue } from "./copy-value.tsx";
 import { PUBLISH_PANEL_LABELS, PUBLISH_PANEL_TITLE } from "./labels.ts";
 import { ProgressChain } from "./progress-chain.tsx";
@@ -45,9 +46,9 @@ const NOW: Partial<Record<PaperStage["stage"], string>> = {
 /**
  * Follows a paper from its page, starting from the view the server read (`PaperLoader`):
  * unless that view is final, asks `/api/papers/<cid>` every 5 s until a final stage, and
- * keeps asking through a stage that could not be read. Once published, shows the record and
- * how to verify it. Shows and asks by the CID's canonical spelling, the one the signature
- * covers, whatever spelling the address has.
+ * keeps asking through a stage that could not be read. Once published, shows the record,
+ * its abstract, its steps as one row, and how to verify it. Shows and asks by the CID's
+ * canonical spelling, the one the signature covers, whatever spelling the address has.
  */
 export function PaperProgress({
   cid: given,
@@ -109,7 +110,7 @@ export function PaperProgress({
     <div className="grid gap-6">
       {trail}
       <div className="enter grid items-start gap-8 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] md:gap-12">
-        <div className="grid content-start gap-6">
+        <div className="grid content-start gap-6 md:sticky md:top-24">
           <div className="grid gap-3">
             <p
               className={`w-fit rounded-md px-2.5 py-1 text-xs font-medium ${
@@ -120,7 +121,9 @@ export function PaperProgress({
             >
               {pill}
             </p>
-            <h1 className="text-balance text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
+            <h1
+              className={`text-balance font-semibold leading-tight tracking-tight ${titleSize(record?.title)}`}
+            >
               {record?.title ?? HEADLINE[view.stage]}
             </h1>
             {record && record.authors.length > 0 && <Authors names={record.authors} />}
@@ -129,15 +132,16 @@ export function PaperProgress({
                 href={`https://doi.org/${record.doi}`}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex w-fit items-center gap-1.5 font-mono text-xs text-accent hover:underline"
+                className="inline-flex w-fit items-center gap-1.5 font-mono text-xs text-muted transition-colors hover:text-ink"
               >
                 doi:{record.doi}
                 <ArrowSquareOut size={12} />
               </a>
             )}
           </div>
+          {record?.abstract && <Abstract text={record.abstract} />}
           <StageNote stage={view} resubmitted={resubmitted} />
-          <ProgressChain stage={view.stage} />
+          <ProgressChain stage={view.stage} compact={view.stage === "published"} />
         </div>
         {view.stage === "published" && record ? (
           <VerifyPanel record={record} ual={view.ual} cid={cid} contextGraph={contextGraph} />
@@ -161,6 +165,16 @@ export function PaperProgress({
       </div>
     </div>
   );
+}
+
+/**
+ * The headline's size: a stage's few words and a short title large, a long title smaller,
+ * so a 200-character title doesn't fill a phone's screen.
+ */
+function titleSize(title: string | undefined): string {
+  if (title === undefined || title.length <= 60) return "text-2xl sm:text-4xl";
+  if (title.length <= 120) return "text-2xl sm:text-3xl";
+  return "text-xl sm:text-2xl";
 }
 
 const SHOWN_AUTHORS = 6;
@@ -213,7 +227,7 @@ function StageNote({ stage, resubmitted }: { stage: PaperView; resubmitted: bool
       return (
         <p className="text-muted">
           Nothing has been published for this PDF yet.{" "}
-          <Link href="/publish" className="font-medium text-accent hover:underline">
+          <Link href="/publish" className="link">
             Publish a paper
           </Link>
         </p>

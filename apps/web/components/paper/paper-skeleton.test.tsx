@@ -1,6 +1,6 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { VERIFY_LABELS } from "./labels.ts";
+import { VERIFY_GROUPS, VERIFY_LABELS } from "./labels.ts";
 import { PaperSkeleton } from "./paper-skeleton.tsx";
 
 const CID = "bafybeias652m2pfpmuaeze4dxmtcjvfwvr7dsteumagdd2vwaqrbkjokxu";
@@ -22,16 +22,21 @@ describe("PaperSkeleton", () => {
     );
   });
 
-  it("shows the verify panel's heading and labels, with only the values to come", () => {
+  it("shows the verify panel's heading, groups and labels, with only the values to come", () => {
     render(<PaperSkeleton cid={CID} following={false} />);
 
     expect(screen.getByRole("heading", { name: "Verify it yourself" })).toBeTruthy();
-    const terms = screen.getAllByRole("term").map((term) => term.textContent);
-    expect(terms).toEqual([
+    const terms = (group: string) =>
+      within(screen.getByRole("group", { name: group }))
+        .getAllByRole("term")
+        .map((term) => term.textContent);
+    expect(terms(VERIFY_GROUPS.submission)).toEqual([
       VERIFY_LABELS.submitter,
       VERIFY_LABELS.signature,
       VERIFY_LABELS.deadline,
       VERIFY_LABELS.contextGraph,
+    ]);
+    expect(terms(VERIFY_GROUPS.asset)).toEqual([
       VERIFY_LABELS.publisher,
       VERIFY_LABELS.token,
       VERIFY_LABELS.ual,

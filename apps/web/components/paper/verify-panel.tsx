@@ -6,9 +6,10 @@ import {
   submissionTypedData,
 } from "@verisci/core";
 import type { PublishedRecord } from "@verisci/workflows";
+import type { ReactNode } from "react";
 import { addressUrl, assetTokenUrl, ipfsUrl } from "../../lib/explorer.ts";
 import { CopyValue } from "./copy-value.tsx";
-import { VERIFY_INTRO, VERIFY_LABELS, VERIFY_TITLE } from "./labels.ts";
+import { VERIFY_GROUPS, VERIFY_INTRO, VERIFY_LABELS, VERIFY_TITLE } from "./labels.ts";
 
 /** The signature's EIP-712 domain and type, as `@verisci/core`'s `submissionTypedData` builds them. */
 const EIP712_DOMAIN = `{ name: "${SUBMISSION_DOMAIN.name}", version: "${SUBMISSION_DOMAIN.version}", chainId: ${SUBMISSION_DOMAIN.chainId} }`;
@@ -36,10 +37,10 @@ const CHECK = {
 } as const;
 
 /**
- * Everything anyone needs to check a published paper without trusting VeriSci: who
- * submitted it and their signature (checked when read), who minted it, its ERC-721 token, the
- * record's UAL
- * and the PDF's CID, with how to check them.
+ * Everything anyone needs to check a published paper without trusting VeriSci, in two
+ * groups: the submission (who submitted it, their signature, checked when read, its deadline
+ * and the context graph it was signed for), then the asset (who minted it, its ERC-721
+ * token, the record's UAL and the PDF's CID), with how to check them.
  */
 export function VerifyPanel({
   record,
@@ -70,7 +71,7 @@ export function VerifyPanel({
         <check.icon size={18} weight="fill" className="shrink-0" />
         {check.text}
       </p>
-      <dl className="grid gap-5">
+      <VerifyGroup group="submission">
         <CopyValue
           label={VERIFY_LABELS.submitter}
           value={record.submitter}
@@ -79,6 +80,8 @@ export function VerifyPanel({
         <CopyValue label={VERIFY_LABELS.signature} value={record.signature} />
         <CopyValue label={VERIFY_LABELS.deadline} value={record.deadline} />
         <CopyValue label={VERIFY_LABELS.contextGraph} value={contextGraph} head={22} />
+      </VerifyGroup>
+      <VerifyGroup group="asset">
         {record.publisher && (
           <CopyValue
             label={VERIFY_LABELS.publisher}
@@ -95,7 +98,7 @@ export function VerifyPanel({
         )}
         <CopyValue label={VERIFY_LABELS.ual} value={ual} head={22} />
         <CopyValue label={VERIFY_LABELS.pdf} value={cid} href={ipfsUrl(cid)} />
-      </dl>
+      </VerifyGroup>
       <details className="group rounded-xl border border-line px-4 py-3 text-sm">
         <summary className="cursor-pointer font-medium marker:text-muted">
           How to check this record
@@ -127,5 +130,31 @@ export function VerifyPanel({
         </ol>
       </details>
     </section>
+  );
+}
+
+/** Each group's edge: the submission lives in the off-chain record, the asset is minted on-chain. */
+const GROUP_EDGE = { submission: "border-accent/50", asset: "border-accent-2/50" } as const;
+
+/**
+ * One of `VerifyPanel`'s groups: its heading, then its fields as a list of terms. The
+ * skeleton (`PaperSkeleton`) uses it too, so both show the same groups.
+ */
+export function VerifyGroup({
+  group,
+  children,
+}: {
+  group: keyof typeof VERIFY_GROUPS;
+  children: ReactNode;
+}) {
+  const id = `verify-${group}`;
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: read-only values, not form controls; a fieldset's legend sits outside its grid
+    <div role="group" aria-labelledby={id} className="grid gap-4">
+      <h3 id={id} className="text-sm font-semibold">
+        {VERIFY_GROUPS[group]}
+      </h3>
+      <dl className={`grid gap-5 border-l-2 pl-4 ${GROUP_EDGE[group]}`}>{children}</dl>
+    </div>
   );
 }

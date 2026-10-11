@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PaperView } from "../../lib/upload-actions.ts";
 import { PaperProgress } from "./paper-progress.tsx";
@@ -92,6 +92,32 @@ describe("PaperProgress", () => {
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
       "Screening VP1 of deformed wing virus",
     );
+  });
+
+  it("shows a published paper's abstract, then its steps as one compact row of done steps", async () => {
+    serve([]);
+    const abstract = "Deformed wing virus enters host cells through a membrane protein.";
+    const initial = { ...PUBLISHED, record: { ...PUBLISHED.record, abstract } } as PaperView;
+
+    render(<PaperProgress cid={CID} contextGraph={GRAPH} eventId={undefined} initial={initial} />);
+
+    expect(screen.getByRole("heading", { name: "Abstract" })).toBeTruthy();
+    expect(screen.getByText(abstract)).toBeTruthy();
+    expect(
+      within(screen.getByRole("list", { name: "Publish steps" }))
+        .getAllByRole("listitem")
+        .map((step) => step.textContent),
+    ).toEqual(["Read", "Saved off-chain", "Minted on-chain", "Published"]);
+  });
+
+  it("shows no abstract heading for a record without one", async () => {
+    serve([]);
+
+    render(
+      <PaperProgress cid={CID} contextGraph={GRAPH} eventId={undefined} initial={PUBLISHED} />,
+    );
+
+    expect(screen.queryByRole("heading", { name: "Abstract" })).toBeNull();
   });
 
   it("keeps asking while the answer cannot be read, and shows it", async () => {

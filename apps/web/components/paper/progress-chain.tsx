@@ -49,12 +49,20 @@ function position(stage: PaperStage["stage"]): { done: number; active: number | 
 /**
  * A paper's publish steps as a vertical chain: done steps carry a check, the line into the
  * current step runs live and its node breathes, and a refused paper is marked at Read,
- * where every refusal happens.
+ * where every refusal happens. `compact` shows a published paper's steps as one row of done
+ * steps, without their details, so the page leads with the paper.
  */
-export function ProgressChain({ stage }: { stage: PaperStage["stage"] }) {
+export function ProgressChain({
+  stage,
+  compact = false,
+}: {
+  stage: PaperStage["stage"];
+  compact?: boolean;
+}) {
+  if (compact) return <CompactChain />;
   const { done, active } = position(stage);
   return (
-    <ol className="relative grid gap-6">
+    <ol aria-label="Publish steps" className="relative grid gap-6">
       {STEPS.map((step, index) => {
         const isDone = index < done;
         const isActive = index === active;
@@ -109,6 +117,42 @@ export function ProgressChain({ stage }: { stage: PaperStage["stage"] }) {
               </p>
               <p className="mt-1 text-sm leading-relaxed text-muted">{step.detail}</p>
             </div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/**
+ * Every step done, as a four-column stepper: a check per step on one line (emerald, then
+ * emerald into cyan from the save to the mint), each label under its check. Four columns
+ * fit a phone, so the row never wraps.
+ */
+function CompactChain() {
+  return (
+    <ol aria-label="Publish steps" className="grid grid-cols-4 gap-2 text-sm">
+      {STEPS.map((step, index) => {
+        const tone = TONE[step.layer ?? "off-chain"];
+        const next = STEPS[index + 1];
+        const linkLine = step.layer === "off-chain" && next?.layer === "on-chain";
+        return (
+          <li key={step.label} className="relative grid content-start gap-2">
+            {next && (
+              <span
+                aria-hidden
+                className={`absolute top-[9px] right-0 left-7 h-0.5 rounded-full ${linkLine ? "signal-gradient" : "bg-accent"}`}
+              />
+            )}
+            <span
+              className={`grid size-5 place-items-center rounded-full ${tone.fill} text-accent-ink`}
+            >
+              <Check size={11} weight="bold" />
+            </span>
+            <span className="font-medium leading-snug text-ink">
+              {step.label}
+              {step.layer && <span className={`block ${tone.text}`}> {step.layer}</span>}
+            </span>
           </li>
         );
       })}
