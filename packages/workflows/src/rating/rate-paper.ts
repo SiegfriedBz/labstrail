@@ -135,7 +135,6 @@ type ReadRequestStep =
 type Attempt =
   | { readonly kind: "fulfil"; readonly score: number; readonly rKaUal: string }
   | { readonly kind: "expire"; readonly orphan?: string }
-  | { readonly kind: "invalid" }
   | { readonly kind: "retry"; readonly failure: RatingFailure; readonly reason: string }
   | { readonly kind: "mint-again" }
   | { readonly kind: "fatal"; readonly failure: RatingFailure; readonly reason: string };
@@ -160,11 +159,11 @@ export function ratingFailureReason(output: unknown): RatingFailure | undefined 
  *
  * 1. the request must be on one of the environment's contracts, pending, and that contract's
  *    oracle must be this deployment's key, or the run stops before spending anything;
- * 2. a target verisci did not publish (`classifyTarget`) is cancelled `invalid-target` at
- *    once (ADR 0011);
+ * 2. a target verisci did not publish is cancelled `invalid-target` at once (ADR 0011): its UAL
+ *    must name our node (`classifyTarget`), and our node must list it among its published
+ *    papers (`find-target`);
  * 3. the R-KA is read: minted is fulfilled; stored is minted at once (ADR 0008); a draft is
- *    shared, then minted; missing is scored once, stored and minted, unless our node answers
- *    that the target is none of the papers it published, which is cancelled `invalid-target`;
+ *    shared, then minted; missing is scored once, stored and minted;
  * 4. the score is always read back from the minted R-KA, so the chain records the R-KA's;
  * 5. past `maxAgeMs`, only a minted R-KA is fulfilled (a stored one is polled, never minted);
  *    anything else is cancelled `expired`.
@@ -191,7 +190,8 @@ export async function runRating(
   if (read.oracle !== deps.oracle) return { state: "skipped", reason: "not-our-oracle" };
 
   const oracle = (id: string, input: OracleInput) => callOracle(id, input, step);
-  if (classifyTarget(request.targetUal, deps.contextGraph) === "invalid") {
+  const ours = classifyTarget(request.targetUal, deps.contextGraph) === "ours";
+  if (!ours || !(await findTarget(request.targetUal, step, deps))) {
     const answer = await oracle("cancel", cancelOf(contract, requestId, "invalid-target"));
     return outcomeOf(answer, undefined, logger);
   }
@@ -223,10 +223,6 @@ export async function runRating(
     if (result.kind === "expire") {
       const answer = await oracle("cancel", cancelOf(contract, requestId, "expired"));
       return outcomeOf(answer, result.orphan, logger);
-    }
-    if (result.kind === "invalid") {
-      const answer = await oracle("cancel", cancelOf(contract, requestId, "invalid-target"));
-      return outcomeOf(answer, undefined, logger);
     }
     if (result.kind === "fatal") throw stop(result.failure, `${name.name}: ${result.reason}`);
     last = result;
@@ -272,6 +268,27 @@ async function readRequest(
       throw stop("chain-unreachable", `request ${requestId}: chain unreachable`);
     }
     await step.sleep(`read-request-retry-${attempt}`, RATING_SETTINGS.retryWait);
+  }
+}
+
+/**
+ * True when our node lists `ual` among the papers it published (ADR 0011), false when it
+ * answers that it does not. A node that does not answer is asked again every `retryWait`, and
+ * is never taken for a missing paper.
+ */
+async function findTarget(ual: string, step: RatingSteps, deps: RatingDeps): Promise<boolean> {
+  const sparql = publishedPaperQuery(deps.contextGraph, ual);
+  if (!sparql) throw stop("setup", `${ual}: target query refused`);
+  for (let attempt = 1; ; attempt++) {
+    const found = await step.run(attempt === 1 ? "find-target" : `find-target-${attempt}`, () =>
+      deps.dkg.query(sparql),
+    );
+    if (found.ok) return found.bindings.length > 0;
+    const failure = failed(found);
+    if (failure.kind === "fatal" || attempt === RATING_SETTINGS.attempts) {
+      throw stop(failure.failure, `${ual}: ${failure.reason}`);
+    }
+    await step.sleep(`find-target-retry-${attempt}`, RATING_SETTINGS.retryWait);
   }
 }
 
@@ -327,13 +344,8 @@ async function score(
 ): Promise<NonNullable<RunContext["scored"]> | Attempt> {
   if (run.scored) return run.scored;
   const { step, deps } = run;
-  const find = publishedPaperQuery(deps.contextGraph, run.targetUal);
   const sparql = targetTriplesQuery(deps.contextGraph, run.targetUal, RATING_SETTINGS.maxTriples);
-  if (!find || !sparql) return { kind: "fatal", failure: "setup", reason: "target query refused" };
-  const found = await step.run(`find-target-${attempt}`, () => deps.dkg.query(find));
-  if (!found.ok) return failed(found);
-  // The node answered, and verisci published no such paper: it can never be rated (ADR 0011).
-  if (found.bindings.length === 0) return { kind: "invalid" };
+  if (!sparql) return { kind: "fatal", failure: "setup", reason: "target query refused" };
   const rows = await step.run(`read-target-${attempt}`, () => deps.dkg.query(sparql));
   if (!rows.ok) return failed(rows);
   const triples = triplesFromBindings(rows.bindings);
@@ -385,7 +397,7 @@ async function readScore(attempt: number, ual: string, run: RunContext): Promise
   return { kind: "fulfil", score: rating.score, rKaUal: ual };
 }
 
-function failed(failure: DkgFailure): Attempt {
+function failed(failure: DkgFailure): Extract<Attempt, { kind: "retry" | "fatal" }> {
   const reason =
     failure.status === undefined ? failure.reason : `${failure.reason} (${failure.status})`;
   return failure.reason === "unauthorized" || failure.reason === "graph-not-served"

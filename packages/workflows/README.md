@@ -138,16 +138,17 @@ is left ([ADR 0007](../../docs/adr/0007-all-writes-converge.md)):
    ([ADR 0011](../../docs/adr/0011-a-rating-is-a-separate-r-ka.md)). A UAL that does not
    parse, is not canonical
    ([ADR 0031](../../docs/adr/0031-uals-are-normalized-before-the-contract.md)), names another
-   chain than Base Sepolia, or names another publisher is cancelled `invalid-target` at once,
-   before anything else is read.
+   chain than Base Sepolia, or names another publisher is cancelled `invalid-target` at once.
+   Then **find-target** asks the node whether the target is one of its published papers
+   (`publishedPaperQuery`), and cancels `invalid-target` when the node answers that it is not
+   (a wrong number, or an R-KA), whatever the request's age. A node that does not answer is
+   asked again every 2 minutes, up to 5 times, then the run fails `node-unreachable`.
 3. **read-rka:** the R-KA `verisci-rka-<request id>`. Minted goes to the read-back. Stored is
    minted at once, with no wait for a mint an earlier run may have started
    ([ADR 0008](../../docs/adr/0008-mints-are-async-polled-in-short-steps.md)). A draft is
-   shared, then minted. Missing: **find-target** asks the node whether the target is one of
-   its published papers (`publishedPaperQuery`), and cancels `invalid-target` when the node
-   answers that it is not (a wrong number, or an R-KA); **read-target** reads up to 200 of
-   its triples from its own asset graph, **score** asks Gemini once, and **store** writes the
-   R-KA (`packages/core` → Ratings). A score that came back is kept for every later attempt.
+   shared, then minted. Missing: **read-target** reads up to 200 of the target's triples
+   from its own asset graph, **score** asks Gemini once, and **store** writes the R-KA
+   (`packages/core` → Ratings). A score that came back is kept for every later attempt.
 4. **mint**, then **poll** every 30 s; a mint not seen after 10 minutes is started again.
 5. **read-score** reads the score back from the minted R-KA, and the oracle function fulfils
    with it, so the score on chain equals the R-KA's

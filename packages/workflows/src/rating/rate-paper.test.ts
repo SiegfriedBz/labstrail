@@ -249,8 +249,19 @@ describe("runRating: which requests it takes", () => {
     expect(await run).toEqual({ state: "cancelled", reason: "invalid-target" });
     expect(oracleCalls).toEqual([cancel("invalid-target")]);
     expect(deps.score).not.toHaveBeenCalled();
+    expect(dkg.readAsset).not.toHaveBeenCalled();
     expect(dkg.query).toHaveBeenCalledWith(publishedPaperQuery(GRAPH, TARGET));
-    expect(log).toEqual(["read-request", "read-rka-1", "find-target-1", "oracle cancel"]);
+    expect(log).toEqual(["read-request", "find-target", "oracle cancel"]);
+  });
+
+  it("cancels invalid-target, not expired, a request past 24 hours for no published paper", async () => {
+    const { run, oracleCalls } = rate({
+      requests: [pending({ requestedAt: OLD })],
+      found: [{ ok: true, bindings: [] }],
+    });
+
+    expect(await run).toEqual({ state: "cancelled", reason: "invalid-target" });
+    expect(oracleCalls).toEqual([cancel("invalid-target")]);
   });
 
   it("retries, never cancels, when the node does not answer whether it published the paper", async () => {
@@ -260,8 +271,20 @@ describe("runRating: which requests it takes", () => {
 
     expect(await run).toMatchObject({ state: "fulfilled" });
     expect(oracleCalls.map((input) => input.action.kind)).toEqual(["fulfil"]);
-    expect(log).toContain("sleep retry-1 2m");
-    expect(log).toContain("find-target-2");
+    expect(log.slice(0, 4)).toEqual([
+      "read-request",
+      "find-target",
+      "sleep find-target-retry-1 2m",
+      "find-target-2",
+    ]);
+  });
+
+  it("fails node-unreachable, leaving the request pending, when the node never answers", async () => {
+    const { run, oracleCalls, log } = rate({ found: [unreachable] });
+
+    await expect(run).rejects.toThrow(/^rating-failed:node-unreachable: /);
+    expect(oracleCalls).toEqual([]);
+    expect(log).toContain(`find-target-${RATING_SETTINGS.attempts}`);
   });
 });
 
@@ -274,8 +297,8 @@ describe("runRating: rating a paper", () => {
     expect(await run).toEqual({ state: "fulfilled", score: 64, rKaUal: R_KA });
     expect(log).toEqual([
       "read-request",
+      "find-target",
       "read-rka-1",
-      "find-target-1",
       "read-target-1",
       "score-1",
       "store-1",
@@ -311,7 +334,13 @@ describe("runRating: rating a paper", () => {
     const { run, deps, log, oracleCalls } = rate({ reads: [minted] });
 
     expect(await run).toEqual({ state: "fulfilled", score: 72, rKaUal: R_KA });
-    expect(log).toEqual(["read-request", "read-rka-1", "read-score-1", "oracle fulfil"]);
+    expect(log).toEqual([
+      "read-request",
+      "find-target",
+      "read-rka-1",
+      "read-score-1",
+      "oracle fulfil",
+    ]);
     expect(deps.score).not.toHaveBeenCalled();
     expect(oracleCalls).toEqual([fulfil(72)]);
   });
@@ -325,6 +354,7 @@ describe("runRating: rating a paper", () => {
     expect(await run).toEqual({ state: "fulfilled", score: 72, rKaUal: R_KA });
     expect(log).toEqual([
       "read-request",
+      "find-target",
       "read-rka-1",
       "mint-1",
       "sleep wait-1-1 30s",
