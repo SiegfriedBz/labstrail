@@ -40,6 +40,11 @@ describe("parsePageParam", () => {
   it("refuses a repeated page", () => {
     expect(parsePageParam(["1", "2"])).toBeUndefined();
   });
+
+  it("refuses a page too far out for its papers' offset to be counted exactly", () => {
+    expect(parsePageParam("450359962737049")).toBe(450_359_962_737_049);
+    expect(parsePageParam("450359962737050")).toBeUndefined();
+  });
 });
 
 describe("pageCount", () => {

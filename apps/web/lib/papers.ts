@@ -31,13 +31,14 @@ const PUBLISHED_DAY = new Intl.DateTimeFormat("en-GB", {
 
 /**
  * The page `?page=` asks for: 1 when absent, a positive whole number in its one spelling,
- * or `undefined` for anything else, a repeated `page` included (the page answers 404).
+ * or `undefined` for anything else, a repeated `page` included, or a page so far out that
+ * its papers' offset is past `Number.MAX_SAFE_INTEGER` (the page answers 404).
  */
 export function parsePageParam(value: string | string[] | undefined): number | undefined {
   if (value === undefined) return 1;
   if (typeof value !== "string" || !PAGE.test(value)) return undefined;
   const page = Number(value);
-  return Number.isSafeInteger(page) ? page : undefined;
+  return Number.isSafeInteger(page * PAPERS_PER_PAGE) ? page : undefined;
 }
 
 /** How many pages `total` papers fill, at least one. */
