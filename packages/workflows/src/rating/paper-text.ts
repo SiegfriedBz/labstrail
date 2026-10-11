@@ -31,13 +31,25 @@ export async function readPaperText(
   if (!pdf.ok) {
     return { ok: false, reason: pdf.reason === "unreachable" ? "unreachable" : "unreadable" };
   }
+  return paperTextOf(pdf.bytes, options.maxChars);
+}
+
+/**
+ * A PDF's text for the scorer: each page's text extracted with unpdf, then prepared with
+ * `preparePaperText` and fitted to `maxChars`. `unreadable` for a PDF that does not parse or
+ * has no text layer. Never throws.
+ */
+export async function paperTextOf(
+  bytes: Uint8Array,
+  maxChars: number,
+): Promise<ReadPaperTextResult> {
   let pages: string[];
   try {
-    const document = await getDocumentProxy(pdf.bytes);
+    const document = await getDocumentProxy(bytes);
     pages = (await extractText(document, { mergePages: false })).text;
   } catch {
     return { ok: false, reason: "unreadable" };
   }
-  const prepared = preparePaperText(pages, options.maxChars);
+  const prepared = preparePaperText(pages, maxChars);
   return prepared.ok ? prepared : { ok: false, reason: "unreadable" };
 }
