@@ -1,5 +1,5 @@
 import { dkgSchema } from "@verisci/dkg";
-import { createSharedEnv, defineEnv, type RuntimeEnv } from "@verisci/env";
+import { createSharedEnv, defineEnv, type RuntimeEnv, type SharedEnv } from "@verisci/env";
 import { z } from "zod";
 
 /** The Pinata API key (JWT) that signs uploads, lists and unpins files. Secret. */
@@ -18,23 +18,26 @@ export const pinataSchema = { PINATA_JWT: z.string().min(1) };
  */
 export function createWorkflowsEnv(runtimeEnv: RuntimeEnv = process.env) {
   const shared = createSharedEnv(runtimeEnv);
-  const inngestKey = shared.APP_ENV === "local" ? z.string().min(1).optional() : z.string().min(1);
-  const isProduction = shared.APP_ENV === "production";
-  return defineEnv({
-    extends: [shared],
-    server: {
-      ...dkgSchema(isProduction),
-      GROBID_URL: z.url(),
-      PINATA_GATEWAY_URL: z.url(),
-      CHAIN_RPC_URL: z.url(),
-      ...pinataSchema,
-      INNGEST_EVENT_KEY: inngestKey,
-      INNGEST_SIGNING_KEY: inngestKey,
-      /** Set by Vercel: the branch, which names a staging deployment's Inngest environment. */
-      VERCEL_GIT_COMMIT_REF: z.string().optional(),
-    },
-    runtimeEnv,
-  });
+  return defineEnv({ extends: [shared], server: workflowsSchema(shared.APP_ENV), runtimeEnv });
+}
+
+/**
+ * The workflows' variables and their rules for `appEnv`, the DKG node's included, for an env
+ * module that validates them with its own in one `defineEnv` (the rating settings).
+ */
+export function workflowsSchema(appEnv: SharedEnv["APP_ENV"]) {
+  const inngestKey = appEnv === "local" ? z.string().min(1).optional() : z.string().min(1);
+  return {
+    ...dkgSchema(appEnv === "production"),
+    GROBID_URL: z.url(),
+    PINATA_GATEWAY_URL: z.url(),
+    CHAIN_RPC_URL: z.url(),
+    ...pinataSchema,
+    INNGEST_EVENT_KEY: inngestKey,
+    INNGEST_SIGNING_KEY: inngestKey,
+    /** Set by Vercel: the branch, which names a staging deployment's Inngest environment. */
+    VERCEL_GIT_COMMIT_REF: z.string().optional(),
+  };
 }
 
 /** The validated workflows settings, the DKG node's and the shared ones included. */
