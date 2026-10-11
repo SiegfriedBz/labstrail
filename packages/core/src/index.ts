@@ -8,6 +8,14 @@ export {
   targetKaName,
 } from "./asset-names.ts";
 export { BASE_SEPOLIA_CHAIN_ID } from "./chains.ts";
+export {
+  CHECKS,
+  type Check,
+  type CheckId,
+  checklistOf,
+  STUDY_TYPES,
+  type StudyType,
+} from "./checklists.ts";
 export { canonicalCid } from "./cid.ts";
 export {
   knowledgeAssetToken,
@@ -30,6 +38,13 @@ export {
   parsePaperRecord,
   type QueryBinding,
 } from "./paper-record.ts";
+export {
+  normalizeForQuote,
+  type PaperText,
+  type PreparePaperResult,
+  preparePaperText,
+  quoteFound,
+} from "./paper-text.ts";
 export {
   classifyTarget,
   PHASE1_SIGNALS,
