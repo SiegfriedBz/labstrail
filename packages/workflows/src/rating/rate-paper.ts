@@ -65,12 +65,15 @@ export const RATING_SETTINGS = {
  * Why a rating run stopped without an outcome, carried in its error as
  * `rating-failed:<reason>: <detail>` ({@link ratingFailureReason}). `setup` and
  * `rating-unreadable` are ours to fix; the others clear up with time, and the request stays
- * pending for the next run. `paper-unreachable` is the gateway not giving the paper's PDF.
+ * pending for the next run. `paper-unreachable` is the gateway not giving the paper's PDF;
+ * `paper-unreadable` is a file that does not read as the PDF the publish run read (the gateway
+ * giving another file, or the reader failing).
  */
 export type RatingFailure =
   | "chain-unreachable"
   | "node-unreachable"
   | "paper-unreachable"
+  | "paper-unreadable"
   | "scorer-unavailable"
   | "mint-not-confirmed"
   | "oracle-failed"
@@ -81,6 +84,7 @@ const RATING_FAILURES: readonly RatingFailure[] = [
   "chain-unreachable",
   "node-unreachable",
   "paper-unreachable",
+  "paper-unreadable",
   "scorer-unavailable",
   "mint-not-confirmed",
   "oracle-failed",
@@ -181,8 +185,9 @@ export function ratingFailureReason(output: unknown): RatingFailure | undefined 
  *    shared, then minted; missing is scored once, stored and minted. Scoring finds the paper's
  *    PDF link (`find-pdf`), reads its text (`read-paper`), and has Gemini classify it and answer
  *    its study type's checks in one request (`score`), each done once per run; a
- *    paper outside the field (ADR 0037), with no PDF link, or whose PDF cannot be read, is
- *    cancelled `invalid-target` before anything is stored;
+ *    paper outside the field (ADR 0037), whose PDF link is not an IPFS CID, or whose PDF holds
+ *    no text (a scan) is cancelled `invalid-target` before anything is stored, and a link or
+ *    PDF that does not come or does not read is asked for again;
  * 4. the score is always read back from the minted R-KA, so the chain records the R-KA's;
  * 5. past `maxAgeMs`, only a minted R-KA is fulfilled (a stored one is polled, never minted);
  *    anything else is cancelled `expired`.
@@ -391,10 +396,12 @@ async function score(
   if (!run.paper) {
     const { cid } = run;
     const read = await step.run(`read-paper-${attempt}`, () => deps.readPaper(cid));
+    if (!read.ok && read.reason === "no-text") return { kind: "invalid-target" };
+    if (!read.ok && read.reason === "unreachable") {
+      return { kind: "retry", failure: "paper-unreachable", reason: `the PDF ${cid} did not come` };
+    }
     if (!read.ok) {
-      return read.reason === "unreadable"
-        ? { kind: "invalid-target" }
-        : { kind: "retry", failure: "paper-unreachable", reason: `the PDF ${cid} did not come` };
+      return { kind: "retry", failure: "paper-unreadable", reason: `${cid} did not read as a PDF` };
     }
     run.paper = read.paper;
   }
@@ -407,9 +414,9 @@ async function score(
 }
 
 /**
- * The CID of the PDF the target links (ADR 0010), or what to do without one: an answer with no
- * link counts only once the node confirms it serves the graph, as in `findTarget`; a link that
- * is not an `ipfs://` CID cancels the request `invalid-target`.
+ * The CID of the PDF the target links (ADR 0010), or what to do without one. `findTarget` found
+ * the target in this graph, so an answer with no link is a node still loading its graph, asked
+ * again (ADR 0011); a link that is not an `ipfs://` CID cancels the request `invalid-target`.
  */
 async function findPdf(attempt: number, run: RunContext): Promise<string | Attempt> {
   const { step, deps } = run;
@@ -417,9 +424,10 @@ async function findPdf(attempt: number, run: RunContext): Promise<string | Attem
   if (!sparql) return { kind: "fatal", failure: "setup", reason: "paper query refused" };
   const rows = await step.run(`find-pdf-${attempt}`, () => deps.dkg.query(sparql));
   if (!rows.ok) return failed(rows);
-  if (rows.bindings.length > 0) return pdfCidOf(rows.bindings) ?? { kind: "invalid-target" };
-  const served = await step.run(`check-pdf-graph-${attempt}`, () => deps.dkg.checkGraph());
-  return served.ok ? { kind: "invalid-target" } : failed(served);
+  if (rows.bindings.length === 0) {
+    return { kind: "retry", failure: "node-unreachable", reason: "no PDF link yet" };
+  }
+  return pdfCidOf(rows.bindings) ?? { kind: "invalid-target" };
 }
 
 /** A Gemini call that did not answer: a refused request is ours to fix, the rest retried. */

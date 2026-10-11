@@ -384,8 +384,8 @@ describe("runRating: rating a paper", () => {
     expect(log.slice(-2)).toEqual(["score-1", "oracle cancel"]);
   });
 
-  it("cancels invalid-target a paper whose PDF cannot be read, scoring nothing", async () => {
-    const { run, deps, dkg, oracleCalls } = rate({ papers: [{ ok: false, reason: "unreadable" }] });
+  it("cancels invalid-target a paper whose PDF holds no text, such as a scan, scoring nothing", async () => {
+    const { run, deps, dkg, oracleCalls } = rate({ papers: [{ ok: false, reason: "no-text" }] });
 
     expect(await run).toEqual({ state: "cancelled", reason: "invalid-target" });
     expect(oracleCalls).toEqual([cancel("invalid-target")]);
@@ -407,23 +407,18 @@ describe("runRating: rating a paper", () => {
     },
   );
 
-  it("cancels invalid-target a paper with no link, once the node confirms it serves the graph", async () => {
-    const { run, dkg, log, oracleCalls } = rate({ pdfRows: [{ ok: true, bindings: [] }] });
-
-    expect(await run).toEqual({ state: "cancelled", reason: "invalid-target" });
-    expect(oracleCalls).toEqual([cancel("invalid-target")]);
-    expect(dkg.checkGraph).toHaveBeenCalledOnce();
-    expect(log).toContain("check-pdf-graph-1");
-  });
-
-  it("never cancels on an empty link answer from a node that no longer serves the graph", async () => {
-    const { run, oracleCalls } = rate({
-      pdfRows: [{ ok: true, bindings: [] }],
-      graph: [{ ok: false, reason: "graph-not-served" }],
+  it("asks again, never cancelling, when the node gives no PDF link for the paper it listed", async () => {
+    const { run, log, oracleCalls } = rate({
+      pdfRows: [
+        { ok: true, bindings: [] },
+        { ok: true, bindings: [{ url: `ipfs://${CID}` }] },
+      ],
     });
 
-    await expect(run).rejects.toThrow(/^rating-failed:setup: .*graph-not-served/);
-    expect(oracleCalls).toEqual([]);
+    expect(await run).toMatchObject({ state: "fulfilled" });
+    expect(log).toContain("sleep retry-1 2m");
+    expect(log).toContain("find-pdf-2");
+    expect(oracleCalls).toEqual([fulfil(72)]);
   });
 
   it("fulfils an R-KA already minted with its score read back, never scoring", async () => {
@@ -573,6 +568,22 @@ describe("runRating: retries", () => {
 
     await expect(run).rejects.toThrow(/^rating-failed:paper-unreachable: /);
     expect(deps.readPaper).toHaveBeenCalledTimes(RATING_SETTINGS.attempts);
+    expect(oracleCalls).toEqual([]);
+  });
+
+  it("fails node-unreachable, with no cancel, when the node never gives the PDF link", async () => {
+    const { run, oracleCalls } = rate({ pdfRows: [{ ok: true, bindings: [] }] });
+
+    await expect(run).rejects.toThrow(/^rating-failed:node-unreachable: /);
+    expect(oracleCalls).toEqual([]);
+  });
+
+  it("reads the PDF again when it does not read as one, then fails paper-unreadable, with no cancel", async () => {
+    const { run, deps, oracleCalls } = rate({ papers: [{ ok: false, reason: "unreadable" }] });
+
+    await expect(run).rejects.toThrow(/^rating-failed:paper-unreadable: /);
+    expect(deps.readPaper).toHaveBeenCalledTimes(RATING_SETTINGS.attempts);
+    expect(deps.score).not.toHaveBeenCalled();
     expect(oracleCalls).toEqual([]);
   });
 

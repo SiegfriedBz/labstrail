@@ -3,13 +3,14 @@ import { extractText, getDocumentProxy } from "unpdf";
 import { type FetchPdfOptions, fetchPdf } from "../publish/fetch-pdf.ts";
 
 /**
- * The result of {@link readPaperText}: `unreachable` (the gateway did not give the file) is worth
- * a retry; `unreadable` (not a PDF, too large, a PDF that does not parse, or one with no text
- * layer) is final, since the same file always reads the same way.
+ * The result of {@link readPaperText}. `no-text` (a PDF with almost no letters, such as a scan)
+ * is the paper's own. `unreachable` (the gateway did not give the file) and `unreadable` (not a
+ * PDF, too large, or a PDF the reader does not parse) are worth a retry: the publish run read
+ * the same file, so these point at the gateway or the reader.
  */
 export type ReadPaperTextResult =
   | { readonly ok: true; readonly paper: PaperText }
-  | { readonly ok: false; readonly reason: "unreachable" | "unreadable" };
+  | { readonly ok: false; readonly reason: "unreachable" | "unreadable" | "no-text" };
 
 /** Where {@link readPaperText} reads a PDF, and how much of its text it keeps. */
 export interface ReadPaperTextOptions extends FetchPdfOptions {
@@ -36,8 +37,8 @@ export async function readPaperText(
 
 /**
  * A PDF's text for the scorer: each page's text extracted with unpdf, then prepared with
- * `preparePaperText` and fitted to `maxChars`. `unreadable` for a PDF that does not parse or
- * has no text layer. Never throws.
+ * `preparePaperText` and fitted to `maxChars`. `unreadable` for a PDF that does not parse,
+ * `no-text` for one with no text layer. Never throws.
  */
 export async function paperTextOf(
   bytes: Uint8Array,
@@ -51,5 +52,5 @@ export async function paperTextOf(
     return { ok: false, reason: "unreadable" };
   }
   const prepared = preparePaperText(pages, maxChars);
-  return prepared.ok ? prepared : { ok: false, reason: "unreadable" };
+  return prepared.ok ? prepared : { ok: false, reason: "no-text" };
 }

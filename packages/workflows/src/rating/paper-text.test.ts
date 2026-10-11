@@ -75,9 +75,12 @@ describe("readPaperText", () => {
   it.each([
     ["a file that is not a PDF", new TextEncoder().encode("<html>not a pdf</html>")],
     ["a PDF that cannot be parsed", new TextEncoder().encode("%PDF-1.4\nthis is not a PDF body")],
-    ["a PDF with no text, such as a scan", pdfOf([])],
   ])("is unreadable for %s", async (_, body) => {
     expect(await read(body).result).toEqual({ ok: false, reason: "unreadable" });
+  });
+
+  it("finds no text in a PDF without a text layer, such as a scan", async () => {
+    expect(await read(pdfOf([])).result).toEqual({ ok: false, reason: "no-text" });
   });
 
   it("is unreadable for a file over maxBytes", async () => {

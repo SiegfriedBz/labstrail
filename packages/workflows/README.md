@@ -152,12 +152,13 @@ is left ([ADR 0007](../../docs/adr/0007-all-writes-converge.md)):
    shared, then minted. Missing is scored, then **store** writes the R-KA
    (`packages/core` → Ratings):
    - **find-pdf** reads the `ipfs://` link to the paper's PDF from its own asset graph. A
-     link that is not an `ipfs://` CID cancels `invalid-target`; so does no link, once
-     **check-pdf-graph** confirms the node serves the graph.
+     link that is not an `ipfs://` CID cancels `invalid-target`. No link is retried:
+     **find-target** found the paper in this graph, so the node is still loading it.
    - **read-paper** fetches the PDF through the gateway and extracts its text with unpdf
-     (`packages/core` → Ratings → The paper's text), up to 150,000 characters. A file that
-     is not a PDF, is over 30 MB, does not parse or has no text layer cancels
-     `invalid-target`: the same file always reads the same way.
+     (`packages/core` → Ratings → The paper's text), up to 150,000 characters. A PDF with no
+     text layer (a scan) cancels `invalid-target`. A file that is not a PDF, is over the size
+     limit or does not parse is retried, since the publish run read the same file: the
+     gateway or the reader is at fault.
    - **score** asks Gemini, in one request, for the paper's field and study type and the
      answer to each of that type's checks, with quotes; `scoreChecks` checks the quotes and
      computes the score. A paper outside the life sciences and health cancels
@@ -177,11 +178,11 @@ cancelled meanwhile, is an orphan: the outcome names it, and the run logs it as 
 
 Retries ([ADR 0009](../../docs/adr/0009-retries-are-spaced-with-step-sleep.md)): a chain
 that does not answer is read again every 2 minutes, up to 5 times. A node that does not
-answer or gives no rows yet, a quorum failure, a gateway that does not give the PDF, or a
-Gemini call that is unreachable, rate-limited or gives an answer the check refuses waits
-2 minutes and starts a new attempt from the R-KA's read, up to 5 attempts, then fails
-(`node-unreachable`, `paper-unreachable`, `scorer-unavailable`; `mint-not-confirmed` when the
-mint is never seen). A node that does not answer is never
+answer or gives no rows yet, a quorum failure, a gateway that does not give the PDF, a file
+that does not read as a PDF, or a Gemini call that is unreachable, rate-limited or gives an
+answer the check refuses waits 2 minutes and starts a new attempt from the R-KA's read, up
+to 5 attempts, then fails (`node-unreachable`, `paper-unreachable`, `paper-unreadable`,
+`scorer-unavailable`; `mint-not-confirmed` when the mint is never seen). A node that does not answer is never
 taken for a missing paper. It fails at once (`setup`) on missing or invalid settings, a node that
 refuses our key, Gemini refusing the request (the detail names its status), or a node that
 does not serve the graph, and
