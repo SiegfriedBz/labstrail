@@ -24,8 +24,8 @@ export async function generateMetadata({
  * Every paper published in this environment, newest first, one page per URL
  * (`/papers?page=N`): the server reads only that page from the DKG. The heading shows at
  * once and a skeleton of the table until the page arrives; keyed by page, so moving to
- * another page shows the skeleton again. A page that is not a positive whole number answers
- * 404 before anything streams.
+ * another page shows the skeleton again. A page that is not a positive whole number, or is
+ * too far out to read (`parsePageParam`), answers 404 before anything streams.
  */
 export default async function PapersPage({ searchParams }: { searchParams: SearchParams }) {
   await connection();

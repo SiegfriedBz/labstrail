@@ -52,7 +52,8 @@ rather than letting requests through.
 `/papers` reads one page from the DKG node per request (`listPapers`,
 [`packages/workflows`](../../packages/workflows/README.md#the-pages-calls)), with no database
 ([ADR 0035](../../docs/adr/0035-limits-are-the-apps-only-state.md)): the papers newest mint
-first, the total, each paper's first three authors and its signature check. The heading
+first, the total, each paper's first three authors (or how many it has, when none could be
+named) and its signature check. The heading
 shows at once and the rows stream into a `Suspense` boundary keyed by page, with a skeleton
 shaped like the table (`components/papers/papers-table-skeleton.tsx`).
 
@@ -63,11 +64,14 @@ shaped like the table (`components/papers/papers-table-skeleton.tsx`).
 - Page links (`components/papers/pager.tsx`) are plain links to `/papers?page=N`, so each page
   is a URL the server renders: the first, the last and the current page's neighbours past
   seven pages.
-- A `?page=` that is not a positive whole number answers 404 before anything streams. A page
-  past the last shows the not-found page, as a 200 with `noindex`, since the response is
-  already streaming when the node answers (`docs/domain.md` → Next.js).
-- A node that does not answer says the list can't be loaded, with a link to try again; on
-  the home page only that block says so ([ADR 0021](../../docs/adr/0021-server-reads-return-typed-results.md)).
+- A `?page=` that is not a positive whole number, or one so far out that page × 20 passes
+  `Number.MAX_SAFE_INTEGER`, answers 404 before anything streams. A page past the last shows
+  the not-found page, as a 200 with `noindex`, since the response is already streaming when
+  the node answers (`docs/domain.md` → Next.js).
+- A node that does not answer says the list can't be loaded, with a link to try again; an
+  answer that can't be read (a refused query, or a page the total covers with no readable
+  row) says so, without the link. On the home page only that block says either
+  ([ADR 0021](../../docs/adr/0021-server-reads-return-typed-results.md)).
 
 ### The paper page
 

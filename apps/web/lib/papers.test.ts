@@ -41,7 +41,7 @@ describe("parsePageParam", () => {
     expect(parsePageParam(["1", "2"])).toBeUndefined();
   });
 
-  it("refuses a page too far out for its papers' offset to be counted exactly", () => {
+  it("refuses a page whose page × 20 is past the largest safe integer", () => {
     expect(parsePageParam("450359962737049")).toBe(450_359_962_737_049);
     expect(parsePageParam("450359962737050")).toBeUndefined();
   });
@@ -97,6 +97,11 @@ describe("authorsLine", () => {
 
   it("says when no author was read", () => {
     expect(authorsLine({ ...PAPER, authors: [], authorCount: 0 })).toBe("No authors listed");
+  });
+
+  it("says how many authors there are when none could be named", () => {
+    expect(authorsLine({ ...PAPER, authors: [], authorCount: 10 })).toBe("10 authors");
+    expect(authorsLine({ ...PAPER, authors: [], authorCount: 1 })).toBe("1 author");
   });
 });
 

@@ -5,7 +5,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const listPapers =
   vi.fn<(options: { page: number; pageSize: number }) => Promise<PaperListResult>>();
 
-vi.mock("@verisci/workflows", () => ({ getUploadService: () => ({ listPapers }) }));
+const getUploadService = vi.fn(() => ({ listPapers }));
+
+vi.mock("@verisci/workflows", () => ({ getUploadService: () => getUploadService() }));
 
 const { LatestPapers } = await import("./latest-papers.tsx");
 
@@ -24,6 +26,20 @@ describe("LatestPapers", () => {
   afterEach(() => {
     cleanup();
     listPapers.mockReset();
+  });
+
+  it("says the papers can't be loaded, and logs why, when the settings are missing", async () => {
+    const setup = new Error("DKG_URL is missing");
+    getUploadService.mockImplementationOnce(() => {
+      throw setup;
+    });
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    render(await LatestPapers());
+
+    expect(screen.getByRole("alert").textContent).toContain("can't be loaded right now");
+    expect(logged).toHaveBeenCalledWith("latest papers:", setup);
+    logged.mockRestore();
   });
 
   it("shows the five newest and links to all of them with the total", async () => {

@@ -32,7 +32,8 @@ const PUBLISHED_DAY = new Intl.DateTimeFormat("en-GB", {
 /**
  * The page `?page=` asks for: 1 when absent, a positive whole number in its one spelling,
  * or `undefined` for anything else, a repeated `page` included, or a page so far out that
- * its papers' offset is past `Number.MAX_SAFE_INTEGER` (the page answers 404).
+ * page × `PAPERS_PER_PAGE` is past `Number.MAX_SAFE_INTEGER`, which `listPapers` could not
+ * count exactly (the page answers 404).
  */
 export function parsePageParam(value: string | string[] | undefined): number | undefined {
   if (value === undefined) return 1;
@@ -72,9 +73,12 @@ export function formatPublished(iso: string): string {
   return PUBLISHED_DAY.format(new Date(iso));
 }
 
-/** A paper's first authors, and how many more it has. */
+/** A paper's first authors and how many more it has, or how many it has when none was named. */
 export function authorsLine(paper: Pick<PaperSummary, "authors" | "authorCount">): string {
-  if (paper.authors.length === 0) return "No authors listed";
+  if (paper.authors.length === 0) {
+    if (paper.authorCount === 0) return "No authors listed";
+    return paper.authorCount === 1 ? "1 author" : `${paper.authorCount} authors`;
+  }
   const more = paper.authorCount - paper.authors.length;
   return more > 0 ? `${paper.authors.join(", ")} +${more} more` : paper.authors.join(", ");
 }
