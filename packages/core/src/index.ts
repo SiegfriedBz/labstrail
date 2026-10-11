@@ -43,7 +43,9 @@ export {
   type PaperText,
   type PreparePaperResult,
   preparePaperText,
+  type QuoteText,
   quoteFound,
+  quoteTextOf,
 } from "./paper-text.ts";
 export {
   classifyTarget,

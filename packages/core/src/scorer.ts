@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { CHECKS, type CheckId, checklistOf, STUDY_TYPES, type StudyType } from "./checklists.ts";
-import { normalizeForQuote, type PaperText, quoteFound } from "./paper-text.ts";
+import { type PaperText, quoteFound, quoteTextOf } from "./paper-text.ts";
 
 /**
  * The version of the scorer's prompt and checklists, recorded in every R-KA with the model
@@ -96,7 +96,7 @@ Then, for a paper in the field, answer each check of its study type:
 - missing: the paper does not state it.
 - not-applicable: only for a check marked "(may not apply)", when the study has nothing to report for it.
 A statement that something does not apply or was not done, such as "no new data were generated" or "the trial was open-label", counts as shown, with that statement as the quote.
-For shown and partly, quote the passage that shows it: copied exactly from the paper, at most 300 characters. For missing and not-applicable, leave the quote empty.
+For shown and partly, quote the passage that shows it: copied exactly from the paper, as one continuous passage with no word left out and no "…", at most 300 characters. Quote a short statement with its heading, such as "Competing interests: None." rather than "None.". For missing and not-applicable, leave the quote empty.
 
 What each check asks:
 ${checks}
@@ -210,7 +210,7 @@ function clip(text: string, max: number): string {
  * check of the study type in checklist order.
  */
 export function scoreChecks(paper: PaperText, answer: ScorerAnswer): ScorerOutput {
-  const text = normalizeForQuote(paper.text);
+  const text = quoteTextOf(paper.text);
   const given = new Map(answer.checks.map((check) => [check.id, check]));
   const checks = checklistOf(answer.studyType).map((check): CheckResult => {
     const found = given.get(check.id);

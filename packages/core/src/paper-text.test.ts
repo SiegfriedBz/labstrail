@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CITICOLINE_PAGES } from "./fixtures/citicoline-pages.ts";
-import { normalizeForQuote, preparePaperText, quoteFound } from "./paper-text.ts";
+import { normalizeForQuote, preparePaperText, quoteFound, quoteTextOf } from "./paper-text.ts";
 
 const WORDS = (count: number, word = "word") => Array.from({ length: count }, () => word).join(" ");
 const prepared = (pages: readonly string[], maxChars = 150_000) => {
@@ -96,8 +96,17 @@ describe("preparePaperText", () => {
   });
 });
 
+describe("normalizeForQuote", () => {
+  it("keeps letters and digits, lowercase, with accents, spacing accents and ligatures undone", () => {
+    expect(normalizeForQuote("Hoˆpital Garcı´a, 3 eﬃcacy — Straße!")).toBe(
+      "hopitalgarcia3efficacystrasse",
+    );
+  });
+});
+
 describe("quoteFound", () => {
-  const text = normalizeForQuote(prepared(CITICOLINE_PAGES).text);
+  const text = quoteTextOf(prepared(CITICOLINE_PAGES).text);
+  const found = (paper: string, quote: string) => quoteFound(quoteTextOf(paper), quote);
 
   it("finds a quote across a line break, whatever its spaces, case and punctuation", () => {
     expect(quoteFound(text, "Competing interests: NO authors have competing interests.")).toBe(
@@ -108,50 +117,118 @@ describe("quoteFound", () => {
   });
 
   it("finds a quote whose ligatures or dashes differ from the paper's", () => {
-    expect(
-      quoteFound(normalizeForQuote("the eﬃcacy—at three months"), "the efficacy - at three months"),
-    ).toBe(true);
+    expect(found("the eﬃcacy—at three months", "the efficacy - at three months")).toBe(true);
   });
 
   it("finds a quote with accents written apart from their letters, as PDFs often give them", () => {
-    const pdf = normalizeForQuote("Ministère des Solidarite´s et de la Sante´, Franc¸ois Rannou");
-
-    expect(quoteFound(pdf, "Ministère des Solidarités et de la Santé, François Rannou")).toBe(true);
-  });
-
-  it("finds a quote split by text from another column, in up to three long passages", () => {
-    const pdf = normalizeForQuote(
-      [
-        "Data Availability Statement: The full original protocol, dataset and statistical codes can be",
-        "accessed by academic researchers by contacting",
-        "knee pain score was 56.2/100 (SD 13.5) at baseline in the whole sample",
-        "the corresponding author, after approval of a proposal.",
-      ].join("\n"),
-    );
-
     expect(
-      quoteFound(
-        pdf,
-        "The full original protocol, dataset and statistical codes can be accessed by academic researchers by contacting the corresponding author, after approval of a proposal.",
+      found(
+        "Ministère des Solidarite´s et de la Sante´, Franc¸ois Rannou",
+        "Ministère des Solidarités et de la Santé, François Rannou",
       ),
     ).toBe(true);
-    expect(quoteFound(pdf, "The full original protocol … after approval of a proposal.")).toBe(
-      true,
-    );
+    expect(
+      found(
+        "by contacting Esther Lo´ pez-Garcı´a at the Hoˆpital Cochin",
+        "by contacting Esther López-García at the Hôpital Cochin",
+      ),
+    ).toBe(true);
+  });
+
+  it("finds a quote whose letters Unicode does not decompose are written another way", () => {
+    expect(
+      found(
+        "Straße, Ørsted, Cæsar, œuvre, Łódź, Đakovo",
+        "Strasse, Orsted, Caesar, oeuvre, Lodz, Dakovo",
+      ),
+    ).toBe(true);
+  });
+
+  const SPLIT = [
+    "Data Availability Statement: The full original protocol, dataset and statistical codes can be",
+    "accessed by academic researchers by contacting",
+    "knee pain score was 56.2/100 (SD 13.5) at baseline in the whole sample",
+    "the corresponding author, after approval of a proposal.",
+  ].join("\n");
+  const STATEMENT =
+    "The full original protocol, dataset and statistical codes can be accessed by academic researchers by contacting the corresponding author, after approval of a proposal.";
+
+  it("finds a quote that whole lines from another column split, in up to three long passages", () => {
+    expect(found(SPLIT, STATEMENT)).toBe(true);
+  });
+
+  it("finds a quote that a page header or reference numbers split", () => {
+    const paper = [
+      "Patients were randomly assigned [12, 13] to citicoline or placebo with a computer-",
+      "PLOS ONE | https://doi.org/10.1371/journal.pone.0269224 June 3, 2022 5 / 14",
+      "generated sequence of sealed envelopes.",
+    ].join("\n");
+
+    expect(
+      found(
+        paper,
+        "Patients were randomly assigned to citicoline or placebo with a computer-generated sequence of sealed envelopes.",
+      ),
+    ).toBe(true);
+  });
+
+  it("finds a quote whose passages lie a page apart, as the box beside a first page leaves them", () => {
+    const abstract = Array.from({ length: 60 }, (_, line) => `Abstract line ${line} of the paper.`);
+    const paper = [...SPLIT.split("\n").slice(0, 2), ...abstract, SPLIT.split("\n")[3]].join("\n");
+
+    expect(found(paper, STATEMENT)).toBe(true);
+  });
+
+  it.each([
+    [
+      "a word, such as not",
+      "The outcome assessors were not blinded to the treatment allocation.",
+      "The outcome assessors were blinded to the treatment allocation.",
+    ],
+    [
+      "part of a word",
+      "The outcome assessors were unblinded to the treatment allocation.",
+      "The outcome assessors were blinded to the treatment allocation.",
+    ],
+    [
+      "words, behind an ellipsis",
+      SPLIT,
+      "The full original protocol … the corresponding author, after approval of a proposal.",
+    ],
+  ])("does not find a quote that leaves out %s", (_, paper, quote) => {
+    expect(found(paper, quote)).toBe(false);
+  });
+
+  it("does not find a quote whose passages come out of order, or over a page apart", () => {
+    const first = "The full original protocol, dataset and statistical codes can be";
+    const second = "accessed by academic researchers by contacting the corresponding author.";
+    const pages = Array.from({ length: 400 }, (_, line) => `Line ${line} of the paper's results.`);
+
+    expect(found(`${second}\n${first}`, `${first} ${second}`)).toBe(false);
+    expect(found([first, ...pages, second].join("\n"), `${first} ${second}`)).toBe(false);
   });
 
   it("does not find a quote that needs more than three passages, or a short one", () => {
-    const pdf = normalizeForQuote(
-      "alpha bravo charlie delta echo. foxtrot golf hotel india juliet. kilo lima mike november oscar. papa quebec romeo sierra tango.",
-    );
+    const paper = [
+      "alpha bravo charlie delta echo",
+      "foxtrot golf hotel india juliet",
+      "kilo lima mike november oscar",
+      "papa quebec romeo sierra tango",
+    ].join("\n");
 
     expect(
-      quoteFound(
-        pdf,
-        "alpha bravo charlie delta echo kilo lima mike november oscar foxtrot golf hotel india juliet papa quebec romeo sierra tango",
+      found(
+        paper,
+        "alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa quebec romeo sierra tango",
+      ),
+    ).toBe(true);
+    expect(
+      found(
+        paper.replaceAll("\n", "\nbox\n"),
+        "alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa quebec romeo sierra tango",
       ),
     ).toBe(false);
-    expect(quoteFound(pdf, "alpha bravo charlie delta echo papa")).toBe(false);
+    expect(found(paper, "alpha bravo charlie delta echo papa")).toBe(false);
   });
 
   it("does not find a quote the paper does not hold", () => {

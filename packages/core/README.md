@@ -57,7 +57,7 @@ so an import of another `@verisci/*` package fails to typecheck.
 | `paperPdfQuery(contextGraph, ual)`, `pdfCidOf(bindings)` | The SPARQL reading the `schema:url` of a paper our node minted, from its own graph (`undefined` for another author or a malformed graph id), and the canonical CID of the `ipfs://` PDF it links, or `undefined` |
 | `triplesFromBindings(bindings)` | The `Triple`s in the rows of a `SELECT ?s ?p ?o` |
 | `preparePaperText(pages, maxChars)`, `PaperText`, `PreparePaperResult` | A paper's text from its PDF's pages, cleaned and fitted to `maxChars` (the reference list left out first, then the end cut, marked `[…]`), or `no-text` for pages holding almost no letters |
-| `normalizeForQuote(text)`, `quoteFound(normalizedText, quote)` | The text a quote is matched against (no accents, lowercase, letters and digits only), and whether a quote is made of up to three passages of the paper, each long enough to show something |
+| `normalizeForQuote(text)`, `quoteTextOf(text)`, `QuoteText`, `quoteFound(paper, quote)` | The letters and digits a quote is matched on (lowercase, accents and ligatures undone, letters such as `ı` or `ß` folded), a paper's text prepared once for matching, and whether a quote is made of up to three passages of the paper in order, each long enough to show something, with only numbers or whole lines between them |
 | `STUDY_TYPES`, `StudyType`, `CHECKS`, `CheckId`, `Check`, `checklistOf(type)` | The eight kinds of study the scorer tells apart, with the checklist each draws on, what each check asks, and a study type's checks in prompt order, each `required` or `conditional` |
 | `scorerPrompt(paper)`, `SCORER_OUTPUT_SCHEMA` | The scorer's system and user text for a paper, one request per paper, and the JSON Schema its answer must match |
 | `parseScorerAnswer(text)`, `ScorerAnswer`, `FIELDS`, `Field`, `CHECK_ANSWERS`, `CheckAnswer`, `CheckResult` | The scorer's answer checked: the field (`life-sciences` or `outside`), the study type and a reason, and for a paper in the field an answer to every check of its study type (`shown`, `partly`, `missing` or `not-applicable`) with its quote, and a rationale. Checks of another study type are left out, a repeated check keeps its first answer, and a reason, quote or rationale over its limit (500, 300 and 2,000 characters) is cut at a word rather than refused |
@@ -179,7 +179,10 @@ request id (Asset names above).
   `partly` half, `missing` none, and the score is `round(100 × points / applicable checks)`,
   rounding half up. A conditional check that does not apply leaves the count; a required one
   counts as `missing`. A `shown` or `partly` answer whose quote `quoteFound` does not find in
-  the paper counts as `missing`, so every point rests on the paper's own words; such a check
+  the paper counts as `missing`, so every point rests on the paper's own words. A quote may
+  run across what a PDF prints inside a statement (a page header, reference numbers, the box
+  beside a first page, up to about a page of it), but never leave out a word: "the assessors
+  were blinded" is not found in a paper that says "were not blinded". Such a check
   keeps what the model claimed (`claimed`), so the record tells "the paper does not say it"
   from "the model quoted something the paper does not hold". The way the
   expectations depend on the kind of study, and the credit for a statement that a check does
@@ -196,10 +199,11 @@ request id (Asset names above).
   which holds `urn:verisci:checkId`, `urn:verisci:answer`, and when they apply
   `urn:verisci:quote`, `urn:verisci:claimedAnswer` and `urn:verisci:claimedQuote`. Later phases add their own `…/phase/<n>` node to the same R-KA
   ([ADR 0012](../../docs/adr/0012-three-phases-settled-by-the-oracle.md)).
-- **The version:** `SCORER_PROMPT_VERSION` names the prompt, the checklists and the scoring
-  together, and every R-KA records it with the model. A test fingerprints all three, so a
-  change to any of them fails until the version is raised; a version merged into `develop` is
-  never changed again.
+- **The version:** `SCORER_PROMPT_VERSION` names the prompt, the checklists, the scoring and
+  quote matching together, and every R-KA records it with the model. A test fingerprints the
+  prompt (system and user), the scores of fixed answers and which of fixed quotes are found, so
+  a change that alters any of them fails until the version is raised; a version merged into
+  `develop` is never changed again.
 - **Reading back:** `ratingQuery` and `parseRating` read the score from the minted R-KA, so
   the score the oracle records always equals the score in the R-KA. An R-KA from the first
   scorer, which judged eight signals over the paper's record (`urn:verisci:observed` and

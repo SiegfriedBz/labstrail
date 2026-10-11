@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CHECKS, type CheckId, checklistOf, STUDY_TYPES } from "./checklists.ts";
-import type { PaperText } from "./paper-text.ts";
+import { type PaperText, quoteFound, quoteTextOf } from "./paper-text.ts";
 import {
   CHECK_ANSWERS,
   parseScorerAnswer,
@@ -77,7 +77,11 @@ describe("scorerPrompt", () => {
     const { system } = scorerPrompt(PAPER);
 
     for (const answer of CHECK_ANSWERS) expect(system).toContain(`- ${answer}:`);
-    expect(system).toContain("copied exactly from the paper, at most 300 characters");
+    expect(system).toContain(
+      "copied exactly from the paper, as one continuous passage with no word left out",
+    );
+    expect(system).toContain("at most 300 characters");
+    expect(system).toContain('"Competing interests: None." rather than "None."');
     expect(system).toContain('"no new data were generated"');
   });
 
@@ -416,16 +420,41 @@ function fingerprint(text: string): string {
   return hash.toString(16).padStart(8, "0");
 }
 
+/** A fixed text, with a page header, reference numbers and accents a PDF writes apart. */
+const QUOTE_TEXT = [
+  "Patients were randomly assigned [12] to citicoline or placebo with a computer-",
+  "PLOS ONE | https://doi.org/10.1371/journal.pone.0269224 June 3, 2022 5 / 14",
+  "generated sequence. The outcome assessors were not blinded to allocation.",
+  "Funding: Ministère de la Sante´, Esther Lo´pez-Garcı´a, Hoˆpital Cochin.",
+  "Competing interests",
+  "None.",
+  ...Array.from({ length: 400 }, (_, line) => `Line ${line} of the results.`),
+  "Data are available from the corresponding author on reasonable request.",
+].join("\n");
+/** Quotes matched against {@link QUOTE_TEXT}, found or not, so quote matching is fingerprinted. */
+const QUOTES = [
+  "Patients were randomly assigned to citicoline or placebo with a computer-generated sequence.",
+  "The outcome assessors were blinded to allocation.",
+  "The outcome assessors were not blinded to allocation.",
+  "Funding: Ministère de la Santé, Esther López-García, Hôpital Cochin.",
+  "None.",
+  "Competing interests: None.",
+  "Patients were randomly assigned … with a computer-generated sequence.",
+  "generated sequence. Data are available from the corresponding author on reasonable request.",
+  "Line 3 of the results. Line 2 of the results.",
+];
+
 /**
- * The fingerprint of each released prompt version: its prompt, which lists every checklist, and
- * the scores a fixed set of answers gets. A version is released once it is merged into
- * `develop`; never change a released one. When this test fails, raise SCORER_PROMPT_VERSION and
- * add the new version's fingerprint (an unreleased version's may be updated).
+ * The fingerprint of each released prompt version: its prompt (system, which lists every
+ * checklist, and user), the scores a fixed set of answers gets, and which of fixed quotes are
+ * found. A version is released once it is merged into `develop`; never change a released one.
+ * When this test fails, raise SCORER_PROMPT_VERSION and add the new version's fingerprint (an
+ * unreleased version's may be updated).
  */
-const RELEASED: Readonly<Record<string, string>> = { "2": "d6b4eee6" };
+const RELEASED: Readonly<Record<string, string>> = { "2": "112e1f57" };
 
 describe("SCORER_PROMPT_VERSION", () => {
-  it("changes whenever the prompt, a checklist or the way answers are scored changes", () => {
+  it("changes whenever the prompt, a checklist, the scoring or quote matching changes", () => {
     const paper: PaperText = {
       text: "The methods are described in full detail here.",
       shortened: false,
@@ -446,7 +475,13 @@ describe("SCORER_PROMPT_VERSION", () => {
         }).score,
     );
     const { system } = scorerPrompt(paper);
+    const { user } = scorerPrompt({ text: "A paper.", shortened: true });
+    const quotes = quoteTextOf(QUOTE_TEXT);
+    const found = QUOTES.map((quote) => (quoteFound(quotes, quote) ? 1 : 0));
 
-    expect(fingerprint(`${system}\n${scores.join(",")}`)).toBe(RELEASED[SCORER_PROMPT_VERSION]);
+    expect(found).toEqual([1, 0, 1, 1, 0, 1, 0, 0, 0]);
+    expect(fingerprint(`${system}\n${user}\n${scores.join(",")}\n${found.join("")}`)).toBe(
+      RELEASED[SCORER_PROMPT_VERSION],
+    );
   });
 });
