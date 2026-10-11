@@ -145,12 +145,12 @@ A rating is its own Knowledge Asset, the R-KA, linked to the KA it rates
 ([ADR 0011](../../docs/adr/0011-a-rating-is-a-separate-r-ka.md)) and named from its phase-1
 request id (Asset names above).
 
-- **Targets:** `classifyTarget` decides what a rating run does with a request's target UAL. A
-  UAL that does not parse, is not in the canonical spelling `normalizeUal` writes, or names
-  another chain than Base Sepolia can never be rated, so the oracle cancels its request
-  ([ADR 0031](../../docs/adr/0031-uals-are-normalized-before-the-contract.md)). Only papers
-  verisci published are rated, so a UAL another publisher minted is cancelled too
-  ([ADR 0011](../../docs/adr/0011-a-rating-is-a-separate-r-ka.md)), and
+- **Targets:** only papers verisci published are rated
+  ([ADR 0011](../../docs/adr/0011-a-rating-is-a-separate-r-ka.md)). `classifyTarget` decides
+  what a rating run does with a request's target UAL: one that does not parse, is not in the
+  canonical spelling `normalizeUal` writes
+  ([ADR 0031](../../docs/adr/0031-uals-are-normalized-before-the-contract.md)), names another
+  chain than Base Sepolia or another publisher is cancelled by the oracle, and
   `publishedPaperQuery` checks that one of ours is a published paper, not an R-KA.
   `targetTriplesQuery` then reads its triples.
 - **Scoring:** `scorerPrompt` asks the model how well the record lets a reader check the work,

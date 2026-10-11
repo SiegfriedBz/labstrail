@@ -185,7 +185,8 @@ sequenceDiagram
   W->>R: event keyed on requestId
   R->>C: read the request and the contract's oracle
   Note over R: Stop if settled, or if the oracle is not this deployment's key.
-  alt not a paper verisci published (by its UAL)
+  R->>N: is the target one of our published papers?
+  alt not a paper verisci published (its UAL, then the node's answer)
     R->>O: cancel(requestId, invalid target)
     O->>C: cancelRequest(requestId, invalid target)
   else otherwise
@@ -196,7 +197,6 @@ sequenceDiagram
       O->>C: cancelRequest(requestId, expired)
     else otherwise
       opt nothing stored
-        R->>N: is the target one of our published papers? (if not: cancel, invalid target)
         R->>N: read the target's triples
         R->>R: score them once (Gemini)
         R->>N: store the R-KA
@@ -226,9 +226,10 @@ the request again and sends nothing if it is already settled, then checks the re
 later steps and raises the fees of a transaction stuck unmined
 ([ADR 0019](docs/adr/0019-oracle-transactions-are-serialized.md)). The score the oracle
 records is always the one read back from the minted R-KA
-([ADR 0018](docs/adr/0018-phase-1-scorer-output-contract.md)); a target UAL
-that is invalid or not in canonical form is cancelled
-([ADR 0031](docs/adr/0031-uals-are-normalized-before-the-contract.md)). The
+([ADR 0018](docs/adr/0018-phase-1-scorer-output-contract.md)); a target that is
+not a paper verisci published is cancelled
+([ADR 0011](docs/adr/0011-a-rating-is-a-separate-r-ka.md)), as is a UAL not in
+canonical form ([ADR 0031](docs/adr/0031-uals-are-normalized-before-the-contract.md)). The
 contract's calls and events are documented in the
 [`@verisci/contracts` README](packages/contracts/README.md).
 
