@@ -11,8 +11,8 @@ import { verifySubmission } from "./publish/verify-submission.ts";
 import { createOracleTransaction, ORACLE_SETTINGS, type OracleChain } from "./rating/oracle.ts";
 import { createOracleChain } from "./rating/oracle-chain.ts";
 import { createRatePaper, RATING_SETTINGS, type RatingDeps } from "./rating/rate-paper.ts";
-import { createRatingEnv, type RatingEnv, servesRating } from "./rating/rating-env.ts";
 import { scorePaper } from "./rating/scorer.ts";
+import { createRatingEnv, type RatingEnv, servesRating } from "./rating-env.ts";
 import { createWorkflowsEnv } from "./workflows-env.ts";
 
 /** How long the gateway and GROBID each get, inside the 300 s a step may take on Vercel. */
@@ -69,8 +69,10 @@ function getRatingChain(): RatingChain {
   const env = createRatingEnv();
   const local = env.APP_ENV === "local";
   const chain = local ? anvil : baseSepolia;
+  // One try per call, so a call ends within its timeout: the steps poll and retry.
   const transport = http(local ? env.LOCAL_CHAIN_RPC_URL : env.CHAIN_RPC_URL, {
     timeout: ORACLE_SETTINGS.rpcTimeoutMs,
+    retryCount: 0,
   });
   const account = privateKeyToAccount(env.ORACLE_PRIVATE_KEY as Hex);
   const client = createPublicClient({ chain, transport });

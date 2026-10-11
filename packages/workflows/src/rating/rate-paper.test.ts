@@ -1,5 +1,6 @@
 import type { RatingRequestState, ReadRequestResult } from "@verisci/contracts";
 import {
+  publishedPaperQuery,
   type QueryBinding,
   rKaQuads,
   SCORER_PROMPT_VERSION,
@@ -35,6 +36,7 @@ const NOW = 1_800_000_000_000;
 const YOUNG = NOW / 1000 - 60;
 const OLD = NOW / 1000 - 25 * 3600;
 const EVENT = { contract: CONTRACT, requestId: REQUEST_ID };
+const ELSEWHERE = "did:dkg:base:84532/0x9a17ec95e96f8a7c40b7ac1411e8a844c7bf9111/3";
 
 const OUTPUT: ScorerOutput = {
   score: 72,
@@ -108,6 +110,7 @@ interface Script {
   reads?: AssetResult[];
   stores?: AssetResult[];
   mints?: MintResult[];
+  found?: QueryResult[];
   targetRows?: QueryResult[];
   ratingRows?: QueryResult[];
   scores?: ScoreResult[];
@@ -128,6 +131,7 @@ function rate(script: Script, data: unknown = EVENT) {
   const reads = [...(script.reads ?? [missing])];
   const stores = [...(script.stores ?? [stored])];
   const mints = [...(script.mints ?? [mintedNow])];
+  const found = [...(script.found ?? [{ ok: true, bindings: [{ ka: TARGET }] }])];
   const targetRows = [...(script.targetRows ?? [{ ok: true, bindings: rows(TARGET_TRIPLES) }])];
   const ratingRowsAnswers = [
     ...(script.ratingRows ?? [{ ok: true, bindings: ratingRows(OUTPUT.score) }]),
@@ -135,14 +139,16 @@ function rate(script: Script, data: unknown = EVENT) {
   const scores = [
     ...(script.scores ?? [{ ok: true, output: OUTPUT, model: "gemini-3.8-flash-001" }]),
   ];
+  const foundQuery = publishedPaperQuery(GRAPH, TARGET);
   const targetQuery = targetTriplesQuery(GRAPH, TARGET, RATING_SETTINGS.maxTriples);
   const dkg = {
     readAsset: vi.fn(async () => next(reads)),
     storeAsset: vi.fn(async () => next(stores)),
     startMint: vi.fn(async () => next(mints)),
-    query: vi.fn(async (sparql: string) =>
-      sparql === targetQuery ? next(targetRows) : next(ratingRowsAnswers),
-    ),
+    query: vi.fn(async (sparql: string) => {
+      if (sparql === foundQuery) return next(found);
+      return sparql === targetQuery ? next(targetRows) : next(ratingRowsAnswers);
+    }),
   };
   const deps = {
     contracts: [CONTRACT],
@@ -226,18 +232,36 @@ describe("runRating: which requests it takes", () => {
     expect(dkg.readAsset).not.toHaveBeenCalled();
   });
 
-  it("leaves a target another node minted waiting: no score, no cancel, no retry", async () => {
-    const { run, deps, dkg, log, oracleCalls } = rate({
-      requests: [
-        pending({ targetUal: "did:dkg:base:84532/0x9a17ec95e96f8a7c40b7ac1411e8a844c7bf9111/3" }),
-      ],
+  it("cancels a paper another publisher minted invalid-target at once, reading nothing", async () => {
+    const { run, deps, dkg, oracleCalls } = rate({
+      requests: [pending({ targetUal: ELSEWHERE })],
     });
 
-    expect(await run).toEqual({ state: "waiting", reason: "target-elsewhere" });
+    expect(await run).toEqual({ state: "cancelled", reason: "invalid-target" });
+    expect(oracleCalls).toEqual([cancel("invalid-target")]);
     expect(deps.score).not.toHaveBeenCalled();
     expect(dkg.readAsset).not.toHaveBeenCalled();
-    expect(oracleCalls).toEqual([]);
-    expect(log).toEqual(["read-request"]);
+  });
+
+  it("cancels invalid-target a UAL our node answers is none of its published papers", async () => {
+    const { run, deps, dkg, log, oracleCalls } = rate({ found: [{ ok: true, bindings: [] }] });
+
+    expect(await run).toEqual({ state: "cancelled", reason: "invalid-target" });
+    expect(oracleCalls).toEqual([cancel("invalid-target")]);
+    expect(deps.score).not.toHaveBeenCalled();
+    expect(dkg.query).toHaveBeenCalledWith(publishedPaperQuery(GRAPH, TARGET));
+    expect(log).toEqual(["read-request", "read-rka-1", "find-target-1", "oracle cancel"]);
+  });
+
+  it("retries, never cancels, when the node does not answer whether it published the paper", async () => {
+    const { run, oracleCalls, log } = rate({
+      found: [unreachable, { ok: true, bindings: [{ ka: TARGET }] }],
+    });
+
+    expect(await run).toMatchObject({ state: "fulfilled" });
+    expect(oracleCalls.map((input) => input.action.kind)).toEqual(["fulfil"]);
+    expect(log).toContain("sleep retry-1 2m");
+    expect(log).toContain("find-target-2");
   });
 });
 
@@ -251,6 +275,7 @@ describe("runRating: rating a paper", () => {
     expect(log).toEqual([
       "read-request",
       "read-rka-1",
+      "find-target-1",
       "read-target-1",
       "score-1",
       "store-1",
@@ -275,8 +300,11 @@ describe("runRating: rating a paper", () => {
     expect(oracleCalls).toEqual([fulfil(64)]);
   });
 
-  it("reads at most 200 of the target's triples", () => {
-    expect(RATING_SETTINGS.maxTriples).toBe(200);
+  it("reads at most 200 of the target's triples", async () => {
+    const { run, dkg } = rate({});
+
+    await run;
+    expect(dkg.query).toHaveBeenCalledWith(targetTriplesQuery(GRAPH, TARGET, 200));
   });
 
   it("fulfils an R-KA already minted with its score read back, never scoring", async () => {
@@ -377,24 +405,39 @@ describe("runRating: past the maximum age", () => {
     expect(oracleCalls).toEqual([cancel("expired")]);
   });
 
-  it("keeps a request younger than 24 hours", () => {
-    expect(RATING_SETTINGS.maxAgeMs).toBe(24 * 3600 * 1000);
+  it("still scores a request exactly 24 hours old, and expires one a second older", async () => {
+    const atLimit = rate({ requests: [pending({ requestedAt: NOW / 1000 - 24 * 3600 })] });
+    expect(await atLimit.run).toEqual({ state: "fulfilled", score: 72, rKaUal: R_KA });
+    expect(atLimit.deps.score).toHaveBeenCalledOnce();
+
+    const past = rate({ requests: [pending({ requestedAt: NOW / 1000 - 24 * 3600 - 1 })] });
+    expect(await past.run).toEqual({ state: "cancelled", reason: "expired" });
+    expect(past.deps.score).not.toHaveBeenCalled();
   });
 });
 
 describe("runRating: retries", () => {
-  it("waits 2 minutes and reads again when the target has no rows, then fails target-unreadable", async () => {
-    const { run, deps, log } = rate({ targetRows: [{ ok: true, bindings: [] }] });
+  it("reads the target again when a paper the node lists gives no rows yet", async () => {
+    const { run, log } = rate({
+      targetRows: [
+        { ok: true, bindings: [] },
+        { ok: true, bindings: rows(TARGET_TRIPLES) },
+      ],
+    });
 
-    await expect(run).rejects.toThrow(/^rating-failed:target-unreadable: /);
-    expect(log.filter((id) => id.startsWith("sleep retry-"))).toEqual([
-      "sleep retry-1 2m",
-      "sleep retry-2 2m",
-      "sleep retry-3 2m",
-      "sleep retry-4 2m",
-    ]);
-    expect(log).toContain("read-target-5");
-    expect(deps.score).not.toHaveBeenCalled();
+    expect(await run).toMatchObject({ state: "fulfilled" });
+    expect(log).toContain("sleep retry-1 2m");
+    expect(log).toContain("read-target-2");
+  });
+
+  it("waits 2 minutes and reads the target again when the node does not answer", async () => {
+    const { run, log } = rate({
+      targetRows: [unreachable, { ok: true, bindings: rows(TARGET_TRIPLES) }],
+    });
+
+    expect(await run).toMatchObject({ state: "fulfilled" });
+    expect(log).toContain("sleep retry-1 2m");
+    expect(log).toContain("read-target-2");
   });
 
   it.each([
@@ -498,12 +541,21 @@ describe("runRating: failures that stop the run at once", () => {
       "the node does not serve the graph",
       { reads: [{ ok: false, reason: "graph-not-served" } as const] },
     ],
-    ["Gemini refuses our key", { scores: [{ ok: false, reason: "unauthorized" } as const] }],
+    [
+      "Gemini refuses the request",
+      { scores: [{ ok: false, reason: "refused", status: 403 } as const] },
+    ],
   ])("fails setup when %s", async (_, script) => {
     const { run } = rate(script);
 
     await expect(run).rejects.toThrow(NonRetriableError);
     await expect(run).rejects.toThrow(/^rating-failed:setup: /);
+  });
+
+  it("names Gemini's status when it refuses the request, so a retired model reads as one", async () => {
+    const { run } = rate({ scores: [{ ok: false, reason: "refused", status: 404 }] });
+
+    await expect(run).rejects.toThrow(/Gemini refused the request \(HTTP 404\)/);
   });
 
   it("fails rating-unreadable when a minted R-KA's score cannot be read back", async () => {
@@ -568,7 +620,7 @@ describe("createRatePaper", () => {
     expect(fn.opts.id).toBe("rate-paper");
     expect(fn.opts.triggers).toEqual([{ event: "verisci/rating.requested" }]);
     expect(fn.opts.singleton).toEqual({ key: "event.data.requestId", mode: "skip" });
-    expect(fn.opts.timeouts).toEqual({ finish: "45m" });
+    expect(fn.opts.timeouts).toEqual({ finish: "2h" });
   });
 
   it("throttles to 3 starts an hour in a deployment, and not locally", () => {

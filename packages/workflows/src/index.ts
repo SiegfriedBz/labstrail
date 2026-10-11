@@ -54,7 +54,7 @@ export {
   type RatingEnv,
   ratingSettingsRequired,
   servesRating,
-} from "./rating/rating-env.ts";
+} from "./rating-env.ts";
 export type { ReadRunResult, RunState } from "./runs.ts";
 export {
   getUploadService,

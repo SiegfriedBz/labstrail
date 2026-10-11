@@ -1,6 +1,6 @@
 import { createSharedEnv, defineEnv, type RuntimeEnv, type SharedEnv } from "@verisci/env";
 import { z } from "zod";
-import { workflowsSchema } from "../workflows-env.ts";
+import { workflowsSchema } from "./workflows-env.ts";
 
 /**
  * The local chain's variables (ADR 0036): Anvil's URL and the RatingController deployed there.

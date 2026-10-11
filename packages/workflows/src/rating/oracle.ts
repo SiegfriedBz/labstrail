@@ -22,7 +22,7 @@ export const ORACLE_SETTINGS = {
   busyPoll: "15s",
   /** How long a transaction in flight holds the lane before its nonce is replaced. */
   busyLimitMs: 600_000,
-  /** Each RPC call's timeout, set on the chain client. */
+  /** Each RPC call's timeout, set on the chain client, which makes one try: steps retry. */
   rpcTimeoutMs: 10_000,
   /** How long a run may try before it fails `oracle-stuck`, inside `finishTimeout`. */
   budgetMs: 1_500_000,
@@ -311,12 +311,11 @@ async function receiptStep(
   logger: OracleLogger,
 ): Promise<ReceiptStep> {
   const at = chain.now();
-  for (const hash of tx.hashes) {
-    const receipt = await chain.receipt(hash);
-    if (!receipt.ok) return { kind: "pending", at, tx };
-    if (receipt.state === "success") return { kind: "mined", at };
-    if (receipt.state === "reverted") return { kind: "again", at };
-  }
+  // Every hash sent shares one nonce, so at most one is ever mined; they are read at once.
+  const receipts = await Promise.all(tx.hashes.map((hash) => chain.receipt(hash)));
+  const mined = receipts.find((receipt) => receipt.ok && receipt.state !== "none");
+  if (mined?.ok) return mined.state === "success" ? { kind: "mined", at } : { kind: "again", at };
+  if (receipts.some((receipt) => !receipt.ok)) return { kind: "pending", at, tx };
   const nonces = await chain.nonces();
   if (!nonces.ok) return { kind: "pending", at, tx };
   if (nonces.latest > tx.nonce) return { kind: "again", at };

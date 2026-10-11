@@ -22,6 +22,7 @@ export {
   parsePaperAuthors,
   parsePaperCount,
   parsePaperListing,
+  publishedPaperQuery,
 } from "./paper-list.ts";
 export {
   type PaperRecord,

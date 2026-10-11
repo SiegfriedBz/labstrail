@@ -51,7 +51,8 @@ scorer's output, and no other workspace. pnpm does not hoist undeclared workspac
 | `PaperListing` | A listed paper |
 | `targetKaQuads(metadata, submission)` | The `Triple`s of a paper's Target KA: its description and who submitted it |
 | `Triple`, `PaperSubmission`, `VERISCI_NS` | One triple as the DKG node takes it, the submitter's address, signature and deadline, and the `urn:verisci:` prefix |
-| `classifyTarget(targetUal, contextGraph)`, `TargetClass` | How a rating run treats a target: `ours` (our node minted it), `elsewhere` (another author, or the older UAL form), `invalid` (does not parse, not canonical, or another chain than Base Sepolia) |
+| `classifyTarget(targetUal, contextGraph)`, `TargetClass` | How a rating run treats a target: `ours` (canonical, on Base Sepolia, minted by our node), or `invalid` (does not parse, not canonical, another chain, another publisher, or the older UAL form), which is cancelled |
+| `publishedPaperQuery(contextGraph, ual)` | The SPARQL that finds one UAL among the graph's published papers, with the papers list's patterns: one row for a paper our node published, none otherwise (an R-KA included); `undefined` for a UAL that is not canonical or a graph id that is not a full one |
 | `targetTriplesQuery(contextGraph, ual, limit)`, `triplesFromBindings(bindings)` | The SPARQL reading up to `limit` triples of an asset our node minted, from its own graph, in a stable order (`undefined` for another author, a malformed graph id or a limit that is not a positive safe integer), and the `Triple`s in its rows |
 | `PHASE1_SIGNALS`, `Phase1Signal`, `SCORER_PROMPT_VERSION` | The signals the phase-1 scorer looks for, with their wording, and the prompt's version |
 | `scorerPrompt(triples)`, `SCORER_OUTPUT_SCHEMA` | The scorer's system and user text for a target's triples, and the JSON Schema its answer must match |
@@ -147,9 +148,11 @@ request id (Asset names above).
 - **Targets:** `classifyTarget` decides what a rating run does with a request's target UAL. A
   UAL that does not parse, is not in the canonical spelling `normalizeUal` writes, or names
   another chain than Base Sepolia can never be rated, so the oracle cancels its request
-  ([ADR 0031](../../docs/adr/0031-uals-are-normalized-before-the-contract.md)). A UAL another
-  author minted cannot be read without its context graph, which a UAL does not name
-  (`docs/domain.md` → DKG). `targetTriplesQuery` reads the triples of a target our node minted.
+  ([ADR 0031](../../docs/adr/0031-uals-are-normalized-before-the-contract.md)). Only papers
+  verisci published are rated, so a UAL another publisher minted is cancelled too
+  ([ADR 0011](../../docs/adr/0011-a-rating-is-a-separate-r-ka.md)), and
+  `publishedPaperQuery` checks that one of ours is a published paper, not an R-KA.
+  `targetTriplesQuery` then reads its triples.
 - **Scoring:** `scorerPrompt` asks the model how well the record lets a reader check the work,
   guided by eight signals: a claim, methods, data, results, limitations, data or code
   availability, an identifier and named authors. The record is untrusted text, so the prompt

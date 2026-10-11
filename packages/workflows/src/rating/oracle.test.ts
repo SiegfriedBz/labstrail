@@ -77,7 +77,7 @@ interface Script {
   oracle?: string;
   fees?: typeof FEES;
   sends?: SendResult[];
-  receipts?: Record<string, ("none" | "success" | "reverted")[]>;
+  receipts?: Record<string, ("none" | "success" | "reverted" | "down")[]>;
 }
 
 /** A chain answering from `script`; each list repeats its last answer. */
@@ -104,8 +104,8 @@ function fakeChain(script: Script, now: () => number) {
     send: vi.fn(async () => next(sends)),
     receipt: vi.fn(async (hash: Hex) => {
       const list = receipts[hash];
-      const state: "none" | "success" | "reverted" = list ? next(list) : "none";
-      return { ok: true as const, state };
+      const state = list ? next(list) : "none";
+      return state === "down" ? { ok: false as const } : { ok: true as const, state };
     }),
   } satisfies OracleChain;
   return chain;
@@ -282,6 +282,23 @@ describe("runOracle", () => {
     });
     expect(log).toContain(`receipt-1-${polls}`);
     expect(chain.receipt).toHaveBeenCalledWith("0xa2");
+  });
+
+  it("finds the mined replacement when an earlier hash's receipt cannot be read", async () => {
+    const polls = ORACLE_SETTINGS.bumpAfterMs / 5_000;
+    const { run, chain } = oracle(FULFIL, {
+      sends: [
+        { ok: true, hash: "0xa1" },
+        { ok: true, hash: "0xa2" },
+      ],
+      receipts: {
+        "0xa1": [...Array.from({ length: polls }, () => "none" as const), "down"],
+        "0xa2": ["success"],
+      },
+    });
+
+    expect(await run).toEqual({ state: "fulfilled", score: 72, rKaUal: R_KA });
+    expect(chain.send).toHaveBeenCalledTimes(2);
   });
 
   it("sends no raise past the fee cap, logs it once and keeps checking", async () => {

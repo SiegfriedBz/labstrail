@@ -37,8 +37,8 @@ export interface ScorerOutput {
   readonly missing: readonly Phase1Signal[];
 }
 
-/** How a rating run treats a target UAL. */
-export type TargetClass = "ours" | "elsewhere" | "invalid";
+/** How a rating run treats a target UAL: `ours` is rated, `invalid` is cancelled. */
+export type TargetClass = "ours" | "invalid";
 
 /** What {@link rKaQuads} writes into a rating's R-KA. */
 export interface RatingContent {
@@ -74,11 +74,11 @@ const SIGNAL_IDS = PHASE1_SIGNALS.map((signal) => signal.id);
 const SIGNAL_SET: ReadonlySet<string> = new Set(SIGNAL_IDS);
 
 /**
- * How a rating run treats `targetUal` (ADRs 0011, 0031): `invalid` when it does not parse,
- * is not in canonical form, or names a chain other than Base Sepolia, the DKG's chain, so it
- * can never be rated; `ours` when our node, the agent of `contextGraph`, minted it, so its
- * triples can be read; `elsewhere` for any other author, or the older UAL form that names the
- * KnowledgeAssets contract.
+ * How a rating run treats `targetUal` (ADRs 0011, 0031): `ours` when it is in canonical form,
+ * on Base Sepolia (the DKG's chain), and minted by our node, the agent of `contextGraph`, so
+ * verisci published it; `invalid` otherwise: it does not parse, is not canonical, names
+ * another chain or another publisher, or is the older form that names the KnowledgeAssets
+ * contract. Only papers verisci published are rated.
  */
 export function classifyTarget(targetUal: string, contextGraph: string): TargetClass {
   const parsed = parseUal(targetUal);
@@ -88,7 +88,7 @@ export function classifyTarget(targetUal: string, contextGraph: string): TargetC
     return "invalid";
   }
   const agent = contextGraph.slice(0, contextGraph.indexOf("/")).toLowerCase();
-  return parsed.ual.address === agent ? "ours" : "elsewhere";
+  return parsed.ual.address === agent ? "ours" : "invalid";
 }
 
 /**

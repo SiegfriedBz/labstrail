@@ -51,16 +51,11 @@ describe("classifyTarget", () => {
   });
 
   it.each([
-    ["another author", OTHER_UAL],
+    ["another publisher's canonical UAL", OTHER_UAL],
     [
       "the older form, which names the KnowledgeAssets contract",
       "did:dkg:base:84532/0x2b2e1bcb7c52a1587264e01f6b53782d791e6fa0/120",
     ],
-  ])("calls a canonical Base Sepolia UAL with %s elsewhere", (_, ual) => {
-    expect(classifyTarget(ual, GRAPH)).toBe("elsewhere");
-  });
-
-  it.each([
     ["a UAL that does not parse", "did:dkg:base:84532/0xnope/7"],
     ["an empty string", ""],
     ["an uppercase address", `did:dkg:base:84532/${AGENT.toUpperCase().replace("0X", "0x")}/7`],

@@ -19,14 +19,15 @@ export interface ScorerOptions {
 
 /**
  * Why a score did not come back: `rate-limited`, `unreachable` and `invalid-output` are worth
- * a retry; `unauthorized` (Gemini refused the key or the request) is a setup error.
+ * a retry; `refused` (any 4xx but 429: a bad key, a key without access, a model Gemini no
+ * longer serves, a request it does not accept) is a setup error.
  */
-export type ScoreFailure = "rate-limited" | "unauthorized" | "unreachable" | "invalid-output";
+export type ScoreFailure = "rate-limited" | "refused" | "unreachable" | "invalid-output";
 
-/** The result of {@link scorePaper}. */
+/** The result of {@link scorePaper}; a `refused` failure carries Gemini's HTTP status. */
 export type ScoreResult =
   | { readonly ok: true; readonly output: ScorerOutput; readonly model: string }
-  | { readonly ok: false; readonly reason: ScoreFailure };
+  | { readonly ok: false; readonly reason: ScoreFailure; readonly status?: number };
 
 const API = "https://generativelanguage.googleapis.com/v1beta/models";
 
@@ -52,8 +53,8 @@ const answer = z.object({
  * Scores a target's triples with Gemini (ADR 0018): the prompt from `scorerPrompt`,
  * temperature 0, and JSON output held to `SCORER_OUTPUT_SCHEMA`, then checked again with
  * `parseScorerOutput`, so nothing else reaches the chain. Returns the output and the model
- * version Gemini reports, which the R-KA records. Never throws, and no result carries the
- * key or Gemini's text.
+ * version Gemini reports, which the R-KA records. Never throws; a failure carries neither the
+ * key nor Gemini's text.
  */
 export async function scorePaper(
   triples: readonly Triple[],
@@ -81,7 +82,10 @@ export async function scorePaper(
   }
   if (!response.ok) {
     await response.body?.cancel();
-    return { ok: false, reason: failureOf(response.status) };
+    const reason = failureOf(response.status);
+    return reason === "refused"
+      ? { ok: false, reason, status: response.status }
+      : { ok: false, reason };
   }
 
   let body: unknown;
@@ -104,9 +108,12 @@ export async function scorePaper(
   return { ok: true, output: output.output, model: parsed.data.modelVersion ?? options.model };
 }
 
-/** Gemini answers a bad key with 400, a key without access with 401 or 403. */
+/**
+ * 429 is Gemini's rate limit and 5xx its outage. Any other status is a request it refuses: a
+ * bad key (400), a key without access (401, 403), a model it no longer serves (404).
+ */
 function failureOf(status: number): ScoreFailure {
   if (status === 429) return "rate-limited";
   if (status >= 500) return "unreachable";
-  return "unauthorized";
+  return "refused";
 }

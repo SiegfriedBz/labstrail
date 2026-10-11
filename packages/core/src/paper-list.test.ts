@@ -7,6 +7,7 @@ import {
   parsePaperAuthors,
   parsePaperCount,
   parsePaperListing,
+  publishedPaperQuery,
 } from "./paper-list.ts";
 import type { QueryBinding } from "./paper-record.ts";
 
@@ -90,6 +91,32 @@ describe("paperCountQuery", () => {
 
   it("gives no query for a graph id that is not a full one", () => {
     expect(paperCountQuery("verisci-staging")).toBeUndefined();
+  });
+});
+
+describe("publishedPaperQuery", () => {
+  const UAL = `did:dkg:base:84532/${AGENT_LOWER}/7`;
+
+  it("finds one UAL among the papers the page query picks, with the same patterns", () => {
+    const query = publishedPaperQuery(GRAPH, UAL);
+    expect(query).toMatch(/^SELECT \?ka WHERE \{/);
+    expect(query).toContain(`VALUES ?ka { <${UAL}> }`);
+    expect(query).toMatch(/LIMIT 1$/);
+    expect(where(query).replace(`\n  VALUES ?ka { <${UAL}> }`, "")).toBe(
+      where(paperListQuery(GRAPH, { limit: 1, offset: 0 })).replace(/\n\s*OPTIONAL \{[^}]*\}/, ""),
+    );
+  });
+
+  it.each([
+    ["a UAL that is not canonical", UAL.toUpperCase()],
+    ["a UAL that does not parse", "did:dkg:base:84532/nope"],
+    ["a UAL with an IRI breaker", `${UAL}> } #`],
+  ])("gives no query for %s", (_, ual) => {
+    expect(publishedPaperQuery(GRAPH, ual)).toBeUndefined();
+  });
+
+  it("gives no query for a graph id that is not a full one", () => {
+    expect(publishedPaperQuery("verisci-staging", UAL)).toBeUndefined();
   });
 });
 

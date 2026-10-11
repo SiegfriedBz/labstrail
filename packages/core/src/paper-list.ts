@@ -34,14 +34,16 @@ const DIGITS = /^\d+$/;
  * joined to the triples in that asset's own graph, so an asset another node adds to the
  * graph is never listed and never changes one of ours. `authors` also counts each paper's
  * authors. The node's layout and why `?g` is filtered rather than bound are in
- * `docs/domain.md` → DKG. `undefined` for a graph id that is not a full one.
+ * `docs/domain.md` → DKG. With `ual` (canonical), only that asset is matched. `undefined` for
+ * a graph id that is not a full one.
  */
-function publishedPapers(contextGraph: string, authors = false): string | undefined {
+function publishedPapers(contextGraph: string, authors = false, ual?: string): string | undefined {
   const graph = contextGraphIri(contextGraph);
   if (!graph) return undefined;
   const agent = contextGraph.slice(0, contextGraph.indexOf("/"));
   const authorPattern = authors ? `\n    OPTIONAL { ?paper <${SCHEMA}author> ?author . }` : "";
-  return `WHERE {
+  const only = ual ? `\n  VALUES ?ka { <${ual}> }` : "";
+  return `WHERE {${only}
   GRAPH <${graph}/_meta> {
     ?asset <${DKG}memoryLayer> "VM" ;
       <${DKG}kaUal> ?ka .
@@ -90,6 +92,19 @@ LIMIT ${page.limit} OFFSET ${page.offset}`;
 export function paperCountQuery(contextGraph: string): string | undefined {
   const where = publishedPapers(contextGraph);
   return where && `SELECT (COUNT(DISTINCT ?paper) AS ?total) ${where}`;
+}
+
+/**
+ * The SPARQL query that finds `ual` among the papers {@link paperListQuery} lists, with the
+ * same patterns but the authors: one row when it is a paper our node published in the graph
+ * (a Target KA, so never an R-KA), none otherwise (ADR 0011). `undefined` for a UAL that is
+ * not canonical (ADR 0031) or a graph id that is not a full one.
+ */
+export function publishedPaperQuery(contextGraph: string, ual: string): string | undefined {
+  const normalized = normalizeUal(ual);
+  if (!normalized.ok || normalized.ual !== ual) return undefined;
+  const where = publishedPapers(contextGraph, false, ual);
+  return where && `SELECT ?ka ${where}\nLIMIT 1`;
 }
 
 /**

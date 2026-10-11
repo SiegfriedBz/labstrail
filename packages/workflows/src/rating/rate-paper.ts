@@ -2,6 +2,7 @@ import type { RatingRequestState, ReadOracleResult, ReadRequestResult } from "@v
 import {
   classifyTarget,
   parseRating,
+  publishedPaperQuery,
   ratingQuery,
   rKaName,
   rKaQuads,
@@ -39,8 +40,12 @@ export const RATING_SETTINGS = {
   pollsPerMint: 20,
   retryWait: "2m",
   attempts: 5,
-  /** A run's whole budget, enforced by Inngest. */
-  finishTimeout: "45m",
+  /**
+   * A run's whole budget, enforced by Inngest. It covers the slowest run: up to 8 minutes to
+   * read the request, 5 attempts of up to 12 minutes each (scoring, a mint and 10 minutes of
+   * polls), 2 minutes between attempts, and the oracle's 35 minutes.
+   */
+  finishTimeout: "2h",
   /** How long the run waits for the oracle function, just over its `finishTimeout`. */
   oracleTimeout: "35m",
   /** Run starts outside `local`, sized against Inngest's free plan (ADR 0015). */
@@ -56,7 +61,6 @@ export const RATING_SETTINGS = {
 export type RatingFailure =
   | "chain-unreachable"
   | "node-unreachable"
-  | "target-unreadable"
   | "scorer-unavailable"
   | "mint-not-confirmed"
   | "oracle-failed"
@@ -66,7 +70,6 @@ export type RatingFailure =
 const RATING_FAILURES: readonly RatingFailure[] = [
   "chain-unreachable",
   "node-unreachable",
-  "target-unreadable",
   "scorer-unavailable",
   "mint-not-confirmed",
   "oracle-failed",
@@ -76,7 +79,7 @@ const RATING_FAILURES: readonly RatingFailure[] = [
 
 /**
  * How a rating run ends, unless it fails: the request fulfilled or cancelled (an `orphan` is an
- * R-KA the contract never recorded, ADR 0014), skipped, or left `waiting` for its maximum age.
+ * R-KA the contract never recorded, ADR 0014), or skipped.
  */
 export type RatingOutcome =
   | { readonly state: "fulfilled"; readonly score: number; readonly rKaUal: string }
@@ -88,8 +91,7 @@ export type RatingOutcome =
   | {
       readonly state: "skipped";
       readonly reason: "bad-event" | "unknown-contract" | "not-pending" | "not-our-oracle";
-    }
-  | { readonly state: "waiting"; readonly reason: "target-elsewhere" };
+    };
 
 /** The step tools a rating run uses: `step.run`, `step.sleep`, and `step.invoke` of the oracle. */
 export interface RatingSteps {
@@ -133,6 +135,7 @@ type ReadRequestStep =
 type Attempt =
   | { readonly kind: "fulfil"; readonly score: number; readonly rKaUal: string }
   | { readonly kind: "expire"; readonly orphan?: string }
+  | { readonly kind: "invalid" }
   | { readonly kind: "retry"; readonly failure: RatingFailure; readonly reason: string }
   | { readonly kind: "mint-again" }
   | { readonly kind: "fatal"; readonly failure: RatingFailure; readonly reason: string };
@@ -157,10 +160,11 @@ export function ratingFailureReason(output: unknown): RatingFailure | undefined 
  *
  * 1. the request must be on one of the environment's contracts, pending, and that contract's
  *    oracle must be this deployment's key, or the run stops before spending anything;
- * 2. a target that can never be rated is cancelled `invalid-target`; one another node minted
- *    waits, since its graph is unknown;
+ * 2. a target verisci did not publish (`classifyTarget`) is cancelled `invalid-target` at
+ *    once (ADR 0011);
  * 3. the R-KA is read: minted is fulfilled; stored is minted at once (ADR 0008); a draft is
- *    shared, then minted; missing is scored once, stored and minted;
+ *    shared, then minted; missing is scored once, stored and minted, unless our node answers
+ *    that the target is none of the papers it published, which is cancelled `invalid-target`;
  * 4. the score is always read back from the minted R-KA, so the chain records the R-KA's;
  * 5. past `maxAgeMs`, only a minted R-KA is fulfilled (a stored one is polled, never minted);
  *    anything else is cancelled `expired`.
@@ -186,10 +190,8 @@ export async function runRating(
   if (request.status !== "pending") return { state: "skipped", reason: "not-pending" };
   if (read.oracle !== deps.oracle) return { state: "skipped", reason: "not-our-oracle" };
 
-  const target = classifyTarget(request.targetUal, deps.contextGraph);
-  if (target === "elsewhere") return { state: "waiting", reason: "target-elsewhere" };
   const oracle = (id: string, input: OracleInput) => callOracle(id, input, step);
-  if (target === "invalid") {
+  if (classifyTarget(request.targetUal, deps.contextGraph) === "invalid") {
     const answer = await oracle("cancel", cancelOf(contract, requestId, "invalid-target"));
     return outcomeOf(answer, undefined, logger);
   }
@@ -221,6 +223,10 @@ export async function runRating(
     if (result.kind === "expire") {
       const answer = await oracle("cancel", cancelOf(contract, requestId, "expired"));
       return outcomeOf(answer, result.orphan, logger);
+    }
+    if (result.kind === "invalid") {
+      const answer = await oracle("cancel", cancelOf(contract, requestId, "invalid-target"));
+      return outcomeOf(answer, undefined, logger);
     }
     if (result.kind === "fatal") throw stop(result.failure, `${name.name}: ${result.reason}`);
     last = result;
@@ -321,19 +327,28 @@ async function score(
 ): Promise<NonNullable<RunContext["scored"]> | Attempt> {
   if (run.scored) return run.scored;
   const { step, deps } = run;
+  const find = publishedPaperQuery(deps.contextGraph, run.targetUal);
   const sparql = targetTriplesQuery(deps.contextGraph, run.targetUal, RATING_SETTINGS.maxTriples);
-  if (!sparql) return { kind: "fatal", failure: "setup", reason: "target query refused" };
+  if (!find || !sparql) return { kind: "fatal", failure: "setup", reason: "target query refused" };
+  const found = await step.run(`find-target-${attempt}`, () => deps.dkg.query(find));
+  if (!found.ok) return failed(found);
+  // The node answered, and verisci published no such paper: it can never be rated (ADR 0011).
+  if (found.bindings.length === 0) return { kind: "invalid" };
   const rows = await step.run(`read-target-${attempt}`, () => deps.dkg.query(sparql));
   if (!rows.ok) return failed(rows);
   const triples = triplesFromBindings(rows.bindings);
   if (triples.length === 0) {
-    return { kind: "retry", failure: "target-unreadable", reason: "the target has no triples" };
+    return { kind: "retry", failure: "node-unreachable", reason: "the target gave no rows yet" };
   }
 
   const result = await step.run(`score-${attempt}`, () => deps.score(triples));
   if (!result.ok) {
-    return result.reason === "unauthorized"
-      ? { kind: "fatal", failure: "setup", reason: "Gemini refused our key" }
+    return result.reason === "refused"
+      ? {
+          kind: "fatal",
+          failure: "setup",
+          reason: `Gemini refused the request (HTTP ${result.status}): check GEMINI_API_KEY and the model`,
+        }
       : { kind: "retry", failure: "scorer-unavailable", reason: `scorer ${result.reason}` };
   }
   run.scored = { output: result.output, model: result.model };
@@ -417,7 +432,7 @@ function outcomeOf(
 
 /**
  * The `rate-paper` Inngest function, run by `verisci/rating.requested`: a singleton per
- * request id in mode `skip` (ADR 0020), with a 45-minute budget, throttled when `throttle`
+ * request id in mode `skip` (ADR 0020), with a 2-hour budget, throttled when `throttle`
  * (outside `local`, ADR 0015). It invokes `oracle` to fulfil or cancel. `getDeps` builds the
  * adapters on the first run, so importing the function validates no settings.
  */

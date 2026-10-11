@@ -33,7 +33,7 @@ server (`APP_ENV` other than `local`) checks them when it starts, through
 | `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY` | Inngest's keys, required unless `APP_ENV` is `local`: the SDK reads them itself, and the signing key also reads runs for the upload page. Secret |
 | `VERCEL_GIT_COMMIT_REF` | Set by Vercel: on staging, the branch, which names the Inngest branch environment runs are read from |
 
-The rating functions read four more, declared in `src/rating/rating-env.ts`
+The rating functions read four more, declared in `src/rating-env.ts`
 (`createRatingEnv`) and validated with the settings above in one pass, so one `EnvError`
 names every bad variable. A deployment serves the rating and oracle functions only when
 `ORACLE_PRIVATE_KEY` is set (`servesRating`); a deployed server checks these at start in
@@ -64,7 +64,7 @@ upload page reads runs there, with no keys.
 | `ratePaper`, `oracleTransaction` | The `rate-paper` function, run by `verisci/rating.requested`, and the `oracle-transaction` function it invokes (below) |
 | `RATING_REQUESTED`, `RatingRequested`, `ratingRequestedEvent(log)` | The rating event's name, `verisci/rating.requested`, its data `{ contract, requestId }`, and the event for a `Phase1Requested` log (id `rating:<request id>`), or `undefined` for any other log |
 | `RATING_SETTINGS`, `ORACLE_SETTINGS` | The rating run's and the oracle function's limits (below) |
-| `RatingOutcome`, `RatingFailure`, `ratingFailureReason(output)` | How a rating run ends (`fulfilled`, `cancelled` with an optional orphan R-KA, `skipped`, `waiting`), and why one stopped instead: each error it throws starts `rating-failed:<reason>:` |
+| `RatingOutcome`, `RatingFailure`, `ratingFailureReason(output)` | How a rating run ends (`fulfilled`, `cancelled` with an optional orphan R-KA, `skipped`), and why one stopped instead: each error it throws starts `rating-failed:<reason>:` |
 | `OracleAction`, `OracleInput`, `OracleResult`, `OracleFailure` | What the oracle function is asked, what it answers, and why it stops (`oracle-failed:<reason>:`) |
 | `createRatingEnv(runtimeEnv)`, `RatingEnv`, `checkRatingSettings(runtimeEnv)`, `ratingSettingsRequired(runtimeEnv)`, `servesRating(runtimeEnv)` | The rating settings and their type, the start check `apps/web/instrumentation.ts` runs, when it requires them, and whether a deployment serves the rating functions |
 | `PAPER_SUBMITTED` | The event's name, `verisci/paper.submitted` |
@@ -124,8 +124,8 @@ Retries ([ADR 0009](../../docs/adr/0009-retries-are-spaced-with-step-sleep.md)):
 `verisci/rating.requested` carries `{ contract, requestId }`: a RatingController's lowercase
 address and a phase-1 request id. The `rate-paper` run is a singleton per request id in mode
 `skip` ([ADR 0020](../../docs/adr/0020-stuck-requests-recovered-only-oracle-cancels.md)),
-has 45 minutes, and outside `APP_ENV=local` is throttled to 3 starts an hour with a burst of
-3, against Inngest's free plan
+has 2 hours, enough for every attempt and the oracle, and outside `APP_ENV=local` is
+throttled to 3 starts an hour with a burst of 3, against Inngest's free plan
 ([ADR 0015](../../docs/adr/0015-rating-requests-are-free-on-testnet.md)). It does only what
 is left ([ADR 0007](../../docs/adr/0007-all-writes-converge.md)):
 
@@ -134,17 +134,20 @@ is left ([ADR 0007](../../docs/adr/0007-all-writes-converge.md)):
    `LOCAL_RATING_CONTRACT`. **read-request** reads the request and the contract's oracle; a
    request no longer pending, or a contract whose oracle is not this deployment's key, ends
    the run before anything is spent.
-2. **The target:** a UAL that does not parse, is not canonical or names another chain than
-   Base Sepolia is cancelled `invalid-target`
-   ([ADR 0031](../../docs/adr/0031-uals-are-normalized-before-the-contract.md)). One another
-   node minted ends the run `waiting`: its context graph is unknown (an open question), so
-   the request waits for its maximum age.
+2. **The target:** only papers verisci published are rated
+   ([ADR 0011](../../docs/adr/0011-a-rating-is-a-separate-r-ka.md)). A UAL that does not
+   parse, is not canonical
+   ([ADR 0031](../../docs/adr/0031-uals-are-normalized-before-the-contract.md)), names another
+   chain than Base Sepolia, or names another publisher is cancelled `invalid-target` at once,
+   before anything else is read.
 3. **read-rka:** the R-KA `verisci-rka-<request id>`. Minted goes to the read-back. Stored is
    minted at once, with no wait for a mint an earlier run may have started
    ([ADR 0008](../../docs/adr/0008-mints-are-async-polled-in-short-steps.md)). A draft is
-   shared, then minted. Missing: **read-target** reads up to 200 of the target's triples
-   from its own asset graph, **score** asks Gemini once, and **store** writes the R-KA
-   (`packages/core` → Ratings). A score that came back is kept for every later attempt.
+   shared, then minted. Missing: **find-target** asks the node whether the target is one of
+   its published papers (`publishedPaperQuery`), and cancels `invalid-target` when the node
+   answers that it is not (a wrong number, or an R-KA); **read-target** reads up to 200 of
+   its triples from its own asset graph, **score** asks Gemini once, and **store** writes the
+   R-KA (`packages/core` → Ratings). A score that came back is kept for every later attempt.
 4. **mint**, then **poll** every 30 s; a mint not seen after 10 minutes is started again.
 5. **read-score** reads the score back from the minted R-KA, and the oracle function fulfils
    with it, so the score on chain equals the R-KA's
@@ -156,22 +159,23 @@ anything else is cancelled `expired`. A stored R-KA left behind, or one minted f
 cancelled meanwhile, is an orphan: the outcome names it, and the run logs it as an error.
 
 Retries ([ADR 0009](../../docs/adr/0009-retries-are-spaced-with-step-sleep.md)): a chain
-that does not answer is read again every 2 minutes, up to 5 times. A target with no triples,
-a node that does not answer or gives no rows yet, a quorum failure, or a scorer that is
-unreachable, rate-limited or gives an answer the output check refuses waits 2 minutes and
-starts a new attempt from the R-KA's read, up to 5 attempts, then fails
-(`target-unreadable`, `node-unreachable`, `scorer-unavailable`; `mint-not-confirmed` when the
-mint is never seen). It fails at once (`setup`) on missing or invalid settings, a node or
-Gemini that refuses our key, or a node that does not serve the graph, and
+that does not answer is read again every 2 minutes, up to 5 times. A node that does not
+answer or gives no rows yet, a quorum failure, or a scorer that is unreachable, rate-limited
+or gives an answer the output check refuses waits 2 minutes and starts a new attempt from
+the R-KA's read, up to 5 attempts, then fails (`node-unreachable`, `scorer-unavailable`;
+`mint-not-confirmed` when the mint is never seen). A node that does not answer is never
+taken for a missing paper. It fails at once (`setup`) on missing or invalid settings, a node that
+refuses our key, Gemini refusing the request (the detail names its status), or a node that
+does not serve the graph, and
 (`rating-unreadable`) on a minted R-KA whose score does not parse. A failed run leaves the
 request pending; the reconciler of the next plan restarts it.
 
 The scorer sends the prompt from `packages/core` (`scorerPrompt`), temperature 0 and the
 output's JSON Schema to `gemini-3.8-flash`, and checks the answer again with
-`parseScorerOutput`. A 429 is `rate-limited`; a 400, 401 or 403 (Gemini answers a bad key
-with 400) is `unauthorized`; a 5xx, a network error or 60 s without an answer is
-`unreachable`; no candidate, a blocked answer or text the check refuses is
-`invalid-output`. No result carries the key.
+`parseScorerOutput`. A 429 is `rate-limited`; any other 4xx is `refused`, with its status
+(a bad key is 400, a key without access 401 or 403, a model Gemini no longer serves 404); a
+5xx, a network error or 60 s without an answer is `unreachable`; no candidate, a blocked
+answer or text the check refuses is `invalid-output`. No failure carries the key.
 
 ## The oracle function
 
@@ -186,7 +190,8 @@ minutes.
   (fulfilled with the same R-KA, or cancelled, is an answer; fulfilled with another R-KA fails
   `oracle-conflict`). Then it sends at the latest nonce, with the chain's fee estimate capped
   at 10 gwei.
-- **receipt:** every 5 s, in steps of its own. A successful receipt settles it. A reverted one,
+- **receipt:** every 5 s, in steps of its own, reading the receipt of every transaction sent
+  for the call at once. A successful receipt settles it. A reverted one,
   or a nonce another transaction took, reads the request again. Unmined after 60 s, the same
   call goes out at the same nonce with both fees raised by 15%; a raise past the cap is not
   sent, and is logged once as `oracle-at-fee-cap`.

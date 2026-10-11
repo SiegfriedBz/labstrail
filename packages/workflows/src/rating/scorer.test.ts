@@ -98,9 +98,6 @@ describe("scorePaper", () => {
 
   it.each([
     ["429", async () => answer({ error: { code: 429 } }, 429), "rate-limited"],
-    ["401", async () => answer({}, 401), "unauthorized"],
-    ["403", async () => answer({}, 403), "unauthorized"],
-    ["400, Gemini's answer to a bad key", async () => answer({}, 400), "unauthorized"],
     ["500", async () => answer({}, 500), "unreachable"],
     ["503", async () => answer({}, 503), "unreachable"],
     ["a network error", () => Promise.reject(new TypeError("fetch failed")), "unreachable"],
@@ -134,6 +131,18 @@ describe("scorePaper", () => {
     const { score } = scorer(reply);
 
     expect(await score()).toEqual({ ok: false, reason });
+  });
+
+  it.each([
+    ["400, Gemini's answer to a bad key", 400],
+    ["401", 401],
+    ["403", 403],
+    ["404, a model Gemini no longer serves", 404],
+    ["413", 413],
+  ])("answers refused with the status for %s", async (_, status) => {
+    const { score } = scorer(async () => answer({}, status));
+
+    expect(await score()).toEqual({ ok: false, reason: "refused", status });
   });
 
   it("never carries the key in a result", async () => {

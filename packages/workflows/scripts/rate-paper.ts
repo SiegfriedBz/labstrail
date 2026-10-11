@@ -22,7 +22,7 @@ import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { anvil } from "viem/chains";
 import { inngest } from "../src/inngest.ts";
 import { ratingRequestedEvent } from "../src/rating/events.ts";
-import { localChainSchema } from "../src/rating/rating-env.ts";
+import { localChainSchema } from "../src/rating-env.ts";
 
 const args = process.argv.slice(2);
 const raw = args.includes("--raw");
