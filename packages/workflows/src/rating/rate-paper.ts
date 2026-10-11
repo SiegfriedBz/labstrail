@@ -1,16 +1,18 @@
 import type { RatingRequestState, ReadOracleResult, ReadRequestResult } from "@verisci/contracts";
 import {
+  type Classification,
   classifyTarget,
+  type PaperText,
+  paperPdfQuery,
   parseRating,
+  pdfCidOf,
   publishedPaperQuery,
   ratingQuery,
   rKaName,
   rKaQuads,
   SCORER_PROMPT_VERSION,
   type ScorerOutput,
-  type Triple,
-  targetTriplesQuery,
-  triplesFromBindings,
+  type StudyType,
 } from "@verisci/core";
 import type { DkgClient, DkgFailure } from "@verisci/dkg";
 import { type Inngest, type InngestFunction, NonRetriableError } from "inngest";
@@ -18,16 +20,23 @@ import type { Hex } from "viem";
 import { z } from "zod";
 import { RATING_REQUESTED } from "./events.ts";
 import type { OracleInput, OracleLogger, OracleResult } from "./oracle.ts";
-import type { ScoreResult } from "./scorer.ts";
+import type { ReadPaperTextResult } from "./paper-text.ts";
+import type { ClassifyResult, JudgeResult, ScoreFailureResult } from "./scorer.ts";
 
 /** The rating run's settings (ADRs 0008, 0009, 0015, 0018, 0020). */
 export const RATING_SETTINGS = {
-  /** The Gemini model that scores, on the free tier (ADR 0018). */
+  /** The Gemini model that classifies and judges, on the free tier (ADR 0018). */
   model: "gemini-3.8-flash",
-  /** Most triples of a target the scorer reads (ADR 0018). */
-  maxTriples: 200,
-  /** How long Gemini gets for one score. */
-  scorerTimeoutMs: 60_000,
+  /** The largest PDF read, the publish run's limit. */
+  maxPdfBytes: 30 * 1024 * 1024,
+  /** How long the gateway gets to give the PDF. */
+  pdfTimeoutMs: 60_000,
+  /** The longest paper text the scorer reads, about 40,000 tokens (`preparePaperText`). */
+  maxTextChars: 150_000,
+  /** How long Gemini gets to classify a paper. */
+  classifierTimeoutMs: 60_000,
+  /** How long Gemini gets to answer a paper's checks, inside a step's 300 s on Vercel. */
+  judgeTimeoutMs: 180_000,
   /**
    * Past this, a request is fulfilled only if its R-KA is minted, else cancelled (ADR 0020).
    * It must exceed the reconciler's threshold and interval plus `finishTimeout`.
@@ -41,12 +50,12 @@ export const RATING_SETTINGS = {
   retryWait: "2m",
   attempts: 5,
   /**
-   * A run's whole budget, enforced by Inngest. It covers the slowest run, about 125 minutes:
-   * up to 8 minutes to read the request and 14 to find the target, 5 attempts of up to 12
-   * minutes each (scoring, a mint and 10 minutes of polls), 2 minutes between attempts, and
-   * the oracle's 35 minutes.
+   * A run's whole budget, enforced by Inngest. It covers the slowest run, about 150 minutes:
+   * up to 8 minutes to read the request and 14 to find the target, 5 attempts of up to 17
+   * minutes each (finding and reading the paper, classifying and judging it, a mint and 10
+   * minutes of polls), 2 minutes between attempts, and the oracle's 35 minutes.
    */
-  finishTimeout: "150m",
+  finishTimeout: "180m",
   /** How long the run waits for the oracle function, just over its `finishTimeout`. */
   oracleTimeout: "35m",
   /** Run starts outside `local`, sized against Inngest's free plan (ADR 0015). */
@@ -57,11 +66,12 @@ export const RATING_SETTINGS = {
  * Why a rating run stopped without an outcome, carried in its error as
  * `rating-failed:<reason>: <detail>` ({@link ratingFailureReason}). `setup` and
  * `rating-unreadable` are ours to fix; the others clear up with time, and the request stays
- * pending for the next run.
+ * pending for the next run. `paper-unreachable` is the gateway not giving the paper's PDF.
  */
 export type RatingFailure =
   | "chain-unreachable"
   | "node-unreachable"
+  | "paper-unreachable"
   | "scorer-unavailable"
   | "mint-not-confirmed"
   | "oracle-failed"
@@ -71,6 +81,7 @@ export type RatingFailure =
 const RATING_FAILURES: readonly RatingFailure[] = [
   "chain-unreachable",
   "node-unreachable",
+  "paper-unreachable",
   "scorer-unavailable",
   "mint-not-confirmed",
   "oracle-failed",
@@ -116,7 +127,12 @@ export interface RatingDeps {
   readRequest(contract: Hex, requestId: Hex): Promise<ReadRequestResult>;
   readOracle(contract: Hex): Promise<ReadOracleResult>;
   readonly dkg: Pick<DkgClient, "readAsset" | "storeAsset" | "startMint" | "query" | "checkGraph">;
-  score(triples: readonly Triple[]): Promise<ScoreResult>;
+  /** The text of the PDF a paper links, by its CID (`readPaperText`). */
+  readPaper(cid: string): Promise<ReadPaperTextResult>;
+  /** The paper's field and study type (`classifyPaper`). */
+  classify(paper: PaperText): Promise<ClassifyResult>;
+  /** The answers to its study type's checks, and the score (`judgePaper`). */
+  judge(paper: PaperText, type: StudyType): Promise<JudgeResult>;
 }
 
 const eventSchema = z.object({
@@ -137,6 +153,7 @@ type Attempt =
   | { readonly kind: "fulfil"; readonly score: number; readonly rKaUal: string }
   | { readonly kind: "expire"; readonly orphan?: string }
   | { readonly kind: "retry"; readonly failure: RatingFailure; readonly reason: string }
+  | { readonly kind: "invalid-target" }
   | { readonly kind: "mint-again" }
   | { readonly kind: "fatal"; readonly failure: RatingFailure; readonly reason: string };
 
@@ -164,14 +181,19 @@ export function ratingFailureReason(output: unknown): RatingFailure | undefined 
  *    must name our node (`classifyTarget`), and our node must list it among its published
  *    papers (`find-target`);
  * 3. the R-KA is read: minted is fulfilled; stored is minted at once (ADR 0008); a draft is
- *    shared, then minted; missing is scored once, stored and minted;
+ *    shared, then minted; missing is scored once, stored and minted. Scoring finds the paper's
+ *    PDF link (`find-pdf`), reads its text (`read-paper`), has Gemini classify it
+ *    (`classify`), then answer its study type's checks (`judge`), each done once per run; a
+ *    paper outside the field (ADR 0037), with no PDF link, or whose PDF cannot be read, is
+ *    cancelled `invalid-target` before anything is stored;
  * 4. the score is always read back from the minted R-KA, so the chain records the R-KA's;
  * 5. past `maxAgeMs`, only a minted R-KA is fulfilled (a stored one is polled, never minted);
  *    anything else is cancelled `expired`.
  *
  * Fulfil and cancel go through the oracle function (ADR 0019). A failure worth a retry waits
  * `retryWait` and starts a new attempt from the R-KA's read (ADR 0009); a mint not seen after
- * `pollsPerMint` polls is started again. A score that came back is never computed again.
+ * `pollsPerMint` polls is started again. A part of the score that came back (the link, the
+ * text, the classification, the judged checks) is never asked for again.
  */
 export async function runRating(
   data: unknown,
@@ -225,6 +247,10 @@ export async function runRating(
       const answer = await oracle("cancel", cancelOf(contract, requestId, "expired"));
       return outcomeOf(answer, result.orphan, logger);
     }
+    if (result.kind === "invalid-target") {
+      const answer = await oracle("cancel", cancelOf(contract, requestId, "invalid-target"));
+      return outcomeOf(answer, undefined, logger);
+    }
     if (result.kind === "fatal") throw stop(result.failure, `${name.name}: ${result.reason}`);
     last = result;
     if (result.kind === "retry" && attempt < RATING_SETTINGS.attempts) {
@@ -244,7 +270,10 @@ interface RunContext {
   readonly expired: boolean;
   readonly step: RatingSteps;
   readonly deps: RatingDeps;
-  /** The score once it came back, kept across attempts so it is never computed again. */
+  /** Each part of the score once it came back, kept across attempts so it is never redone. */
+  cid?: string;
+  paper?: PaperText;
+  classification?: Classification;
   scored?: { readonly output: ScorerOutput; readonly model: string };
 }
 
@@ -342,34 +371,70 @@ async function rateOnce(attempt: number, run: RunContext): Promise<Attempt> {
   return readScore(attempt, ual, run);
 }
 
-/** The score, from an earlier attempt or from the scorer, reading the target first. */
+/**
+ * The score, from an earlier attempt or from the scorer: the paper's PDF link, its text, its
+ * classification, then the judged checks, each step skipped once its result is in.
+ */
 async function score(
   attempt: number,
   run: RunContext,
 ): Promise<NonNullable<RunContext["scored"]> | Attempt> {
   if (run.scored) return run.scored;
   const { step, deps } = run;
-  const sparql = targetTriplesQuery(deps.contextGraph, run.targetUal, RATING_SETTINGS.maxTriples);
-  if (!sparql) return { kind: "fatal", failure: "setup", reason: "target query refused" };
-  const rows = await step.run(`read-target-${attempt}`, () => deps.dkg.query(sparql));
-  if (!rows.ok) return failed(rows);
-  const triples = triplesFromBindings(rows.bindings);
-  if (triples.length === 0) {
-    return { kind: "retry", failure: "node-unreachable", reason: "the target gave no rows yet" };
+  if (!run.cid) {
+    const cid = await findPdf(attempt, run);
+    if (typeof cid !== "string") return cid;
+    run.cid = cid;
   }
-
-  const result = await step.run(`score-${attempt}`, () => deps.score(triples));
-  if (!result.ok) {
-    return result.reason === "refused"
-      ? {
-          kind: "fatal",
-          failure: "setup",
-          reason: `Gemini refused the request (HTTP ${result.status}): check GEMINI_API_KEY and the model`,
-        }
-      : { kind: "retry", failure: "scorer-unavailable", reason: `scorer ${result.reason}` };
+  if (!run.paper) {
+    const { cid } = run;
+    const read = await step.run(`read-paper-${attempt}`, () => deps.readPaper(cid));
+    if (!read.ok) {
+      return read.reason === "unreadable"
+        ? { kind: "invalid-target" }
+        : { kind: "retry", failure: "paper-unreachable", reason: `the PDF ${cid} did not come` };
+    }
+    run.paper = read.paper;
   }
-  run.scored = { output: result.output, model: result.model };
+  const { paper } = run;
+  if (!run.classification) {
+    const classified = await step.run(`classify-${attempt}`, () => deps.classify(paper));
+    if (!classified.ok) return geminiFailed(classified);
+    if (classified.output.field === "outside") return { kind: "invalid-target" };
+    run.classification = classified.output;
+  }
+  const { studyType } = run.classification;
+  const judged = await step.run(`judge-${attempt}`, () => deps.judge(paper, studyType));
+  if (!judged.ok) return geminiFailed(judged);
+  run.scored = { output: judged.output, model: judged.model };
   return run.scored;
+}
+
+/**
+ * The CID of the PDF the target links (ADR 0010), or what to do without one: an answer with no
+ * link counts only once the node confirms it serves the graph, as in `findTarget`; a link that
+ * is not an `ipfs://` CID cancels the request `invalid-target`.
+ */
+async function findPdf(attempt: number, run: RunContext): Promise<string | Attempt> {
+  const { step, deps } = run;
+  const sparql = paperPdfQuery(deps.contextGraph, run.targetUal);
+  if (!sparql) return { kind: "fatal", failure: "setup", reason: "paper query refused" };
+  const rows = await step.run(`find-pdf-${attempt}`, () => deps.dkg.query(sparql));
+  if (!rows.ok) return failed(rows);
+  if (rows.bindings.length > 0) return pdfCidOf(rows.bindings) ?? { kind: "invalid-target" };
+  const served = await step.run(`check-pdf-graph-${attempt}`, () => deps.dkg.checkGraph());
+  return served.ok ? { kind: "invalid-target" } : failed(served);
+}
+
+/** A Gemini call that did not answer: a refused request is ours to fix, the rest retried. */
+function geminiFailed(result: ScoreFailureResult): Attempt {
+  return result.reason === "refused"
+    ? {
+        kind: "fatal",
+        failure: "setup",
+        reason: `Gemini refused the request (HTTP ${result.status}): check GEMINI_API_KEY and the model`,
+      }
+    : { kind: "retry", failure: "scorer-unavailable", reason: `scorer ${result.reason}` };
 }
 
 /** Polls the R-KA's state; its UAL once minted, a failure, or `undefined` after every poll. */
@@ -449,7 +514,7 @@ function outcomeOf(
 
 /**
  * The `rate-paper` Inngest function, run by `verisci/rating.requested`: a singleton per
- * request id in mode `skip` (ADR 0020), with a 150-minute budget, throttled when `throttle`
+ * request id in mode `skip` (ADR 0020), with a 180-minute budget, throttled when `throttle`
  * (outside `local`, ADR 0015). It invokes `oracle` to fulfil or cancel. `getDeps` builds the
  * adapters on the first run, so importing the function validates no settings.
  */

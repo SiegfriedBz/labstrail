@@ -1,19 +1,26 @@
 import {
-  parseScorerOutput,
-  SCORER_OUTPUT_SCHEMA,
+  CLASSIFIER_OUTPUT_SCHEMA,
+  type Classification,
+  classifierPrompt,
+  judgeOutputSchema,
+  judgePrompt,
+  type PaperText,
+  parseClassifierOutput,
+  parseJudgeOutput,
   type ScorerOutput,
-  scorerPrompt,
-  type Triple,
+  type StudyType,
+  scoreChecks,
 } from "@verisci/core";
 import { z } from "zod";
 
-/** How the scorer reaches Gemini. */
+/** How the scorer reaches Gemini, for one call. */
 export interface ScorerOptions {
   /** A Gemini API key. Secret. */
   readonly apiKey: string;
   /** The model id, such as `gemini-3.8-flash`. */
   readonly model: string;
   readonly fetch: typeof fetch;
+  /** How long Gemini gets to answer. */
   readonly timeoutMs: number;
 }
 
@@ -24,10 +31,22 @@ export interface ScorerOptions {
  */
 export type ScoreFailure = "rate-limited" | "refused" | "unreachable" | "invalid-output";
 
-/** The result of {@link scorePaper}; a `refused` failure carries Gemini's HTTP status. */
-export type ScoreResult =
+/** A call that did not answer; a `refused` one carries Gemini's HTTP status. */
+export type ScoreFailureResult = {
+  readonly ok: false;
+  readonly reason: ScoreFailure;
+  readonly status?: number;
+};
+
+/** The result of {@link classifyPaper}. */
+export type ClassifyResult =
+  | { readonly ok: true; readonly output: Classification; readonly model: string }
+  | ScoreFailureResult;
+
+/** The result of {@link judgePaper}: the score as `scoreChecks` computed it. */
+export type JudgeResult =
   | { readonly ok: true; readonly output: ScorerOutput; readonly model: string }
-  | { readonly ok: false; readonly reason: ScoreFailure; readonly status?: number };
+  | ScoreFailureResult;
 
 const API = "https://generativelanguage.googleapis.com/v1beta/models";
 
@@ -50,29 +69,63 @@ const answer = z.object({
 });
 
 /**
- * Scores a target's triples with Gemini (ADR 0018): the prompt from `scorerPrompt`,
- * temperature 0, and JSON output held to `SCORER_OUTPUT_SCHEMA`, then checked again with
- * `parseScorerOutput`, so nothing else reaches the chain. Returns the output and the model
- * version Gemini reports, which the R-KA records. Never throws; a failure carries neither the
- * key nor Gemini's text.
+ * Asks Gemini which field a paper is in and what kind of study it is (ADRs 0018, 0037): the
+ * prompt from `classifierPrompt`, temperature 0, JSON output held to `CLASSIFIER_OUTPUT_SCHEMA`
+ * and checked again with `parseClassifierOutput`. Returns the classification and the model
+ * version Gemini reports. Never throws; a failure carries neither the key nor Gemini's text.
  */
-export async function scorePaper(
-  triples: readonly Triple[],
+export async function classifyPaper(
+  paper: PaperText,
   options: ScorerOptions,
-): Promise<ScoreResult> {
-  const { system, user } = scorerPrompt(triples);
+): Promise<ClassifyResult> {
+  const answer = await generate(classifierPrompt(paper), CLASSIFIER_OUTPUT_SCHEMA, options);
+  if (!answer.ok) return answer;
+  const parsed = parseClassifierOutput(answer.text);
+  return parsed.ok
+    ? { ok: true, output: parsed.output, model: answer.model }
+    : { ok: false, reason: "invalid-output" };
+}
+
+/**
+ * Asks Gemini to answer each check of `type`'s checklist for a paper, with quotes (ADR 0018):
+ * the prompt from `judgePrompt`, temperature 0, JSON output held to `judgeOutputSchema(type)`
+ * and checked again with `parseJudgeOutput`; `scoreChecks` then checks the quotes and computes
+ * the score, so nothing else reaches the chain. Returns the output and the model version
+ * Gemini reports. Never throws; a failure carries neither the key nor Gemini's text.
+ */
+export async function judgePaper(
+  paper: PaperText,
+  type: StudyType,
+  options: ScorerOptions,
+): Promise<JudgeResult> {
+  const answer = await generate(judgePrompt(paper, type), judgeOutputSchema(type), options);
+  if (!answer.ok) return answer;
+  const parsed = parseJudgeOutput(answer.text, type);
+  return parsed.ok
+    ? { ok: true, output: scoreChecks(paper, type, parsed.output), model: answer.model }
+    : { ok: false, reason: "invalid-output" };
+}
+
+/** One `generateContent` call: the answer's text, leaving out thoughts, and the model version. */
+async function generate(
+  prompt: { readonly system: string; readonly user: string },
+  schema: object,
+  options: ScorerOptions,
+): Promise<
+  { readonly ok: true; readonly text: string; readonly model: string } | ScoreFailureResult
+> {
   let response: Response;
   try {
     response = await options.fetch(`${API}/${options.model}:generateContent`, {
       method: "POST",
       headers: { "content-type": "application/json", "x-goog-api-key": options.apiKey },
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: system }] },
-        contents: [{ role: "user", parts: [{ text: user }] }],
+        systemInstruction: { parts: [{ text: prompt.system }] },
+        contents: [{ role: "user", parts: [{ text: prompt.user }] }],
         generationConfig: {
           temperature: 0,
           responseMimeType: "application/json",
-          responseJsonSchema: SCORER_OUTPUT_SCHEMA,
+          responseJsonSchema: schema,
         },
       }),
       signal: AbortSignal.timeout(options.timeoutMs),
@@ -103,9 +156,7 @@ export async function scorePaper(
     .filter((part) => !part.thought)
     .map((part) => part.text ?? "")
     .join("");
-  const output = parseScorerOutput(text);
-  if (!output.ok) return { ok: false, reason: "invalid-output" };
-  return { ok: true, output: output.output, model: parsed.data.modelVersion ?? options.model };
+  return { ok: true, text, model: parsed.data.modelVersion ?? options.model };
 }
 
 /**

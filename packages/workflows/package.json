@@ -19,6 +19,7 @@
     "@verisci/dkg": "workspace:*",
     "@verisci/env": "workspace:*",
     "inngest": "4.22.0",
+    "unpdf": "1.8.1",
     "viem": "2.57.4",
     "zod": "4.6.5"
   },

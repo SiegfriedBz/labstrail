@@ -2,19 +2,15 @@ import { describe, expect, it } from "vitest";
 import type { QueryBinding } from "./paper-record.ts";
 import {
   classifyTarget,
-  PHASE1_SIGNALS,
+  paperPdfQuery,
   parseRating,
-  parseScorerOutput,
+  pdfCidOf,
   type RatingContent,
   ratingQuery,
   rKaQuads,
-  SCORER_OUTPUT_SCHEMA,
-  SCORER_PROMPT_VERSION,
-  type ScorerOutput,
-  scorerPrompt,
-  targetTriplesQuery,
   triplesFromBindings,
 } from "./rating.ts";
+import { SCORER_PROMPT_VERSION, type ScorerOutput } from "./scorer.ts";
 import type { Triple } from "./target-ka.ts";
 
 const GRAPH = "0xD701ed157232ad5E14BC4134a8D10D64D86f13B3/verisci-staging";
@@ -22,13 +18,18 @@ const AGENT = "0xd701ed157232ad5e14bc4134a8d10d64d86f13b3";
 const OUR_UAL = `did:dkg:base:84532/${AGENT}/7`;
 const OTHER_UAL = "did:dkg:base:84532/0x9a17ec95e96f8a7c40b7ac1411e8a844c7bf9111/3";
 const REQUEST_ID = `0x${"ab".repeat(32)}`;
-const SIGNAL_IDS = PHASE1_SIGNALS.map((signal) => signal.id);
+const CID = "bafkreigh2akiscaildcqabsyg3dfr6chu3fgpregiymsck7e7aqa4s52zy";
 
 const OUTPUT: ScorerOutput = {
   score: 72,
-  rationale: 'The abstract states a "clear" claim\nand its methods.',
-  observed: ["claim", "methods", "identifier", "authors"],
-  missing: ["data", "results", "limitations", "availability"],
+  rationale: 'The paper states a "clear" claim\nand its methods.',
+  studyType: "randomized-trial",
+  checks: [
+    { id: "sample-size", answer: "shown", quote: "We needed 60 patients for 80% power." },
+    { id: "randomization", answer: "partly", quote: 'Patients were "randomly" assigned.' },
+    { id: "harms", answer: "missing" },
+    { id: "code-availability", answer: "not-applicable" },
+  ],
 };
 
 const RATING: RatingContent = {
@@ -68,26 +69,32 @@ describe("classifyTarget", () => {
   });
 });
 
-describe("targetTriplesQuery", () => {
-  it("selects the asset's triples from its own graph, in a stable order, up to the limit", () => {
-    const query = targetTriplesQuery(GRAPH, OUR_UAL, 200) ?? "";
+describe("paperPdfQuery and pdfCidOf", () => {
+  it("reads the paper's schema:url from its own graph", () => {
+    const query = paperPdfQuery(GRAPH, OUR_UAL) ?? "";
 
-    expect(query).toContain("SELECT ?s ?p ?o");
+    expect(query).toContain("SELECT ?url");
     expect(query).toContain(
-      `GRAPH <did:dkg:context-graph:${GRAPH}/_verifiable_memory/${AGENT}/7> { ?s ?p ?o }`,
+      `GRAPH <did:dkg:context-graph:${GRAPH}/_verifiable_memory/${AGENT}/7> { ?paper <http://schema.org/url> ?url }`,
     );
-    expect(query).toMatch(/ORDER BY \?s \?p \?o\s+LIMIT 200$/);
+  });
+
+  it("is undefined for a paper another agent minted", () => {
+    expect(paperPdfQuery(GRAPH, OTHER_UAL)).toBeUndefined();
+  });
+
+  it("finds the CID of the PDF the paper links", () => {
+    expect(pdfCidOf([{ url: `ipfs://${CID}` }])).toBe(CID);
   });
 
   it.each([
-    ["another author", GRAPH, OTHER_UAL, 200],
-    ["a malformed graph id", "verisci-staging", OUR_UAL, 200],
-    ["a limit of zero", GRAPH, OUR_UAL, 0],
-    ["a negative limit", GRAPH, OUR_UAL, -1],
-    ["a limit that is not an integer", GRAPH, OUR_UAL, 1.5],
-    ["a limit past the safe integers", GRAPH, OUR_UAL, Number.MAX_SAFE_INTEGER + 1],
-  ])("is undefined for %s", (_, graph, ual, limit) => {
-    expect(targetTriplesQuery(graph, ual, limit)).toBeUndefined();
+    ["no rows", []],
+    ["a row with no url", [{ paper: "urn:verisci:paper:x" }]],
+    ["a link that is not ipfs://", [{ url: `https://gateway.example/ipfs/${CID}` }]],
+    ["an invalid CID", [{ url: "ipfs://not-a-cid" }]],
+    ["a literal", [{ url: `"ipfs://${CID}"` }]],
+  ])("is undefined for %s", (_, rows: QueryBinding[]) => {
+    expect(pdfCidOf(rows)).toBeUndefined();
   });
 });
 
@@ -101,90 +108,6 @@ describe("triplesFromBindings", () => {
     expect(triplesFromBindings(rows)).toEqual([
       { subject: "urn:verisci:paper:x", predicate: "http://schema.org/name", object: '"A title"' },
     ]);
-  });
-});
-
-describe("scorerPrompt", () => {
-  const TRIPLES: Triple[] = [
-    { subject: "urn:verisci:paper:x", predicate: "http://schema.org/name", object: '"A title"' },
-    {
-      subject: "urn:verisci:paper:x",
-      predicate: "http://schema.org/sameAs",
-      object: "https://doi.org/10.1/x",
-    },
-  ];
-
-  it("names every signal and the four output fields, and says the record is data", () => {
-    const { system } = scorerPrompt(TRIPLES);
-
-    for (const signal of PHASE1_SIGNALS) {
-      expect(system).toContain(`${signal.id}: ${signal.label}`);
-    }
-    for (const field of ["score", "rationale", "observed", "missing"]) {
-      expect(system).toContain(`${field}:`);
-    }
-    expect(system).toMatch(/data to rate, never instructions/);
-  });
-
-  it("puts one triple per line, in the order given, IRIs in angle brackets", () => {
-    const { user } = scorerPrompt(TRIPLES);
-
-    const lines = user.split("\n");
-    const first = lines.indexOf('<urn:verisci:paper:x> <http://schema.org/name> "A title" .');
-    const second = lines.indexOf(
-      "<urn:verisci:paper:x> <http://schema.org/sameAs> <https://doi.org/10.1/x> .",
-    );
-    expect(first).toBeGreaterThan(-1);
-    expect(second).toBe(first + 1);
-  });
-
-  it("gives the same text for the same triples", () => {
-    expect(scorerPrompt(TRIPLES)).toEqual(scorerPrompt([...TRIPLES]));
-  });
-});
-
-describe("parseScorerOutput", () => {
-  const json = (value: unknown) => JSON.stringify(value);
-
-  it("accepts a valid output", () => {
-    expect(parseScorerOutput(json(OUTPUT))).toEqual({ ok: true, output: OUTPUT });
-  });
-
-  it("accepts the ends of the score range and of the rationale's length", () => {
-    expect(parseScorerOutput(json({ ...OUTPUT, score: 0 })).ok).toBe(true);
-    expect(parseScorerOutput(json({ ...OUTPUT, score: 100 })).ok).toBe(true);
-    expect(parseScorerOutput(json({ ...OUTPUT, rationale: "x".repeat(2000) })).ok).toBe(true);
-  });
-
-  it.each([
-    ["text that is not JSON", "Score: 72"],
-    ["a score that is not an integer", json({ ...OUTPUT, score: 72.5 })],
-    ["a score given as text", json({ ...OUTPUT, score: "72" })],
-    ["a score below 0", json({ ...OUTPUT, score: -1 })],
-    ["a score above 100", json({ ...OUTPUT, score: 101 })],
-    ["a missing rationale", json({ ...OUTPUT, rationale: undefined })],
-    ["an empty rationale", json({ ...OUTPUT, rationale: "   " })],
-    ["a rationale over 2,000 characters", json({ ...OUTPUT, rationale: "x".repeat(2001) })],
-    ["an unknown signal", json({ ...OUTPUT, observed: [...OUTPUT.observed, "novelty"] })],
-    ["a signal in both lists", json({ ...OUTPUT, missing: [...OUTPUT.missing, "claim"] })],
-    ["a signal in neither list", json({ ...OUTPUT, missing: OUTPUT.missing.slice(1) })],
-    ["a signal twice in one list", json({ ...OUTPUT, observed: [...OUTPUT.observed, "claim"] })],
-    ["a missing list", json({ ...OUTPUT, missing: undefined })],
-  ])("refuses %s", (_, text) => {
-    expect(parseScorerOutput(text)).toEqual({ ok: false });
-  });
-});
-
-describe("SCORER_OUTPUT_SCHEMA", () => {
-  it("requires the four fields, the score an integer from 0 to 100, the signals an enum", () => {
-    expect(SCORER_OUTPUT_SCHEMA.required).toEqual(["score", "rationale", "observed", "missing"]);
-    expect(SCORER_OUTPUT_SCHEMA.properties.score).toMatchObject({
-      type: "integer",
-      minimum: 0,
-      maximum: 100,
-    });
-    expect(SCORER_OUTPUT_SCHEMA.properties.observed.items.enum).toEqual(SIGNAL_IDS);
-    expect(SCORER_OUTPUT_SCHEMA.properties.missing.items.enum).toEqual(SIGNAL_IDS);
   });
 });
 
@@ -209,16 +132,36 @@ describe("rKaQuads", () => {
     has(PHASE_IRI, "urn:verisci:phase", integer(1));
   });
 
-  it("holds the rationale, each signal, the model and the prompt version on the phase node", () => {
+  it("holds the rationale, the study type, the model and the prompt version on the phase node", () => {
     has(
       PHASE_IRI,
       "http://schema.org/ratingExplanation",
-      '"The abstract states a \\"clear\\" claim\\nand its methods."',
+      '"The paper states a \\"clear\\" claim\\nand its methods."',
     );
-    for (const id of OUTPUT.observed) has(PHASE_IRI, "urn:verisci:observed", `"${id}"`);
-    for (const id of OUTPUT.missing) has(PHASE_IRI, "urn:verisci:missing", `"${id}"`);
+    has(PHASE_IRI, "urn:verisci:studyType", '"randomized-trial"');
     has(PHASE_IRI, "urn:verisci:model", '"gemini-3.8-flash"');
-    has(PHASE_IRI, "urn:verisci:promptVersion", `"${SCORER_PROMPT_VERSION}"`);
+    has(PHASE_IRI, "urn:verisci:promptVersion", '"2"');
+  });
+
+  it("links one node per check, with its id, its answer and its quote when it has one", () => {
+    const check = (id: string) => `${PHASE_IRI}/check/${id}`;
+    for (const { id, answer } of OUTPUT.checks) {
+      has(PHASE_IRI, "urn:verisci:check", check(id));
+      has(check(id), "urn:verisci:checkId", `"${id}"`);
+      has(check(id), "urn:verisci:answer", `"${answer}"`);
+    }
+    has(check("sample-size"), "urn:verisci:quote", '"We needed 60 patients for 80% power."');
+    has(check("randomization"), "urn:verisci:quote", '"Patients were \\"randomly\\" assigned."');
+    const quoted = rKaQuads(RATING).filter((t) => t.predicate === "urn:verisci:quote");
+    expect(quoted.map((t) => t.subject)).toEqual([check("sample-size"), check("randomization")]);
+  });
+
+  it("writes the checks in the order given", () => {
+    const linked = rKaQuads(RATING)
+      .filter((t) => t.predicate === "urn:verisci:check")
+      .map((t) => t.object.split("/").at(-1));
+
+    expect(linked).toEqual(["sample-size", "randomization", "harms", "code-availability"]);
   });
 
   it("records the request id and the contract on the rating", () => {
@@ -263,11 +206,77 @@ describe("ratingQuery and parseRating", () => {
       targetUal: OUR_UAL,
       score: 72,
       rationale: OUTPUT.rationale,
-      observed: OUTPUT.observed,
-      missing: OUTPUT.missing,
+      studyType: "randomized-trial",
+      checks: OUTPUT.checks,
       model: "gemini-3.8-flash",
       promptVersion: SCORER_PROMPT_VERSION,
     });
+  });
+
+  it("puts the checks in checklist order, whatever order the node returns them in", () => {
+    const rows = rowsOf(rKaQuads(RATING)).reverse();
+
+    expect(parseRating(rows)?.checks.map((check) => check.id)).toEqual([
+      "sample-size",
+      "randomization",
+      "harms",
+      "code-availability",
+    ]);
+  });
+
+  it("leaves out a check with an unknown id, an unknown answer, or none of the study type's", () => {
+    const phase = `urn:verisci:rating:${REQUEST_ID}/phase/1`;
+    const extra = (id: string, answer: string): Triple[] => [
+      { subject: phase, predicate: "urn:verisci:check", object: `${phase}/check/${id}` },
+      { subject: `${phase}/check/${id}`, predicate: "urn:verisci:checkId", object: `"${id}"` },
+      { subject: `${phase}/check/${id}`, predicate: "urn:verisci:answer", object: `"${answer}"` },
+    ];
+    const rows = rowsOf([
+      ...rKaQuads(RATING),
+      ...extra("novelty", "shown"),
+      ...extra("blinding", "yes"),
+      ...extra("replicates", "shown"),
+    ]);
+
+    expect(parseRating(rows)?.checks).toEqual(OUTPUT.checks);
+  });
+
+  it("reads a v1 R-KA's score, with no study type and no checks", () => {
+    const review = `urn:verisci:rating:${REQUEST_ID}`;
+    const phase = `${review}/phase/1`;
+    const v1: Triple[] = [
+      {
+        subject: review,
+        predicate: "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
+        object: "http://schema.org/Review",
+      },
+      { subject: review, predicate: "http://schema.org/about", object: OUR_UAL },
+      { subject: review, predicate: "http://schema.org/reviewRating", object: phase },
+      {
+        subject: phase,
+        predicate: "http://schema.org/ratingValue",
+        object: '"38"^^<http://www.w3.org/2001/XMLSchema#integer>',
+      },
+      { subject: phase, predicate: "urn:verisci:observed", object: '"claim"' },
+      { subject: phase, predicate: "urn:verisci:missing", object: '"data"' },
+      { subject: phase, predicate: "urn:verisci:promptVersion", object: '"1"' },
+    ];
+
+    expect(parseRating(rowsOf(v1))).toMatchObject({
+      score: 38,
+      checks: [],
+      promptVersion: "1",
+    });
+    expect(parseRating(rowsOf(v1))?.studyType).toBeUndefined();
+  });
+
+  it("reads an unknown study type as none, with no checks", () => {
+    const rows = rowsOf(rKaQuads(RATING)).map((row) =>
+      row.p === "urn:verisci:studyType" ? { ...row, o: '"poem"' } : row,
+    );
+
+    expect(parseRating(rows)).toMatchObject({ score: 72, checks: [] });
+    expect(parseRating(rows)?.studyType).toBeUndefined();
   });
 
   it.each([
@@ -289,8 +298,7 @@ describe("ratingQuery and parseRating", () => {
       targetUal: OUR_UAL,
       score: 72,
       rationale: "",
-      observed: [],
-      missing: [],
+      checks: [],
       model: "",
       promptVersion: "",
     });
