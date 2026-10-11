@@ -169,34 +169,73 @@ describe("parseScorerAnswer", () => {
     ).toMatchObject({ ok: true, answer: { checks: [], rationale: "" } });
   });
 
+  it("keeps an answer whose quote, reason or rationale runs long, cutting each at a word", () => {
+    const quote = "The authors received no specific funding for this work. ".repeat(8).trim();
+    const reason = "A case report. ".repeat(40).trim();
+    const rationale = "It names its funding. ".repeat(100).trim();
+    const result = parseScorerAnswer(
+      JSON.stringify({
+        ...valid,
+        reason,
+        rationale,
+        checks: valid.checks.map((check) => (check.id === "funding" ? { ...check, quote } : check)),
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const kept = {
+      quote: result.answer.checks.find((check) => check.id === "funding")?.quote ?? "",
+      reason: result.answer.reason,
+      rationale: result.answer.rationale,
+    };
+    for (const [name, text, max] of [
+      ["quote", quote, 300],
+      ["reason", reason, 500],
+      ["rationale", rationale, 2_000],
+    ] as const) {
+      expect(kept[name].length, name).toBeLessThanOrEqual(max);
+      expect(kept[name].length, name).toBeGreaterThan(max - 20);
+      expect(text.startsWith(kept[name]), name).toBe(true);
+      expect(text[kept[name].length], name).toBe(" ");
+    }
+  });
+
+  it("leaves out a check of another study type, and keeps the first answer to a repeated check", () => {
+    const result = parseScorerAnswer(
+      JSON.stringify({
+        ...valid,
+        checks: [
+          ...valid.checks,
+          { id: "harms", answer: "shown", quote: "No harms were seen." },
+          { id: "funding", answer: "missing", quote: "" },
+        ],
+      }),
+    );
+
+    expect(result.ok && result.answer.checks.map((check) => check.id)).toEqual(OTHER_IDS);
+    expect(result.ok && result.answer.checks.find((check) => check.id === "funding")).toEqual({
+      id: "funding",
+      answer: "shown",
+      quote: "Funding: none.",
+    });
+  });
+
   it.each([
     ["not JSON", () => "shown"],
     ["an unknown field", () => ({ ...valid, field: "physics" })],
     ["an unknown study type", () => ({ ...valid, studyType: "poem" })],
     ["an empty reason", () => ({ ...valid, reason: " " })],
-    ["a reason over 500 characters", () => ({ ...valid, reason: "x".repeat(501) })],
-    [
-      "a check of another study type",
-      () => ({
-        ...valid,
-        checks: [...valid.checks, { id: "harms", answer: "missing", quote: "" }],
-      }),
-    ],
     ["a missing check", () => ({ ...valid, checks: valid.checks.slice(1) })],
-    ["a repeated check", () => ({ ...valid, checks: [...valid.checks.slice(1), valid.checks[1]] })],
+    [
+      "a missing check, though as many answers as checks",
+      () => ({ ...valid, checks: [...valid.checks.slice(1), valid.checks[1]] }),
+    ],
     [
       "an unknown answer",
       () => ({ ...valid, checks: valid.checks.map((check) => ({ ...check, answer: "yes" })) }),
     ],
-    [
-      "a quote over 300 characters",
-      () => ({
-        ...valid,
-        checks: valid.checks.map((check) => ({ ...check, quote: "x".repeat(301) })),
-      }),
-    ],
     ["an empty rationale in the field", () => ({ ...valid, rationale: "" })],
-    ["a rationale over 2,000 characters", () => ({ ...valid, rationale: "x".repeat(2001) })],
   ])("refuses %s", (_, build) => {
     const value = build();
     const text = typeof value === "string" ? value : JSON.stringify(value);

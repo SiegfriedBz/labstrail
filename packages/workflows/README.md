@@ -159,7 +159,7 @@ is left ([ADR 0007](../../docs/adr/0007-all-writes-converge.md)):
      text layer (a scan) cancels `invalid-target`. A file that is not a PDF, is over the size
      limit or does not parse is retried, since the publish run read the same file: the
      gateway or the reader is at fault.
-   - **score** asks Gemini, in one request, for the paper's field and study type and the
+   - **score-paper** asks Gemini, in one request, for the paper's field and study type and the
      answer to each of that type's checks, with quotes; `scoreChecks` checks the quotes and
      computes the score. A paper outside the life sciences and health cancels
      `invalid-target`
@@ -179,10 +179,12 @@ cancelled meanwhile, is an orphan: the outcome names it, and the run logs it as 
 Retries ([ADR 0009](../../docs/adr/0009-retries-are-spaced-with-step-sleep.md)): a chain
 that does not answer is read again every 2 minutes, up to 5 times. A node that does not
 answer or gives no rows yet, a quorum failure, a gateway that does not give the PDF, a file
-that does not read as a PDF, or a Gemini call that is unreachable, rate-limited or gives an
-answer the check refuses waits 2 minutes and starts a new attempt from the R-KA's read, up
-to 5 attempts, then fails (`node-unreachable`, `paper-unreachable`, `paper-unreadable`,
-`scorer-unavailable`; `mint-not-confirmed` when the mint is never seen). A node that does not answer is never
+that does not read as a PDF, or a Gemini call that is unreachable or rate-limited waits 2
+minutes and starts a new attempt from the R-KA's read, up to 5 attempts, then fails
+(`node-unreachable`, `paper-unreachable`, `paper-unreadable`, `scorer-unavailable`;
+`mint-not-confirmed` when the mint is never seen). A Gemini answer the check refuses is asked
+for again once, then the run fails `scorer-unusable`: the same paper and prompt tend to give
+the same answer, and each answer uses one of the free tier's 20 requests a day. A node that does not answer is never
 taken for a missing paper. It fails at once (`setup`) on missing or invalid settings, a node that
 refuses our key, Gemini refusing the request (the detail names its status), or a node that
 does not serve the graph, and
@@ -195,8 +197,10 @@ a day (`docs/domain.md` → Gemini): `scorePaper` sends `scorerPrompt`, temperat
 a paper in the field with `scoreChecks`. A 429 is `rate-limited`; any other 4xx is
 `refused`; a 5xx, a network error or no answer within 240 s is `unreachable`; each failure
 Gemini answered carries its HTTP status (a bad key is 400, a key without access 401 or 403, a
-model Gemini no longer serves 404). No candidate, a blocked answer or text the check refuses
-is `invalid-output`. No failure carries the key.
+model Gemini no longer serves 404). No candidate, a blocked or unfinished answer, or text
+the check refuses (`parseScorerAnswer`: a check of the study type left unanswered, say) is
+`invalid-output`; a quote, reason or rationale over its limit is cut, not refused. No failure
+carries the key.
 
 ### Measuring the scorer
 

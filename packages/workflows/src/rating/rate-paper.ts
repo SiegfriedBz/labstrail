@@ -49,6 +49,12 @@ export const RATING_SETTINGS = {
   retryWait: "2m",
   attempts: 5,
   /**
+   * Gemini answers the check refuses before the run stops (`scorer-unusable`): the same paper
+   * and prompt tend to give the same answer again, and each answer uses one of the free tier's
+   * 20 requests a day.
+   */
+  unusableAnswers: 2,
+  /**
    * A run's whole budget, enforced by Inngest. It covers the slowest run, about 150 minutes:
    * up to 8 minutes to read the request and 14 to find the target, 5 attempts of up to 17
    * minutes each (finding and reading the paper, scoring it, a mint and 10
@@ -67,7 +73,8 @@ export const RATING_SETTINGS = {
  * `rating-unreadable` are ours to fix; the others clear up with time, and the request stays
  * pending for the next run. `paper-unreachable` is the gateway not giving the paper's PDF;
  * `paper-unreadable` is a file that does not read as the PDF the publish run read (the gateway
- * giving another file, or the reader failing).
+ * giving another file, or the reader failing). `scorer-unusable` is Gemini answering twice with
+ * an answer the check refuses.
  */
 export type RatingFailure =
   | "chain-unreachable"
@@ -75,6 +82,7 @@ export type RatingFailure =
   | "paper-unreachable"
   | "paper-unreadable"
   | "scorer-unavailable"
+  | "scorer-unusable"
   | "mint-not-confirmed"
   | "oracle-failed"
   | "rating-unreadable"
@@ -86,6 +94,7 @@ const RATING_FAILURES: readonly RatingFailure[] = [
   "paper-unreachable",
   "paper-unreadable",
   "scorer-unavailable",
+  "scorer-unusable",
   "mint-not-confirmed",
   "oracle-failed",
   "rating-unreadable",
@@ -184,7 +193,7 @@ export function ratingFailureReason(output: unknown): RatingFailure | undefined 
  * 3. the R-KA is read: minted is fulfilled; stored is minted at once (ADR 0008); a draft is
  *    shared, then minted; missing is scored once, stored and minted. Scoring finds the paper's
  *    PDF link (`find-pdf`), reads its text (`read-paper`), and has Gemini classify it and answer
- *    its study type's checks in one request (`score`), each done once per run; a
+ *    its study type's checks in one request (`score-paper`), each done once per run; a
  *    paper outside the field (ADR 0037), whose PDF link is not an IPFS CID, or whose PDF holds
  *    no text (a scan) is cancelled `invalid-target` before anything is stored, and a link or
  *    PDF that does not come or does not read is asked for again;
@@ -281,6 +290,8 @@ interface RunContext {
     /** Whether the paper's text was shortened to fit, recorded in the R-KA. */
     readonly textShortened: boolean;
   };
+  /** Gemini answers the check refused so far. */
+  unusable?: number;
 }
 
 async function readRequest(
@@ -406,7 +417,13 @@ async function score(
     run.paper = read.paper;
   }
   const { paper } = run;
-  const scored = await step.run(`score-${attempt}`, () => deps.score(paper));
+  const scored = await step.run(`score-paper-${attempt}`, () => deps.score(paper));
+  if (!scored.ok && scored.reason === "invalid-output") {
+    run.unusable = (run.unusable ?? 0) + 1;
+    if (run.unusable === RATING_SETTINGS.unusableAnswers) {
+      return { kind: "fatal", failure: "scorer-unusable", reason: "two answers refused" };
+    }
+  }
   if (!scored.ok) return geminiFailed(scored);
   if (scored.field === "outside") return { kind: "invalid-target" };
   run.scored = { output: scored.output, model: scored.model, textShortened: paper.shortened };

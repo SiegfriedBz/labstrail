@@ -144,43 +144,58 @@ export const SCORER_OUTPUT_SCHEMA = {
 const answerSchema = z.object({
   field: z.enum(FIELDS),
   studyType: z.enum(STUDY_TYPE_IDS),
-  reason: z.string().trim().min(1).max(MAX_REASON),
+  reason: z.string().trim().min(1),
   checks: z.array(
     z.object({
       id: z.string(),
       answer: z.enum(CHECK_ANSWERS),
-      quote: z.string().trim().max(MAX_QUOTE).optional(),
+      quote: z.string().trim().optional(),
     }),
   ),
-  rationale: z.string().trim().max(MAX_RATIONALE),
+  rationale: z.string().trim(),
 });
 
 /**
- * The scorer's answer, checked: JSON with a known field and study type and a reason of 1 to 500
- * characters. For a paper in the field, every check of its study type exactly once, in any
- * order, each with a known answer and a quote of at most 300 characters (an empty quote is
- * dropped), and a rationale of 1 to 2,000 characters. For a paper outside the field, its checks
- * and rationale are left out. Anything else is `{ ok: false }`.
+ * The scorer's answer, checked: JSON with a known field and study type and a reason. For a
+ * paper in the field, an answer to every check of its study type, in any order, each a known
+ * answer (a check of another study type is left out, and a repeated check keeps its first
+ * answer), and a rationale. A reason, quote or rationale over its limit (500, 300 and 2,000
+ * characters) is cut at a word within it rather than refused, so a long passage the model
+ * copied whole still counts: its start is copied from the paper too. An empty quote is
+ * dropped. For a paper outside the field, its checks and rationale are left out. Anything else
+ * is `{ ok: false }`.
  */
 export function parseScorerAnswer(
   text: string,
 ): { readonly ok: true; readonly answer: ScorerAnswer } | { readonly ok: false } {
   const parsed = answerSchema.safeParse(parseJson(text));
   if (!parsed.success) return { ok: false };
-  const { field, studyType, reason, rationale } = parsed.data;
+  const { field, studyType } = parsed.data;
+  const reason = clip(parsed.data.reason, MAX_REASON);
   if (field === "outside") {
     return { ok: true, answer: { field, studyType, reason, checks: [], rationale: "" } };
   }
-  const expected = checklistOf(studyType).map((check) => check.id as string);
-  const ids = parsed.data.checks.map((check) => check.id);
-  if (ids.length !== expected.length || new Set(ids).size !== ids.length) return { ok: false };
-  if (!ids.every((id) => expected.includes(id)) || rationale.length === 0) return { ok: false };
-  const checks = parsed.data.checks.map(({ id, answer, quote }) => ({
-    id: id as CheckId,
-    answer,
-    ...(quote ? { quote } : {}),
-  }));
-  return { ok: true, answer: { field, studyType, reason, checks, rationale } };
+  const expected = new Set<string>(checklistOf(studyType).map((check) => check.id));
+  const checks = new Map<string, CheckResult>();
+  for (const { id, answer, quote } of parsed.data.checks) {
+    if (!expected.has(id) || checks.has(id)) continue;
+    const kept = quote ? clip(quote, MAX_QUOTE) : "";
+    checks.set(id, { id: id as CheckId, answer, ...(kept ? { quote: kept } : {}) });
+  }
+  const rationale = clip(parsed.data.rationale, MAX_RATIONALE);
+  if (checks.size !== expected.size || rationale.length === 0) return { ok: false };
+  return {
+    ok: true,
+    answer: { field, studyType, reason, checks: [...checks.values()], rationale },
+  };
+}
+
+/** `text` cut to at most `max` characters, at its last space within them when it has one. */
+function clip(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const room = text.slice(0, max + 1);
+  const end = room.search(/\s\S*$/);
+  return (end > 0 ? room.slice(0, end) : text.slice(0, max)).trimEnd();
 }
 
 /**

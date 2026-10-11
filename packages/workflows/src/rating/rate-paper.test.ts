@@ -332,7 +332,7 @@ describe("runRating: rating a paper", () => {
       "read-rka-1",
       "find-pdf-1",
       "read-paper-1",
-      "score-1",
+      "score-paper-1",
       "store-1",
       "mint-1",
       "read-score-1",
@@ -381,7 +381,7 @@ describe("runRating: rating a paper", () => {
     expect(await run).toEqual({ state: "cancelled", reason: "invalid-target" });
     expect(oracleCalls).toEqual([cancel("invalid-target")]);
     expect(dkg.storeAsset).not.toHaveBeenCalled();
-    expect(log.slice(-2)).toEqual(["score-1", "oracle cancel"]);
+    expect(log.slice(-2)).toEqual(["score-paper-1", "oracle cancel"]);
   });
 
   it("cancels invalid-target a paper whose PDF holds no text, such as a scan, scoring nothing", async () => {
@@ -587,10 +587,29 @@ describe("runRating: retries", () => {
     expect(oracleCalls).toEqual([]);
   });
 
+  it("asks Gemini at most twice for an answer the check refuses, then fails scorer-unusable", async () => {
+    const { run, deps, oracleCalls } = rate({ scores: [{ ok: false, reason: "invalid-output" }] });
+
+    await expect(run).rejects.toThrow(/^rating-failed:scorer-unusable: /);
+    expect(deps.score).toHaveBeenCalledTimes(RATING_SETTINGS.unusableAnswers);
+    expect(oracleCalls).toEqual([]);
+  });
+
+  it("scores after one answer the check refuses when the next one is usable", async () => {
+    const { run, deps } = rate({
+      scores: [
+        { ok: false, reason: "invalid-output" },
+        { ok: true, field: "life-sciences", output: OUTPUT, model: MODEL },
+      ],
+    });
+
+    expect(await run).toMatchObject({ state: "fulfilled" });
+    expect(deps.score).toHaveBeenCalledTimes(2);
+  });
+
   it.each([
     ["unreachable", { ok: false, reason: "unreachable" } as const],
     ["rate-limited", { ok: false, reason: "rate-limited" } as const],
-    ["invalid-output", { ok: false, reason: "invalid-output" } as const],
   ])("retries a scorer that is %s, then fails scorer-unavailable", async (_, failure) => {
     const { run, deps } = rate({ scores: [failure] });
 
@@ -616,7 +635,7 @@ describe("runRating: retries", () => {
     expect(await run).toMatchObject({ state: "fulfilled" });
     expect(deps.score).toHaveBeenCalledTimes(2);
     expect(deps.readPaper).toHaveBeenCalledOnce();
-    expect(log).toContain("score-2");
+    expect(log).toContain("score-paper-2");
     expect(log).not.toContain("find-pdf-2");
     expect(log).not.toContain("read-paper-2");
   });
@@ -632,7 +651,7 @@ describe("runRating: retries", () => {
     expect(deps.score).toHaveBeenCalledOnce();
     expect(dkg.storeAsset).toHaveBeenCalledTimes(2);
     expect(log).toContain("store-2");
-    expect(log).not.toContain("score-2");
+    expect(log).not.toContain("score-paper-2");
   });
 
   it("retries a node that does not answer, then fails node-unreachable", async () => {
