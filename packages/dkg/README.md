@@ -50,6 +50,7 @@ the `publish-pdf` script build on the same rule.
 | `client.storeAsset(name, quads)` | Stores and shares the asset, doing only what is left, and returns `stored` or `minted`; a stored or minted asset keeps its first content |
 | `client.startMint(name, { listenMs? })` | Starts the mint of a stored asset; returns `minted` with its UAL, or `minting` when no reply came within `listenMs` (10 s by default) or a mint may be in flight |
 | `client.query(sparql)` | Runs a SPARQL `SELECT` on the graph (`POST /api/query`, with the full graph id) and returns its rows; terms come as the node writes them, IRIs bare and literals quoted |
+| `client.checkGraph()` | `ok` when the node lists the graph as subscribed, `graph-not-served` when it does not; a node that dropped the graph answers every query with no rows, so check this before reading an empty answer as "nothing there" |
 | `DkgClient`, `DkgClientConfig` | The client's calls and its settings |
 | `Quad`, `AssetState`, `AssetResult`, `MintResult`, `QueryResult`, `DkgFailure` | The client's input and result types |
 | `env` (from `@verisci/dkg/env`) | The settings, validated from `process.env` on import |

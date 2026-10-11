@@ -53,6 +53,12 @@ export interface DkgClient {
    * string is dropped.
    */
   query(sparql: string): Promise<QueryResult>;
+  /**
+   * Whether the node serves the graph: `ok` when it lists it as subscribed, `graph-not-served`
+   * when it does not. A node that dropped the graph answers every `query` with no rows, so a
+   * caller checks this before reading an empty answer as "nothing there".
+   */
+  checkGraph(): Promise<{ readonly ok: true } | DkgFailure>;
 }
 
 /** Builds a client for one context graph on one DKG node. Every UAL it returns is normalized (ADR 0031). */
@@ -70,9 +76,8 @@ export function createDkgClient(config: DkgClientConfig): DkgClient {
     const query = new URLSearchParams(graph).toString();
     const reply = await send(connection, "GET", `${assetPath(name)}?${query}`, { timeoutMs });
     if (reply.kind === "answer" && reply.status === 404) {
-      const served = await isGraphServed();
-      if (served === true) return { ok: true, state: "missing" };
-      return served === false ? { ok: false, reason: "graph-not-served" } : served;
+      const served = await checkGraph();
+      return served.ok ? { ok: true, state: "missing" } : served;
     }
     if (reply.kind !== "answer" || !isSuccess(reply)) return toFailure(reply);
     return toAssetState(reply.body) ?? { ok: false, reason: "unexpected", status: reply.status };
@@ -82,6 +87,12 @@ export function createDkgClient(config: DkgClientConfig): DkgClient {
    * True when the node lists the graph as subscribed; a failure when the list cannot be read.
    * Asked on every 404, never remembered: a node restart can drop the graph at any time.
    */
+  async function checkGraph(): Promise<{ readonly ok: true } | DkgFailure> {
+    const served = await isGraphServed();
+    if (served === true) return { ok: true };
+    return served === false ? { ok: false, reason: "graph-not-served" } : served;
+  }
+
   async function isGraphServed(): Promise<boolean | DkgFailure> {
     const reply = await send(connection, "GET", "/api/context-graph/list", { timeoutMs });
     if (reply.kind !== "answer" || !isSuccess(reply)) return toFailure(reply);
@@ -178,7 +189,7 @@ export function createDkgClient(config: DkgClientConfig): DkgClient {
     return { ok: true, bindings: rows.filter(isStringRow) };
   }
 
-  return { readAsset, storeAsset, startMint, query };
+  return { readAsset, storeAsset, startMint, query, checkGraph };
 }
 
 /** Same graph: the agent address in any case, the graph name exactly. */

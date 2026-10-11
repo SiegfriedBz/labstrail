@@ -86,6 +86,29 @@ const published: Reply = {
 };
 const conflict = (code: string): Reply => ({ status: 409, body: { code, error: "refused" } });
 
+describe("checkGraph", () => {
+  it("answers ok when the node lists the graph as subscribed", async () => {
+    const { client } = fakeNode({ [GRAPHS]: [graphList(GRAPH)] });
+
+    expect(await client.checkGraph()).toEqual({ ok: true });
+  });
+
+  it.each([
+    ["not listed", graphList(`${AGENT}/other`)],
+    ["listed but not subscribed", graphList(GRAPH, false)],
+  ])("answers graph-not-served when the graph is %s", async (_, list) => {
+    const { client } = fakeNode({ [GRAPHS]: [list] });
+
+    expect(await client.checkGraph()).toEqual({ ok: false, reason: "graph-not-served" });
+  });
+
+  it("reports a node that does not answer", async () => {
+    const { client } = fakeNode({ [GRAPHS]: ["network-error"] });
+
+    expect(await client.checkGraph()).toEqual({ ok: false, reason: "unreachable" });
+  });
+});
+
 describe("readAsset", () => {
   it.each([
     ["not listed", graphList(`${AGENT}/other`)],
