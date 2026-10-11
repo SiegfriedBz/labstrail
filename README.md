@@ -266,8 +266,9 @@ then open http://localhost:3000/publish (it needs the workflows' settings and
 Environment variables are listed in [`.env.example`](.env.example): copy it to
 `.env.local` at the repo root (gitignored), where `apps/web` loads it from.
 `pnpm test` runs without it, and `pnpm build` needs only `APP_ENV` (`APP_ENV=local`).
-`pnpm dev` starts without it, but the publish and paper pages need the DKG node and
-publish run settings, and the wallet window `REOWN_PROJECT_ID`. How workspaces declare
+`pnpm dev` starts without it, but the home page's latest papers, the papers list, and the
+publish and paper pages need the DKG node and publish run settings, and the wallet window
+`REOWN_PROJECT_ID`. How workspaces declare
 and validate them is in the [`@verisci/env` README](packages/env/README.md).
 
 ## Commands

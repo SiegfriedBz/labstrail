@@ -21,6 +21,7 @@ function Table({ className, ...props }: ComponentProps<"table">) {
   );
 }
 
+/** The header row group; its rows take a hairline under them. */
 function TableHeader({ className, ...props }: ComponentProps<"thead">) {
   return (
     <thead
@@ -31,6 +32,7 @@ function TableHeader({ className, ...props }: ComponentProps<"thead">) {
   );
 }
 
+/** The body row group; its last row has no border. */
 function TableBody({ className, ...props }: ComponentProps<"tbody">) {
   return (
     <tbody
@@ -41,6 +43,7 @@ function TableBody({ className, ...props }: ComponentProps<"tbody">) {
   );
 }
 
+/** The footer row group, on the faint surface. */
 function TableFooter({ className, ...props }: ComponentProps<"tfoot">) {
   return (
     <tfoot
@@ -54,6 +57,7 @@ function TableFooter({ className, ...props }: ComponentProps<"tfoot">) {
   );
 }
 
+/** A row with a hairline under it and a faint hover. */
 function TableRow({ className, ...props }: ComponentProps<"tr">) {
   return (
     <tr
@@ -67,6 +71,7 @@ function TableRow({ className, ...props }: ComponentProps<"tr">) {
   );
 }
 
+/** A header cell: small, muted, on one line. */
 function TableHead({ className, ...props }: ComponentProps<"th">) {
   return (
     <th
@@ -80,10 +85,12 @@ function TableHead({ className, ...props }: ComponentProps<"th">) {
   );
 }
 
+/** A body cell, aligned to the top so wrapped cells line up. */
 function TableCell({ className, ...props }: ComponentProps<"td">) {
   return <td data-slot="table-cell" className={cn("px-3 py-4 align-top", className)} {...props} />;
 }
 
+/** The table's caption, under it. */
 function TableCaption({ className, ...props }: ComponentProps<"caption">) {
   return (
     <caption
