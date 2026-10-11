@@ -56,18 +56,13 @@ export default async function PublishPage() {
         <h2 id="before-title" className="text-xl font-semibold tracking-tight">
           What publishing means
         </h2>
-        <ul className="grid gap-4 sm:grid-cols-2">
+        <ul className="grid gap-x-12 gap-y-7 sm:grid-cols-2">
           {BEFORE.map(({ icon: Icon, title, body }) => (
-            <li
-              key={title}
-              className="glass grid grid-cols-[2.25rem_1fr] content-start gap-3 rounded-2xl p-5"
-            >
-              <span className="grid size-9 place-items-center rounded-lg bg-accent-soft text-accent">
-                <Icon size={18} />
-              </span>
+            <li key={title} className="grid grid-cols-[1.25rem_1fr] content-start gap-x-3">
+              <Icon size={20} className="mt-px text-muted" />
               <div>
                 <h3 className="text-sm font-medium">{title}</h3>
-                <p className="mt-1 text-sm leading-relaxed text-muted">{body}</p>
+                <p className="mt-1 max-w-[56ch] text-sm leading-relaxed text-muted">{body}</p>
               </div>
             </li>
           ))}

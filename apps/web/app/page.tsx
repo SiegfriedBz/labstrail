@@ -37,17 +37,17 @@ const HOW = [
 const RATE = [
   {
     icon: Robot,
-    title: "Phase 1 · Machine score",
+    title: "Machine score",
     body: "An AI model scores the paper's record (title, authors, abstract) from 0 to 100. The score goes on-chain, its reasons into the rating's asset.",
   },
   {
     icon: UsersThree,
-    title: "Phase 2 · Human review",
+    title: "Human review",
     body: "Reviewers read the paper and score it. Their score is recorded next to the machine score, which stays as it was.",
   },
   {
     icon: Flask,
-    title: "Phase 3 · Wet-lab replication",
+    title: "Wet-lab replication",
     body: "A lab repeats the experiments, then reviewers check its results. That verdict is recorded as a third score, next to the first two.",
   },
 ] as const;
@@ -56,7 +56,7 @@ const RATE = [
 const UAL_PARTS = [
   { value: "did:dkg:base:84532", label: "chain: Base Sepolia" },
   { value: "0xd701…13b3", label: "publisher: VeriSci's node" },
-  { value: "5", label: "asset number" },
+  { value: "7", label: "asset number" },
 ] as const;
 
 const HOLDS = [
@@ -74,13 +74,17 @@ const HOLDS = [
   },
 ] as const;
 
+/** The example asset: the staging record also in the hero's demo, its signature valid. */
 const RECORD = [
-  ["title", "Attention Is All You Need"],
-  ["authors", "Vaswani, Shazeer, Parmar, …"],
-  ["pdf", "ipfs://bafybeicrwkcuh…ats642m"],
-  ["submitter", "0x7a31…c9f2"],
-  ["signature", "0x4be0…1c (EIP-712)"],
-  ["deadline", "1791639162 (Unix seconds)"],
+  [
+    "title",
+    "Emerging trends in nanomedicine: The role of RNAi-based therapies and onpattro's clinical journey",
+  ],
+  ["authors", "Dilpreet Singh, Satvir Singh, Nitin Tandon, …"],
+  ["pdf", "ipfs://bafybeia54htwu…sp5sfhgi"],
+  ["submitter", "0x9a17…9111"],
+  ["signature", "0xd116…7f1c (EIP-712)"],
+  ["deadline", "1791639437 (Unix seconds)"],
 ] as const;
 
 /**
@@ -90,8 +94,11 @@ const RECORD = [
 export default function Home() {
   return (
     <div className="grid gap-24 sm:gap-32">
-      <section className="grid items-center gap-14 md:grid-cols-[1.3fr_1fr] md:gap-14">
-        <div className="enter grid min-h-[calc(100dvh-9rem)] content-center gap-7 md:min-h-0">
+      {/* The first screen, below the header and the page's top padding, so no section is cut
+          at the fold: text and panel side by side from md; below it, the text fills the first
+          screen and the panel starts just under the fold. */}
+      <section className="grid items-center gap-10 md:min-h-[calc(100dvh-8rem)] md:grid-cols-[1.3fr_1fr] md:content-center md:gap-14">
+        <div className="enter grid min-h-[calc(100dvh-6.5rem)] content-center gap-7 sm:min-h-[calc(100dvh-8rem)] md:min-h-0">
           <h1 className="text-4xl font-semibold leading-[1.08] tracking-tight md:text-[2.75rem] lg:text-5xl">
             Publish your paper as a record anyone can <span className="text-accent">verify</span>
           </h1>
@@ -99,7 +106,7 @@ export default function Home() {
             Drop a PDF and sign with your wallet. VeriSci records it on the knowledge graph, with
             you as its submitter.
           </p>
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
             <Link
               href="/publish"
               className="signal-gradient inline-flex w-fit items-center gap-2 rounded-xl px-5 py-3 font-semibold text-accent-ink shadow-glow transition hover:brightness-110 active:scale-[0.98]"
@@ -107,20 +114,14 @@ export default function Home() {
               Publish a paper
               <ArrowRight size={18} weight="bold" />
             </Link>
-            <span
-              aria-disabled
-              className="inline-flex w-fit cursor-not-allowed items-center gap-2 rounded-xl border border-line px-5 py-3 font-medium text-muted"
-            >
-              Rate a paper
-              <span className="rounded-md bg-surface-strong px-1.5 py-0.5 font-mono text-[11px]">
-                soon
-              </span>
-            </span>
+            <Link href="/papers" className="link">
+              Browse papers
+            </Link>
           </div>
         </div>
         <div className="enter-late relative">
           <div aria-hidden className="signal-glow absolute -inset-x-4 -inset-y-10 sm:-inset-10" />
-          <figure className="glass relative grid gap-6 rounded-2xl p-6 sm:p-8">
+          <figure className="glass relative grid gap-5 rounded-2xl p-6 sm:p-7">
             <figcaption className="flex items-center justify-between gap-3 text-sm text-muted">
               <span>Publish flow</span>
               <span className="font-mono text-xs text-accent">live</span>
@@ -130,7 +131,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="grid gap-6" aria-labelledby="latest-papers">
+      <section className="reveal grid gap-6" aria-labelledby="latest-papers">
         <div className="grid max-w-[62ch] gap-3">
           <h2 id="latest-papers" className="text-2xl font-semibold tracking-tight sm:text-3xl">
             Latest papers
@@ -144,7 +145,7 @@ export default function Home() {
         </Suspense>
       </section>
 
-      <section className="grid gap-8">
+      <section className="reveal grid gap-8">
         <div className="grid max-w-[62ch] gap-3">
           <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
             Two layers, one record
@@ -155,34 +156,30 @@ export default function Home() {
             on-chain. Its content and its proof live in two places that check each other.
           </p>
         </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          <article className="glass grid content-start gap-4 rounded-2xl p-6">
-            <span className="grid size-11 place-items-center rounded-xl bg-accent-soft text-accent">
-              <Graph size={22} />
-            </span>
-            <div className="grid gap-2">
-              <h3 className="font-semibold">The content, off-chain</h3>
-              <p className="text-sm leading-relaxed text-muted">
-                DKG nodes store the asset's statements: title, authors, the PDF's link, the
-                submitter, their signature and its deadline. Once published, OriginTrail replicates
-                them across the context graph's nodes, and any node subscribed to VeriSci's graph
-                can fetch them by the UAL, the asset's permanent address.
-              </p>
-            </div>
+        <div className="grid gap-8 md:grid-cols-2 md:gap-12">
+          <article className="grid content-start gap-2 border-l-2 border-accent pl-5">
+            <h3 className="flex items-center gap-2 font-semibold">
+              <Graph size={20} className="shrink-0 text-accent" />
+              The content, off-chain
+            </h3>
+            <p className="max-w-[56ch] text-sm leading-relaxed text-muted">
+              DKG nodes store the asset's statements: title, authors, the PDF's link, the submitter,
+              their signature and its deadline. Once published, OriginTrail replicates them across
+              the context graph's nodes, and any node subscribed to VeriSci's graph can fetch them
+              by the UAL, the asset's permanent address.
+            </p>
           </article>
-          <article className="glass grid content-start gap-4 rounded-2xl p-6">
-            <span className="grid size-11 place-items-center rounded-xl bg-accent-2-soft text-accent-2">
-              <Cube size={22} />
-            </span>
-            <div className="grid gap-2">
-              <h3 className="font-semibold">The owner and the proof, on-chain</h3>
-              <p className="text-sm leading-relaxed text-muted">
-                Publishing mints the asset on Base as an ERC-721 token and anchors the merkle root
-                of its statements, one hash computed from all of them. Any node can check that the
-                content still matches that root. Only the token's holder can update the asset, and
-                each update anchors a new root under the same UAL.
-              </p>
-            </div>
+          <article className="grid content-start gap-2 border-l-2 border-accent-2 pl-5">
+            <h3 className="flex items-center gap-2 font-semibold">
+              <Cube size={20} className="shrink-0 text-accent-2" />
+              The owner and the proof, on-chain
+            </h3>
+            <p className="max-w-[56ch] text-sm leading-relaxed text-muted">
+              Publishing mints the asset on Base as an ERC-721 token and anchors the merkle root of
+              its statements, one hash computed from all of them. Any node can check that the
+              content still matches that root. Only the token's holder can update the asset, and
+              each update anchors a new root under the same UAL.
+            </p>
           </article>
         </div>
         <figure className="glass grid gap-5 rounded-2xl p-5 sm:p-6">
@@ -231,9 +228,9 @@ export default function Home() {
         </figure>
       </section>
 
-      <section className="grid gap-10">
+      <section className="reveal grid gap-10">
         <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">How it works</h2>
-        <div className="grid gap-12 md:grid-cols-2 md:gap-10">
+        <div className="grid gap-16">
           <Track
             label="Publish"
             badge={<span className="text-accent">live</span>}
@@ -250,7 +247,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="grid items-center gap-10 md:grid-cols-[1.6fr_1fr] md:gap-16">
+      <section className="reveal grid items-center gap-10 md:grid-cols-[1.6fr_1fr] md:gap-16">
         <div className="glass order-2 overflow-hidden rounded-2xl md:order-1">
           <div className="flex items-center justify-between border-b border-line px-5 py-3 text-xs text-muted">
             <span>Paper asset · stored off-chain</span>
@@ -266,7 +263,7 @@ export default function Home() {
           </dl>
           <div className="grid gap-1 border-t border-line px-5 py-3 font-mono text-xs">
             <span className="text-muted">address (UAL)</span>
-            <span className="truncate text-accent">did:dkg:base:84532/0xd701…/5</span>
+            <span className="truncate text-ink">did:dkg:base:84532/0xd701…/7</span>
           </div>
         </div>
         <div className="order-1 grid content-start gap-3 md:order-2">
@@ -288,7 +285,10 @@ export default function Home() {
   );
 }
 
-/** One flow of "How it works": its name, a status, a line of context and its steps. */
+/**
+ * One flow of "How it works": its name, a status, a line of context and its steps, as a
+ * row joined by a line from `md` up and a vertical timeline below.
+ */
 function Track({
   label,
   badge,
@@ -313,21 +313,31 @@ function Track({
         </h3>
         <p className="max-w-[52ch] text-sm leading-relaxed text-muted">{intro}</p>
       </div>
-      <ol className={`grid gap-4 ${muted ? "opacity-70" : ""}`}>
-        {steps.map(({ icon: Icon, title, body }) => (
+      <ol className="grid gap-7 md:grid-cols-3 md:gap-8">
+        {steps.map(({ icon: Icon, title, body }, index) => (
           <li
             key={title}
-            className="glass grid grid-cols-[2.75rem_1fr] items-start gap-4 rounded-2xl p-5"
+            className="relative grid grid-cols-[2.5rem_1fr] items-start gap-4 md:grid-cols-1"
           >
+            {index < steps.length - 1 && (
+              <span
+                aria-hidden
+                className={`absolute top-10 bottom-[-1.75rem] left-[19px] w-px md:top-5 md:right-[-1.5rem] md:bottom-auto md:left-12 md:h-px md:w-auto ${
+                  muted ? "bg-line-strong" : "bg-accent/40"
+                }`}
+              />
+            )}
             <span
-              className={`grid size-11 place-items-center rounded-xl ${
-                muted ? "bg-surface-strong text-muted" : "bg-accent-soft text-accent"
+              className={`relative grid size-10 place-items-center rounded-full border ${
+                muted
+                  ? "border-line-strong bg-page text-muted"
+                  : "border-accent/40 bg-accent-soft text-accent"
               }`}
             >
-              <Icon size={22} />
+              <Icon size={18} />
             </span>
-            <div>
-              <h4 className="font-medium">{title}</h4>
+            <div className="pt-1.5 md:pt-0">
+              <h4 className={`font-medium ${muted ? "text-ink/80" : ""}`}>{title}</h4>
               <p className="mt-1 max-w-[52ch] text-sm leading-relaxed text-muted">{body}</p>
             </div>
           </li>

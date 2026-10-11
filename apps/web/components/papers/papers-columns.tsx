@@ -58,11 +58,9 @@ function PaperCell({ paper }: { paper: PaperSummary }) {
         {paper.title}
       </Link>
       <p className="text-pretty text-xs leading-relaxed text-muted">{authorsLine(paper)}</p>
-      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted md:hidden">
+      <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted md:hidden">
         <Published iso={paper.publishedAt} />
-        <span aria-hidden>·</span>
         <Submitter address={paper.submitter} />
-        <span aria-hidden>·</span>
         <Signature check={paper.signatureCheck} />
       </p>
     </div>
