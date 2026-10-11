@@ -37,16 +37,33 @@ function bindingsFor(triples: ReturnType<typeof targetKaQuads>): QueryBinding[] 
 }
 
 describe("paperRecordQuery", () => {
-  it("selects the paper's triples, with each author's name and position", () => {
-    const query = paperRecordQuery(CID);
+  const GRAPH = "0xD701ed157232ad5E14BC4134a8D10D64D86f13B3/verisci-staging";
+  const UAL = "did:dkg:base:84532/0xd701ed157232ad5e14bc4134a8d10d64d86f13b3/6";
 
-    expect(query).toContain(`<urn:verisci:paper:${CID}> ?p ?o`);
+  it("selects the paper's triples from its own asset's graph, with each author's name and position", () => {
+    const query = paperRecordQuery(CID, GRAPH, UAL) ?? "";
+
+    expect(query).toMatch(
+      new RegExp(
+        `GRAPH <did:dkg:context-graph:${GRAPH}/_verifiable_memory/0xd701ed157232ad5e14bc4134a8d10d64d86f13b3/6> \\{\\s*<urn:verisci:paper:${CID}> \\?p \\?o`,
+      ),
+    );
     expect(query).toContain("?authorName");
     expect(query).toContain("?authorPosition");
   });
 
-  it("refuses to build a query for anything but a canonical CID", () => {
-    expect(paperRecordQuery("x> } DROP ALL { <y")).toBeUndefined();
+  it.each([
+    ["a CID that is not canonical", "x> } DROP ALL { <y", GRAPH, UAL],
+    ["a graph id that is not a full one", CID, "verisci-staging", UAL],
+    ["a UAL that does not parse", CID, GRAPH, "did:dkg:base:84532/0xnope/6"],
+    [
+      "a UAL another agent minted",
+      CID,
+      GRAPH,
+      "did:dkg:base:84532/0x1111111111111111111111111111111111111111/6",
+    ],
+  ])("refuses to build a query for %s", (_, cid, graph, ual) => {
+    expect(paperRecordQuery(cid, graph, ual)).toBeUndefined();
   });
 });
 

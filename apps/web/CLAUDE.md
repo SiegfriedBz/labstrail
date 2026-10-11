@@ -16,6 +16,11 @@ Next.js 16 App Router app. See `README.md` here for scripts and status.
   ([ADR 0021](../../docs/adr/0021-server-reads-return-typed-results.md)).
 - Inngest functions live in `@verisci/workflows`; `web` only serves them
   ([ADR 0003](../../docs/adr/0003-inngest-functions-live-in-workflows.md)).
+- Components are grouped by area: `components/site` (the shell every page shares: logo,
+  header links, footer, breadcrumbs), `wallet` (providers and button), `home`, `papers`
+  (the list), `paper` (one paper's page), `publish`, and `ui` (shadcn primitives, restyled
+  with `globals.css`'s tokens). A component another area reuses stays in its own area; a
+  test sits next to its component.
 - Playwright end-to-end tests come in a later plan; until then, cover logic in unit tests.
   Put a flow's logic in `lib/` with its IO passed in (`publishFile`, `paperProgress`,
   `requestUploadUrl`), and keep components and `app/actions.ts` thin.
@@ -30,6 +35,15 @@ Next.js 16 App Router app. See `README.md` here for scripts and status.
   plain props; client components never import `@verisci/workflows` at runtime (types only).
 - Reads the page polls are route handlers, not server actions: Next runs server actions
   one at a time per client.
+- A page reads the node on the server, in an async component inside `Suspense` with a
+  skeleton shaped like the result (`PapersResults`, `PaperLoader`); what is known already
+  shows in the skeleton. Check a 404 before the boundary when you can: `notFound()` inside it
+  gives a 200 with `noindex`, since the response is already streaming.
+- Tables are TanStack Table v9 over shadcn's table (`components/ui/table.tsx`): the server
+  sorts and pages, columns and features are module constants (`papers-columns.tsx`), and
+  rows arrive as props. Strings a server component needs from a client file go in a plain
+  module (`components/paper/labels.ts`): a `"use client"` file's exports reach the server
+  as client references.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

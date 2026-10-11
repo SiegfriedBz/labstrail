@@ -85,6 +85,22 @@ describe("createWorkflowsEnv", () => {
     expect(() => createWorkflowsEnv({ ...runtimeEnv, PINATA_JWT: "" })).toThrow(EnvError);
   });
 
+  it("refuses a context graph whose address is not in the node's checksum case", () => {
+    const lowercase = runtimeEnv.DKG_CONTEXT_GRAPH.toLowerCase();
+    let caught: unknown;
+    try {
+      createWorkflowsEnv({ ...runtimeEnv, DKG_CONTEXT_GRAPH: lowercase });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(EnvError);
+    const [issue] = (caught as EnvError).issues;
+    expect(issue?.variable).toBe("DKG_CONTEXT_GRAPH");
+    expect(issue?.message).toMatch(/EIP-55/);
+    expect(issue?.message).not.toContain("0xd701");
+  });
+
   it("keeps the DKG node's -prod guard", () => {
     expect(() =>
       createWorkflowsEnv({

@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { PaperStage } from "../lib/progress.ts";
-import { ProgressChain } from "./progress-chain.tsx";
+import type { PaperStage } from "../../lib/progress.ts";
+import { ProgressChain } from "../paper/progress-chain.tsx";
 
 const LOOP: PaperStage["stage"][] = ["reading", "saving", "minting", "published"];
 const STEP_MS = 1800;

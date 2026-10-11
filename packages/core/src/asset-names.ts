@@ -9,7 +9,8 @@ export type AssetNameResult =
   | { readonly ok: false; readonly reason: AssetNameError };
 
 const R_KA_PREFIX = "verisci-rka-";
-const TARGET_KA_PREFIX = "verisci-tka-";
+/** What every Target KA name starts with; the paper's canonical CID follows. */
+export const TARGET_KA_PREFIX = "verisci-tka-";
 const REQUEST_ID = /^0x[0-9a-f]{64}$/;
 
 /**

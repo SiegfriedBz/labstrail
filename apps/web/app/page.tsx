@@ -10,7 +10,11 @@ import {
   Wallet,
 } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
-import { ChainDemo } from "../components/chain-demo.tsx";
+import { Suspense } from "react";
+import { ChainDemo } from "../components/home/chain-demo.tsx";
+import { LatestPapers } from "../components/home/latest-papers.tsx";
+import { PapersTableSkeleton } from "../components/papers/papers-table-skeleton.tsx";
+import { LATEST_PAPERS } from "../lib/papers.ts";
 
 const HOW = [
   {
@@ -79,7 +83,10 @@ const RECORD = [
   ["deadline", "1791639162 (Unix seconds)"],
 ] as const;
 
-/** Home: what VeriSci does, the way to publish, and the rating flow to come. */
+/**
+ * Home: what VeriSci does, the latest published papers, the way to publish, and the rating
+ * flow to come. The latest papers stream in, so the hero never waits for the DKG node.
+ */
 export default function Home() {
   return (
     <div className="grid gap-24 sm:gap-32">
@@ -121,6 +128,20 @@ export default function Home() {
             <ChainDemo />
           </figure>
         </div>
+      </section>
+
+      <section className="grid gap-6" aria-labelledby="latest-papers">
+        <div className="grid max-w-[62ch] gap-3">
+          <h2 id="latest-papers" className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            Latest papers
+          </h2>
+          <p className="leading-relaxed text-muted">
+            The newest records on the knowledge graph. Open one to check who submitted it.
+          </p>
+        </div>
+        <Suspense fallback={<PapersTableSkeleton rows={LATEST_PAPERS} />}>
+          <LatestPapers />
+        </Suspense>
       </section>
 
       <section className="grid gap-8">

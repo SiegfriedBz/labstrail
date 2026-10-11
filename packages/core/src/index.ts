@@ -15,6 +15,15 @@ export {
   type OriginTrailContracts,
 } from "./origintrail.ts";
 export {
+  type PaperListing,
+  paperAuthorsQuery,
+  paperCountQuery,
+  paperListQuery,
+  parsePaperAuthors,
+  parsePaperCount,
+  parsePaperListing,
+} from "./paper-list.ts";
+export {
   type PaperRecord,
   paperRecordQuery,
   parsePaperRecord,

@@ -4,11 +4,14 @@ import { ArrowSquareOut, Warning } from "@phosphor-icons/react";
 import { canonicalCid } from "@verisci/core";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ipfsUrl } from "../lib/explorer.ts";
-import { failureMessage, refusalMessage } from "../lib/messages.ts";
-import { isFinal, type PaperStage } from "../lib/progress.ts";
-import type { PaperView } from "../lib/upload-actions.ts";
+import { ipfsUrl } from "../../lib/explorer.ts";
+import { failureMessage, refusalMessage } from "../../lib/messages.ts";
+import { isFinal, type PaperStage } from "../../lib/progress.ts";
+import { shorten } from "../../lib/shorten.ts";
+import type { PaperView } from "../../lib/upload-actions.ts";
+import { Breadcrumbs } from "../site/breadcrumbs.tsx";
 import { CopyValue } from "./copy-value.tsx";
+import { PUBLISH_PANEL_LABELS, PUBLISH_PANEL_TITLE } from "./labels.ts";
 import { ProgressChain } from "./progress-chain.tsx";
 import { VerifyPanel } from "./verify-panel.tsx";
 
@@ -40,28 +43,33 @@ const NOW: Partial<Record<PaperStage["stage"], string>> = {
 };
 
 /**
- * Follows a paper from its page: asks `/api/papers/<cid>` every 5 s until a final stage,
- * and keeps asking through a stage that could not be read. Once published, shows the
- * record and how to verify it. Shows and asks by the CID's canonical spelling, the one the
- * signature covers, whatever spelling the address has.
+ * Follows a paper from its page, starting from the view the server read (`PaperLoader`):
+ * unless that view is final, asks `/api/papers/<cid>` every 5 s until a final stage, and
+ * keeps asking through a stage that could not be read. Once published, shows the record and
+ * how to verify it. Shows and asks by the CID's canonical spelling, the one the signature
+ * covers, whatever spelling the address has.
  */
 export function PaperProgress({
   cid: given,
   contextGraph,
   eventId,
+  initial,
   resubmitted = false,
 }: {
   cid: string;
   /** The context graph this environment publishes to, which the signature covers. */
   contextGraph: string;
   eventId: string | undefined;
+  /** Where the paper stood when the server read it. */
+  initial: PaperView;
   /** The visitor just submitted a paper that was already published. */
   resubmitted?: boolean;
 }) {
   const cid = canonicalCid(given) ?? given;
-  const [view, setView] = useState<PaperView | undefined>();
+  const [view, setView] = useState<PaperView>(initial);
 
   useEffect(() => {
+    if (isFinal(initial)) return;
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const query = eventId ? `?event=${encodeURIComponent(eventId)}` : "";
@@ -77,23 +85,20 @@ export function PaperProgress({
       setView(next);
       if (!isFinal(next)) timer = setTimeout(() => void poll(), POLL_MS);
     };
-    void poll();
+    timer = setTimeout(() => void poll(), POLL_MS);
     return () => {
       stopped = true;
       clearTimeout(timer);
     };
-  }, [cid, eventId]);
-
-  if (!view) {
-    return (
-      <div aria-busy className="grid gap-4">
-        <div className="h-9 w-56 animate-pulse rounded-xl bg-surface-strong" />
-        <div className="h-64 animate-pulse rounded-2xl bg-surface-strong" />
-      </div>
-    );
-  }
+  }, [cid, eventId, initial]);
 
   const record = view.stage === "published" ? view.record : undefined;
+  const trail = (
+    <Breadcrumbs
+      items={[{ label: "Papers", href: "/papers" }, { label: record?.title ?? shorten(cid) }]}
+    />
+  );
+
   const pill =
     view.stage === "published"
       ? resubmitted
@@ -101,56 +106,59 @@ export function PaperProgress({
         : "Published"
       : HEADLINE[view.stage];
   return (
-    <div className="enter grid items-start gap-8 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] md:gap-12">
-      <div className="grid content-start gap-6">
-        <div className="grid gap-3">
-          <p
-            className={`w-fit rounded-md px-2.5 py-1 text-xs font-medium ${
-              view.stage === "published"
-                ? "bg-accent-soft text-accent"
-                : "bg-surface-strong text-muted"
-            }`}
-          >
-            {pill}
-          </p>
-          <h1 className="text-balance text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
-            {record?.title ?? HEADLINE[view.stage]}
-          </h1>
-          {record && record.authors.length > 0 && <Authors names={record.authors} />}
-          {record?.doi && (
-            <a
-              href={`https://doi.org/${record.doi}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex w-fit items-center gap-1.5 font-mono text-xs text-accent hover:underline"
+    <div className="grid gap-6">
+      {trail}
+      <div className="enter grid items-start gap-8 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] md:gap-12">
+        <div className="grid content-start gap-6">
+          <div className="grid gap-3">
+            <p
+              className={`w-fit rounded-md px-2.5 py-1 text-xs font-medium ${
+                view.stage === "published"
+                  ? "bg-accent-soft text-accent"
+                  : "bg-surface-strong text-muted"
+              }`}
             >
-              doi:{record.doi}
-              <ArrowSquareOut size={12} />
-            </a>
-          )}
-        </div>
-        <StageNote stage={view} resubmitted={resubmitted} />
-        <ProgressChain stage={view.stage} />
-      </div>
-      {view.stage === "published" && record ? (
-        <VerifyPanel record={record} ual={view.ual} cid={cid} contextGraph={contextGraph} />
-      ) : (
-        <aside className="glass grid content-start gap-5 rounded-2xl p-5 sm:p-6">
-          {NOW[view.stage] && (
-            <div className="grid gap-1">
-              <h2 className="text-sm font-semibold">What's happening now</h2>
-              <p className="text-sm leading-relaxed text-muted">{NOW[view.stage]}</p>
-            </div>
-          )}
-          <dl className="grid gap-5">
-            {view.stage === "published" && (
-              <CopyValue label="Knowledge Asset (UAL)" value={view.ual} head={22} />
+              {pill}
+            </p>
+            <h1 className="text-balance text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
+              {record?.title ?? HEADLINE[view.stage]}
+            </h1>
+            {record && record.authors.length > 0 && <Authors names={record.authors} />}
+            {record?.doi && (
+              <a
+                href={`https://doi.org/${record.doi}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex w-fit items-center gap-1.5 font-mono text-xs text-accent hover:underline"
+              >
+                doi:{record.doi}
+                <ArrowSquareOut size={12} />
+              </a>
             )}
-            <CopyValue label="PDF (CID)" value={cid} href={ipfsUrl(cid)} />
-            <CopyValue label="IPFS link" value={`ipfs://${cid}`} />
-          </dl>
-        </aside>
-      )}
+          </div>
+          <StageNote stage={view} resubmitted={resubmitted} />
+          <ProgressChain stage={view.stage} />
+        </div>
+        {view.stage === "published" && record ? (
+          <VerifyPanel record={record} ual={view.ual} cid={cid} contextGraph={contextGraph} />
+        ) : (
+          <aside className="glass grid content-start gap-5 rounded-2xl p-5 sm:p-6">
+            {NOW[view.stage] && (
+              <div className="grid gap-1">
+                <h2 className="text-sm font-semibold">{PUBLISH_PANEL_TITLE}</h2>
+                <p className="text-sm leading-relaxed text-muted">{NOW[view.stage]}</p>
+              </div>
+            )}
+            <dl className="grid gap-5">
+              {view.stage === "published" && (
+                <CopyValue label={PUBLISH_PANEL_LABELS.ual} value={view.ual} head={22} />
+              )}
+              <CopyValue label={PUBLISH_PANEL_LABELS.pdf} value={cid} href={ipfsUrl(cid)} />
+              <CopyValue label={PUBLISH_PANEL_LABELS.ipfs} value={`ipfs://${cid}`} />
+            </dl>
+          </aside>
+        )}
+      </div>
     </div>
   );
 }

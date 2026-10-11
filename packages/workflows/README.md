@@ -3,8 +3,8 @@
 Inngest workflows that combine `core` logic with the `dkg` and `contracts` adapters;
 `apps/web` only serves them ([ADR 0003](../../docs/adr/0003-inngest-functions-live-in-workflows.md)).
 
-Status: the publish run, which turns a pinned PDF into a minted Target KA, and the calls
-the upload page makes to start and follow it.
+Status: the publish run, which turns a pinned PDF into a minted Target KA, the calls the
+upload page makes to start and follow it, and the papers list's read.
 
 ## Depends on
 
@@ -30,6 +30,10 @@ server (`APP_ENV` other than `local`) checks them when it starts, through
 | `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY` | Inngest's keys, required unless `APP_ENV` is `local`: the SDK reads them itself, and the signing key also reads runs for the upload page. Secret |
 | `VERCEL_GIT_COMMIT_REF` | Set by Vercel: on staging, the branch, which names the Inngest branch environment runs are read from |
 
+`DKG_CONTEXT_GRAPH` must spell its address in EIP-55 checksum case, as the node lists it
+(`@verisci/dkg`'s rule): a query with the address in another case reads another, empty
+graph, so the papers list would show none (`docs/domain.md` → DKG).
+
 With `APP_ENV=local` the Inngest client sends events to the local dev server and the
 upload page reads runs there, with no keys.
 
@@ -45,10 +49,11 @@ upload page reads runs there, with no keys.
 | `PUBLISH_SETTINGS` | The publish run's limits (below) |
 | `PublishOutcome`, `PaperRefusal`, `SubmissionRefusal` | How a run ends: `minted` with its UAL, or `refused` with why |
 | `PublishFailure`, `publishFailureReason(output)` | Why a run stopped instead (`chain-unreachable`, `paper-unreachable`, `node-unreachable`, `mint-not-confirmed`, `setup`): each error it throws starts `publish-failed:<reason>:`, and the reader finds it in a failed run's output however Inngest nests it |
-| `getUploadService()` | The upload page's calls, built on first use from the settings: `contextGraph`, `createUploadUrl()`, `submitPaper(input, limiter)`, `readPaper(cid, eventId?)` (below) |
+| `getUploadService()` | The pages' calls, built on first use from the settings: `contextGraph`, `createUploadUrl()`, `submitPaper(input, limiter)`, `readPaper(cid, eventId?)`, `listPapers({ page, pageSize })` (below) |
 | `UploadService`, `PaperStatus`, `PublishedRecord`, `UPLOAD_SETTINGS` | Their type, what `readPaper` returns (the Target KA's state and the run), and the upload URL's and signature's lifetimes |
 | `SubmitResult`, `SubmitRefusal`, `SubmitLimiter` | What `submitPaper` returns, why it refuses, and the per-submitter limit the web app passes it |
 | `UploadUrlResult`, `ReadRunResult`, `RunState` | What `createUploadUrl` and the run read return |
+| `PaperListResult`, `PaperSummary`, `SignatureCheck`, `QueryProblem` | What `listPapers` returns: a page of papers with the total, or why not (`unavailable`, `unreadable`); one listed paper; a signature check (`valid`, `invalid`, `unknown`) |
 | `env` (from `@verisci/workflows/env`); `createWorkflowsEnv(runtimeEnv)`, `WorkflowsEnv` (from either entry) | The validated settings, the function that builds them from a given object, and their type |
 
 ## Publishing a paper
@@ -92,9 +97,11 @@ Retries ([ADR 0009](../../docs/adr/0009-retries-are-spaced-with-step-sleep.md)):
   our credential, or when the node does not serve the graph. A run that fails is recovered
   by publishing the same PDF again.
 
-## The upload page's calls
+## The pages' calls
 
-`getUploadService()` serves `apps/web`'s upload page ([ADR 0010](../../docs/adr/0010-pdf-to-target-ka-pipeline.md)):
+`getUploadService()` serves `apps/web`'s pages: the upload page
+([ADR 0010](../../docs/adr/0010-pdf-to-target-ka-pipeline.md)), the paper's page and the
+papers list:
 
 - **`createUploadUrl()`** signs a Pinata upload URL, valid 5 minutes, for one file of at most
   30 MB detected as `application/pdf`, pinned with `cid_version` `v1` like `publish-pdf`, so
@@ -117,15 +124,32 @@ Retries ([ADR 0009](../../docs/adr/0009-retries-are-spaced-with-step-sleep.md)):
   the run.
 - **`readPaper(cid, eventId?)`** reads the Target KA's state on the node and, given the
   event id, the run Inngest started for it (REST, from the dev server locally). Once the KA
-  is minted, it also reads the record back (SPARQL through the node: title, authors, DOI,
-  PDF link, submitter, signature, deadline), checks the signature against the submitter as
-  the run does, without the deadline rule, and gives the agent address the asset is minted
-  to (`publisher`: the UAL's author, our node). A failed run's status carries `failure`,
-  the reason its error names; a minted paper whose record cannot be shown carries
+  is minted, it also reads the record back from the asset's own graph (SPARQL through the
+  node: title, authors, DOI, PDF link, submitter, signature, deadline), checks the signature
+  against the submitter as the run does, without the deadline rule (`unknown` when the
+  chain does not answer within 3 s), and gives the agent address the asset is minted to
+  (`publisher`: the UAL's author, our node). A failed run's status carries `failure`, the
+  reason its error names; a minted paper whose record cannot be shown carries
   `recordProblem`: `unavailable` when the node did not answer the query, asked to retry, or
-  answered 429 or a server error; `unreadable` when it refused the query or no record parses
+  answered 429 or a server error; `unreadable` when it refused the query, no record parses,
+  or the asset's UAL names another agent than our node
   ([ADR 0021](../../docs/adr/0021-server-reads-return-typed-results.md)). Locally, a run's
   output comes from the dev server's GraphQL API, since its REST read answers it empty.
+- **`listPapers({ page, pageSize })`** reads one page of this graph's published papers,
+  newest mint first, from the node, with no database
+  ([ADR 0035](../../docs/adr/0035-limits-are-the-apps-only-state.md)): only Target KAs our
+  node minted, each read from its own asset's graph (`packages/core` → Target KAs). It asks
+  for the page, with each paper's author count, and the total at once, then for the page's
+  first three authors, then checks each signature as `readPaper` does; a check that waits on
+  the chain for more than 3 s shows as `unknown`, so a slow RPC never holds the page. It returns
+  `{ ok: true, total, papers }`, each paper's `PaperSummary` with its CID, UAL, mint date,
+  title, first authors, author count, submitter and signature check; a page past the last
+  has no papers. A node that does not answer, asks to retry, or answers 429 or a server error
+  gives `unavailable`; a refused query, a count that does not parse, or a page the total
+  covers that comes back with no readable row gives `unreadable`
+  ([ADR 0021](../../docs/adr/0021-server-reads-return-typed-results.md)). A page or page size
+  that is not a positive integer, a page size over 50, or a page whose offset is not a safe
+  integer throws a `RangeError`.
 
 ## Running a publish locally
 

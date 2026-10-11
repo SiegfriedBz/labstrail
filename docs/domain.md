@@ -32,6 +32,11 @@ edge`, testnet), Base Sepolia.
 - **Context graph ids** are the full `<agent address>/<name>`. A bare name refers to a
   different, local graph, so queries with it silently return nothing (`POST /api/query`
   with `verisci-staging` returned no rows on 10.0.22, 2026-10-09).
+- **A context graph id is case-sensitive in queries** (10.0.22, 2026-10-10): with the
+  address in lowercase in `contextGraphId` and in the query, `/api/query` answered 200 with
+  no rows, reading another, empty graph; a `GRAPH` IRI spelled in another case than
+  `contextGraphId` answered 400 "Scoped query violation". The node spells the address in
+  its EIP-55 checksum form (`0xD701…13B3`).
 - **Asset names are scoped per context graph and per writing agent** (OriginTrail/dkg,
   checked at `74a515e`, 2026-10-07): a name is stored at
   `did:dkg:context-graph:<graph id>/assertion/<agent address>/<name>`
@@ -61,6 +66,34 @@ edge`, testnet), Base Sepolia.
   call, so a UAL being present does not mean minted: read `state`
   ([ADR 0007](adr/0007-all-writes-converge.md)). `GET …/{name}/wm/quads` returns the
   draft's quads.
+- **`/api/query` with `contextGraphId` and no `view` reads minted content only** (10.0.22,
+  read in the daemon's `dkg-query/dist/dkg-query-engine.js`, 2026-10-10): the graph's data
+  graph and its per-asset verifiable-memory graphs (`…/_verifiable_memory/<author>/<n>`).
+  Shared memory is read only with `includeSharedMemory: true`.
+- **A graph's `_meta` graph indexes its assets** (10.0.22, 2026-10-10), and a query scoped to
+  the graph can read it as `GRAPH <did:dkg:context-graph:<graph id>/_meta>`. With `dkg:` for
+  `http://dkg.io/ontology/`:
+  - each asset name, at `did:dkg:context-graph:<graph id>/assertion/<agent address>/<name>`,
+    has `dkg:memoryLayer` (`"VM"` once minted), `dkg:kaUal`, `dkg:publishedAtBlock`,
+    `dkg:publishedAtTx` (the mint's transaction) and `dkg:assertionFinalizedAt` (when it was
+    sealed);
+  - each UAL has `dkg:publishedAt`, the mint's date-time.
+- **A query that mixes `GRAPH <…/_meta>` with default-graph patterns returns no rows**
+  (10.0.22, 2026-10-10): the content patterns go in `GRAPH ?g { … }`, which binds the data or
+  verifiable-memory graph. `ORDER BY`, `LIMIT`/`OFFSET`, `COUNT(DISTINCT …)`, `GROUP BY`,
+  subqueries, `VALUES` and `BIND(IRI(CONCAT(…)))` work; an offset past the end answers 200
+  with no rows. The papers list relies on these (`packages/core` → Target KAs).
+- **Each minted asset's triples sit in a graph of their own** (10.0.22, 2026-10-10):
+  `did:dkg:context-graph:<graph id>/_verifiable_memory/<address>/<number>`, from the UAL's
+  lowercase address and number, while its `_meta` path,
+  `…/assertion/<agent address>/<name>`, keeps the graph id's EIP-55 spelling. Another node
+  may add assets to an open graph (`docs/node-host.md`), and a query reads every author's
+  graphs, so our reads keep to assets under our agent and read each from its own graph.
+- **How the node lets a query name `?g`** (10.0.22, 2026-10-10): `FILTER(STR(?g) = …)` after
+  the `GRAPH ?g` block and a top-level `VALUES (?x ?g) { … }` work; a `BIND(… AS ?g)` before
+  the block answers 400 (`expected OPTIONAL`), and a `GRAPH ?g` inside a subquery answers
+  400 "Scoped query violation: GRAPH variables inside nested SELECT subqueries cannot be
+  constrained safely". `GRAPH <iri> { … }` naming one asset's graph works on its own.
 - **A KA passes through three memory layers on 10.0.22:** a working-memory draft (`wm`:
   create, write, finalize), shared memory (`swm/share`, acknowledged by peers), then
   verifiable memory (`vm/publish`, the mint). `dkg ka create --share` runs the first two
@@ -118,6 +151,7 @@ edge`, testnet), Base Sepolia.
   (written by `dkg init` on 10.0.16; on 10.0.22, 2026-10-09, by the first `dkg start`,
   with the agent key), valid for every graph on the node; there are no tokens scoped per
   graph, so whoever holds it can write every environment's graph ([ADR 0005](adr/0005-staging-and-production-are-isolated.md)).
+  On 10.0.22 the file starts with a comment line; the token is its second line.
 - **Every context graph must be listed** under `contextGraphs` in the node's
   `~/.dkg/config.json`, or the node stops serving it after a restart.
 - **A new graph reports `authority-resolution-failed` for up to about 20 minutes** (10.0.16).
@@ -327,6 +361,14 @@ Observed on Next.js 16.3.8.
   wagmi's connectors reach Coinbase's SDK, whose lazily imported `@x402/*` packages are
   optional peers; `next build` fails on them until `turbopack.resolveAlias` points them at a
   module declaring the imported names (`apps/web/next.config.ts`).
+- **A response's status is sent with its first streamed chunk** (Next.js docs,
+  `03-api-reference/04-functions/not-found.md`, 16.3.8): `notFound()` inside a `Suspense`
+  boundary renders the not-found page as a 200 with `noindex`, a soft 404; a real 404 needs
+  the check before any `await` that suspends or any `Suspense` boundary. Seen on `/papers`
+  (2026-10-10): `?page=0` answered 404, a page past the last 200 with `noindex`.
+- **Everything a `"use client"` file exports reaches a server component as a client
+  reference**, not its value, so a string or constant the server needs lives in a plain
+  module (`apps/web/components/paper/labels.ts`).
 
 ## Tooling
 
@@ -348,5 +390,9 @@ a fact names another tool.
   object it is given (`process.env` by default), so `defineEnv` passes a copy; `extends`
   merges presets without validating them again; `skipValidation` returns the whole runtime
   env, secrets included, with no defaults.
+- **Tailwind v4 puts utilities in a cascade layer, and unlayered CSS beats any layer**
+  (Tailwind 4.3.3, 2026-10-10): `apps/web/app/globals.css`'s `li { text-wrap: pretty }` beat
+  `truncate` on an `li`, which wrapped instead of cutting the text. Put the utility on a
+  child element, or put the global rule in `@layer base`.
 - **Zod 4 reports a missing enum value as "Invalid option".** Give the schema its own
   `error` callback when "required" is what is actually wrong.

@@ -3,6 +3,12 @@ export const workflowsName = "@verisci/workflows";
 
 export { functions, publishPaper } from "./functions.ts";
 export { inngest } from "./inngest.ts";
+export type {
+  PaperListResult,
+  PaperSummary,
+  QueryProblem,
+  SignatureCheck,
+} from "./papers.ts";
 export type { UploadUrlResult } from "./pinata.ts";
 export {
   PAPER_SUBMITTED,

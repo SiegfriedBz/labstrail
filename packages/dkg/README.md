@@ -12,11 +12,13 @@ with `authority-resolution-failed` is often a chain-read problem there, not in t
 package (`docs/domain.md` → DKG).
 
 Status: a client to read an asset's state, store it, start its mint, and run a SPARQL
-query (`query`), which reads a published paper's record back.
+query (`query`), which reads a published paper's record back and lists the published
+papers (a page, the count and the page's first authors).
 
 ## Depends on
 
-`@verisci/core` (UAL normalization), `@verisci/env`, and Zod.
+`@verisci/core` (UAL normalization), `@verisci/env`, Zod, and viem (the EIP-55 checksum of
+`DKG_CONTEXT_GRAPH`'s address).
 
 ## Environment
 
@@ -28,12 +30,14 @@ the client's types never needs them.
 | --- | --- |
 | `DKG_URL` | The node's base URL: `http://127.0.0.1:9200` locally |
 | `DKG_TOKEN` | Bearer token: the node's admin token (`~/.dkg/auth.token`) locally; the environment's credential once the node is on its server |
-| `DKG_CONTEXT_GRAPH` | The full context graph id, `<agent address>/<graph name>`, such as `0x…/verisci-staging` |
+| `DKG_CONTEXT_GRAPH` | The full context graph id, `<agent address>/<graph name>`, with the address in EIP-55 checksum case as the node lists it, such as `0xD701…13B3/verisci-staging` |
 
-`DKG_CONTEXT_GRAPH` is refused when it is a bare name (which reads another, empty graph,
-`docs/domain.md` → DKG), when it ends in `-prod` and `APP_ENV` is not `production`, and when
-`APP_ENV` is `production` and it does not
-([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)).
+`DKG_CONTEXT_GRAPH` is refused when it is a bare name or its address is in another case
+than the node's EIP-55 spelling (either reads another, empty graph, `docs/domain.md` →
+DKG), when it ends in `-prod` and `APP_ENV` is not `production`, and when `APP_ENV` is
+`production` and it does not
+([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)). The workflows and
+the `publish-pdf` script build on the same rule.
 
 ## API
 
@@ -49,7 +53,7 @@ the client's types never needs them.
 | `Quad`, `AssetState`, `AssetResult`, `MintResult`, `QueryResult`, `DkgFailure` | The client's input and result types |
 | `env` (from `@verisci/dkg/env`) | The settings, validated from `process.env` on import |
 | `dkgSchema(isProduction)` | The three variables' rules, for a workspace that validates them with its own in one pass |
-| `contextGraphSchema(isProduction)` | The rule for `DKG_CONTEXT_GRAPH` (full id, `-prod` guard), for a script that reads only that variable |
+| `contextGraphSchema(isProduction)` | The rule for `DKG_CONTEXT_GRAPH` (full id, address in EIP-55 case, `-prod` guard), for a script that reads only that variable |
 | `createDkgEnv(runtimeEnv)`, `DkgEnv` (from either entry) | The function that validates the settings from a given object, when called (what `@verisci/dkg/env` and tests use), and their type; a workspace that also reads the DKG settings spreads `dkgSchema` into its own `defineEnv` instead |
 
 ```ts

@@ -8,7 +8,8 @@ Domain logic. Core does no IO: no `fetch`, no `node:*` imports and no other
 `node:*` and `@verisci/*` into errors ("core does no IO").
 
 Status: shared constants, UAL parsing, asset names, a Target KA's content and submission,
-reading a paper's record back (`paperRecordQuery`, `parsePaperRecord`), and OriginTrail's
+reading a paper's record back (`paperRecordQuery`, `parsePaperRecord`), listing published
+papers a page at a time (`paperListQuery` and its parsers), and OriginTrail's
 contracts with the token behind a UAL (`ORIGINTRAIL_CONTRACTS`, `knowledgeAssetToken`).
 
 ## Depends on
@@ -40,8 +41,12 @@ workspace. pnpm does not hoist undeclared workspace packages, so an import of an
 | `parseTeiHeader(xml)` | A paper's `PaperMetadata` (title, authors, abstract, DOI) from GROBID's TEI header, or `not-tei` or `no-title`; returns a result for every input |
 | `PaperMetadata`, `TeiResult` | The metadata read from a TEI header, and the result of `parseTeiHeader` |
 | `ORIGINTRAIL_CONTRACTS`, `OriginTrailContracts`, `knowledgeAssetToken(ual)` | OriginTrail's `DKGKnowledgeAssets` (the ERC-721 holding every asset's token) and `KnowledgeAssetsLifecycle` addresses by chain id, and the contract and token id behind a UAL: the id itself when the UAL names the contract, else the author's address above the asset number in the low 96 bits; `undefined` for a chain with no recorded contracts |
-| `paperRecordQuery(cid)`, `parsePaperRecord(cid, bindings)` | The SPARQL that reads a paper's Target KA back, and the `PaperRecord` (title, authors in order, abstract, DOI, PDF link, submitter, signature, deadline) from its rows, or `undefined` when a required field is missing |
+| `paperRecordQuery(cid, contextGraph, ual)`, `parsePaperRecord(cid, bindings)` | The SPARQL that reads a paper's Target KA back from that asset's own graph (named by its UAL; `undefined` when another agent than the graph's minted it), and the `PaperRecord` (title, authors in order, abstract, DOI, PDF link, submitter, signature, deadline) from its rows, or `undefined` when a required field is missing |
 | `PaperRecord`, `QueryBinding` | A record read back, and one row of a SPARQL answer |
+| `paperListQuery(contextGraph, { limit, offset })`, `parsePaperListing(bindings)` | The SPARQL for one page of a graph's published papers, newest mint first, and the `PaperListing`s (CID, normalized UAL, mint date, title, submitter, signature, deadline, author count) from its rows, each paper once; a row that does not parse is left out. The query is `undefined` for a graph id that is not a full one or whose name holds one of `<>"{}|^` `` ` `` `\`, or a limit or offset that is negative or not a safe integer (limit at least 1) |
+| `paperCountQuery(contextGraph)`, `parsePaperCount(bindings)` | The SPARQL counting those papers, with the same patterns, and the total from its row, or `undefined` |
+| `paperAuthorsQuery(contextGraph, papers, first)`, `parsePaperAuthors(bindings)` | The SPARQL for the first `first` authors of each listed paper (`{ cid, ual }`), each from its own asset's graph (canonical CIDs and UALs the graph's agent minted only; `undefined` when none is left), and a map from CID to those names in position order |
+| `PaperListing` | A listed paper |
 | `targetKaQuads(metadata, submission)` | The `Triple`s of a paper's Target KA: its description and who submitted it |
 | `Triple`, `PaperSubmission`, `VERISCI_NS` | One triple as the DKG node takes it, the submitter's address, signature and deadline, and the `urn:verisci:` prefix |
 
@@ -113,6 +118,16 @@ A Target KA describes a paper and who submitted it
   submission signs; and
   verify the signature against the submitter's address with any EIP-712 library (viem's
   `verifyTypedData` also checks smart-contract wallets).
+- **Listing published papers:** `paperListQuery` reads the graph's `_meta` graph, where the
+  node records each minted asset (`dkg:memoryLayer "VM"`), its UAL and the mint's date
+  (`dkg:publishedAt`). It keeps only the Target KAs our node named and minted: the asset's
+  path is `assertion/<graph's agent>/verisci-tka-…` and its UAL's address is that agent, so
+  an asset another node adds to an open graph is never listed. It reads each paper's
+  triples from that asset's own graph, `_verifiable_memory/<agent>/<number>`, so another
+  asset's triples about the same paper never mix into a row (`docs/domain.md` → DKG).
+  `paperRecordQuery` and `paperAuthorsQuery` read from the same per-asset graph. The list
+  orders by the mint's date, newest first, then by paper, so pages are stable between two
+  reads with no new mint.
 
 ## Scripts
 

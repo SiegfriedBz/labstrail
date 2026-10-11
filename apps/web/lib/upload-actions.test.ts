@@ -22,6 +22,7 @@ function fakeService(overrides: Partial<UploadService> = {}) {
       calls.read.push([cid, eventId]);
       return { asset: { ok: true, state: "stored", reservedUal: "x" }, run: undefined };
     },
+    listPapers: async () => ({ ok: true, total: 0, papers: [] }),
     ...overrides,
   };
   return { service, calls };

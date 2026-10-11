@@ -61,6 +61,14 @@ describe("createDkgEnv", () => {
     expect(error.issues.map((issue) => issue.variable)).toEqual(["DKG_CONTEXT_GRAPH"]);
   });
 
+  it("refuses an address that is not in the node's checksum case, naming the rule only", () => {
+    const error = envError({ DKG_CONTEXT_GRAPH: `${AGENT.toLowerCase()}/verisci-staging` });
+
+    expect(error.issues.map((issue) => issue.variable)).toEqual(["DKG_CONTEXT_GRAPH"]);
+    expect(error.issues[0]?.message).toMatch(/EIP-55/);
+    expect(error.message).not.toContain(AGENT.toLowerCase());
+  });
+
   it("names a missing token and a bad URL without showing the token", () => {
     const error = envError({ DKG_TOKEN: "", DKG_URL: "not a url" });
 
@@ -80,6 +88,8 @@ describe("contextGraphSchema", () => {
     [false, `${AGENT}/verisci-staging`, true],
     [false, `${AGENT}/verisci-prod`, false],
     [false, "verisci-staging", false],
+    [false, `${AGENT.toLowerCase()}/verisci-staging`, false],
+    [false, `0x${AGENT.slice(2).toUpperCase()}/verisci-staging`, false],
     [true, `${AGENT}/verisci-prod`, true],
     [true, `${AGENT}/verisci-staging`, false],
   ])("in production %s, accepts %s: %s", (isProduction, id, accepted) => {

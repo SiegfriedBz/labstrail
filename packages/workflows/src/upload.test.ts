@@ -179,20 +179,27 @@ describe("readPaper on a minted paper", () => {
             }
           : { p: t.predicate, o: t.object };
       });
-    const fetch = (async (input: string | URL | Request) => {
+    const asked: string[] = [];
+    const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input);
-      if (url.includes("/api/query")) return Response.json({ result: { bindings } });
+      if (url.includes("/api/query")) {
+        asked.push((JSON.parse(String(init?.body)) as { sparql: string }).sparql);
+        return Response.json({ result: { bindings } });
+      }
       return Response.json({ state: "published", publishedUal: MINTED, reservedUal: MINTED });
     }) as typeof globalThis.fetch;
-    return { fetch, signer };
+    return { fetch, signer, asked };
   }
 
   it("reads the record back, checks its signature, and names the publisher", async () => {
-    const { fetch, signer } = await mintedNode();
+    const { fetch, signer, asked } = await mintedNode();
     const service = createUploadService(env(), { ...io().uploadIo, fetch });
 
     const { record } = await service.readPaper(CID);
 
+    expect(asked[0]).toContain(
+      `GRAPH <did:dkg:context-graph:${GRAPH}/_verifiable_memory/0xd701ed157232ad5e14bc4134a8d10d64d86f13b3/6>`,
+    );
     expect(record).toMatchObject({
       title: "Screening VP1",
       authors: ["Di Liu", "Yuting Xiao"],
@@ -240,6 +247,22 @@ describe("readPaper on a minted paper", () => {
     }
   });
 
+  it("says the record is unreadable when another agent minted the asset, and reads nothing", async () => {
+    const foreign = "did:dkg:base:84532/0x1111111111111111111111111111111111111111/6";
+    const queries: string[] = [];
+    const fetch = (async (input: string | URL | Request) => {
+      if (String(input).includes("/api/query")) {
+        queries.push(String(input));
+        return Response.json({ result: { bindings: [] } });
+      }
+      return Response.json({ state: "published", publishedUal: foreign, reservedUal: foreign });
+    }) as typeof globalThis.fetch;
+    const service = createUploadService(env(), { ...io().uploadIo, fetch });
+
+    expect((await service.readPaper(CID)).recordProblem).toBe("unreadable");
+    expect(queries).toEqual([]);
+  });
+
   it("says the record is unreadable when the node answers no usable record", async () => {
     const empty = (async (input: string | URL | Request) =>
       String(input).includes("/api/query")
@@ -258,5 +281,32 @@ describe("readPaper on a minted paper", () => {
     const { uploadIo } = io();
 
     expect((await createUploadService(env(), uploadIo).readPaper(CID)).record).toBeUndefined();
+  });
+});
+
+describe("listPapers", () => {
+  it("lists a page from the node, in this graph, with the total", async () => {
+    const asked: { sparql: string; contextGraphId: string }[] = [];
+    const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      if (!String(input).endsWith("/api/query")) return new Response("unexpected", { status: 500 });
+      const body = JSON.parse(String(init?.body)) as { sparql: string; contextGraphId: string };
+      asked.push(body);
+      return Response.json({
+        result: {
+          bindings: body.sparql.startsWith("SELECT (COUNT")
+            ? [{ total: '"0"^^<http://www.w3.org/2001/XMLSchema#integer>' }]
+            : [],
+        },
+      });
+    }) as typeof globalThis.fetch;
+    const service = createUploadService(env(), { ...io().uploadIo, fetch });
+
+    expect(await service.listPapers({ page: 1, pageSize: 20 })).toEqual({
+      ok: true,
+      total: 0,
+      papers: [],
+    });
+    expect(asked.map((request) => request.contextGraphId)).toEqual([GRAPH, GRAPH]);
+    expect(asked[0]?.sparql).toContain(`GRAPH <did:dkg:context-graph:${GRAPH}/_meta>`);
   });
 });

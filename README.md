@@ -20,8 +20,9 @@ Status: early. VeriSci is a rebuild of an earlier prototype,
 Base Sepolia. This repo starts again from clean foundations (monorepo, tooling,
 CI), and its ADRs and domain facts record what the prototype taught us. The first
 user-facing feature is the upload page: connect a wallet, publish a PDF, follow it until it
-is minted, then verify its record (signature, token, UAL, CID) from the paper's page. Rating
-comes next. The repo, its packages and the EIP-712 domain keep the lowercase name `verisci`.
+is minted, then verify its record (signature, token, UAL, CID) from the paper's page. Every
+published paper is listed at `/papers`, newest first, read a page at a time from the DKG.
+Rating comes next. The repo, its packages and the EIP-712 domain keep the lowercase name `verisci`.
 Everything runs on testnets.
 
 ## How it works
@@ -232,7 +233,7 @@ TypeScript source, with no build step; Next.js compiles them through
 | [`packages/core`](packages/core/README.md) | Domain logic, no IO | none |
 | [`packages/dkg`](packages/dkg/README.md) | DKG adapter | core, env |
 | [`packages/contracts`](packages/contracts/README.md) | Solidity contracts and their TypeScript side | core, env |
-| [`packages/workflows`](packages/workflows/README.md) | Inngest workflows and the upload page's calls | core, env, dkg, contracts |
+| [`packages/workflows`](packages/workflows/README.md) | Inngest workflows and the pages' calls | core, env, dkg, contracts |
 | [`infra/rpc-proxy`](infra/rpc-proxy/README.md) | JSON-RPC proxy run on the DKG node server | none |
 
 Each workspace may only import the workspaces it declares. pnpm does not
@@ -265,8 +266,9 @@ then open http://localhost:3000/publish (it needs the workflows' settings and
 Environment variables are listed in [`.env.example`](.env.example): copy it to
 `.env.local` at the repo root (gitignored), where `apps/web` loads it from.
 `pnpm test` runs without it, and `pnpm build` needs only `APP_ENV` (`APP_ENV=local`).
-`pnpm dev` starts without it, but the publish and paper pages need the DKG node and
-publish run settings, and the wallet window `REOWN_PROJECT_ID`. How workspaces declare
+`pnpm dev` starts without it, but the home page's latest papers, the papers list, and the
+publish and paper pages need the DKG node and publish run settings, and the wallet window
+`REOWN_PROJECT_ID`. How workspaces declare
 and validate them is in the [`@verisci/env` README](packages/env/README.md).
 
 ## Commands

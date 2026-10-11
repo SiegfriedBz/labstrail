@@ -6,8 +6,9 @@ import {
   submissionTypedData,
 } from "@verisci/core";
 import type { PublishedRecord } from "@verisci/workflows";
-import { addressUrl, assetTokenUrl, ipfsUrl } from "../lib/explorer.ts";
+import { addressUrl, assetTokenUrl, ipfsUrl } from "../../lib/explorer.ts";
 import { CopyValue } from "./copy-value.tsx";
+import { VERIFY_INTRO, VERIFY_LABELS, VERIFY_TITLE } from "./labels.ts";
 
 /** The signature's EIP-712 domain and type, as `@verisci/core`'s `submissionTypedData` builds them. */
 const EIP712_DOMAIN = `{ name: "${SUBMISSION_DOMAIN.name}", version: "${SUBMISSION_DOMAIN.version}", chainId: ${SUBMISSION_DOMAIN.chainId} }`;
@@ -59,11 +60,9 @@ export function VerifyPanel({
     <section className="glass grid gap-6 rounded-2xl p-5 sm:p-6" aria-labelledby="verify-title">
       <div className="grid gap-1">
         <h2 id="verify-title" className="text-lg font-semibold">
-          Verify it yourself
+          {VERIFY_TITLE}
         </h2>
-        <p className="text-sm leading-relaxed text-muted">
-          These values are public. You can check each one without trusting us.
-        </p>
+        <p className="text-sm leading-relaxed text-muted">{VERIFY_INTRO}</p>
       </div>
       <p
         className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium ${check.tone}`}
@@ -73,29 +72,29 @@ export function VerifyPanel({
       </p>
       <dl className="grid gap-5">
         <CopyValue
-          label="Submitted by"
+          label={VERIFY_LABELS.submitter}
           value={record.submitter}
           href={addressUrl(record.submitter)}
         />
-        <CopyValue label="Submitter's signature" value={record.signature} />
-        <CopyValue label="Signed deadline (Unix seconds)" value={record.deadline} />
-        <CopyValue label="Context graph" value={contextGraph} head={22} />
+        <CopyValue label={VERIFY_LABELS.signature} value={record.signature} />
+        <CopyValue label={VERIFY_LABELS.deadline} value={record.deadline} />
+        <CopyValue label={VERIFY_LABELS.contextGraph} value={contextGraph} head={22} />
         {record.publisher && (
           <CopyValue
-            label="Minted to VeriSci's node"
+            label={VERIFY_LABELS.publisher}
             value={record.publisher}
             href={addressUrl(record.publisher)}
           />
         )}
         {token && (
           <CopyValue
-            label="Asset token (ERC-721, OriginTrail's DKGKnowledgeAssets)"
+            label={VERIFY_LABELS.token}
             value={token.tokenId.toString()}
             href={assetTokenUrl(ual)}
           />
         )}
-        <CopyValue label="Knowledge Asset (UAL)" value={ual} head={22} />
-        <CopyValue label="PDF (CID)" value={cid} href={ipfsUrl(cid)} />
+        <CopyValue label={VERIFY_LABELS.ual} value={ual} head={22} />
+        <CopyValue label={VERIFY_LABELS.pdf} value={cid} href={ipfsUrl(cid)} />
       </dl>
       <details className="group rounded-xl border border-line px-4 py-3 text-sm">
         <summary className="cursor-pointer font-medium marker:text-muted">
