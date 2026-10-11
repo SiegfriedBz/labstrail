@@ -26,7 +26,7 @@ points the optional `@x402/*` packages, reached through wagmi's connectors, at
 | `/` | Home: what VeriSci does, the latest papers (the five newest, streamed in with a skeleton, linking to `/papers`), the DKG's two layers (the record off-chain, its ERC-721 token and merkle root on-chain, the UAL linking them), how publishing works and the rating flow to come, and an example paper asset |
 | `/publish` | Connect a wallet, drop a PDF, sign once; what publishing means and the limits ([ADR 0010](../../docs/adr/0010-pdf-to-target-ka-pipeline.md), [ADR 0034](../../docs/adr/0034-users-connect-a-wallet-anyone-may-publish.md)) |
 | `/papers?page=<n>` | Every paper this environment published, newest mint first, 20 to a page (below) |
-| `/papers/<cid>?event=<id>` | Where a paper stands, then its record and how to verify it (below), under "Papers / <title>" breadcrumbs. `?already=1` says a re-submitted PDF was already published |
+| `/papers/<cid>?event=<id>` | Where a paper stands, then its record, abstract and how to verify it (below), under "Papers / <title>" breadcrumbs. `?already=1` says a re-submitted PDF was already published |
 | `/api/papers/<cid>?event=<id>` | The same as JSON (`PaperView`: the stage, and the record once published), never cached: a read, so a route rather than a server action |
 | `/api/inngest` | Serves the Inngest functions |
 | any other path | `app/not-found.tsx`; a page that fails to render shows `app/error.tsx` with a retry |
@@ -78,9 +78,10 @@ shaped like the table (`components/papers/papers-table-skeleton.tsx`).
 
 The server reads where the paper stands (`components/paper/paper-loader.tsx`, the same
 `readProgress` as `/api/papers/<cid>`) inside a `Suspense` boundary. Until the node answers,
-a skeleton shows the breadcrumbs, the side panel's real heading and labels, and the PDF's
-CID, with only the values pulsing: the publish panel's when the address has `?event=`, the
-verify panel's otherwise (`components/paper/labels.ts` holds the labels both use).
+a skeleton shows the breadcrumbs, the side panel's real heading, groups and labels, and the
+PDF's CID, with only the values pulsing: the chain of steps and the publish panel's labels
+when the address has `?event=`, a published paper's shape (abstract, one row of steps) and
+the verify panel's otherwise (`components/paper/labels.ts` holds the labels both use).
 `components/paper/paper-progress.tsx` then follows the paper from that first view: unless it
 is final, it asks `/api/papers/<cid>` every 5 s and stops on a final stage. It shows and asks
 by the CID's canonical spelling, the one the signature covers, whatever spelling the address
@@ -131,43 +132,68 @@ stateDiagram-v2
   loads; one whose record cannot be read says so
   ([ADR 0021](../../docs/adr/0021-server-reads-return-typed-results.md)).
 
-Once published, the page shows the record (title, authors, DOI) and a "Verify it
-yourself" panel (`components/paper/verify-panel.tsx`): the signature checked when read, the
-submitter, the signature, its deadline and the context graph, the EIP-712 domain and type
-to check it with, the agent address the asset is minted to (our node, the UAL's author),
-the asset's ERC-721 token in OriginTrail's `DKGKnowledgeAssets` (`lib/explorer.ts` →
-`assetTokenUrl`), the UAL, and the PDF's CID, linked through Pinata's public gateway
-(`ipfsUrl`; ipfs.io no longer serves files). Addresses and the token link to Basescan.
+Once published, the page leads with the paper: the record (title, sized by its length,
+authors, DOI), then its abstract (`components/paper/abstract.tsx`: past 420 characters, cut
+to five lines with a "Read more" toggle), then the publish steps as one row of done steps.
+Beside it, a "Verify it yourself" panel (`components/paper/verify-panel.tsx`) shows the
+signature checked when read, then two groups: "The submission" (the submitter, the
+signature, its deadline and the context graph) and "The asset" (the agent address the asset
+is minted to, which is our node and the UAL's author; the asset's ERC-721 token in
+OriginTrail's `DKGKnowledgeAssets`, `lib/explorer.ts` → `assetTokenUrl`; the UAL; and the
+PDF's CID, linked through Pinata's public gateway, `ipfsUrl`, since ipfs.io no longer
+serves files). Addresses and the token link to Basescan. "How to check this record" gives
+the EIP-712 domain and type to check the signature with.
 
 ## Code layout
 
 - `app/`: the pages, the route handlers and the server actions.
 - `lib/`: each flow's logic, pure or with its IO passed in, tested in unit tests.
 - `components/`, grouped by area: `site` (the shell every page shares: logo, header links,
-  footer, breadcrumbs), `wallet` (the wallet providers and button), `home`, `papers` (the
-  papers list), `paper` (one paper's page), `publish`, and `ui` (shadcn primitives,
-  restyled with the app's tokens). Tests sit next to their component.
+  theme button, footer, breadcrumbs), `wallet` (the wallet providers and button),
+  `home`, `papers` (the papers list), `paper` (one paper's page), `publish`, and `ui`
+  (shadcn primitives, restyled with the app's tokens). Tests sit next to their component.
 
 ## Design
 
-A dark lab instrument with a web3 edge, in Tailwind CSS v4 (`app/globals.css`):
+A lab instrument with a web3 edge, in Tailwind CSS v4 (`app/globals.css`):
 
-- Near-black, glass panels with hairline borders, a faint grid, one glow behind the hero.
-  Dark only.
+- Two themes: light by default, dark once the visitor picks it with the sun and moon button
+  in the header; the choice is kept in this browser (`localStorage`). `THEME_SCRIPT`
+  (`lib/theme.ts`) sets `<html data-theme>` in `<head>` before the first paint, so no page
+  flashes the other theme; AppKit's wallet window follows the same theme. Every colour is a
+  token defined for both themes: light accents are dark enough for AA text contrast, and
+  dark is a dimmed graphite with solid panels one step lighter than the page.
+- An off-white page (graphite in dark), a soft wash across the top of each page (emerald
+  from the top left, cyan from the top right, no pattern), one soft glow behind the hero. Raised panels with hairline borders only where a figure or a tool needs one (the hero's publish
+  chain, the UAL figure, the example asset, the paper's verify panel, the publish form);
+  elsewhere, coloured edges, timelines and hairline rules group the content, with one call
+  to action per page.
 - Two signal colours with one meaning each: emerald for the off-chain record, cyan for the
   on-chain asset. They blend only on the main action, live lines, and the line linking a
-  save to its mint in the publish chain.
+  save to its mint in the publish chain. Text links are ink with an emerald underline
+  (`link`); on-chain values are muted and turn cyan on hover. The header's wallet button
+  is neutral, so each page's own call to action leads.
 - Sora for text, Martian Mono for on-chain values (`next/font`), Phosphor icons. One radius
   scale: `rounded-2xl` panels, `rounded-xl` buttons and inputs, `rounded-lg` small
   controls, `rounded-md` flags.
-- Motion: the home page plays the publish chain on a loop and the step being worked on
-  breathes; all of it stops for visitors who ask for reduced motion.
-- Every page works from 360 px wide, one column on phones, and the page clips any overflow.
-  On-chain values show in short form with a copy button.
+- The hero's panel plays the publish flow on a loop: the example paper's PDF goes in, the
+  steps run, and its UAL comes out once minted (`components/home/chain-demo.tsx`). The
+  example is a real staging record whose signature checks out, the same as the example
+  asset lower on the page. Beside "Publish a paper", a "Browse papers" link.
+- Motion: the hero's publish flow loops and the step being worked on breathes; the home sections after the hero rise in as they enter the screen (`reveal`, a
+  CSS scroll-driven animation, where the browser supports one). All of it stops for
+  visitors who ask for reduced motion.
+- Every page works from 360 px wide, one column on phones, and the page clips any overflow
+  (`overflow-x: clip`, which keeps the sticky header working). The home hero fills the
+  first screen, so the next section starts below the fold; below `md`, the hero's text fills
+  the first screen and its panel starts just under the fold. On a paper's page, the paper's column stays in view
+  while the verify panel scrolls. On-chain values show in short form with a copy button.
 - The product name is VeriSci; its mark (`components/site/logo.tsx`, and `app/icon.svg` for the
   tab) is a check drawn as three linked graph nodes.
-- Keyboard users get a skip link and one accent focus ring; the header marks the current
-  page. On phones the wallet button reads "Connect", so the header keeps one line.
+- Keyboard users get a skip link and one accent focus ring; the header underlines the
+  current page's link in emerald. On phones the wallet button is a wallet icon (with a dot
+  once connected) beside the theme button, so the header keeps one line; AppKit's own
+  window opens from it.
 - What the DKG node answers loads behind a skeleton shaped like what replaces it, streamed
   in a `Suspense` boundary; what is known already (labels, the CID) shows at once.
 - The footer (`components/site/site-footer.tsx`) lists the contracts on Base Sepolia, linked on
