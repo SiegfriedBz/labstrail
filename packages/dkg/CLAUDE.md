@@ -11,7 +11,8 @@ here.
 - Every store and mint reads the asset's state first (ADR 0007); a store includes the
   share; `startMint` listens for `vm/publish` only briefly and returns `minting`, and
   the caller polls `readAsset` (0008); the env module refuses a `-prod` context graph
-  unless `APP_ENV=production` (0005). See [`docs/adr/`](../../docs/adr/README.md).
+  unless `APP_ENV=production` (0005), and a graph address not in the node's EIP-55 case
+  (`docs/domain.md` → DKG). See [`docs/adr/`](../../docs/adr/README.md).
 - `src/env.ts` validates on import, so only `@verisci/dkg/env` imports it; the main
   entry (`src/index.ts`) never does, since the web app imports it. The main entry
   exports `createDkgEnv`, which validates only when called.

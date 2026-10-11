@@ -1,23 +1,9 @@
-import { contextGraphSchema, dkgSchema } from "@verisci/dkg";
+import { dkgSchema } from "@verisci/dkg";
 import { createSharedEnv, defineEnv, type RuntimeEnv } from "@verisci/env";
-import { getAddress } from "viem";
 import { z } from "zod";
 
 /** The Pinata API key (JWT) that signs uploads, lists and unpins files. Secret. */
 export const pinataSchema = { PINATA_JWT: z.string().min(1) };
-
-/**
- * Whether a context graph id's address is in EIP-55 checksum case, the spelling the DKG node
- * lists it in: in another case, queries read another, empty graph (`docs/domain.md` → DKG).
- */
-function checksummed(contextGraph: string): boolean {
-  const address = contextGraph.split("/")[0] ?? "";
-  try {
-    return getAddress(address) === address;
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Validates the workflows' settings from `runtimeEnv` (default `process.env`): GROBID, the
@@ -38,9 +24,6 @@ export function createWorkflowsEnv(runtimeEnv: RuntimeEnv = process.env) {
     extends: [shared],
     server: {
       ...dkgSchema(isProduction),
-      DKG_CONTEXT_GRAPH: contextGraphSchema(isProduction).refine(checksummed, {
-        message: "must spell its address as the DKG node lists it, in EIP-55 checksum case",
-      }),
       GROBID_URL: z.url(),
       PINATA_GATEWAY_URL: z.url(),
       CHAIN_RPC_URL: z.url(),
