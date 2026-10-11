@@ -5,19 +5,29 @@
 //   pnpm --filter @verisci/workflows score-papers [id…]
 //
 // Reads GEMINI_API_KEY from the root .env.local (packages/workflows README). Downloads each PDF
-// once into node_modules/.cache/verisci-reference/, and writes each run's answers there too.
+// once into node_modules/.cache/verisci-reference/, and writes each run's answers there too,
+// after each paper, so a run that stops keeps the answers it paid for.
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { setTimeout as sleep } from "node:timers/promises";
-import { type PaperText, type ScorerAnswer, type ScorerOutput, scoreChecks } from "@verisci/core";
+import {
+  type CheckResult,
+  type PaperText,
+  type ScorerAnswer,
+  type ScorerOutput,
+  scoreChecks,
+} from "@verisci/core";
 import { createSharedEnv, defineEnv } from "@verisci/env";
-import { z } from "zod";
 import { paperTextOf } from "../src/rating/paper-text.ts";
 import { RATING_SETTINGS } from "../src/rating/rate-paper.ts";
 import { askScorer, type ScoreFailureResult } from "../src/rating/scorer.ts";
+import { geminiSchema } from "../src/rating-env.ts";
 import { type ReferencePaper, readReferencePapers } from "./reference-papers.ts";
 
 const CACHE = new URL("../node_modules/.cache/verisci-reference/", import.meta.url);
-/** Gemini's free tier answers a burst with 429s: wait between calls, and retry a few times. */
+/**
+ * Gemini's free tier answers a burst with 429s: wait between calls, and retry a few times. An
+ * answer the check refuses is asked for again only as often as a rating run does.
+ */
 const PAUSE_MS = 5_000;
 const RETRY_WAIT_MS = 30_000;
 const TRIES = 3;
@@ -29,7 +39,7 @@ if (shared.APP_ENV !== "local") {
 }
 const env = defineEnv({
   extends: [shared],
-  server: { GEMINI_API_KEY: z.string().min(1) },
+  server: geminiSchema,
   runtimeEnv: process.env,
 });
 const gemini = {
@@ -64,24 +74,29 @@ interface Found {
   readonly failure?: string;
 }
 
+const file = new URL(`results-${new Date().toISOString().replaceAll(":", "-")}.json`, CACHE);
 const results: Found[] = [];
 for (const paper of papers) {
-  const result = await score(paper);
+  const result = await score(paper).catch(
+    (error: unknown): Found => ({ ...baseOf(paper), failure: `stopped: ${String(error)}` }),
+  );
   results.push(result);
   report(paper, result);
+  await writeFile(file, `${JSON.stringify(results, null, 2)}\n`);
 }
 summarize(results);
-const file = new URL(`results-${new Date().toISOString().replaceAll(":", "-")}.json`, CACHE);
-await writeFile(file, `${JSON.stringify(results, null, 2)}\n`);
 console.log(`\nAnswers written to ${file.pathname}`);
 
-async function score(paper: ReferencePaper): Promise<Found> {
-  const expected = paper.field === "outside" ? "outside" : paper.studyType;
-  const base = {
+function baseOf(paper: ReferencePaper) {
+  return {
     id: paper.id,
-    expected,
+    expected: paper.field === "outside" ? "outside" : paper.studyType,
     ...(paper.expectedScore ? { range: paper.expectedScore } : {}),
   };
+}
+
+async function score(paper: ReferencePaper): Promise<Found> {
+  const base = baseOf(paper);
   const text = await paperText(paper);
   if (!text.ok) return { ...base, failure: text.failure };
 
@@ -92,39 +107,59 @@ async function score(paper: ReferencePaper): Promise<Found> {
   const seconds = Math.round((Date.now() - started) / 1000);
   if (!asked.ok) return { ...base, seconds, failure: `scorer ${describe(asked)}` };
   const { answer } = asked;
-  if (answer.field === "outside") return { ...base, found: "outside", seconds };
+  if (answer.field === "outside") return { ...base, found: "outside", seconds, asked: answer };
   const output = scoreChecks(text.paper, answer);
   return { ...base, found: answer.studyType, seconds, asked: answer, output };
 }
 
-/** The paper's text, from its PDF downloaded once into the cache. */
+/**
+ * The paper's text, from its PDF downloaded once into the cache. A file that is not a PDF, such
+ * as the page a publisher shows a robot, is never cached: save the PDF there by hand.
+ */
 async function paperText(
   paper: ReferencePaper,
 ): Promise<{ ok: true; paper: PaperText } | { ok: false; failure: string }> {
   const path = new URL(`${paper.id}.pdf`, CACHE);
-  let bytes: Uint8Array;
-  try {
-    bytes = new Uint8Array(await readFile(path));
-  } catch {
-    const response = await fetch(paper.url, { signal: AbortSignal.timeout(120_000) }).catch(
-      () => undefined,
-    );
-    if (!response?.ok) {
-      return { ok: false, failure: `download failed (${response?.status ?? "no answer"})` };
-    }
-    bytes = new Uint8Array(await response.arrayBuffer());
-    await writeFile(path, bytes);
+  const cached = await readFile(path).then(
+    (file) => new Uint8Array(file),
+    () => undefined,
+  );
+  const bytes = cached ?? (await download(paper.url));
+  if (typeof bytes === "string") return { ok: false, failure: bytes };
+  if (!isPdf(bytes)) {
+    return { ok: false, failure: `not a PDF (a robot check?): save the PDF as ${path.pathname}` };
   }
+  // unpdf takes the bytes over, so they are written to the cache first.
+  if (!cached) await writeFile(path, bytes);
   const text = await paperTextOf(bytes, RATING_SETTINGS.maxTextChars);
-  return text.ok ? text : { ok: false, failure: "the PDF has no readable text" };
+  if (text.ok) return text;
+  return { ok: false, failure: text.reason === "no-text" ? "the PDF has no text" : "unreadable" };
 }
 
-/** Calls Gemini, retrying a rate limit, an outage or an answer that did not parse. */
+/** The file at `url`, or why it did not come. */
+async function download(url: string): Promise<Uint8Array | string> {
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(120_000) });
+    if (!response.ok) return `download failed (HTTP ${response.status})`;
+    return new Uint8Array(await response.arrayBuffer());
+  } catch {
+    return "download failed (no answer)";
+  }
+}
+
+function isPdf(bytes: Uint8Array): boolean {
+  return new TextDecoder().decode(bytes.subarray(0, 5)) === "%PDF-";
+}
+
+/** Calls Gemini, retrying a rate limit or an outage, and an answer the check refuses once. */
 async function withRetries<T extends { ok: true } | ScoreFailureResult>(call: () => Promise<T>) {
+  let unusable = 0;
   for (let attempt = 1; ; attempt++) {
     await sleep(PAUSE_MS);
     const result = await call();
     if (result.ok || result.reason === "refused" || attempt === TRIES) return result;
+    if (result.reason === "invalid-output") unusable += 1;
+    if (unusable === RATING_SETTINGS.unusableAnswers) return result;
     console.error(`  Gemini: ${result.reason}, trying again in ${RETRY_WAIT_MS / 1000} s`);
     await sleep(RETRY_WAIT_MS);
   }
@@ -136,41 +171,51 @@ function describe(failure: ScoreFailureResult): string {
     : `${failure.reason} (HTTP ${failure.status})`;
 }
 
-/** One paper's line, then each check answered otherwise than expected. */
+/**
+ * One paper's line, then each check scored otherwise than expected or that lost Gemini's
+ * answer, with why. Checks are compared only when the study type is the expected one.
+ */
 function report(paper: ReferencePaper, result: Found): void {
   const type =
     result.found === result.expected
       ? result.expected
       : `${result.expected} → ${result.found ?? "?"}`;
   const range = result.range ? `${result.range[0]}–${result.range[1]}` : "outside";
-  const verdict = result.failure
-    ? `FAILED: ${result.failure}`
-    : result.output
-      ? inRange(result)
-        ? "in range"
-        : "OUT OF RANGE"
-      : result.found === result.expected
-        ? "right"
-        : "WRONG";
   const score = result.output?.score ?? "-";
   const took = result.seconds === undefined ? "" : ` · ${result.seconds} s`;
   console.log(
-    `\n${paper.id}\n  type ${type} · expected ${range} · score ${score} · ${verdict}${took}`,
+    `\n${paper.id}\n  type ${type} · expected ${range} · score ${score} · ${verdict(result)}${took}`,
   );
   if (!paper.expectedChecks || !result.output) return;
-  for (const check of result.output.checks) {
-    const expected = paper.expectedChecks[check.id];
-    const said = result.asked?.checks.find((asked) => asked.id === check.id);
-    const dropped = said && said.answer !== check.answer ? said : undefined;
-    if (expected === check.answer && !dropped) continue;
-    const quote = dropped?.quote ?? check.quote;
-    const note = dropped
-      ? ` (Gemini said ${dropped.answer}; quote not found${quote ? `: "${clip(quote)}"` : ""})`
-      : quote
-        ? ` ("${clip(quote)}")`
-        : "";
-    console.log(`  ${check.id}: expected ${expected}, scored ${check.answer}${note}`);
+  if (result.found !== result.expected) {
+    console.log("  checks not compared: another study type");
+    return;
   }
+  for (const check of result.output.checks) {
+    const expected = paper.expectedChecks[check.id] ?? "?";
+    if (expected === check.answer && !check.claimed) continue;
+    console.log(`  ${check.id}: expected ${expected}, scored ${check.answer}${note(check)}`);
+  }
+}
+
+/** The quote behind a check's answer, or why Gemini's answer did not count. */
+function note(check: CheckResult): string {
+  const { claimed } = check;
+  if (!claimed) return check.quote ? ` ("${clip(check.quote)}")` : "";
+  if (claimed.answer === "not-applicable")
+    return " (Gemini said not-applicable; it always applies)";
+  return claimed.quote
+    ? ` (Gemini said ${claimed.answer}; quote not in the paper: "${clip(claimed.quote)}")`
+    : ` (Gemini said ${claimed.answer}, with no quote)`;
+}
+
+function verdict(result: Found): string {
+  if (result.failure) return `FAILED: ${result.failure}`;
+  if (result.expected === "outside") {
+    return result.found === "outside" ? "right" : "WRONG: scored in the field";
+  }
+  if (result.found === "outside") return "WRONG: classed outside";
+  return inRange(result) ? "in range" : "OUT OF RANGE";
 }
 
 function clip(text: string): string {

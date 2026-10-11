@@ -63,6 +63,7 @@ export {
   CHECK_ANSWERS,
   type CheckAnswer,
   type CheckResult,
+  checklistScore,
   FIELDS,
   type Field,
   parseScorerAnswer,

@@ -212,12 +212,15 @@ consistent with the checklists. The expectations were written before the scorer 
 the papers, and change only on purpose.
 
 `pnpm --filter @verisci/workflows score-papers [id…]` scores them as a rating run would:
-the PDF's text, then one request to Gemini. It prints, for each paper, the study type found, the score against its range and each check answered otherwise than expected, marking
-an answer that lost its point because its quote is not in the paper. Run it whenever a
-prompt, a checklist or the model changes, and keep the change only if the results improve.
-It needs `GEMINI_API_KEY` and `APP_ENV=local`, downloads each PDF once into
-`node_modules/.cache/verisci-reference/` and writes each run's answers there too. It never
-publishes, stores or rates anything.
+the PDF's text, then one request to Gemini, asked again as a rating run would. It prints,
+for each paper, the study type found, the score against its range and, when the type is the
+expected one, each check answered otherwise than expected, with why an answer lost its point:
+its quote is not in the paper, it has none, or it says a check that always applies does not.
+Run it whenever a prompt, a checklist or the model changes, and keep the change only if the
+results improve. It needs `GEMINI_API_KEY` and `APP_ENV=local`, downloads each PDF once into
+`node_modules/.cache/verisci-reference/` (a file that is not a PDF, such as a publisher's
+robot check, is not kept: save the PDF there by hand), and writes the run's answers there
+after each paper. It never publishes, stores or rates anything.
 
 Each paper costs one Gemini request, and the free tier allows 20 a day per Google project
 (`docs/domain.md` → Gemini): a full run uses 14 of them. To try a change within a day, run

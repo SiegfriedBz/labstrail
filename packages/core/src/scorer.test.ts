@@ -3,6 +3,7 @@ import { CHECKS, type CheckId, checklistOf, STUDY_TYPES } from "./checklists.ts"
 import { type PaperText, quoteFound, quoteTextOf } from "./paper-text.ts";
 import {
   CHECK_ANSWERS,
+  checklistScore,
   parseScorerAnswer,
   SCORER_OUTPUT_SCHEMA,
   SCORER_PROMPT_VERSION,
@@ -407,6 +408,27 @@ describe("scoreChecks", () => {
       id: "statistics",
       answer: "missing",
     });
+  });
+});
+
+describe("checklistScore", () => {
+  it("counts partly as half, leaves out a conditional check that does not apply, and rounds half up", () => {
+    // other: 8 checks; 4 conditional ones do not apply; funding shown, methods partly: 1.5 / 4.
+    expect(
+      checklistScore("other", {
+        "methods-described": "partly",
+        funding: "shown",
+        statistics: "not-applicable",
+        ethics: "not-applicable",
+        "data-availability": "not-applicable",
+        "code-availability": "not-applicable",
+      }),
+    ).toBe(38);
+  });
+
+  it("counts a required check said not to apply, or with no answer, as missing", () => {
+    // other: 8 checks, all applying; funding shown: 1 / 8.
+    expect(checklistScore("other", { funding: "shown", conflicts: "not-applicable" })).toBe(13);
   });
 });
 

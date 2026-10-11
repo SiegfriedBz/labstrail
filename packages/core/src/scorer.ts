@@ -226,14 +226,32 @@ export function scoreChecks(paper: PaperText, answer: ScorerAnswer): ScorerOutpu
     const claimed = found?.quote ? { answer: result, quote: found.quote } : { answer: result };
     return { id: check.id, answer: "missing", claimed };
   });
-  const applicable = checks.filter((check) => check.answer !== "not-applicable").length;
-  const halves = checks.reduce(
-    (sum, check) => sum + (check.answer === "shown" ? 2 : check.answer === "partly" ? 1 : 0),
-    0,
-  );
-  // Every checklist has required checks, so `applicable` is never 0.
-  const score = Math.floor((100 * halves + applicable) / (2 * applicable));
+  const answers = Object.fromEntries(checks.map((check) => [check.id, check.answer]));
+  const score = checklistScore(answer.studyType, answers);
   return { score, rationale: answer.rationale, studyType: answer.studyType, checks };
+}
+
+/**
+ * The score answers to a study type's checklist earn (ADR 0018): `shown` 1 point, `partly`
+ * half, `missing` none, over the checks that apply, as `round(100 × points / applicable
+ * checks)`, rounding half up. A conditional check answered `not-applicable` leaves the count; a
+ * required one, or a check with no answer, counts as `missing`. {@link scoreChecks} scores with
+ * it once quotes are checked.
+ */
+export function checklistScore(
+  studyType: StudyType,
+  answers: Readonly<Partial<Record<CheckId, CheckAnswer>>>,
+): number {
+  let halves = 0;
+  let applicable = 0;
+  for (const check of checklistOf(studyType)) {
+    const answer = answers[check.id] ?? "missing";
+    if (answer === "not-applicable" && check.applies === "conditional") continue;
+    applicable += 1;
+    halves += answer === "shown" ? 2 : answer === "partly" ? 1 : 0;
+  }
+  // Every checklist has required checks, so `applicable` is never 0.
+  return Math.floor((100 * halves + applicable) / (2 * applicable));
 }
 
 function parseJson(text: string): unknown {

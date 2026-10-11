@@ -1,13 +1,7 @@
 // The scorer's reference set: open-access papers with the study type, the answer to each check
 // and the score range a careful reader expects, written before the scorer first read them.
 // `score-papers` compares the scorer's answers with them (packages/workflows README).
-import {
-  CHECK_ANSWERS,
-  type CheckAnswer,
-  checklistOf,
-  STUDY_TYPES,
-  type StudyType,
-} from "@verisci/core";
+import { CHECK_ANSWERS, STUDY_TYPES, type StudyType } from "@verisci/core";
 import { z } from "zod";
 
 const STUDY_TYPE_IDS = STUDY_TYPES.map((type) => type.id) as [StudyType, ...StudyType[]];
@@ -43,21 +37,4 @@ export type ReferencePaper = z.infer<typeof paperSchema>;
 /** The reference set from `reference-papers.json`'s content; throws when it does not match. */
 export function readReferencePapers(json: unknown): ReferencePaper[] {
   return z.array(paperSchema).parse(json);
-}
-
-/**
- * The score expected answers give, by `scoreChecks`' rule: `shown` 1 point, `partly` half,
- * `missing` none; `not-applicable` leaves the count on a conditional check and counts as
- * `missing` on a required one; a check with no answer counts as `missing`.
- */
-export function impliedScore(type: StudyType, answers: Readonly<Record<string, CheckAnswer>>) {
-  let halves = 0;
-  let applicable = 0;
-  for (const check of checklistOf(type)) {
-    const answer = answers[check.id] ?? "missing";
-    if (answer === "not-applicable" && check.applies === "conditional") continue;
-    applicable += 1;
-    halves += answer === "shown" ? 2 : answer === "partly" ? 1 : 0;
-  }
-  return Math.floor((100 * halves + applicable) / (2 * applicable));
 }
