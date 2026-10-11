@@ -8,7 +8,7 @@ import {
   type Triple,
   targetTriplesQuery,
 } from "@verisci/core";
-import type { AssetResult, DkgClient, MintResult, QueryResult } from "@verisci/dkg";
+import type { AssetResult, DkgFailure, MintResult, QueryResult } from "@verisci/dkg";
 import { Inngest, NonRetriableError } from "inngest";
 import type { Hex } from "viem";
 import { describe, expect, it, vi } from "vitest";
@@ -111,6 +111,7 @@ interface Script {
   stores?: AssetResult[];
   mints?: MintResult[];
   found?: QueryResult[];
+  graph?: ({ ok: true } | DkgFailure)[];
   targetRows?: QueryResult[];
   ratingRows?: QueryResult[];
   scores?: ScoreResult[];
@@ -132,6 +133,7 @@ function rate(script: Script, data: unknown = EVENT) {
   const stores = [...(script.stores ?? [stored])];
   const mints = [...(script.mints ?? [mintedNow])];
   const found = [...(script.found ?? [{ ok: true, bindings: [{ ka: TARGET }] }])];
+  const graph = [...(script.graph ?? [{ ok: true as const }])];
   const targetRows = [...(script.targetRows ?? [{ ok: true, bindings: rows(TARGET_TRIPLES) }])];
   const ratingRowsAnswers = [
     ...(script.ratingRows ?? [{ ok: true, bindings: ratingRows(OUTPUT.score) }]),
@@ -145,6 +147,7 @@ function rate(script: Script, data: unknown = EVENT) {
     readAsset: vi.fn(async () => next(reads)),
     storeAsset: vi.fn(async () => next(stores)),
     startMint: vi.fn(async () => next(mints)),
+    checkGraph: vi.fn(async () => next(graph)),
     query: vi.fn(async (sparql: string) => {
       if (sparql === foundQuery) return next(found);
       return sparql === targetQuery ? next(targetRows) : next(ratingRowsAnswers);
@@ -158,7 +161,7 @@ function rate(script: Script, data: unknown = EVENT) {
     now: () => NOW,
     readRequest: vi.fn(async () => next(requests)),
     readOracle: vi.fn(async () => ({ ok: true as const, oracle: script.oracle ?? ORACLE })),
-    dkg: dkg as unknown as Pick<DkgClient, "readAsset" | "storeAsset" | "startMint" | "query">,
+    dkg: dkg as unknown as RatingDeps["dkg"],
     score: vi.fn(async () => next(scores)),
   } satisfies RatingDeps;
   const { step, log, oracleCalls } = fakeSteps(script.oracleAnswer ?? settles);
@@ -251,7 +254,26 @@ describe("runRating: which requests it takes", () => {
     expect(deps.score).not.toHaveBeenCalled();
     expect(dkg.readAsset).not.toHaveBeenCalled();
     expect(dkg.query).toHaveBeenCalledWith(publishedPaperQuery(GRAPH, TARGET));
-    expect(log).toEqual(["read-request", "find-target", "oracle cancel"]);
+    expect(log).toEqual(["read-request", "find-target", "check-graph", "oracle cancel"]);
+  });
+
+  it("never cancels on an empty answer from a node that no longer serves the graph", async () => {
+    const { run, oracleCalls, dkg } = rate({
+      found: [{ ok: true, bindings: [] }],
+      graph: [{ ok: false, reason: "graph-not-served" }],
+    });
+
+    await expect(run).rejects.toThrow(/^rating-failed:setup: .*graph-not-served/);
+    expect(oracleCalls).toEqual([]);
+    expect(dkg.readAsset).not.toHaveBeenCalled();
+  });
+
+  it("fails setup before reading the R-KA when the node refuses the published-paper query", async () => {
+    const { run, oracleCalls, dkg } = rate({ found: [{ ok: false, reason: "unauthorized" }] });
+
+    await expect(run).rejects.toThrow(/^rating-failed:setup: /);
+    expect(oracleCalls).toEqual([]);
+    expect(dkg.readAsset).not.toHaveBeenCalled();
   });
 
   it("cancels invalid-target, not expired, a request past 24 hours for no published paper", async () => {
@@ -650,7 +672,7 @@ describe("createRatePaper", () => {
     expect(fn.opts.id).toBe("rate-paper");
     expect(fn.opts.triggers).toEqual([{ event: "verisci/rating.requested" }]);
     expect(fn.opts.singleton).toEqual({ key: "event.data.requestId", mode: "skip" });
-    expect(fn.opts.timeouts).toEqual({ finish: "2h" });
+    expect(fn.opts.timeouts).toEqual({ finish: "150m" });
   });
 
   it("throttles to 3 starts an hour in a deployment, and not locally", () => {

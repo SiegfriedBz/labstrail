@@ -41,11 +41,12 @@ export const RATING_SETTINGS = {
   retryWait: "2m",
   attempts: 5,
   /**
-   * A run's whole budget, enforced by Inngest. It covers the slowest run: up to 8 minutes to
-   * read the request, 5 attempts of up to 12 minutes each (scoring, a mint and 10 minutes of
-   * polls), 2 minutes between attempts, and the oracle's 35 minutes.
+   * A run's whole budget, enforced by Inngest. It covers the slowest run, about 125 minutes:
+   * up to 8 minutes to read the request and 14 to find the target, 5 attempts of up to 12
+   * minutes each (scoring, a mint and 10 minutes of polls), 2 minutes between attempts, and
+   * the oracle's 35 minutes.
    */
-  finishTimeout: "2h",
+  finishTimeout: "150m",
   /** How long the run waits for the oracle function, just over its `finishTimeout`. */
   oracleTimeout: "35m",
   /** Run starts outside `local`, sized against Inngest's free plan (ADR 0015). */
@@ -114,7 +115,7 @@ export interface RatingDeps {
   now(): number;
   readRequest(contract: Hex, requestId: Hex): Promise<ReadRequestResult>;
   readOracle(contract: Hex): Promise<ReadOracleResult>;
-  readonly dkg: Pick<DkgClient, "readAsset" | "storeAsset" | "startMint" | "query">;
+  readonly dkg: Pick<DkgClient, "readAsset" | "storeAsset" | "startMint" | "query" | "checkGraph">;
   score(triples: readonly Triple[]): Promise<ScoreResult>;
 }
 
@@ -273,18 +274,22 @@ async function readRequest(
 
 /**
  * True when our node lists `ual` among the papers it published (ADR 0011), false when it
- * answers that it does not. A node that does not answer is asked again every `retryWait`, and
- * is never taken for a missing paper.
+ * answers that it does not. A node that dropped the graph answers every query with no rows,
+ * so an empty answer counts only once the node confirms it serves the graph. A node that
+ * does not answer is asked again every `retryWait`; neither is ever taken for a missing paper.
  */
 async function findTarget(ual: string, step: RatingSteps, deps: RatingDeps): Promise<boolean> {
   const sparql = publishedPaperQuery(deps.contextGraph, ual);
   if (!sparql) throw stop("setup", `${ual}: target query refused`);
   for (let attempt = 1; ; attempt++) {
-    const found = await step.run(attempt === 1 ? "find-target" : `find-target-${attempt}`, () =>
-      deps.dkg.query(sparql),
-    );
-    if (found.ok) return found.bindings.length > 0;
-    const failure = failed(found);
+    const suffix = attempt === 1 ? "" : `-${attempt}`;
+    const found = await step.run(`find-target${suffix}`, () => deps.dkg.query(sparql));
+    if (found.ok && found.bindings.length > 0) return true;
+    const answer = found.ok
+      ? await step.run(`check-graph${suffix}`, () => deps.dkg.checkGraph())
+      : found;
+    if (answer.ok) return false;
+    const failure = failed(answer);
     if (failure.kind === "fatal" || attempt === RATING_SETTINGS.attempts) {
       throw stop(failure.failure, `${ual}: ${failure.reason}`);
     }
@@ -444,7 +449,7 @@ function outcomeOf(
 
 /**
  * The `rate-paper` Inngest function, run by `verisci/rating.requested`: a singleton per
- * request id in mode `skip` (ADR 0020), with a 2-hour budget, throttled when `throttle`
+ * request id in mode `skip` (ADR 0020), with a 150-minute budget, throttled when `throttle`
  * (outside `local`, ADR 0015). It invokes `oracle` to fulfil or cancel. `getDeps` builds the
  * adapters on the first run, so importing the function validates no settings.
  */

@@ -124,7 +124,7 @@ Retries ([ADR 0009](../../docs/adr/0009-retries-are-spaced-with-step-sleep.md)):
 `verisci/rating.requested` carries `{ contract, requestId }`: a RatingController's lowercase
 address and a phase-1 request id. The `rate-paper` run is a singleton per request id in mode
 `skip` ([ADR 0020](../../docs/adr/0020-stuck-requests-recovered-only-oracle-cancels.md)),
-has 2 hours, enough for every attempt and the oracle, and outside `APP_ENV=local` is
+has 150 minutes, enough for every attempt and the oracle, and outside `APP_ENV=local` is
 throttled to 3 starts an hour with a burst of 3, against Inngest's free plan
 ([ADR 0015](../../docs/adr/0015-rating-requests-are-free-on-testnet.md)). It does only what
 is left ([ADR 0007](../../docs/adr/0007-all-writes-converge.md)):
@@ -141,8 +141,11 @@ is left ([ADR 0007](../../docs/adr/0007-all-writes-converge.md)):
    chain than Base Sepolia, or names another publisher is cancelled `invalid-target` at once.
    Then **find-target** asks the node whether the target is one of its published papers
    (`publishedPaperQuery`), and cancels `invalid-target` when the node answers that it is not
-   (a wrong number, or an R-KA), whatever the request's age. A node that does not answer is
-   asked again every 2 minutes, up to 5 times, then the run fails `node-unreachable`.
+   (a wrong number, or an R-KA), whatever the request's age. A node that dropped the graph
+   answers every query with no rows, so an empty answer counts only after **check-graph**
+   confirms the node serves the graph; otherwise the run fails `setup` and cancels nothing. A
+   node that does not answer is asked again every 2 minutes, up to 5 times, then the run
+   fails `node-unreachable`.
 3. **read-rka:** the R-KA `verisci-rka-<request id>`. Minted goes to the read-back. Stored is
    minted at once, with no wait for a mint an earlier run may have started
    ([ADR 0008](../../docs/adr/0008-mints-are-async-polled-in-short-steps.md)). A draft is
