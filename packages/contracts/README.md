@@ -8,7 +8,8 @@ recorded in `deployments/base-sepolia.json`.
 
 ## Depends on
 
-`@verisci/core`, `@verisci/env`, and Zod (validates `deployments/base-sepolia.json`).
+`@verisci/core`, `@verisci/env`, Zod (validates `deployments/base-sepolia.json`), and viem
+(reads a request and encodes the oracle's calls).
 
 ## RatingController
 
@@ -210,6 +211,10 @@ cast send <previous address> "pause()" --rpc-url base_sepolia --account verisci-
 | `ratingControllerDeployments(appEnv)` | `{ chainId, current, past }` for `staging` or `production`; `local` resolves to staging ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)). `current` accepts new requests; `past` contracts are paused and drained ([ADR 0023](../../docs/adr/0023-a-fix-is-a-redeploy-owner-powers-fixed.md)) |
 | `NoDeploymentError` | Thrown by `ratingControllerDeployments` for an environment with no current deployment |
 | `Deployment`, `DeployEnv`, `RatingControllerDeployments` | The corresponding types |
+| `readRatingRequest(client, contract, requestId)` | The request's `RatingRequestState` (status `none`, `pending`, `fulfilled` or `cancelled`, cancel reason, lowercase requester, `requestedAt` in seconds, score, target and R-KA UALs), or `unreachable` when the RPC fails or the reply does not decode |
+| `readOracleAgent(client, contract)` | The contract's oracle address in lowercase, or `unreachable` |
+| `fulfilCalldata(requestId, score, rKaUal)`, `cancelCalldata(requestId, reason)` | The calldata of `fulfilPhase1` and of `cancelRequest` (`expired` or `invalid-target`), which the oracle signs and sends |
+| `ContractReader`, `RequestStatus`, `CancelReason`, `ReadRequestResult`, `ReadOracleResult` | What the reads take from a viem public client, and their types |
 | `contractsName` | The package name, imported by the web app's package test |
 
 Each `Deployment` records the contract `address`, the deployment `txHash` and
@@ -223,7 +228,7 @@ fails every importer with the invalid field named.
 ## Layout
 
 ```text
-src/            # Solidity contracts and the TypeScript API (index.ts, deployments)
+src/            # Solidity contracts and the TypeScript API (index.ts, deployments, rating reads)
 src/interfaces/ # contract interfaces: types, events, errors, NatSpec
 src/generated/  # generated, committed: the typed ABI
 script/         # Foundry scripts: HelperConfig, DeployRatingController
