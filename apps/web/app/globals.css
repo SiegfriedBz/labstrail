@@ -1,33 +1,71 @@
 @import "tailwindcss";
 
 /*
- * VeriSci's look: a dark lab instrument with a web3 edge. Near-black, two signal colours
- * with one meaning each: emerald for the off-chain record ("verified"), cyan for the
- * on-chain asset; they blend only on the main action, live lines and the link between them,
- * glass panels with hairline borders, a faint grid. Dark only, by design. One radius
- * scale: rounded-2xl for panels, rounded-xl for buttons and inputs, rounded-lg for small
- * inline controls.
+ * VeriSci's look: a lab instrument with a web3 edge, light by default, with a dark theme.
+ * Neutral greys, two signal colours with one meaning each: emerald for the off-chain record
+ * ("verified"), cyan for the on-chain asset. They blend only on the main action, live lines
+ * and the link between them, and stay out of plain text and links, which are ink with an
+ * emerald underline. Raised panels with hairline borders, a soft emerald and cyan wash at
+ * the top of each page. One radius scale: rounded-2xl for panels, rounded-xl for buttons and inputs,
+ * rounded-lg for small inline controls.
+ *
+ * `<html data-theme>` picks the theme: `THEME_SCRIPT` (lib/theme.ts) sets it before the
+ * first paint from the visitor's stored choice, else light. Every colour is a token below,
+ * defined for both themes; components use the tokens only.
  */
 :root {
-  --page: #06090a;
-  --surface: rgb(255 255 255 / 0.035);
-  --surface-strong: rgb(255 255 255 / 0.06);
-  --line: rgb(255 255 255 / 0.09);
-  --line-strong: rgb(255 255 255 / 0.16);
-  --ink: #e7efeb;
-  --muted: #8b9893;
-  --accent: #3ddc97;
-  --accent-2: #2dd4e6;
-  --accent-ink: #03140c;
-  --accent-soft: rgb(61 220 151 / 0.1);
-  --accent-glow: rgb(61 220 151 / 0.25);
-  /* A darker emerald for surfaces with white text, such as the wallet window's accent:
-     white on --accent would fail contrast. */
+  color-scheme: light;
+  --page: #f4f6f6;
+  --surface: rgb(255 255 255 / 0.82);
+  --surface-strong: rgb(17 20 22 / 0.05);
+  --line: rgb(17 20 22 / 0.09);
+  --line-strong: rgb(17 20 22 / 0.16);
+  --ink: #111416;
+  --muted: #5a6361;
+  /* The accents are dark enough for AA text contrast on the page, so their fills take white text. */
+  --accent: #087a52;
+  --accent-2: #0a7489;
+  /* Text and icons on an accent fill. */
+  --accent-ink: #ffffff;
+  --accent-soft: rgb(8 122 82 / 0.09);
+  --accent-glow: rgb(8 122 82 / 0.2);
+  /* A darker emerald for surfaces with white text, such as the wallet window's accent. */
   --accent-deep: #0d7a55;
   /* On-chain things (tokens, mints, contracts) take the cyan; off-chain records the emerald. */
-  --accent-2-soft: rgb(45 212 230 / 0.1);
-  --danger: #ff8a93;
-  --danger-soft: rgb(255 138 147 / 0.1);
+  --accent-2-soft: rgb(10 116 137 / 0.09);
+  --danger: #c4313d;
+  --danger-soft: rgb(196 49 61 / 0.08);
+  /* How strong the bench's wash is, a panel's edge light and shadow, and its fill without
+     transparency. */
+  --wash: 15%;
+  --glass-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.9), 0 1px 2px rgb(17 20 22 / 0.05),
+    0 12px 32px -16px rgb(17 20 22 / 0.12);
+  --glass-solid: #ffffff;
+}
+
+/* Dark: a dimmed graphite, not black, with solid raised panels one step lighter than the
+   page, so depth reads without glass; the accents lift to stay clear on it. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #121517;
+  --surface: #181c1f;
+  --surface-strong: rgb(255 255 255 / 0.06);
+  --line: rgb(255 255 255 / 0.08);
+  --line-strong: rgb(255 255 255 / 0.15);
+  --ink: #e8ecea;
+  --muted: #9aa4a1;
+  --accent: #4ccf9b;
+  --accent-2: #5cbfd6;
+  --accent-ink: #05140e;
+  --accent-soft: rgb(76 207 155 / 0.12);
+  --accent-glow: rgb(76 207 155 / 0.2);
+  --accent-2-soft: rgb(92 191 214 / 0.12);
+  --danger: #f2939a;
+  --danger-soft: rgb(242 147 154 / 0.12);
+  --wash: 12%;
+  --glass-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 12px 32px -18px rgb(4 6 7 / 0.6);
+  --glass-solid: #181c1f;
 }
 
 @theme inline {
@@ -43,16 +81,12 @@
   --color-accent-ink: var(--accent-ink);
   --color-accent-soft: var(--accent-soft);
   --color-accent-deep: var(--accent-deep);
-  --shadow-glow: 0 8px 30px var(--accent-glow);
+  --shadow-glow: 0 10px 28px -12px var(--accent-glow);
   --color-accent-2-soft: var(--accent-2-soft);
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
   --font-sans: var(--font-sora), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-martian), ui-monospace, monospace;
-}
-
-html {
-  color-scheme: dark;
 }
 
 body {
@@ -79,31 +113,56 @@ li {
   border-radius: 0.5rem;
 }
 
-/* The lab bench: a hairline grid that fades out from the top of the page. */
+/* The lab bench: a soft wash behind the top of each page, emerald from the top left and
+   cyan from the top right, each fading out on its own. No pattern. */
 .bench {
   background-image:
-    linear-gradient(to right, rgb(255 255 255 / 0.035) 1px, transparent 1px),
-    linear-gradient(to bottom, rgb(255 255 255 / 0.035) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 30%, transparent 75%);
+    radial-gradient(
+      55% 75% at 12% 0%,
+      color-mix(in oklab, var(--accent) var(--wash), transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      45% 60% at 92% 8%,
+      color-mix(in oklab, var(--accent-2) var(--wash), transparent),
+      transparent 70%
+    );
 }
 
 /* One soft signal glow, behind the hero's instrument panel. */
 .signal-glow {
   background: radial-gradient(
     closest-side,
-    rgb(61 220 151 / 0.22),
-    rgb(45 212 230 / 0.06),
+    color-mix(in oklab, var(--accent) 12%, transparent),
+    color-mix(in oklab, var(--accent-2) 4%, transparent),
     transparent
   );
-  filter: blur(24px);
+  filter: blur(32px);
+}
+
+/* Inline text links: ink, with an emerald underline that fills in on hover. In the
+   components layer, so a utility on the same element still wins. */
+@layer components {
+  .link {
+    color: var(--ink);
+    font-weight: 500;
+    text-decoration-line: underline;
+    text-decoration-color: color-mix(in oklab, var(--accent) 45%, transparent);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
+    transition: text-decoration-color 150ms;
+  }
+
+  .link:hover {
+    text-decoration-color: var(--accent);
+  }
 }
 
 .glass {
   background: var(--surface);
   border: 1px solid var(--line);
   backdrop-filter: blur(12px);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05);
+  box-shadow: var(--glass-shadow);
 }
 
 /* The off-chain to on-chain link: emerald into cyan. */
@@ -128,6 +187,16 @@ li {
     animation: enter 0.6s 0.12s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
+  /* Home sections rise in as they enter the screen, where the browser drives animations
+     by scroll; elsewhere they simply show. */
+  @supports (animation-timeline: view()) {
+    .reveal {
+      animation: reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 45%;
+    }
+  }
+
   .line-live {
     background-image: linear-gradient(to bottom, var(--accent), var(--accent-2), var(--accent));
     background-size: 100% 200%;
@@ -137,7 +206,7 @@ li {
 
 @media (prefers-reduced-transparency: reduce) {
   .glass {
-    background: #101415;
+    background: var(--glass-solid);
     backdrop-filter: none;
   }
 }
@@ -145,10 +214,10 @@ li {
 @keyframes step-breathe {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgb(61 220 151 / 0.45);
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 40%, transparent);
   }
   50% {
-    box-shadow: 0 0 0 7px rgb(61 220 151 / 0);
+    box-shadow: 0 0 0 7px color-mix(in oklab, var(--accent) 0%, transparent);
   }
 }
 
@@ -156,6 +225,17 @@ li {
   from {
     opacity: 0;
     transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
   }
   to {
     opacity: 1;
