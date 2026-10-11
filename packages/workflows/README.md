@@ -44,7 +44,7 @@ production, which refuses to start without the key, and on staging when the key 
 | --- | --- |
 | `ORACLE_PRIVATE_KEY` | The oracle's key, `0x` and 64 hex: on Vercel only `develop` (staging's, scoped to that branch) and production hold one; locally, Anvil's second default account's key. Secret |
 | `GEMINI_API_KEY` | A Gemini API key from Google AI Studio, for the scorer ([ADR 0018](../../docs/adr/0018-phase-1-scorer-output-contract.md)). Secret |
-| `LOCAL_CHAIN_RPC_URL`, `LOCAL_RATING_CONTRACT` | Required only when `APP_ENV=local`: Anvil's URL (`http://127.0.0.1:8545`) and the RatingController deployed there ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)). Elsewhere the contracts come from the committed deployments file, current and past ([ADR 0028](../../docs/adr/0028-deployed-addresses-are-committed.md)) |
+| `LOCAL_CHAIN_RPC_URL`, `LOCAL_RATING_CONTRACT` | Required only when `APP_ENV=local`: Anvil's URL (`http://127.0.0.1:8546`) and the RatingController deployed there ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)). Elsewhere the contracts come from the committed deployments file, current and past ([ADR 0028](../../docs/adr/0028-deployed-addresses-are-committed.md)) |
 
 `DKG_CONTEXT_GRAPH` must spell its address in EIP-55 checksum case, as the node lists it
 (`@verisci/dkg`'s rule): a query with the address in another case reads another, empty
@@ -277,22 +277,30 @@ RatingController on Anvil ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-
 R-KAs still go to the staging graph.
 
 1. Start the RPC proxy and the DKG node ([`docs/node-host.md`](../../docs/node-host.md)), and
-   `anvil` in a terminal of its own.
+   `anvil --port 8546` in a terminal of its own: the proxy holds 8545, Anvil's default.
 2. Deploy the contract on Anvil
    ([`packages/contracts` → Deploying on Anvil](../contracts/README.md#deploying-on-anvil)).
 3. In the root `.env.local`, set `ORACLE_PRIVATE_KEY` to the key of Anvil's second account,
-   `GEMINI_API_KEY`, `LOCAL_CHAIN_RPC_URL=http://127.0.0.1:8545` and `LOCAL_RATING_CONTRACT`
+   `GEMINI_API_KEY`, `LOCAL_CHAIN_RPC_URL=http://127.0.0.1:8546` and `LOCAL_RATING_CONTRACT`
    ([`.env.example`](../../.env.example)), with the DKG and publish settings.
 4. `pnpm dev`, then, in another terminal, `pnpm --filter @verisci/web inngest`.
 5. `pnpm --filter @verisci/workflows rate-paper <target UAL>` requests a rating of a paper
    from the staging graph, from a throwaway requester it funds on Anvil, and sends the event.
    It prints the request id; the run shows in the dev server. `--raw` sends the UAL as typed,
    to see an invalid one cancelled.
-6. `cast call <contract> "getRatingRequest(bytes32)" <request id> --rpc-url http://127.0.0.1:8545`
+6. `cast call <contract> "getRatingRequest(bytes32)" <request id> --rpc-url http://127.0.0.1:8546`
    shows the request, its score and its R-KA once fulfilled.
 
 Restarting Anvil empties it: deploy again (the first deploy on a fresh chain gets the same
 address). Every request comes from a new requester, so request ids never repeat.
+
+The script stands in for the Alchemy webhook, which comes with the next plan: it reads the
+`Phase1Requested` log from its own transaction's receipt and builds the event with
+`ratingRequestedEvent`, the function the webhook route will call. From the event on, the run
+is the one staging runs: the contract and its oracle, the target read from the staging graph,
+Gemini's score, the R-KA minted on Base Sepolia, and the oracle's transaction and receipt.
+Alchemy's signed delivery, Inngest crons in a branch environment and Base's handling of a
+stuck transaction are checked on `develop`; the unit tests cover every branch with mocks.
 
 ## Scripts
 

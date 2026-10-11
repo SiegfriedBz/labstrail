@@ -185,8 +185,8 @@ Anvil chain ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)). No
 recorded in `deployments/`.
 
 ```bash
-anvil    # in a terminal of its own; prints its funded accounts and their keys
-forge script script/DeployRatingController.s.sol --rpc-url http://127.0.0.1:8545 \
+anvil --port 8546    # in a terminal of its own; prints its funded accounts and their keys
+forge script script/DeployRatingController.s.sol --rpc-url http://127.0.0.1:8546 \
   --broadcast --unlocked --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
 ```
 
@@ -196,7 +196,8 @@ forge script script/DeployRatingController.s.sol --rpc-url http://127.0.0.1:8545
 `LOCAL_RATING_CONTRACT` in the root `.env.local` to the address the script prints, and
 `ORACLE_PRIVATE_KEY` to the second account's key
 ([`packages/workflows` → Running a rating locally](../workflows/README.md#running-a-rating-locally)).
-Anvil forgets everything when it stops: deploy again after a restart.
+Anvil listens on 8546 because the DKG node's RPC proxy holds 8545, Anvil's default, and
+answers as Base Sepolia. Anvil forgets everything when it stops: deploy again after a restart.
 
 ### How the scripts fit together
 

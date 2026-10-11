@@ -24,7 +24,7 @@ const rating = { ...workflows, ORACLE_PRIVATE_KEY: ORACLE_KEY, GEMINI_API_KEY: "
 const local = {
   ...rating,
   APP_ENV: "local",
-  LOCAL_CHAIN_RPC_URL: "http://127.0.0.1:8545",
+  LOCAL_CHAIN_RPC_URL: "http://127.0.0.1:8546",
   LOCAL_RATING_CONTRACT: "0x5FbDB2315678afecb367f032d93F642f64180aa3",
 };
 
