@@ -12,4 +12,5 @@ Pure domain logic. See `README.md` here.
   before adding it, and import only its pure subpaths. From `multiformats`, core uses
   `multiformats/cid`, `multiformats/bases/*` and `multiformats/hashes/digest`;
   `multiformats/hashes/sha1` and `multiformats/hashes/sha2` load `node:crypto`. From
-  `@xmldom/xmldom` (pure JS, no dependencies), core uses `DOMParser`.
+  `@xmldom/xmldom` (pure JS, no dependencies), core uses `DOMParser`. From `zod`, core uses
+  its schemas, to check the scorer's output (`parseScorerOutput`).

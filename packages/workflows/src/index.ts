@@ -1,7 +1,13 @@
 /** Package name, imported by the web app's package test (`apps/web/app/packages.test.ts`). */
 export const workflowsName = "@verisci/workflows";
 
-export { functions, publishPaper } from "./functions.ts";
+export {
+  functions,
+  oracleTransaction,
+  publishPaper,
+  ratePaper,
+  servedFunctions,
+} from "./functions.ts";
 export { inngest } from "./inngest.ts";
 export type {
   PaperListResult,
@@ -24,6 +30,31 @@ export type {
   SubmitResult,
 } from "./publish/submit-paper.ts";
 export type { SubmissionRefusal } from "./publish/verify-submission.ts";
+export {
+  RATING_REQUESTED,
+  type RatingRequested,
+  ratingRequestedEvent,
+} from "./rating/events.ts";
+export {
+  ORACLE_SETTINGS,
+  type OracleAction,
+  type OracleFailure,
+  type OracleInput,
+  type OracleResult,
+} from "./rating/oracle.ts";
+export {
+  RATING_SETTINGS,
+  type RatingFailure,
+  type RatingOutcome,
+  ratingFailureReason,
+} from "./rating/rate-paper.ts";
+export {
+  checkRatingSettings,
+  createRatingEnv,
+  type RatingEnv,
+  ratingSettingsRequired,
+  servesRating,
+} from "./rating-env.ts";
 export type { ReadRunResult, RunState } from "./runs.ts";
 export {
   getUploadService,

@@ -132,6 +132,9 @@ importers:
       '@verisci/env':
         specifier: workspace:*
         version: link:../env
+      viem:
+        specifier: 2.57.4
+        version: 2.57.4(typescript@6.0.3)(zod@4.6.5)
       zod:
         specifier: 4.6.5
         version: 4.6.5
@@ -151,6 +154,9 @@ importers:
       multiformats:
         specifier: 14.0.5
         version: 14.0.5
+      zod:
+        specifier: 4.6.5
+        version: 4.6.5
     devDependencies:
       fast-check:
         specifier: 4.10.2

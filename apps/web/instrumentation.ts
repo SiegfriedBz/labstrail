@@ -2,15 +2,15 @@ import type { RuntimeEnv } from "@verisci/env";
 
 /**
  * Runs once when a Next.js server starts, before it answers any request, and not during
- * `next build`. A deployed server checks the workflows' and the web app's settings here, so
- * a bad one stops it at start (ADR 0004, ADR 0005). Both are imported only on the Node.js
- * runtime.
+ * `next build`. A deployed server checks the workflows', the web app's and, where the rating
+ * functions run, the rating settings here, so a bad one stops it at start (ADRs 0004, 0005,
+ * 0019). They are imported only on the Node.js runtime.
  */
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
-  const { createWorkflowsEnv } = await import("@verisci/workflows");
+  const { checkRatingSettings, createWorkflowsEnv } = await import("@verisci/workflows");
   const { createWebEnv } = await import("./lib/web-env.ts");
-  checkServerSettings(process.env, [createWorkflowsEnv, createWebEnv]);
+  checkServerSettings(process.env, [createWorkflowsEnv, createWebEnv, checkRatingSettings]);
 }
 
 /**

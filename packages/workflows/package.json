@@ -10,7 +10,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "publish-pdf": "node --env-file-if-exists=../../.env.local scripts/publish-pdf.ts"
+    "publish-pdf": "node --env-file-if-exists=../../.env.local scripts/publish-pdf.ts",
+    "rate-paper": "node --env-file-if-exists=../../.env.local scripts/rate-paper.ts"
   },
   "dependencies": {
     "@verisci/contracts": "workspace:*",

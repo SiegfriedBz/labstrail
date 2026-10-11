@@ -74,7 +74,8 @@ export function targetKaQuads(metadata: PaperMetadata, submission: PaperSubmissi
   return triples;
 }
 
-function literal(value: string): string {
+/** A string as a quoted literal the node reads as one term: `"`, `\`, CR and LF escaped. */
+export function literal(value: string): string {
   const escaped = value
     .replaceAll("\\", "\\\\")
     .replaceAll('"', '\\"')
@@ -83,6 +84,7 @@ function literal(value: string): string {
   return `"${escaped}"`;
 }
 
-function integer(value: number | bigint): string {
+/** An integer as an `xsd:integer` literal (`"7"^^<…#integer>`). */
+export function integer(value: number | bigint): string {
   return `"${value}"^^<${XSD_INTEGER}>`;
 }

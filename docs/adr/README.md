@@ -31,6 +31,7 @@ taken, so a later ADR can sit in an earlier group.
 | [0023. A fix is a redeploy, and the owner's powers are fixed](0023-a-fix-is-a-redeploy-owner-powers-fixed.md) | A fix is a redeploy; old contracts are paused and drained; the owner sets the oracle and cap, pauses and unpauses, and transfers ownership in two steps, never to the oracle, with no renounce |
 | [0028. Deployed addresses are committed](0028-deployed-addresses-are-committed.md) | Staging's and production's contract addresses live in a committed file, changed by a reviewed PR |
 | [0030. The owner and the oracle are different addresses](0030-owner-and-oracle-are-different-addresses.md) | The owner's key stays offline; the oracle's key is on the deployment; the contract keeps them apart |
+| [0036. Local rating runs use an Anvil chain](0036-local-rating-runs-use-anvil.md) | A developer runs the rating functions against a contract on a local Anvil chain, named by local-only settings; staging's and production's addresses stay committed |
 
 ## Writing to the DKG
 
@@ -54,7 +55,7 @@ A PDF becomes a Target KA.
 
 | ADR | Decision |
 | --- | --- |
-| [0011. A rating is a separate R-KA, linked by schema:about](0011-a-rating-is-a-separate-r-ka.md) | Each rating is its own R-KA pointing at the paper; the paper is never modified |
+| [0011. A rating is a separate R-KA, linked by schema:about](0011-a-rating-is-a-separate-r-ka.md) | Each rating is its own R-KA pointing at the paper; the paper is never modified; only papers verisci published are rated |
 | [0012. Ratings evolve in three phases, each settled by the oracle](0012-three-phases-settled-by-the-oracle.md) | Machine score, human review, wet-lab; the oracle records every phase's score |
 | [0013. A paper can have several ratings](0013-several-ratings-per-paper.md) | A rating is identified by its request id and its R-KA's UAL |
 | [0014. The contract owns scores, the DKG owns content](0014-contract-owns-scores-dkg-owns-content.md) | The UI shows the contract's score and flags a gap with the DKG |
@@ -70,8 +71,8 @@ In the order a request lives: requested, named, ingested, scored, fulfilled, and
 | [0015. Rating requests are free on testnet](0015-rating-requests-are-free-on-testnet.md) | Requesters pay only gas; a cap and a throttle bound spend until mainnet |
 | [0016. Asset names derive from the on-chain request id](0016-asset-names-derive-from-request-id.md) | Each phase-1 request has an on-chain id; any process computes the rating's name and its recovery from it alone |
 | [0017. Chain events are ingested at least once](0017-chain-events-are-ingested-at-least-once.md) | Signed webhooks, one event per request id, acked only after hand-off; the reconciler heals what is missed |
-| [0018. The phase-1 scorer has a fixed output contract](0018-phase-1-scorer-output-contract.md) | The scorer returns `{ score, rationale, observed, missing }`, computed once and read back |
-| [0019. Oracle transactions are serialized](0019-oracle-transactions-are-serialized.md) | One function sends every oracle transaction, one at a time; only `main` and `develop` hold the oracle keys |
+| [0018. The phase-1 scorer has a fixed output contract](0018-phase-1-scorer-output-contract.md) | The scorer returns `{ score, rationale, observed, missing }`, computed once and read back; Gemini scores, on its free tier |
+| [0019. Oracle transactions are serialized](0019-oracle-transactions-are-serialized.md) | One function sends every oracle transaction the backend sends, one at a time, checking receipts in later steps; only `main` and `develop` hold the oracle keys |
 | [0020. Stuck requests are recovered, and only the oracle cancels](0020-stuck-requests-recovered-only-oracle-cancels.md) | One run per request finishes what is left; a cron restarts stuck ones; only the oracle cancels |
 
 ## App
@@ -101,11 +102,9 @@ Not decided yet. Each becomes an ADR in the plan that first needs the answer; th
 
 | Question | Leaning | Decided in |
 | --- | --- | --- |
-| Where do alerts go? | One chat-bot channel behind a single `notify()`, fed by a scheduled check (wallet balances, orphans, age of the oldest pending request) and an uptime check on the node's `/api/status`. | rating plan |
+| Where do alerts go? | One chat-bot channel behind a single `notify()`, fed by a scheduled check (wallet balances, orphans, age of the oldest pending request) and an uptime check on the node's `/api/status`. | intake and recovery plan |
 | Who may request phases 2 and 3? | Anyone, not only the phase-1 requester. Whoever requests, our node writes the R-KA update, since it owns the R-KA ([0012](0012-three-phases-settled-by-the-oracle.md)). Also open: whether a later phase's request gets its own id or reuses the rating's. | phase-2 plan |
 | Where does phases 2 and 3's human input wait before the oracle scores it? | None yet: on the DKG, as a draft the node holds, or in a store of the app's own, which would amend [0035](0035-limits-are-the-apps-only-state.md) ([0012](0012-three-phases-settled-by-the-oracle.md)). | phase-2 plan |
-| How does a local test run target a developer's own contract? | One local-only address variable for that contract, read by the workflows when `APP_ENV=local`; staging's and production's addresses stay in the committed file ([0028](0028-deployed-addresses-are-committed.md), [0019](0019-oracle-transactions-are-serialized.md)). | rating plan |
-| How does a rating run find the context graph of a target VeriSci did not publish? | The rating request names it next to the target's UAL, since a UAL alone does not name its graph ([0011](0011-a-rating-is-a-separate-r-ka.md)); check first whether a later DKG release resolves a UAL to its graph. | rating plan |
 | Who holds the DKG node's credential? | Caddy keeps the daemon's admin token on the host and checks one credential per environment, so each can be revoked alone. The `-prod` guard stays ([0005](0005-staging-and-production-are-isolated.md)). | node server plan |
 
 ## Adding an ADR

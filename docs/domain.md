@@ -21,8 +21,9 @@ edge`, testnet), Base Sepolia.
   - `did:dkg:base:{chainId}/{DKGKnowledgeAssets address}/{kaId}`: the older form, for ids
     with no author bits. OriginTrail's docs still show only this one.
 
-  A UAL parser accepts both and never assumes the middle segment is our node: a target
-  published elsewhere ([ADR 0011](adr/0011-a-rating-is-a-separate-r-ka.md)) may use either.
+  A UAL parser accepts both and never assumes the middle segment is our node: a rating
+  request may name either, and the rating run rates only our node's papers
+  ([ADR 0011](adr/0011-a-rating-is-a-separate-r-ka.md)).
 - **Canonical UAL spelling** (OriginTrail/dkg `packages/core/src/ka-ual-identity.ts`,
   checked at `74a515e`, 2026-10-06): lowercase address and chain namespace, decimal numbers
   with no leading zero; the chain part may be namespaced with several colons, and the chain
@@ -70,6 +71,10 @@ edge`, testnet), Base Sepolia.
   read in the daemon's `dkg-query/dist/dkg-query-engine.js`, 2026-10-10): the graph's data
   graph and its per-asset verifiable-memory graphs (`…/_verifiable_memory/<author>/<n>`).
   Shared memory is read only with `includeSharedMemory: true`.
+- **A query naming an asset graph that does not exist is refused, not empty** (10.0.22, local
+  node, 2026-10-11): `GRAPH <…/_verifiable_memory/<agent>/999>` answers 400 "Scoped query
+  violation: GRAPH <…> is outside the allowed graph set". To ask whether an asset exists,
+  query `_meta` instead (`publishedPaperQuery`), which answers 200 with no rows.
 - **A graph's `_meta` graph indexes its assets** (10.0.22, 2026-10-10), and a query scoped to
   the graph can read it as `GRAPH <did:dkg:context-graph:<graph id>/_meta>`. With `dkg:` for
   `http://dkg.io/ontology/`:
@@ -270,6 +275,26 @@ Observed on `lfoppiano/grobid:0.9.1-crf`, 2026-10-09, except where a fact cites 
   (the arXiv PDF prints none). A Target KA carries what GROBID read
   ([ADR 0010](adr/0010-pdf-to-target-ka-pipeline.md)).
 
+## Gemini
+
+From the Gemini API's pricing and models pages (2026-10-11), and the rating run's first live
+score the same day (plan 021).
+
+- **The free tier includes `gemini-3.8-flash`,** a stable model, Google's newest Flash; Gemini
+  3.1 Pro is not on the free tier. On the free tier, Google may use prompts and answers to
+  improve its products ([ADR 0018](adr/0018-phase-1-scorer-output-contract.md)).
+- **Rate limits are not published:** each account sees its own in Google AI Studio
+  (`aistudio.google.com/rate-limit`). A 429 means one was hit.
+- **`POST https://generativelanguage.googleapis.com/v1beta/models/<model>:generateContent`,**
+  key in the `x-goog-api-key` header, with `generationConfig.responseMimeType:
+  "application/json"` and `responseJsonSchema` (a JSON Schema: `integer` with `minimum` and
+  `maximum`, `enum`, `required` all held): `gemini-3.8-flash` answered one JSON object
+  matching it, in `candidates[0].content.parts[].text` with `finishReason: "STOP"`, and gave
+  `modelVersion: "gemini-3.8-flash"`. A whole rating run took about 25 s on Anvil, the mint on
+  Base Sepolia included.
+- The docs also show a newer `/v1beta/interactions` endpoint with a `response_format` field;
+  `generateContent` is not marked deprecated.
+
 ## Chain
 
 Observed on Base Sepolia (chain id 84532) with Alchemy.
@@ -287,6 +312,14 @@ Observed on Base Sepolia (chain id 84532) with Alchemy.
 - **Base has no public mempool:** the RPC forwards transactions to the sequencer, so
   whether Alchemy's pending nonce (`eth_getTransactionCount(…, "pending")`) shows a
   transaction not yet included is to verify ([ADR 0019](adr/0019-oracle-transactions-are-serialized.md)).
+- **Anvil, for local rating runs** (Foundry 1.8.4, 2026-10-11,
+  [ADR 0036](adr/0036-local-rating-runs-use-anvil.md)): its default port 8545 is the one the
+  DKG node's RPC proxy holds, and a call to `127.0.0.1:8545` then answers as Base Sepolia
+  (chain id 84532), so Anvil runs on 8546. `forge script … --broadcast --unlocked --sender
+  <Anvil's first account>` deploys with no key passed, since Anvil signs for its built-in
+  accounts; the first deploy on a fresh chain lands at
+  `0x5FbDB2315678afecb367f032d93F642f64180aa3`. The base fee starts at 1 gwei; viem's
+  `setBalance` (test client, mode `anvil`) funds any address.
 - **Replacing a pending transaction needs both `maxFeePerGas` and `maxPriorityFeePerGas`
   raised by at least 10%** (geth's default price bump; to verify on Base), or it is
   rejected as underpriced ([ADR 0019](adr/0019-oracle-transactions-are-serialized.md)).
@@ -332,6 +365,9 @@ Observed on Vercel Hobby with Inngest Cloud, except where a fact cites the vendo
   `GET /v1/events/{id}/runs` answers an empty list (2026-10-10): an id that a user can repeat
   (the same PDF published again by the same wallet) must carry something new per attempt,
   as the submission's deadline does.
+- **A function created with no triggers can only be invoked** with `step.invoke` (Inngest
+  4.22.0; its `opts.triggers` reads `[]`). The dev server ran the oracle function that way.
+  Step outputs are serialized as JSON, and `JSON.stringify` throws on a `bigint`.
 - **Inngest caps sizes:** an event payload at 256 KB, a step's output at 4 MB, a run's
   state at 32 MB and a function at 1,000 steps (Inngest docs, to verify on our plan).
   Payloads carry ids, never file bytes ([ADR 0010](adr/0010-pdf-to-target-ka-pipeline.md)).

@@ -1,14 +1,16 @@
 # @verisci/contracts
 
 Solidity contracts built with Foundry, and the TypeScript bindings the other
-workspaces import: the typed ABI and the deployed addresses of each environment.
+workspaces import: the typed ABI, the deployed addresses of each environment, reads of a
+rating request and of the contract's oracle, and the calldata of the oracle's calls.
 
 Status: `RatingController` v2 is implemented and tested. Deployed addresses are
 recorded in `deployments/base-sepolia.json`.
 
 ## Depends on
 
-`@verisci/core`, `@verisci/env`, and Zod (validates `deployments/base-sepolia.json`).
+`@verisci/core`, `@verisci/env`, Zod (validates `deployments/base-sepolia.json`), and viem
+(reads a request and encodes the oracle's calls).
 
 ## RatingController
 
@@ -29,8 +31,10 @@ pending on it
   ([ADR 0015](../../docs/adr/0015-rating-requests-are-free-on-testnet.md)).
   The contract stores and hashes the UAL exactly as given, so callers send the
   canonical spelling from `normalizeUal` in `@verisci/core`; the oracle cancels
-  a request whose UAL is in any other spelling with `InvalidTarget`
-  ([ADR 0031](../../docs/adr/0031-uals-are-normalized-before-the-contract.md)).
+  with `InvalidTarget` a request whose UAL is in any other spelling
+  ([ADR 0031](../../docs/adr/0031-uals-are-normalized-before-the-contract.md)), or
+  whose target is not a paper verisci published
+  ([ADR 0011](../../docs/adr/0011-a-rating-is-a-separate-r-ka.md)).
 - **Fulfil.** The oracle calls `fulfilPhase1(requestId, score, rKaUal)` with a
   score from 0 to 100 and the R-KA's UAL. The record holds the phase-1 score;
   later phases get their own fields in later contract versions
@@ -177,6 +181,27 @@ explicitly; when it is missing, `HelperConfig`
 reverts with `UnknownDeployEnv`. Without `--rpc-url`, the script deploys to an
 in-memory chain with the local Anvil configuration.
 
+### Deploying on Anvil
+
+A local rating run needs a contract whose oracle key you hold: a RatingController on a local
+Anvil chain ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)). Nothing is
+recorded in `deployments/`.
+
+```bash
+anvil --port 8546    # in a terminal of its own; prints its funded accounts and their keys
+forge script script/DeployRatingController.s.sol --rpc-url http://127.0.0.1:8546 \
+  --broadcast --unlocked --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+```
+
+`HelperConfig`'s local config makes Anvil's first account the owner and its second the oracle
+(`ANVIL_ORACLE`), so the two stay apart
+([ADR 0030](../../docs/adr/0030-owner-and-oracle-are-different-addresses.md)). Set
+`LOCAL_RATING_CONTRACT` in the root `.env.local` to the address the script prints, and
+`ORACLE_PRIVATE_KEY` to the second account's key
+([`packages/workflows` → Running a rating locally](../workflows/README.md#running-a-rating-locally)).
+Anvil listens on 8546 because the DKG node's RPC proxy holds 8545, Anvil's default, and
+answers as Base Sepolia. Anvil forgets everything when it stops: deploy again after a restart.
+
 ### How the scripts fit together
 
 - `script/HelperConfig.s.sol` holds the constructor arguments of each
@@ -210,6 +235,10 @@ cast send <previous address> "pause()" --rpc-url base_sepolia --account verisci-
 | `ratingControllerDeployments(appEnv)` | `{ chainId, current, past }` for `staging` or `production`; `local` resolves to staging ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)). `current` accepts new requests; `past` contracts are paused and drained ([ADR 0023](../../docs/adr/0023-a-fix-is-a-redeploy-owner-powers-fixed.md)) |
 | `NoDeploymentError` | Thrown by `ratingControllerDeployments` for an environment with no current deployment |
 | `Deployment`, `DeployEnv`, `RatingControllerDeployments` | The corresponding types |
+| `readRatingRequest(client, contract, requestId)` | The request's `RatingRequestState` (status `none`, `pending`, `fulfilled` or `cancelled`, cancel reason, lowercase requester, `requestedAt` in seconds, score, target and R-KA UALs), or `unreachable` when the RPC fails or the reply does not decode |
+| `readOracleAgent(client, contract)` | The contract's oracle address in lowercase, or `unreachable` |
+| `fulfilCalldata(requestId, score, rKaUal)`, `cancelCalldata(requestId, reason)` | The calldata of `fulfilPhase1` and of `cancelRequest` (`expired` or `invalid-target`), which the oracle signs and sends |
+| `ContractReader`, `RequestStatus`, `CancelReason`, `ReadRequestResult`, `ReadOracleResult` | What the reads take from a viem public client, and their types |
 | `contractsName` | The package name, imported by the web app's package test |
 
 Each `Deployment` records the contract `address`, the deployment `txHash` and
@@ -223,7 +252,7 @@ fails every importer with the invalid field named.
 ## Layout
 
 ```text
-src/            # Solidity contracts and the TypeScript API (index.ts, deployments)
+src/            # Solidity contracts and the TypeScript API (index.ts, deployments, rating reads)
 src/interfaces/ # contract interfaces: types, events, errors, NatSpec
 src/generated/  # generated, committed: the typed ABI
 script/         # Foundry scripts: HelperConfig, DeployRatingController
