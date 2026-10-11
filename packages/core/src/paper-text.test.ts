@@ -113,6 +113,47 @@ describe("quoteFound", () => {
     ).toBe(true);
   });
 
+  it("finds a quote with accents written apart from their letters, as PDFs often give them", () => {
+    const pdf = normalizeForQuote("Ministère des Solidarite´s et de la Sante´, Franc¸ois Rannou");
+
+    expect(quoteFound(pdf, "Ministère des Solidarités et de la Santé, François Rannou")).toBe(true);
+  });
+
+  it("finds a quote split by text from another column, in up to three long passages", () => {
+    const pdf = normalizeForQuote(
+      [
+        "Data Availability Statement: The full original protocol, dataset and statistical codes can be",
+        "accessed by academic researchers by contacting",
+        "knee pain score was 56.2/100 (SD 13.5) at baseline in the whole sample",
+        "the corresponding author, after approval of a proposal.",
+      ].join("\n"),
+    );
+
+    expect(
+      quoteFound(
+        pdf,
+        "The full original protocol, dataset and statistical codes can be accessed by academic researchers by contacting the corresponding author, after approval of a proposal.",
+      ),
+    ).toBe(true);
+    expect(quoteFound(pdf, "The full original protocol … after approval of a proposal.")).toBe(
+      true,
+    );
+  });
+
+  it("does not find a quote that needs more than three passages, or a short one", () => {
+    const pdf = normalizeForQuote(
+      "alpha bravo charlie delta echo. foxtrot golf hotel india juliet. kilo lima mike november oscar. papa quebec romeo sierra tango.",
+    );
+
+    expect(
+      quoteFound(
+        pdf,
+        "alpha bravo charlie delta echo kilo lima mike november oscar foxtrot golf hotel india juliet papa quebec romeo sierra tango",
+      ),
+    ).toBe(false);
+    expect(quoteFound(pdf, "alpha bravo charlie delta echo papa")).toBe(false);
+  });
+
   it("does not find a quote the paper does not hold", () => {
     expect(quoteFound(text, "The sample size was calculated with a power of 80%.")).toBe(false);
   });

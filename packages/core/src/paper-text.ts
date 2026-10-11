@@ -15,6 +15,14 @@ export type PreparePaperResult =
 const MIN_LETTERS = 500;
 /** A quote shorter than this, letters and digits only, shows nothing on its own. */
 const MIN_QUOTE_CHARS = 10;
+/**
+ * A quote may join up to this many passages of the paper, each at least `MIN_PASSAGE_CHARS`
+ * letters and digits long (the last at least `MIN_LAST_PASSAGE_CHARS`): a statement that text
+ * from another column interrupts, or a quote shortened with an ellipsis.
+ */
+const MAX_PASSAGES = 3;
+const MIN_PASSAGE_CHARS = 20;
+const MIN_LAST_PASSAGE_CHARS = 8;
 const REFERENCES_LEFT_OUT = "[References left out]";
 const CUT = "\n[…]";
 const NUMBER_ONLY = /^\d{1,5}$/;
@@ -71,23 +79,48 @@ function leaveOutReferences(text: string): string {
 }
 
 /**
- * Text as a quote is matched against it: Unicode-normalized (NFKC, so a ligature reads as its
- * letters), lowercase, letters and digits only, so line breaks, hyphenation, dashes and quote
- * marks never decide a match. Normalize the paper's text once and pass it to {@link quoteFound}.
+ * Text as a quote is matched against it: Unicode-decomposed (NFKD, so a ligature reads as its
+ * letters) with accents dropped, lowercase, letters and digits only, so line breaks,
+ * hyphenation, dashes, quote marks and accents a PDF writes apart from their letters never
+ * decide a match. Normalize the paper's text once and pass it to {@link quoteFound}.
  */
 export function normalizeForQuote(text: string): string {
   return text
-    .normalize("NFKC")
+    .normalize("NFKD")
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, "");
 }
 
 /**
- * True when `quote` appears in the paper whose {@link normalizeForQuote normalized} text is
- * `normalizedText`, and holds at least 10 letters or digits: a quote the scorer made up, or
- * one too short to show anything, is not found.
+ * True when `quote` holds at least 10 letters or digits and is made of passages of the paper
+ * whose {@link normalizeForQuote normalized} text is `normalizedText`: up to three, each at
+ * least 20 letters and digits long (the last at least 8), taken greedily, longest first. So a
+ * statement that text from another column interrupts, or a quote shortened with an ellipsis,
+ * is found; a quote the scorer made up, or one too short to show anything, is not.
  */
 export function quoteFound(normalizedText: string, quote: string): boolean {
   const needle = normalizeForQuote(quote);
-  return needle.length >= MIN_QUOTE_CHARS && normalizedText.includes(needle);
+  if (needle.length < MIN_QUOTE_CHARS) return false;
+  let start = 0;
+  for (let passages = 1; passages <= MAX_PASSAGES; passages++) {
+    const length = longestPassage(normalizedText, needle, start);
+    const last = start + length === needle.length;
+    if (length < (last ? MIN_LAST_PASSAGE_CHARS : MIN_PASSAGE_CHARS)) return false;
+    if (last) return true;
+    start += length;
+  }
+  return false;
+}
+
+/** The length of the longest prefix of `needle` from `start` that `text` holds. */
+function longestPassage(text: string, needle: string, start: number): number {
+  let found = 0;
+  let missing = needle.length - start + 1;
+  // Every shorter prefix of a prefix the text holds is held too, so search the length.
+  while (missing - found > 1) {
+    const length = Math.floor((found + missing) / 2);
+    if (text.includes(needle.slice(start, start + length))) found = length;
+    else missing = length;
+  }
+  return found;
 }
