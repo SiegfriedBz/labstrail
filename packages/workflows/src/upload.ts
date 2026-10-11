@@ -11,11 +11,11 @@ import { createPublicClient, http } from "viem";
 import { baseSepolia } from "viem/chains";
 import { inngest } from "./inngest.ts";
 import {
+  checkSignature,
   listPapers,
   type PaperListResult,
   queryProblem,
   type SignatureCheck,
-  signatureCheck,
 } from "./papers.ts";
 import { createUploadUrl, deleteFile, findPublicFile, type UploadUrlResult } from "./pinata.ts";
 import {
@@ -29,7 +29,7 @@ import {
   type SubmitResult,
   submitPaper,
 } from "./publish/submit-paper.ts";
-import { signatureMatches, verifySubmission } from "./publish/verify-submission.ts";
+import { verifySubmission } from "./publish/verify-submission.ts";
 import { type ReadRunResult, readRun } from "./runs.ts";
 import { createWorkflowsEnv, type WorkflowsEnv } from "./workflows-env.ts";
 
@@ -137,7 +137,7 @@ export function createUploadService(env: WorkflowsEnv, io: UploadIo): UploadServ
     if (!answer.ok) return { ok: false, reason: queryProblem(answer) };
     const record = parsePaperRecord(cid, answer.bindings);
     if (!record) return { ok: false, reason: "unreadable" };
-    const matches = await signatureMatches(
+    const check = await checkSignature(
       { ...record, cid, contextGraph: canonicalContextGraph(env.DKG_CONTEXT_GRAPH) },
       chain,
     );
@@ -147,7 +147,7 @@ export function createUploadService(env: WorkflowsEnv, io: UploadIo): UploadServ
       record: {
         ...record,
         deadline: record.deadline.toString(),
-        signatureCheck: signatureCheck(matches),
+        signatureCheck: check,
         publisher: parsed.ok ? parsed.ual.address : undefined,
       },
     };

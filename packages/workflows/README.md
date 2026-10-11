@@ -125,12 +125,14 @@ papers list:
 - **`readPaper(cid, eventId?)`** reads the Target KA's state on the node and, given the
   event id, the run Inngest started for it (REST, from the dev server locally). Once the KA
   is minted, it also reads the record back from the asset's own graph (SPARQL through the
-  node: title, authors, DOI, PDF link, submitter, signature, deadline), checks the signature against the submitter as
-  the run does, without the deadline rule, and gives the agent address the asset is minted
-  to (`publisher`: the UAL's author, our node). A failed run's status carries `failure`,
-  the reason its error names; a minted paper whose record cannot be shown carries
+  node: title, authors, DOI, PDF link, submitter, signature, deadline), checks the signature
+  against the submitter as the run does, without the deadline rule (`unknown` when the
+  chain does not answer within 3 s), and gives the agent address the asset is minted to
+  (`publisher`: the UAL's author, our node). A failed run's status carries `failure`, the
+  reason its error names; a minted paper whose record cannot be shown carries
   `recordProblem`: `unavailable` when the node did not answer the query, asked to retry, or
-  answered 429 or a server error; `unreadable` when it refused the query or no record parses
+  answered 429 or a server error; `unreadable` when it refused the query, no record parses,
+  or the asset's UAL names another agent than our node
   ([ADR 0021](../../docs/adr/0021-server-reads-return-typed-results.md)). Locally, a run's
   output comes from the dev server's GraphQL API, since its REST read answers it empty.
 - **`listPapers({ page, pageSize })`** reads one page of this graph's published papers,
@@ -143,8 +145,8 @@ papers list:
   `{ ok: true, total, papers }`, each paper's `PaperSummary` with its CID, UAL, mint date,
   title, first authors, author count, submitter and signature check; a page past the last
   has no papers. A node that does not answer, asks to retry, or answers 429 or a server error
-  gives `unavailable`; a refused query, a count that does not parse, or a page whose rows
-  all fail to parse gives `unreadable`
+  gives `unavailable`; a refused query, a count that does not parse, or a page the total
+  covers that comes back with no readable row gives `unreadable`
   ([ADR 0021](../../docs/adr/0021-server-reads-return-typed-results.md)). A page or page size
   that is not a positive integer, a page size over 50, or a page whose offset is not a safe
   integer throws a `RangeError`.

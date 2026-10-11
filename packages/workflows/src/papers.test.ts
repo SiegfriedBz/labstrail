@@ -2,7 +2,7 @@ import { submissionTypedData } from "@verisci/core";
 import type { DkgFailure, QueryResult } from "@verisci/dkg";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { listPapers, type PaperListDeps } from "./papers.ts";
+import { checkSignature, listPapers, type PaperListDeps } from "./papers.ts";
 
 const GRAPH = "0xD701ed157232ad5E14BC4134a8D10D64D86f13B3/verisci-staging";
 const FIRST = "bafybeihwexgn2z6ffhokgkcu55hyrq6pc4v2pnkdvpj6nc63durj4q6b6m";
@@ -183,6 +183,15 @@ describe("listPapers", () => {
     expect(asked).toHaveLength(2);
   });
 
+  it("says the list is unreadable when a page the total covers comes back empty", async () => {
+    const { query, asked } = node({ page: rows([]), count: total(5) });
+
+    expect(
+      await listPapers({ page: 1, pageSize: 20 }, { contextGraph: GRAPH, query, chain: chainUp }),
+    ).toEqual({ ok: false, reason: "unreadable" });
+    expect(asked).toHaveLength(2);
+  });
+
   it("gives no papers, with the total, for a page past the last, and asks for no authors", async () => {
     const { query, asked } = node({ page: rows([]), count: total(5) });
 
@@ -255,5 +264,34 @@ describe("listPapers", () => {
     await expect(
       listPapers(options, { contextGraph: GRAPH, query, chain: chainUp }),
     ).rejects.toThrow(RangeError);
+  });
+});
+
+describe("checkSignature", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("checks one paper's signature, and answers unknown when the chain takes more than 3 s", async () => {
+    const signed = async (by = signer) => ({
+      cid: FIRST,
+      contextGraph: GRAPH,
+      deadline: DEADLINE,
+      submitter: signer.address.toLowerCase(),
+      signature: await by.signTypedData(
+        submissionTypedData({ cid: FIRST, contextGraph: GRAPH, deadline: DEADLINE }),
+      ),
+    });
+    expect(await checkSignature(await signed(), chainUp)).toBe("valid");
+    expect(await checkSignature(await signed(stranger), chainUp)).toBe("invalid");
+
+    const foreign = await signed(stranger);
+    vi.useFakeTimers();
+    const checked = checkSignature(foreign, {
+      verifyTypedData: () => new Promise(() => {}),
+      getBlockNumber: () => new Promise(() => {}),
+    });
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(await checked).toBe("unknown");
   });
 });

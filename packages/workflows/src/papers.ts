@@ -64,9 +64,9 @@ export interface PaperListDeps {
  * One page of the graph's published papers, newest mint first, with the total
  * (`docs/domain.md` → DKG): only Target KAs our node minted, each read from its own asset's
  * graph. The page and the count are asked at once, then the page's first authors, then each
- * signature is checked as the paper's page checks it; a check that waits on the chain for
- * more than 3 s shows as `unknown`. A page past the last gives no papers and the total; an
- * answer with rows of which none can be read is `unreadable`. Throws a `RangeError` for a
+ * signature is checked as the paper's page checks it ({@link checkSignature}: `unknown`
+ * after 3 s). A page past the last gives no papers and the total; a page the total covers
+ * that comes back with no readable row is `unreadable`. Throws a `RangeError` for a
  * page or page size that is not a positive integer, a page size over 50, or a page whose
  * offset is not a safe integer: a bug in the caller, not an expected failure.
  */
@@ -89,9 +89,10 @@ export async function listPapers(
   const total = parsePaperCount(counted.bindings);
   if (total === undefined) return { ok: false, reason: "unreadable" };
   const listings = parsePaperListing(listed.bindings);
-  // Rows of which none can be read are a broken answer, not an empty page (ADR 0021).
+  // No readable row on a page the total covers is a broken answer, not an empty page
+  // (ADR 0021); past the last page, an empty page is the answer.
   if (listings.length === 0) {
-    return listed.bindings.length === 0
+    return listed.bindings.length === 0 && offset >= total
       ? { ok: true, total, papers: [] }
       : { ok: false, reason: "unreadable" };
   }
@@ -104,10 +105,7 @@ export async function listPapers(
   const contextGraph = canonicalContextGraph(deps.contextGraph);
   const papers = await Promise.all(
     listings.map(async (listing): Promise<PaperSummary> => {
-      const matches = await within(
-        CHECK_TIMEOUT_MS,
-        signatureMatches({ ...listing, contextGraph }, deps.chain),
-      );
+      const check = await checkSignature({ ...listing, contextGraph }, deps.chain);
       return {
         cid: listing.cid,
         ual: listing.ual,
@@ -116,7 +114,7 @@ export async function listPapers(
         authors: authors.get(listing.cid) ?? [],
         authorCount: listing.authorCount,
         submitter: listing.submitter,
-        signatureCheck: signatureCheck(matches),
+        signatureCheck: check,
       };
     }),
   );
@@ -134,6 +132,18 @@ export function queryProblem(failure: DkgFailure): QueryProblem {
     failure.status === 429 ||
     (failure.status !== undefined && failure.status >= 500);
   return passing ? "unavailable" : "unreadable";
+}
+
+/**
+ * Whether a paper's signature is its submitter's, as the pages show it: checked as
+ * `signatureMatches` checks it, and `unknown` when the chain did not answer within 3 s, so a
+ * slow RPC never holds a page.
+ */
+export async function checkSignature(
+  signed: Parameters<typeof signatureMatches>[0],
+  chain: VerifyOptions["client"],
+): Promise<SignatureCheck> {
+  return signatureCheck(await within(CHECK_TIMEOUT_MS, signatureMatches(signed, chain)));
 }
 
 /** A signature check from `signatureMatches`: `unreachable` (the chain did not answer) is `unknown`. */
