@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { resolveTheme, THEME_KEY, THEME_SCRIPT } from "./theme.ts";
+import { THEME_KEY, THEME_SCRIPT } from "./theme.ts";
 
 /** Runs the inline script with a stored choice, or none. */
 function runScript(stored: string | null) {
@@ -7,18 +7,6 @@ function runScript(stored: string | null) {
   else localStorage.setItem(THEME_KEY, stored);
   new Function(THEME_SCRIPT)();
 }
-
-describe("resolveTheme", () => {
-  it("takes the visitor's stored choice", () => {
-    expect(resolveTheme("dark")).toBe("dark");
-    expect(resolveTheme("light")).toBe("light");
-  });
-
-  it("is light when nothing valid is stored", () => {
-    expect(resolveTheme(null)).toBe("light");
-    expect(resolveTheme("sepia")).toBe("light");
-  });
-});
 
 describe("THEME_SCRIPT", () => {
   afterEach(() => {
@@ -35,6 +23,12 @@ describe("THEME_SCRIPT", () => {
   it("sets light when nothing is stored", () => {
     document.documentElement.dataset.theme = "dark";
     runScript(null);
+
+    expect(document.documentElement.dataset.theme).toBe("light");
+  });
+
+  it("sets light for a stored value that names no theme", () => {
+    runScript("sepia");
 
     expect(document.documentElement.dataset.theme).toBe("light");
   });

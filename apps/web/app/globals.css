@@ -1,13 +1,16 @@
 @import "tailwindcss";
 
+/* `dark:` follows the site's theme, `<html data-theme>`, which the visitor picks. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 /*
  * VeriSci's look: a lab instrument with a web3 edge, light by default, with a dark theme.
  * Neutral greys, two signal colours with one meaning each: emerald for the off-chain record
  * ("verified"), cyan for the on-chain asset. They blend only on the main action, live lines
  * and the link between them, and stay out of plain text and links, which are ink with an
  * emerald underline. Raised panels with hairline borders, a soft emerald and cyan wash at
- * the top of each page. One radius scale: rounded-2xl for panels, rounded-xl for buttons and inputs,
- * rounded-lg for small inline controls.
+ * the top of each page. One radius scale: rounded-2xl for panels, rounded-xl for buttons
+ * and inputs, rounded-lg for small inline controls.
  *
  * `<html data-theme>` picks the theme: `THEME_SCRIPT` (lib/theme.ts) sets it before the
  * first paint from the visitor's stored choice, else light. Every colour is a token below,
@@ -22,7 +25,8 @@
   --line-strong: rgb(17 20 22 / 0.16);
   --ink: #111416;
   --muted: #5a6361;
-  /* The accents are dark enough for AA text contrast on the page, so their fills take white text. */
+  /* The accents are dark enough for AA text contrast on the page, so their fills take white
+     text. */
   --accent: #087a52;
   --accent-2: #0a7489;
   /* Text and icons on an accent fill. */
@@ -44,8 +48,8 @@
   --glass-solid: #ffffff;
 }
 
-/* Dark: a dimmed graphite, not black, with solid raised panels one step lighter than the
-   page, so depth reads without glass; the accents lift to stay clear on it. */
+/* Dark: a dimmed graphite with solid raised panels one step lighter than the page, so
+   depth reads without glass; the accents lift to stay clear on it. */
 :root[data-theme="dark"] {
   color-scheme: dark;
   --page: #121517;
@@ -114,7 +118,7 @@ li {
 }
 
 /* The lab bench: a soft wash behind the top of each page, emerald from the top left and
-   cyan from the top right, each fading out on its own. No pattern. */
+   cyan from the top right, each fading out on its own. */
 .bench {
   background-image:
     radial-gradient(

@@ -24,11 +24,11 @@ describe("WalletButton", () => {
     expect(open).toHaveBeenCalledOnce();
   });
 
-  it("shows a connected address in short form, and opens the account window", () => {
+  it("shows a connected address in short form, named as shown, and opens the account window", () => {
     account.mockReturnValueOnce({ address: ADDRESS, isConnected: true });
     render(<WalletButton />);
 
-    const button = screen.getByRole("button", { name: `Wallet ${ADDRESS}, open account` });
+    const button = screen.getByRole("button", { name: "Wallet 0x9a17…9111, open account" });
     expect(button.textContent).toBe("0x9a17…9111");
     fireEvent.click(button);
     expect(open).toHaveBeenCalledOnce();

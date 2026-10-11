@@ -14,6 +14,8 @@ describe("Abstract", () => {
     render(<Abstract text={LONG} />);
 
     expect(screen.getByRole("heading", { name: "Abstract" })).toBeTruthy();
+    const text = screen.getByText(LONG.trim());
+    expect(text.className).toContain("line-clamp-5");
     const toggle = screen.getByRole("button", { name: "Read more" });
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
 
@@ -21,6 +23,7 @@ describe("Abstract", () => {
     expect(screen.getByRole("button", { name: "Show less" }).getAttribute("aria-expanded")).toBe(
       "true",
     );
+    expect(text.className).not.toContain("line-clamp-5");
   });
 
   it("shows a short abstract whole, with no toggle", () => {

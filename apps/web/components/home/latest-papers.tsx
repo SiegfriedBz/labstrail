@@ -29,7 +29,7 @@ export async function LatestPapers() {
     return (
       <p className="glass rounded-2xl p-5 text-sm leading-relaxed text-muted">
         No paper is published yet.{" "}
-        <Link href="/publish" className="font-medium text-accent hover:underline">
+        <Link href="/publish" className="link">
           Publish the first one
         </Link>
       </p>

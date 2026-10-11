@@ -30,7 +30,7 @@ function ConnectedWalletButton() {
       <button
         type="button"
         onClick={() => void open()}
-        aria-label={`Wallet ${address}, open account`}
+        aria-label={`Wallet ${shorten(address, 6, 4)}, open account`}
         title={address}
         className={BUTTON}
       >

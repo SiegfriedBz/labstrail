@@ -110,7 +110,7 @@ export function PaperProgress({
     <div className="grid gap-6">
       {trail}
       <div className="enter grid items-start gap-8 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] md:gap-12">
-        <div className="grid content-start gap-6 md:sticky md:top-24">
+        <div className="grid content-start gap-6">
           <div className="grid gap-3">
             <p
               className={`w-fit rounded-md px-2.5 py-1 text-xs font-medium ${

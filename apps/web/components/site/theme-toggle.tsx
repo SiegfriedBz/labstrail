@@ -22,20 +22,22 @@ export function useTheme(): Theme {
   return useSyncExternalStore(subscribe, pageTheme, () => "light");
 }
 
-/** A button that switches to the other theme and remembers the choice in this browser. */
+/**
+ * A button that switches to the other theme and remembers the choice in this browser. Its
+ * name is the same in both themes and CSS picks its icon (a moon in light, a sun in dark),
+ * so it is right before JavaScript runs.
+ */
 export function ThemeToggle() {
-  const theme = useTheme();
-  const next: Theme = theme === "dark" ? "light" : "dark";
-  const Icon = theme === "dark" ? Sun : Moon;
   return (
     <button
       type="button"
-      onClick={() => applyTheme(next)}
-      aria-label={`Switch to the ${next} theme`}
-      title={`Switch to the ${next} theme`}
+      onClick={() => applyTheme(pageTheme() === "dark" ? "light" : "dark")}
+      aria-label="Switch between light and dark"
+      title="Switch between light and dark"
       className="grid size-9 shrink-0 place-items-center rounded-xl border border-line-strong text-muted transition hover:bg-surface-strong hover:text-ink active:scale-[0.96]"
     >
-      <Icon size={16} weight="bold" />
+      <Moon aria-hidden size={16} weight="bold" className="dark:hidden" />
+      <Sun aria-hidden size={16} weight="bold" className="hidden dark:block" />
     </button>
   );
 }

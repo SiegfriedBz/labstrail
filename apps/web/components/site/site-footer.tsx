@@ -79,9 +79,7 @@ export function SiteFooter({ ratingController }: { ratingController: string | un
             {rows.map((row) => (
               <li
                 key={row.address}
-                className={`grid gap-2 px-4 py-3.5 sm:px-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-6 ${
-                  row.soon ? "opacity-70" : ""
-                }`}
+                className="grid gap-2 px-4 py-3.5 sm:px-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-6"
               >
                 <span className="grid min-w-0 gap-1">
                   <span className="flex min-w-0 flex-wrap items-center gap-2">
