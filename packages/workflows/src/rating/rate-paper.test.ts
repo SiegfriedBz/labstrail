@@ -63,6 +63,7 @@ const ratingRows = (score: number) =>
       output: { ...OUTPUT, score },
       model: MODEL,
       promptVersion: SCORER_PROMPT_VERSION,
+      textShortened: false,
     }),
   );
 
@@ -349,10 +350,27 @@ describe("runRating: rating a paper", () => {
         output: OUTPUT,
         model: MODEL,
         promptVersion: SCORER_PROMPT_VERSION,
+        textShortened: false,
       }),
     );
     expect(dkg.startMint).toHaveBeenCalledWith(NAME, { listenMs: RATING_SETTINGS.listenMs });
     expect(oracleCalls).toEqual([fulfil(64)]);
+  });
+
+  it("records in the R-KA that a paper's text was shortened to fit", async () => {
+    const { run, dkg } = rate({ papers: [{ ok: true, paper: { ...PAPER, shortened: true } }] });
+
+    await run;
+    expect(dkg.storeAsset).toHaveBeenCalledWith(
+      NAME,
+      expect.arrayContaining([
+        {
+          subject: `urn:verisci:rating:${REQUEST_ID}/phase/1`,
+          predicate: "urn:verisci:textShortened",
+          object: '"true"^^<http://www.w3.org/2001/XMLSchema#boolean>',
+        },
+      ]),
+    );
   });
 
   it("cancels invalid-target a paper outside the field, storing nothing", async () => {

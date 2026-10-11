@@ -223,6 +223,10 @@ describe("askScorer", () => {
       scored.ok &&
         scored.field === "life-sciences" &&
         scored.output.checks.find((check) => check.id === "conflicts"),
-    ).toEqual({ id: "conflicts", answer: "missing" });
+    ).toEqual({
+      id: "conflicts",
+      answer: "missing",
+      claimed: { answer: "shown", quote: "No competing interests." },
+    });
   });
 });

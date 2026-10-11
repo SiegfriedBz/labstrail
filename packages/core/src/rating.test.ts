@@ -27,7 +27,11 @@ const OUTPUT: ScorerOutput = {
   checks: [
     { id: "sample-size", answer: "shown", quote: "We needed 60 patients for 80% power." },
     { id: "randomization", answer: "partly", quote: 'Patients were "randomly" assigned.' },
-    { id: "harms", answer: "missing" },
+    {
+      id: "harms",
+      answer: "missing",
+      claimed: { answer: "shown", quote: "No serious adverse events occurred." },
+    },
     { id: "code-availability", answer: "not-applicable" },
   ],
 };
@@ -39,6 +43,7 @@ const RATING: RatingContent = {
   output: OUTPUT,
   model: "gemini-3.8-flash",
   promptVersion: SCORER_PROMPT_VERSION,
+  textShortened: false,
 };
 
 /** The node's rows for `SELECT ?s ?p ?o`, built from the triples we write. */
@@ -139,6 +144,11 @@ describe("rKaQuads", () => {
       '"The paper states a \\"clear\\" claim\\nand its methods."',
     );
     has(PHASE_IRI, "urn:verisci:studyType", '"randomized-trial"');
+    has(
+      PHASE_IRI,
+      "urn:verisci:textShortened",
+      '"false"^^<http://www.w3.org/2001/XMLSchema#boolean>',
+    );
     has(PHASE_IRI, "urn:verisci:model", '"gemini-3.8-flash"');
     has(PHASE_IRI, "urn:verisci:promptVersion", '"2"');
   });
@@ -154,6 +164,24 @@ describe("rKaQuads", () => {
     has(check("randomization"), "urn:verisci:quote", '"Patients were \\"randomly\\" assigned."');
     const quoted = rKaQuads(RATING).filter((t) => t.predicate === "urn:verisci:quote");
     expect(quoted.map((t) => t.subject)).toEqual([check("sample-size"), check("randomization")]);
+  });
+
+  it("keeps what the model claimed for a check the score could not count", () => {
+    const harms = `${PHASE_IRI}/check/harms`;
+
+    has(harms, "urn:verisci:answer", '"missing"');
+    has(harms, "urn:verisci:claimedAnswer", '"shown"');
+    has(harms, "urn:verisci:claimedQuote", '"No serious adverse events occurred."');
+    const claimed = rKaQuads(RATING).filter((t) => t.predicate === "urn:verisci:claimedAnswer");
+    expect(claimed.map((t) => t.subject)).toEqual([harms]);
+  });
+
+  it("says when the paper's text was shortened to fit", () => {
+    expect(rKaQuads({ ...RATING, textShortened: true })).toContainEqual({
+      subject: PHASE_IRI,
+      predicate: "urn:verisci:textShortened",
+      object: '"true"^^<http://www.w3.org/2001/XMLSchema#boolean>',
+    });
   });
 
   it("writes the checks in the order given", () => {
@@ -210,7 +238,11 @@ describe("ratingQuery and parseRating", () => {
       checks: OUTPUT.checks,
       model: "gemini-3.8-flash",
       promptVersion: SCORER_PROMPT_VERSION,
+      textShortened: false,
     });
+    expect(parseRating(rowsOf(rKaQuads({ ...RATING, textShortened: true })))?.textShortened).toBe(
+      true,
+    );
   });
 
   it("puts the checks in checklist order, whatever order the node returns them in", () => {
@@ -241,6 +273,17 @@ describe("ratingQuery and parseRating", () => {
     expect(parseRating(rows)?.checks).toEqual(OUTPUT.checks);
   });
 
+  it("leaves out a claimed answer that is not one of the answers", () => {
+    const rows = rowsOf(rKaQuads(RATING)).map((row) =>
+      row.p === "urn:verisci:claimedAnswer" ? { ...row, o: '"maybe"' } : row,
+    );
+
+    expect(parseRating(rows)?.checks.find((check) => check.id === "harms")).toEqual({
+      id: "harms",
+      answer: "missing",
+    });
+  });
+
   it("reads a v1 R-KA's score, with no study type and no checks", () => {
     const review = `urn:verisci:rating:${REQUEST_ID}`;
     const phase = `${review}/phase/1`;
@@ -268,6 +311,7 @@ describe("ratingQuery and parseRating", () => {
       promptVersion: "1",
     });
     expect(parseRating(rowsOf(v1))?.studyType).toBeUndefined();
+    expect(parseRating(rowsOf(v1))?.textShortened).toBeUndefined();
   });
 
   it("reads an unknown study type as none, with no checks", () => {

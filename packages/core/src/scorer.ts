@@ -26,6 +26,12 @@ export interface CheckResult {
   readonly answer: CheckAnswer;
   /** Copied from the paper, at most 300 characters. */
   readonly quote?: string;
+  /**
+   * What the model answered when the score could not count it, so the check counts as
+   * `missing`: `shown` or `partly` with a quote the paper does not hold or no quote, or
+   * `not-applicable` for a check that always applies. Set only by {@link scoreChecks}.
+   */
+  readonly claimed?: { readonly answer: CheckAnswer; readonly quote?: string };
 }
 
 /**
@@ -183,9 +189,10 @@ export function parseScorerAnswer(
  * none, and the score is `round(100 × points / applicable checks)`, rounding half up.
  *
  * A `conditional` check answered `not-applicable` leaves the count; a `required` one counts as
- * `missing`. A `shown` or `partly` answer counts as `missing`, its quote dropped, unless its
- * quote is found in the paper's text ({@link quoteFound}), so every point rests on a passage the
- * paper holds. The output lists every check of the study type in checklist order.
+ * `missing`. A `shown` or `partly` answer counts as `missing` unless its quote is found in the
+ * paper's text ({@link quoteFound}), so every point rests on a passage the paper holds. A check
+ * the score could not count keeps what the model answered as `claimed`. The output lists every
+ * check of the study type in checklist order.
  */
 export function scoreChecks(paper: PaperText, answer: ScorerAnswer): ScorerOutput {
   const text = normalizeForQuote(paper.text);
@@ -200,7 +207,9 @@ export function scoreChecks(paper: PaperText, answer: ScorerAnswer): ScorerOutpu
       if (quoteFound(text, found.quote))
         return { id: check.id, answer: result, quote: found.quote };
     }
-    return { id: check.id, answer: "missing" };
+    if (result === "missing") return { id: check.id, answer: "missing" };
+    const claimed = found?.quote ? { answer: result, quote: found.quote } : { answer: result };
+    return { id: check.id, answer: "missing", claimed };
   });
   const applicable = checks.filter((check) => check.answer !== "not-applicable").length;
   const halves = checks.reduce(

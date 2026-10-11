@@ -295,11 +295,15 @@ describe("scoreChecks", () => {
       otherAnswer({ funding, conflicts: { answer: "not-applicable" } }),
     );
 
-    expect(result.checks.find((check) => check.id === "conflicts")?.answer).toBe("missing");
+    expect(result.checks.find((check) => check.id === "conflicts")).toEqual({
+      id: "conflicts",
+      answer: "missing",
+      claimed: { answer: "not-applicable" },
+    });
     expect(result.score).toBe(13);
   });
 
-  it("counts as missing a shown or partly check whose quote the paper does not hold, dropping the quote", () => {
+  it("counts as missing a shown or partly check whose quote the paper does not hold, keeping what the model claimed", () => {
     const result = scoreChecks(
       PAPER,
       otherAnswer({
@@ -311,10 +315,12 @@ describe("scoreChecks", () => {
     expect(result.checks.find((check) => check.id === "funding")).toEqual({
       id: "funding",
       answer: "missing",
+      claimed: { answer: "shown", quote: "This work was funded by the Wellcome Trust." },
     });
     expect(result.checks.find((check) => check.id === "conflicts")).toEqual({
       id: "conflicts",
       answer: "missing",
+      claimed: { answer: "partly", quote: "The authors received fees from Acme." },
     });
     expect(result.score).toBe(0);
   });
@@ -322,7 +328,11 @@ describe("scoreChecks", () => {
   it("counts as missing a shown check with no quote", () => {
     const result = scoreChecks(PAPER, otherAnswer({ funding: { answer: "shown" } }));
 
-    expect(result.checks.find((check) => check.id === "funding")?.answer).toBe("missing");
+    expect(result.checks.find((check) => check.id === "funding")).toEqual({
+      id: "funding",
+      answer: "missing",
+      claimed: { answer: "shown" },
+    });
   });
 
   it("finds a quote across the paper's line breaks and whatever its spacing or case", () => {
@@ -354,5 +364,50 @@ describe("scoreChecks", () => {
       id: "statistics",
       answer: "missing",
     });
+  });
+});
+
+/** A short fingerprint of a text (FNV-1a, 32 bits), to notice any change in it. */
+function fingerprint(text: string): string {
+  let hash = 0x811c9dc5;
+  for (const char of text) {
+    hash ^= char.codePointAt(0) ?? 0;
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+
+/**
+ * The fingerprint of each released prompt version: its prompt, which lists every checklist, and
+ * the scores a fixed set of answers gets. A version is released once it is merged into
+ * `develop`; never change a released one. When this test fails, raise SCORER_PROMPT_VERSION and
+ * add the new version's fingerprint (an unreleased version's may be updated).
+ */
+const RELEASED: Readonly<Record<string, string>> = { "2": "d6b4eee6" };
+
+describe("SCORER_PROMPT_VERSION", () => {
+  it("changes whenever the prompt, a checklist or the way answers are scored changes", () => {
+    const paper: PaperText = {
+      text: "The methods are described in full detail here.",
+      shortened: false,
+    };
+    const answers = ["shown", "partly", "missing", "not-applicable"] as const;
+    const scores = STUDY_TYPES.map(
+      ({ id: studyType }) =>
+        scoreChecks(paper, {
+          field: "life-sciences",
+          studyType,
+          reason: "A fixed answer.",
+          rationale: "A fixed answer.",
+          checks: checklistOf(studyType).map((check, index) => ({
+            id: check.id,
+            answer: answers[index % answers.length] ?? "missing",
+            quote: "The methods are described in full detail",
+          })),
+        }).score,
+    );
+    const { system } = scorerPrompt(paper);
+
+    expect(fingerprint(`${system}\n${scores.join(",")}`)).toBe(RELEASED[SCORER_PROMPT_VERSION]);
   });
 });

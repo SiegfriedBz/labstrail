@@ -270,7 +270,12 @@ interface RunContext {
   /** Each part of the score once it came back, kept across attempts so it is never redone. */
   cid?: string;
   paper?: PaperText;
-  scored?: { readonly output: ScorerOutput; readonly model: string };
+  scored?: {
+    readonly output: ScorerOutput;
+    readonly model: string;
+    /** Whether the paper's text was shortened to fit, recorded in the R-KA. */
+    readonly textShortened: boolean;
+  };
 }
 
 async function readRequest(
@@ -346,6 +351,7 @@ async function rateOnce(attempt: number, run: RunContext): Promise<Attempt> {
       output: scored.output,
       model: scored.model,
       promptVersion: SCORER_PROMPT_VERSION,
+      textShortened: scored.textShortened,
     });
     const stored = await step.run(`store-${attempt}`, () => deps.dkg.storeAsset(name, quads));
     if (!stored.ok) return failed(stored);
@@ -396,7 +402,7 @@ async function score(
   const scored = await step.run(`score-${attempt}`, () => deps.score(paper));
   if (!scored.ok) return geminiFailed(scored);
   if (scored.field === "outside") return { kind: "invalid-target" };
-  run.scored = { output: scored.output, model: scored.model };
+  run.scored = { output: scored.output, model: scored.model, textShortened: paper.shortened };
   return run.scored;
 }
 
