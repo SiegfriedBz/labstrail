@@ -160,8 +160,10 @@ request id (Asset names above).
   `publishedPaperQuery` checks that one of ours is a published paper, not an R-KA.
   `paperPdfQuery` and `pdfCidOf` then find the PDF it links.
 - **The paper's text:** `preparePaperText` takes the text of each of the PDF's pages: it trims
-  each line, drops lines holding only a number (line and page numbers), joins a lowercase word
-  hyphenated across a line break, and collapses runs of spaces and blank lines. A text over
+  each line, drops lines holding only a number (line and page numbers) and, in a line-numbered
+  manuscript (eight lines in a row ending in numbers that count up, as Word and LaTeX's lineno
+  glue them: "Methods66"), the number at each line's end, joins a lowercase word hyphenated
+  across a line break, and collapses runs of spaces and blank lines. A text over
   the cap loses its reference list first, from a "References" heading to the next statement or
   methods heading, then is cut at a word boundary.
 - **The scorer's request:** `scorerPrompt` asks the model, in one request, for the paper's
@@ -199,11 +201,12 @@ request id (Asset names above).
   which holds `urn:verisci:checkId`, `urn:verisci:answer`, and when they apply
   `urn:verisci:quote`, `urn:verisci:claimedAnswer` and `urn:verisci:claimedQuote`. Later phases add their own `…/phase/<n>` node to the same R-KA
   ([ADR 0012](../../docs/adr/0012-three-phases-settled-by-the-oracle.md)).
-- **The version:** `SCORER_PROMPT_VERSION` names the prompt, the checklists, the scoring and
-  quote matching together, and every R-KA records it with the model. A test fingerprints the
-  prompt (system and user), the scores of fixed answers and which of fixed quotes are found, so
-  a change that alters any of them fails until the version is raised; a version merged into
-  `develop` is never changed again.
+- **The version:** `SCORER_PROMPT_VERSION` names the prompt, the checklists, the scoring, quote
+  matching and the paper's text preparation together, and every R-KA records it with the model.
+  A test fingerprints the prompt (system and user), the scores of fixed answers, which of fixed
+  quotes are found and the text two real papers' pages give, so a change that alters any of
+  them fails until the version is raised; a version merged into `develop` is never changed
+  again.
 - **Reading back:** `ratingQuery` and `parseRating` read the score from the minted R-KA, so
   the score the oracle records always equals the score in the R-KA. An R-KA from the first
   scorer, which judged eight signals over the paper's record (`urn:verisci:observed` and

@@ -45,6 +45,13 @@ const NOT_MATCHED = /[^\p{L}\p{N}]|\p{Lm}/gu;
 const REFERENCES_LEFT_OUT = "[References left out]";
 const CUT = "\n[…]";
 const NUMBER_ONLY = /^\d{1,5}$/;
+/**
+ * Lines in a row ending in numbers that count up by one, from which a text is a line-numbered
+ * manuscript: Word and LaTeX's lineno glue each line's number to its end ("Methods66").
+ */
+const MIN_NUMBERED_LINES = 8;
+/** A line's last digits, when the character before them is neither a digit nor a space. */
+const GLUED_DIGITS = /[^\d\s](\d+)$/;
 const REFERENCES_HEADING =
   /^(?:references|reference list|bibliography|literature cited|works cited)$/i;
 /** Headings that can follow a reference list: online methods, statements, appendices. */
@@ -53,8 +60,9 @@ const AFTER_REFERENCES =
 
 /**
  * A paper's text from its PDF's pages, as text extraction gives them: each line trimmed, lines
- * holding only a number (line and page numbers) dropped, a lowercase word hyphenated across a
- * line break joined, runs of spaces and of blank lines collapsed. A text over `maxChars` loses
+ * holding only a number (line and page numbers) dropped, the number a line-numbered manuscript
+ * glues to each line's end dropped too, a lowercase word hyphenated across a line break joined,
+ * runs of spaces and of blank lines collapsed. A text over `maxChars` loses
  * its reference list first (from a "References" heading to the next statement or methods
  * heading, or to the end), then is cut at a word boundary and marked `[…]`; it never passes
  * `maxChars`. The same pages always give the same text.
@@ -62,14 +70,11 @@ const AFTER_REFERENCES =
  * Returns `no-text` for pages holding fewer than 500 letters, such as a scanned PDF's.
  */
 export function preparePaperText(pages: readonly string[], maxChars: number): PreparePaperResult {
-  const text = pages
-    .map((page) =>
-      page
-        .split("\n")
-        .map((line) => line.replace(/[ \t ]+/g, " ").trim())
-        .filter((line) => !NUMBER_ONLY.test(line))
-        .join("\n"),
-    )
+  const lines = pages.map((page) =>
+    page.split("\n").map((line) => line.replace(/[ \t ]+/g, " ").trim()),
+  );
+  const text = withoutLineNumbers(lines)
+    .map((page) => page.filter((line) => !NUMBER_ONLY.test(line)).join("\n"))
     .join("\n\n")
     .replace(/(\p{Ll})-\n(\p{Ll})/gu, "$1$2")
     .replace(/\n{3,}/g, "\n\n")
@@ -85,6 +90,68 @@ export function preparePaperText(pages: readonly string[], maxChars: number): Pr
   const end = room.search(/\s\S*$/);
   const kept = room.slice(0, end > 0 ? end : maxChars - CUT.length).trimEnd();
   return { ok: true, paper: { text: `${kept}${CUT}`, shortened: true } };
+}
+
+/**
+ * The pages' lines without the numbers a line-numbered manuscript glues to their ends, when
+ * `MIN_NUMBERED_LINES` lines in a row count up by one. The count is followed across pages, past
+ * lines without a number, such as a preprint server's footer, and through blank numbered lines,
+ * which give their number alone ("176"). A line's own digits before its number stay: "NUTS
+ * 202199" is line 99 of "NUTS 2021".
+ */
+function withoutLineNumbers(pages: readonly (readonly string[])[]): string[][] {
+  if (!pages.some((lines) => countsUp(lines))) return pages.map((lines) => [...lines]);
+  let expected: number | undefined;
+  return pages.map((lines) => {
+    const kept: string[] = [];
+    for (const [index, line] of lines.entries()) {
+      const next = lines[index + 1] ?? "";
+      const number =
+        expected !== undefined && numbered(line, expected)
+          ? expected
+          : gluedNumbers(line).find((value) => numbered(next, value + 1));
+      if (number === undefined) {
+        kept.push(line);
+        continue;
+      }
+      kept.push(line === String(number) ? line : line.slice(0, -String(number).length).trimEnd());
+      expected = number + 1;
+    }
+    return kept;
+  });
+}
+
+/**
+ * True when `MIN_NUMBERED_LINES` lines in a row count up by one from a line ending in a glued
+ * number, blank numbered lines included.
+ */
+function countsUp(lines: readonly string[]): boolean {
+  return lines.some((line, start) =>
+    gluedNumbers(line).some((first) => {
+      for (let count = 1; count < MIN_NUMBERED_LINES; count++) {
+        const next = lines[start + count] ?? "";
+        const value = first + count;
+        if (next !== String(value) && !gluedNumbers(next).includes(value)) return false;
+      }
+      return true;
+    }),
+  );
+}
+
+/** True when `line` is the line numbered `value`: that number alone, or after the line's text. */
+function numbered(line: string, value: number): boolean {
+  const number = String(value);
+  return line === number || (line.length > number.length && line.endsWith(number));
+}
+
+/**
+ * The numbers glued to a line's end, longest first: its last 4 to 1 digits, after text with no
+ * space. "Abstract32" may be line 32 or line 2: the longest that counts on is taken.
+ */
+function gluedNumbers(line: string): number[] {
+  const digits = GLUED_DIGITS.exec(line)?.[1] ?? "";
+  const longest = Math.min(4, digits.length);
+  return Array.from({ length: longest }, (_, index) => Number(digits.slice(index - longest)));
 }
 
 /** The text with its last reference list replaced by a marker, or unchanged without one. */

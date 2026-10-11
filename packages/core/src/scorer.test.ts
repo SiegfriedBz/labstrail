@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { CHECKS, type CheckId, checklistOf, STUDY_TYPES } from "./checklists.ts";
-import { type PaperText, quoteFound, quoteTextOf } from "./paper-text.ts";
+import { AEROSOL_PAGES } from "./fixtures/aerosol-pages.ts";
+import { CITICOLINE_PAGES } from "./fixtures/citicoline-pages.ts";
+import { type PaperText, preparePaperText, quoteFound, quoteTextOf } from "./paper-text.ts";
 import {
   CHECK_ANSWERS,
   checklistScore,
@@ -468,15 +470,15 @@ const QUOTES = [
 
 /**
  * The fingerprint of each released prompt version: its prompt (system, which lists every
- * checklist, and user), the scores a fixed set of answers gets, and which of fixed quotes are
- * found. A version is released once it is merged into `develop`; never change a released one.
+ * checklist, and user), the scores a fixed set of answers gets, which of fixed quotes are found,
+ * and the text two real papers' pages are prepared into, one cut to fit. A version is released once it is merged into `develop`; never change a released one.
  * When this test fails, raise SCORER_PROMPT_VERSION and add the new version's fingerprint (an
  * unreleased version's may be updated).
  */
-const RELEASED: Readonly<Record<string, string>> = { "2": "112e1f57" };
+const RELEASED: Readonly<Record<string, string>> = { "2": "72754c07" };
 
 describe("SCORER_PROMPT_VERSION", () => {
-  it("changes whenever the prompt, a checklist, the scoring or quote matching changes", () => {
+  it("changes whenever the prompt, a checklist, the scoring, quote matching or the text changes", () => {
     const paper: PaperText = {
       text: "The methods are described in full detail here.",
       shortened: false,
@@ -501,9 +503,15 @@ describe("SCORER_PROMPT_VERSION", () => {
     const quotes = quoteTextOf(QUOTE_TEXT);
     const found = QUOTES.map((quote) => (quoteFound(quotes, quote) ? 1 : 0));
 
+    const texts = [
+      preparePaperText(AEROSOL_PAGES, 150_000),
+      preparePaperText(CITICOLINE_PAGES, 3_000),
+    ];
+    const prepared = texts.map((text) => (text.ok ? text.paper.text : text.reason));
+
     expect(found).toEqual([1, 0, 1, 1, 0, 1, 0, 0, 0]);
-    expect(fingerprint(`${system}\n${user}\n${scores.join(",")}\n${found.join("")}`)).toBe(
-      RELEASED[SCORER_PROMPT_VERSION],
-    );
+    expect(
+      fingerprint([system, user, scores.join(","), found.join(""), ...prepared].join("\n")),
+    ).toBe(RELEASED[SCORER_PROMPT_VERSION]);
   });
 });
