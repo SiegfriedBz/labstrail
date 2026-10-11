@@ -28,7 +28,7 @@ points the optional `@x402/*` packages, reached through wagmi's connectors, at
 | `/papers?page=<n>` | Every paper this environment published, newest mint first, 20 to a page (below) |
 | `/papers/<cid>?event=<id>` | Where a paper stands, then its record, abstract and how to verify it (below), under "Papers / <title>" breadcrumbs. `?already=1` says a re-submitted PDF was already published |
 | `/api/papers/<cid>?event=<id>` | The same as JSON (`PaperView`: the stage, and the record once published), never cached: a read, so a route rather than a server action |
-| `/api/inngest` | Serves the Inngest functions |
+| `/api/inngest` | Serves the Inngest functions: the publish function, plus the rating and oracle functions where the oracle key is set |
 | any other path | `app/not-found.tsx`; a page that fails to render shows `app/error.tsx` with a retry |
 
 The publish form calls two server actions (`app/actions.ts`): `requestUpload()` signs a
@@ -226,7 +226,10 @@ The pages also need the workflows' settings (DKG, Pinata, chain, Inngest;
 [`packages/workflows`](../../packages/workflows/README.md#environment)). With
 `APP_ENV=local`, `/api/inngest` and the upload page talk to the Inngest dev server.
 `instrumentation.ts` checks the workflows' and the web app's settings when a deployed server
-starts, so a bad one stops it there. It checks nothing when `APP_ENV` is `local`, and does
+starts, so a bad one stops it there; it checks the rating settings too in production, which
+refuses to start without its oracle key, and on staging when the key is set
+([`packages/workflows`](../../packages/workflows/README.md#environment),
+[ADR 0019](../../docs/adr/0019-oracle-transactions-are-serialized.md)). It checks nothing when `APP_ENV` is `local`, and does
 not run during `next build`. On Vercel, a server starts on a request after the deploy is
 live, so a missing setting makes every route fail: set them in each Vercel environment
 before its first deploy, and allow each deployed domain in the Reown project.

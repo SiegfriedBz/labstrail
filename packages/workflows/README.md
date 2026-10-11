@@ -4,12 +4,15 @@ Inngest workflows that combine `core` logic with the `dkg` and `contracts` adapt
 `apps/web` only serves them ([ADR 0003](../../docs/adr/0003-inngest-functions-live-in-workflows.md)).
 
 Status: the publish run, which turns a pinned PDF into a minted Target KA, the calls the
-upload page makes to start and follow it, and the papers list's read.
+upload page makes to start and follow it, and the papers list's read; the rating run, which
+scores a requested paper and has the oracle record it, and the oracle function. Locally a
+dev script starts the rating run; on staging, the Alchemy webhook will (next plan).
 
 ## Depends on
 
 `@verisci/core`, `@verisci/env`, `@verisci/dkg`, `@verisci/contracts`; Inngest, viem
-(signature checks) and Zod.
+(signature checks, the rating contract, the oracle's transactions) and Zod. The scorer calls
+the Gemini API over `fetch`, with no SDK.
 
 ## Environment
 
@@ -25,10 +28,23 @@ server (`APP_ENV` other than `local`) checks them when it starts, through
 | --- | --- |
 | `GROBID_URL` | GROBID's base URL: `http://127.0.0.1:8070` locally ([`docs/node-host.md`](../../docs/node-host.md) → GROBID) |
 | `PINATA_GATEWAY_URL` | The Pinata account's dedicated gateway, `https://<name>.mypinata.cloud`; one account serves every environment ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)) |
-| `CHAIN_RPC_URL` | A Base Sepolia RPC URL, to check smart-contract wallets' signatures |
+| `CHAIN_RPC_URL` | A Base Sepolia RPC URL, to check smart-contract wallets' signatures and, on staging and production, to read and write the rating contract |
 | `PINATA_JWT` | A Pinata API key (JWT) allowed to upload, list and delete files; the `publish-pdf` dev script reads it too. Secret |
 | `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY` | Inngest's keys, required unless `APP_ENV` is `local`: the SDK reads them itself, and the signing key also reads runs for the upload page. Secret |
 | `VERCEL_GIT_COMMIT_REF` | Set by Vercel: on staging, the branch, which names the Inngest branch environment runs are read from |
+
+The rating functions read four more, declared in `src/rating/rating-env.ts`
+(`createRatingEnv`) and validated with the settings above in one pass, so one `EnvError`
+names every bad variable. A deployment serves the rating and oracle functions only when
+`ORACLE_PRIVATE_KEY` is set (`servesRating`); a deployed server checks these at start in
+production, which refuses to start without the key, and on staging when the key is set
+([ADR 0019](../../docs/adr/0019-oracle-transactions-are-serialized.md)).
+
+| Variable | Value |
+| --- | --- |
+| `ORACLE_PRIVATE_KEY` | The oracle's key, `0x` and 64 hex: on Vercel only `develop` (staging's, scoped to that branch) and production hold one; locally, Anvil's second default account's key. Secret |
+| `GEMINI_API_KEY` | A Gemini API key from Google AI Studio, for the scorer ([ADR 0018](../../docs/adr/0018-phase-1-scorer-output-contract.md)). Secret |
+| `LOCAL_CHAIN_RPC_URL`, `LOCAL_RATING_CONTRACT` | Required only when `APP_ENV=local`: Anvil's URL (`http://127.0.0.1:8545`) and the RatingController deployed there ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)). Elsewhere the contracts come from the committed deployments file, current and past ([ADR 0028](../../docs/adr/0028-deployed-addresses-are-committed.md)) |
 
 `DKG_CONTEXT_GRAPH` must spell its address in EIP-55 checksum case, as the node lists it
 (`@verisci/dkg`'s rule): a query with the address in another case reads another, empty
@@ -43,8 +59,14 @@ upload page reads runs there, with no keys.
 | --- | --- |
 | `workflowsName` | The package name, imported by the web app's package test |
 | `inngest` | VeriSci's Inngest client, in dev mode when `APP_ENV` is `local` |
-| `functions` | Every Inngest function, for `web`'s `/api/inngest` route |
+| `functions`, `servedFunctions(runtimeEnv)` | The Inngest functions this deployment serves, for `web`'s `/api/inngest` route: the publish function, plus the rating and oracle functions when `ORACLE_PRIVATE_KEY` is set |
 | `publishPaper` | The `publish-paper` function, run by `verisci/paper.submitted` |
+| `ratePaper`, `oracleTransaction` | The `rate-paper` function, run by `verisci/rating.requested`, and the `oracle-transaction` function it invokes (below) |
+| `RATING_REQUESTED`, `RatingRequested`, `ratingRequestedEvent(log)` | The rating event's name, `verisci/rating.requested`, its data `{ contract, requestId }`, and the event for a `Phase1Requested` log (id `rating:<request id>`), or `undefined` for any other log |
+| `RATING_SETTINGS`, `ORACLE_SETTINGS` | The rating run's and the oracle function's limits (below) |
+| `RatingOutcome`, `RatingFailure`, `ratingFailureReason(output)` | How a rating run ends (`fulfilled`, `cancelled` with an optional orphan R-KA, `skipped`, `waiting`), and why one stopped instead: each error it throws starts `rating-failed:<reason>:` |
+| `OracleAction`, `OracleInput`, `OracleResult`, `OracleFailure` | What the oracle function is asked, what it answers, and why it stops (`oracle-failed:<reason>:`) |
+| `createRatingEnv(runtimeEnv)`, `RatingEnv`, `checkRatingSettings(runtimeEnv)`, `ratingSettingsRequired(runtimeEnv)`, `servesRating(runtimeEnv)` | The rating settings and their type, the start check `apps/web/instrumentation.ts` runs, when it requires them, and whether a deployment serves the rating functions |
 | `PAPER_SUBMITTED` | The event's name, `verisci/paper.submitted` |
 | `PUBLISH_SETTINGS` | The publish run's limits (below) |
 | `PublishOutcome`, `PaperRefusal`, `SubmissionRefusal` | How a run ends: `minted` with its UAL, or `refused` with why |
@@ -96,6 +118,90 @@ Retries ([ADR 0009](../../docs/adr/0009-retries-are-spaced-with-step-sleep.md)):
 - It fails at once when its settings are missing or invalid, when the node or GROBID refuses
   our credential, or when the node does not serve the graph. A run that fails is recovered
   by publishing the same PDF again.
+
+## Rating a paper
+
+`verisci/rating.requested` carries `{ contract, requestId }`: a RatingController's lowercase
+address and a phase-1 request id. The `rate-paper` run is a singleton per request id in mode
+`skip` ([ADR 0020](../../docs/adr/0020-stuck-requests-recovered-only-oracle-cancels.md)),
+has 45 minutes, and outside `APP_ENV=local` is throttled to 3 starts an hour with a burst of
+3, against Inngest's free plan
+([ADR 0015](../../docs/adr/0015-rating-requests-are-free-on-testnet.md)). It does only what
+is left ([ADR 0007](../../docs/adr/0007-all-writes-converge.md)):
+
+1. **Which requests:** the contract must be one of the environment's, current or past
+   ([ADR 0023](../../docs/adr/0023-a-fix-is-a-redeploy-owner-powers-fixed.md)), or locally
+   `LOCAL_RATING_CONTRACT`. **read-request** reads the request and the contract's oracle; a
+   request no longer pending, or a contract whose oracle is not this deployment's key, ends
+   the run before anything is spent.
+2. **The target:** a UAL that does not parse, is not canonical or names another chain than
+   Base Sepolia is cancelled `invalid-target`
+   ([ADR 0031](../../docs/adr/0031-uals-are-normalized-before-the-contract.md)). One another
+   node minted ends the run `waiting`: its context graph is unknown (an open question), so
+   the request waits for its maximum age.
+3. **read-rka:** the R-KA `verisci-rka-<request id>`. Minted goes to the read-back. Stored is
+   minted at once, with no wait for a mint an earlier run may have started
+   ([ADR 0008](../../docs/adr/0008-mints-are-async-polled-in-short-steps.md)). A draft is
+   shared, then minted. Missing: **read-target** reads up to 200 of the target's triples
+   from its own asset graph, **score** asks Gemini once, and **store** writes the R-KA
+   (`packages/core` → Ratings). A score that came back is kept for every later attempt.
+4. **mint**, then **poll** every 30 s; a mint not seen after 10 minutes is started again.
+5. **read-score** reads the score back from the minted R-KA, and the oracle function fulfils
+   with it, so the score on chain equals the R-KA's
+   ([ADR 0018](../../docs/adr/0018-phase-1-scorer-output-contract.md)).
+
+Past the maximum age (24 hours after the request's block), a minted R-KA is still fulfilled;
+a stored one is polled for 10 minutes without a new mint, and is fulfilled if it lands;
+anything else is cancelled `expired`. A stored R-KA left behind, or one minted for a request
+cancelled meanwhile, is an orphan: the outcome names it, and the run logs it as an error.
+
+Retries ([ADR 0009](../../docs/adr/0009-retries-are-spaced-with-step-sleep.md)): a chain
+that does not answer is read again every 2 minutes, up to 5 times. A target with no triples,
+a node that does not answer or gives no rows yet, a quorum failure, or a scorer that is
+unreachable, rate-limited or gives an answer the output check refuses waits 2 minutes and
+starts a new attempt from the R-KA's read, up to 5 attempts, then fails
+(`target-unreadable`, `node-unreachable`, `scorer-unavailable`; `mint-not-confirmed` when the
+mint is never seen). It fails at once (`setup`) on missing or invalid settings, a node or
+Gemini that refuses our key, or a node that does not serve the graph, and
+(`rating-unreadable`) on a minted R-KA whose score does not parse. A failed run leaves the
+request pending; the reconciler of the next plan restarts it.
+
+The scorer sends the prompt from `packages/core` (`scorerPrompt`), temperature 0 and the
+output's JSON Schema to `gemini-3.8-flash`, and checks the answer again with
+`parseScorerOutput`. A 429 is `rate-limited`; a 400, 401 or 403 (Gemini answers a bad key
+with 400) is `unauthorized`; a 5xx, a network error or 60 s without an answer is
+`unreachable`; no candidate, a blocked answer or text the check refuses is
+`invalid-output`. No result carries the key.
+
+## The oracle function
+
+`oracle-transaction` sends every fulfil and cancel the backend sends
+([ADR 0019](../../docs/adr/0019-oracle-transactions-are-serialized.md)). Rating runs invoke it
+with `step.invoke`; no event starts it. It runs one step at a time (concurrency 1) and has 30
+minutes.
+
+- **send:** reads the account's latest and pending nonces. A pending nonce above the latest
+  is a transaction in flight: it sends nothing and checks again every 15 s. Otherwise it reads
+  the request and the contract's oracle and decides: a request already settled sends nothing
+  (fulfilled with the same R-KA, or cancelled, is an answer; fulfilled with another R-KA fails
+  `oracle-conflict`). Then it sends at the latest nonce, with the chain's fee estimate capped
+  at 10 gwei.
+- **receipt:** every 5 s, in steps of its own. A successful receipt settles it. A reverted one,
+  or a nonce another transaction took, reads the request again. Unmined after 60 s, the same
+  call goes out at the same nonce with both fees raised by 15%; a raise past the cap is not
+  sent, and is logged once as `oracle-at-fee-cap`.
+- A send refused as nonce too low, already known or underpriced counts as a transaction in
+  flight. One that holds the nonce for 10 minutes is replaced by a zero-value transfer to the
+  oracle's own address, priced one raise above the cap. An oracle that cannot pay its gas is
+  logged as `oracle-no-funds`.
+- Nothing settled within 25 minutes fails `oracle-stuck`. Inngest's concurrency counts
+  executing steps, not sleeping runs, so the pending-nonce check, not the limit, keeps one
+  transaction in flight at a time.
+
+Its answer is `fulfilled` (with the score and R-KA the chain holds), `cancelled` (with the
+chain's reason), `not-our-oracle`, or `unknown` (the contract no longer knows the request).
+Errors logged with a fixed tag (`oracle-at-fee-cap`, `oracle-conflict`, `oracle-no-funds`,
+`rating-orphan`) wait for alerts, which come with the next plan.
 
 ## The pages' calls
 
@@ -164,6 +270,30 @@ papers list:
 5. Or publish through the page: open http://localhost:3000/publish with `REOWN_PROJECT_ID`
    set ([`apps/web`](../../apps/web/README.md#environment)).
 
+## Running a rating locally
+
+The rating functions run only against a contract whose oracle key you hold: locally, a
+RatingController on Anvil ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)).
+R-KAs still go to the staging graph.
+
+1. Start the RPC proxy and the DKG node ([`docs/node-host.md`](../../docs/node-host.md)), and
+   `anvil` in a terminal of its own.
+2. Deploy the contract on Anvil
+   ([`packages/contracts` → Deploying on Anvil](../contracts/README.md#deploying-on-anvil)).
+3. In the root `.env.local`, set `ORACLE_PRIVATE_KEY` to the key of Anvil's second account,
+   `GEMINI_API_KEY`, `LOCAL_CHAIN_RPC_URL=http://127.0.0.1:8545` and `LOCAL_RATING_CONTRACT`
+   ([`.env.example`](../../.env.example)), with the DKG and publish settings.
+4. `pnpm dev`, then, in another terminal, `pnpm --filter @verisci/web inngest`.
+5. `pnpm --filter @verisci/workflows rate-paper <target UAL>` requests a rating of a paper
+   from the staging graph, from a throwaway requester it funds on Anvil, and sends the event.
+   It prints the request id; the run shows in the dev server. `--raw` sends the UAL as typed,
+   to see an invalid one cancelled.
+6. `cast call <contract> "getRatingRequest(bytes32)" <request id> --rpc-url http://127.0.0.1:8545`
+   shows the request, its score and its R-KA once fulfilled.
+
+Restarting Anvil empties it: deploy again (the first deploy on a fresh chain gets the same
+address). Every request comes from a new requester, so request ids never repeat.
+
 ## Scripts
 
 | Command | What it does |
@@ -171,5 +301,6 @@ papers list:
 | `pnpm --filter @verisci/workflows typecheck` | Typechecks the package and its scripts |
 | `pnpm --filter @verisci/workflows test` | Runs its Vitest project (`vitest run`) with mocked adapters |
 | `pnpm --filter @verisci/workflows publish-pdf <file.pdf>` | Dev only: pins a PDF, signs it and sends `verisci/paper.submitted` to the local dev server |
+| `pnpm --filter @verisci/workflows rate-paper <target UAL> [--raw]` | Dev only, `APP_ENV=local`: requests a rating on the Anvil contract from a throwaway requester and sends `verisci/rating.requested` to the local dev server |
 
 Ships TypeScript source (`src/index.ts`, `src/env.ts`), with no build step.

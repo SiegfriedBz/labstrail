@@ -178,6 +178,26 @@ explicitly; when it is missing, `HelperConfig`
 reverts with `UnknownDeployEnv`. Without `--rpc-url`, the script deploys to an
 in-memory chain with the local Anvil configuration.
 
+### Deploying on Anvil
+
+A local rating run needs a contract whose oracle key you hold: a RatingController on a local
+Anvil chain ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)). Nothing is
+recorded in `deployments/`.
+
+```bash
+anvil    # in a terminal of its own; prints its funded accounts and their keys
+forge script script/DeployRatingController.s.sol --rpc-url http://127.0.0.1:8545 \
+  --broadcast --unlocked --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+```
+
+`HelperConfig`'s local config makes Anvil's first account the owner and its second the oracle
+(`ANVIL_ORACLE`), so the two stay apart
+([ADR 0030](../../docs/adr/0030-owner-and-oracle-are-different-addresses.md)). Set
+`LOCAL_RATING_CONTRACT` in the root `.env.local` to the address the script prints, and
+`ORACLE_PRIVATE_KEY` to the second account's key
+([`packages/workflows` → Running a rating locally](../workflows/README.md#running-a-rating-locally)).
+Anvil forgets everything when it stops: deploy again after a restart.
+
 ### How the scripts fit together
 
 - `script/HelperConfig.s.sol` holds the constructor arguments of each

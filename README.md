@@ -22,7 +22,8 @@ CI), and its ADRs and domain facts record what the prototype taught us. The firs
 user-facing feature is the upload page: connect a wallet, publish a PDF, follow it until it
 is minted, then verify its record (signature, token, UAL, CID) from the paper's page. Every
 published paper is listed at `/papers`, newest first, read a page at a time from the DKG.
-Rating comes next. The repo, its packages and the EIP-712 domain keep the lowercase name `verisci`.
+The rating run is built and runs locally against a contract on Anvil; what starts it on
+staging, and the rating pages, come next. The repo, its packages and the EIP-712 domain keep the lowercase name `verisci`.
 Everything runs on testnets.
 
 ## How it works
@@ -41,13 +42,17 @@ Built:
   oracle wallets and limit stores (production's graph and store come with its first app
   deployment); the DKG node, the Reown project and the pinning account are shared
   ([ADR 0005](docs/adr/0005-staging-and-production-are-isolated.md)).
-
-Next (the contracts are deployed; the rating runs are not built yet):
-
-- **Anyone requests a rating on chain.** VeriSci scores the paper, our DKG node
-  publishes the rating as its own Rating KA (R-KA), and the oracle records the
+- **A requested paper is rated.** A rating run scores the paper once with an LLM, our
+  DKG node publishes the rating as its own Rating KA (R-KA), and the oracle records the
   score on the contract ([ADR 0011](docs/adr/0011-a-rating-is-a-separate-r-ka.md),
-  [ADR 0014](docs/adr/0014-contract-owns-scores-dkg-owns-content.md)).
+  [ADR 0014](docs/adr/0014-contract-owns-scores-dkg-owns-content.md),
+  [ADR 0018](docs/adr/0018-phase-1-scorer-output-contract.md)). Locally, it runs
+  against a contract on Anvil ([ADR 0036](docs/adr/0036-local-rating-runs-use-anvil.md)).
+
+Next (the contracts and the rating run are built; nothing starts a run on staging yet):
+
+- **Anyone requests a rating on chain**, and an Alchemy webhook turns the request into a
+  rating run ([ADR 0017](docs/adr/0017-chain-events-are-ingested-at-least-once.md)).
 - **A cron job restarts stuck rating requests**, from the contract's own list of
   pending requests, and that request's run finishes or cancels it
   ([ADR 0020](docs/adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
@@ -92,8 +97,9 @@ also shows how the parts connect: on a server, Caddy is the only public entry.
 Each environment also has its own oracle wallet, Alchemy webhook, Inngest
 environment and Upstash store. Only `develop` holds staging's oracle key and runs
 its ratings; previews and local development share staging's contract and graph, and a
-developer running the rating functions locally uses their own contract and
-oracle key ([ADR 0019](docs/adr/0019-oracle-transactions-are-serialized.md)).
+developer running the rating functions locally uses a contract on a local Anvil chain and
+its oracle key ([ADR 0019](docs/adr/0019-oracle-transactions-are-serialized.md),
+[ADR 0036](docs/adr/0036-local-rating-runs-use-anvil.md)).
 
 ```mermaid
 flowchart TB
@@ -102,7 +108,7 @@ flowchart TB
     sa["App server<br/>upload page, Upstash limits"]
     sp["Publish runs<br/>Inngest environment"]
     sc["RatingController (staging)<br/>Base Sepolia<br/>+ past contracts, paused"]
-    sr["Rating runs (next)<br/>oracle wallet, Alchemy webhook,<br/>same Inngest environment"]
+    sr["Rating runs<br/>oracle wallet, Alchemy webhook (next),<br/>same Inngest environment"]
     sg["Staging graph<br/>on the shared DKG node host"]
     sa -->|"paper.submitted"| sp -->|"stores and mints Target KAs"| sg
     sc --> sr -->|"stores and mints R-KAs"| sg
@@ -112,7 +118,7 @@ flowchart TB
     pa["App server<br/>upload page, Upstash limits"]
     pp["Publish runs<br/>Inngest environment"]
     pc["RatingController (production)<br/>Base Sepolia<br/>+ past contracts, paused"]
-    pr["Rating runs (next)<br/>oracle wallet, Alchemy webhook,<br/>same Inngest environment"]
+    pr["Rating runs<br/>oracle wallet, Alchemy webhook (next),<br/>same Inngest environment"]
     pg["Production graph<br/>on the shared DKG node host"]
     pa -->|"paper.submitted"| pp -->|"stores and mints Target KAs"| pg
     pc --> pr -->|"stores and mints R-KAs"| pg
@@ -178,26 +184,24 @@ sequenceDiagram
   C-->>W: Phase1Requested(requestId, …) via Alchemy
   W->>R: event keyed on requestId
   R->>C: read the request and the contract's oracle
-  Note over R: Stop if settled, or if the oracle is not this deployment's key.
+  Note over R: Stop if settled, or if the oracle is not this deployment's key.<br/>A target another node minted waits: its graph is unknown.
   R->>R: R-KA name from requestId
   R->>N: read R-KA state by name
   alt invalid target, or past the maximum age without a minted R-KA
     R->>O: cancel(requestId, reason)
     O->>C: cancelRequest(requestId, reason)
-  else missing
-    R->>R: score the target
-    R->>N: store R-KA, then mint and poll until minted
+  else otherwise
+    opt nothing stored
+      R->>N: read the target's triples
+      R->>R: score them once (Gemini)
+      R->>N: store the R-KA
+    end
+    opt not minted yet (a draft is shared first)
+      R->>N: mint and poll until minted
+    end
+    R->>N: read the score back from the minted R-KA
     R->>O: fulfil(requestId, score, rKaUal)
-    O->>C: fulfilPhase1(requestId, score, rKaUal)
-  else stored
-    R->>N: read the stored score back
-    R->>N: mint and poll until minted
-    R->>O: fulfil(requestId, score, rKaUal)
-    O->>C: fulfilPhase1(requestId, score, rKaUal)
-  else minted
-    R->>N: read the score back from the R-KA
-    R->>O: fulfil(requestId, score, rKaUal)
-    O->>C: fulfilPhase1(requestId, score, rKaUal)
+    O->>C: fulfilPhase1(requestId, score, rKaUal), then check the receipt
   end
   Note over C,O: The oracle function re-reads the request and sends nothing if it is already settled.
   Note over C,R: A cron reconciler pages through pendingRequestIds(offset, limit)<br/>on every contract of the environment, past ones included,<br/>and restarts the run of any stuck request.
@@ -212,8 +216,11 @@ that finds an R-KA stored by an earlier run mints it at once: a KA cannot be
 minted twice
 ([ADR 0008](docs/adr/0008-mints-are-async-polled-in-short-steps.md)). Every
 fulfil and cancel goes through the one serialized oracle function, which reads
-the request again and sends nothing if it is already settled
-([ADR 0019](docs/adr/0019-oracle-transactions-are-serialized.md)); a target UAL
+the request again and sends nothing if it is already settled, then checks the receipt in
+later steps and raises the fees of a transaction stuck unmined
+([ADR 0019](docs/adr/0019-oracle-transactions-are-serialized.md)). The score the oracle
+records is always the one read back from the minted R-KA
+([ADR 0018](docs/adr/0018-phase-1-scorer-output-contract.md)); a target UAL
 that is invalid or not in canonical form is cancelled
 ([ADR 0031](docs/adr/0031-uals-are-normalized-before-the-contract.md)). The
 contract's calls and events are documented in the
@@ -261,7 +268,9 @@ pnpm dev         # starts apps/web on http://localhost:3000
 To publish a PDF locally (the RPC proxy, the DKG node, GROBID and the Inngest dev server),
 follow [`packages/workflows` → Running a publish locally](packages/workflows/README.md#running-a-publish-locally),
 then open http://localhost:3000/publish (it needs the workflows' settings and
-`REOWN_PROJECT_ID`; see [`apps/web`](apps/web/README.md#environment)).
+`REOWN_PROJECT_ID`; see [`apps/web`](apps/web/README.md#environment)). To rate a paper
+locally, against a contract on Anvil, follow
+[`packages/workflows` → Running a rating locally](packages/workflows/README.md#running-a-rating-locally).
 
 Environment variables are listed in [`.env.example`](.env.example): copy it to
 `.env.local` at the repo root (gitignored), where `apps/web` loads it from.
