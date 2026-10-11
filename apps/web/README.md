@@ -160,19 +160,23 @@ A lab instrument with a web3 edge, in Tailwind CSS v4 (`app/globals.css`):
 - Two themes: light by default, dark once the visitor picks it with the sun and moon button
   in the header; the choice is kept in this browser (`localStorage`). `THEME_SCRIPT`
   (`lib/theme.ts`) sets `<html data-theme>` in `<head>` before the first paint, so no page
-  flashes the other theme; AppKit's wallet window follows the same theme. Every colour is a
-  token defined for both themes: light accents are dark enough for AA text contrast, and
-  dark is a dimmed graphite with solid panels one step lighter than the page.
+  flashes the other theme, and Tailwind's `dark:` variant follows that attribute. The
+  button's name is the same in both themes and CSS picks its icon, so it is right before
+  JavaScript runs. AppKit's wallet window follows the same theme. Every colour is a token
+  defined for both themes: light accents are dark enough for AA text contrast, and dark is
+  a dimmed graphite with solid panels one step lighter than the page.
 - An off-white page (graphite in dark), a soft wash across the top of each page (emerald
-  from the top left, cyan from the top right, no pattern), one soft glow behind the hero. Raised panels with hairline borders only where a figure or a tool needs one (the hero's publish
-  chain, the UAL figure, the example asset, the paper's verify panel, the publish form);
-  elsewhere, coloured edges, timelines and hairline rules group the content, with one call
-  to action per page.
+  from the top left, cyan from the top right), one soft glow behind the hero. Raised panels
+  with hairline borders hold figures, tools, tables and lists: the hero's publish flow, the
+  UAL figure, the example asset, the papers table and its messages, the paper page's verify
+  and publish panels, the publish form and the footer's contracts. Elsewhere, coloured
+  edges, timelines and hairline rules group the content, with one call to action per page.
 - Two signal colours with one meaning each: emerald for the off-chain record, cyan for the
   on-chain asset. They blend only on the main action, live lines, and the line linking a
   save to its mint in the publish chain. Text links are ink with an emerald underline
-  (`link`); on-chain values are muted and turn cyan on hover. The header's wallet button
-  is neutral, so each page's own call to action leads.
+  (`link`); addresses in the papers list and the footer's contract links are muted and
+  turn cyan on hover. The header's wallet button is neutral, so each page's own call to
+  action leads.
 - Sora for text, Martian Mono for on-chain values (`next/font`), Phosphor icons. One radius
   scale: `rounded-2xl` panels, `rounded-xl` buttons and inputs, `rounded-lg` small
   controls, `rounded-md` flags.
@@ -180,20 +184,21 @@ A lab instrument with a web3 edge, in Tailwind CSS v4 (`app/globals.css`):
   steps run, and its UAL comes out once minted (`components/home/chain-demo.tsx`). The
   example is a real staging record whose signature checks out, the same as the example
   asset lower on the page. Beside "Publish a paper", a "Browse papers" link.
-- Motion: the hero's publish flow loops and the step being worked on breathes; the home sections after the hero rise in as they enter the screen (`reveal`, a
-  CSS scroll-driven animation, where the browser supports one). All of it stops for
-  visitors who ask for reduced motion.
+- Motion: the hero's publish flow loops and the step being worked on breathes; the home
+  sections after the hero rise in as they enter the screen (`reveal`, a CSS scroll-driven
+  animation, where the browser supports one). All of it stops for visitors who ask for
+  reduced motion.
 - Every page works from 360 px wide, one column on phones, and the page clips any overflow
   (`overflow-x: clip`, which keeps the sticky header working). The home hero fills the
-  first screen, so the next section starts below the fold; below `md`, the hero's text fills
-  the first screen and its panel starts just under the fold. On a paper's page, the paper's column stays in view
-  while the verify panel scrolls. On-chain values show in short form with a copy button.
+  first screen, so the next section starts below the fold; below `md`, the hero's text
+  fills the first screen and its panel starts just under the fold. On-chain values show in
+  short form with a copy button.
 - The product name is VeriSci; its mark (`components/site/logo.tsx`, and `app/icon.svg` for the
   tab) is a check drawn as three linked graph nodes.
 - Keyboard users get a skip link and one accent focus ring; the header underlines the
   current page's link in emerald. On phones the wallet button is a wallet icon (with a dot
-  once connected) beside the theme button, so the header keeps one line; AppKit's own
-  window opens from it.
+  once connected) beside the theme button, so the header keeps one line; once connected it
+  is named by the short address it shows, and AppKit's own window opens from it.
 - What the DKG node answers loads behind a skeleton shaped like what replaces it, streamed
   in a `Suspense` boundary; what is known already (labels, the CID) shows at once.
 - The footer (`components/site/site-footer.tsx`) lists the contracts on Base Sepolia, linked on

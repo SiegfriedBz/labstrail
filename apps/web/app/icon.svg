@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <title>VeriSci</title>
-  <!-- VeriSci's mark, as components/site/logo.tsx draws it, with the theme's colours written out. -->
+  <!-- VeriSci's mark, as components/site/logo.tsx draws it, in fixed colours (emerald and cyan on a near-black tile) that read on light and dark browser tabs. -->
   <defs>
     <linearGradient id="g" x1="6" y1="24" x2="26" y2="8" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#43d095"/>

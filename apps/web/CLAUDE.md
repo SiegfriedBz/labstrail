@@ -27,11 +27,12 @@ Next.js 16 App Router app. See `README.md` here for scripts and status.
 - Styling is Tailwind v4 with the tokens and classes in `app/globals.css` (`glass`,
   `signal-gradient`, `link`, `text-muted`, `text-accent`…): light (the default) and dark
   themes, so every colour is a token defined for both (`<html data-theme>`), never a raw
-  colour; emerald for off-chain and cyan for on-chain (nothing else: text links take
-  `link`); `rounded-2xl` panels, `rounded-xl` buttons and inputs, `rounded-lg` small
-  controls, `rounded-md` flags. Check every page in both themes at 360, 768 and 1280 px
-  with no horizontal scroll. Page copy follows the `design-taste-frontend` and humanizer
-  skills: plain words, no em dashes.
+  colour; emerald marks off-chain records and cyan on-chain assets, and emerald also marks
+  the site's own cues (the main action, a `link` underline, the current page, the wallet
+  button's hover) and nothing else; `rounded-2xl` panels, `rounded-xl` buttons and inputs,
+  `rounded-lg` small controls, `rounded-md` flags. Check every page in both themes at 360,
+  768 and 1280 px with no horizontal scroll. Page copy follows the `design-taste-frontend`
+  and humanizer skills: plain words, no em dashes.
 - Wallet hooks (wagmi, AppKit) run only under `Providers` with a project id: render them
   behind `useWalletReady()`. Never pass server-only values to a client component except as
   plain props; client components never import `@verisci/workflows` at runtime (types only).
