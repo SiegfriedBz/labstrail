@@ -30,6 +30,24 @@ export {
   type QueryBinding,
 } from "./paper-record.ts";
 export {
+  classifyTarget,
+  PHASE1_SIGNALS,
+  type Phase1Signal,
+  parseRating,
+  parseScorerOutput,
+  type RatingContent,
+  type RatingRecord,
+  ratingQuery,
+  rKaQuads,
+  SCORER_OUTPUT_SCHEMA,
+  SCORER_PROMPT_VERSION,
+  type ScorerOutput,
+  scorerPrompt,
+  type TargetClass,
+  targetTriplesQuery,
+  triplesFromBindings,
+} from "./rating.ts";
+export {
   canonicalContextGraph,
   SUBMISSION_DOMAIN,
   type SubmissionMessage,
