@@ -1,0 +1,1 @@
+Step read-paper-<n>: fetches the PDF through the gateway and extracts its text with unpdf (workflows/src/pdf/), prepared and cut to 150,000 characters. A scan with no text or a file over 15 MB cancels invalid-target; a file that does not read as a PDF is read again and cancels after 3 bad reads; a gateway that does not answer is retried (paper-unreachable).

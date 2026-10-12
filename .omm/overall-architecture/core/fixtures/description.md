@@ -1,0 +1,1 @@
+packages/core/src/fixtures/: test data as TypeScript modules, since core reads no files: GROBID's TEI for arXiv 1706.03762, the pages unpdf extracts from two open-access papers (one line-numbered medRxiv preprint), and SPARQL rows of the papers list.

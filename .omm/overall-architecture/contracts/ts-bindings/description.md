@@ -1,0 +1,1 @@
+The package's TypeScript side (src/index.ts, rating-controller.ts, deployments.ts, committed-deployments.ts, generated/): the ABI generated from the contract (CI checks it matches), typed reads of a request, and each environment's deployed addresses, current and past, from the committed deployments file (ADR 0028), so the oracle still serves a paused past contract.

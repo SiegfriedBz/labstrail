@@ -1,0 +1,14 @@
+graph LR
+    read-request["Read Request\nstep read-request"] -->|"pending, our oracle"| find-target["Find Target\nstep find-target"]
+    find-target -->|"a paper verisci published"| read-rka["Read R-KA\nstep read-rka-n"]
+    find-target -->|"anything else"| cancel["Cancel\noracle cancel"]
+    read-rka -->|"missing"| find-pdf["Find PDF\nstep find-pdf-n"]
+    find-pdf -->|"ipfs:// CID"| read-text["Read Text\nstep read-paper-n"]
+    read-text -->|"the paper's text"| score-paper["Score Paper\nstep score-paper-n"]
+    score-paper -->|"score, study type, checks"| store-mint["Store and Mint\nsteps store-n, mint-n, poll-n-k"]
+    read-rka -->|"stored or draft"| store-mint
+    store-mint -->|"minted R-KA"| read-score["Read Score\nstep read-score-n"]
+    read-rka -->|"minted"| read-score
+    read-score -->|"score from the R-KA"| fulfil["Fulfil\noracle fulfil"]
+    score-paper -->|"outside the field"| cancel
+    read-text -->|"no text, too large, 3 bad reads"| cancel

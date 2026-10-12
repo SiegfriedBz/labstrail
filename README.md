@@ -84,6 +84,12 @@ Terms:
 
 The diagrams below show the target design; the workspaces build it plan by plan.
 
+Generated architecture views (overall architecture, the publish and rating pipelines, external
+integrations, state machines, routes) are in [`.omm/`](.omm/): a snapshot of 2026-10-12 at
+commit `dff0db5`, made with [oh-my-mermaid](https://github.com/oh-my-mermaid/oh-my-mermaid).
+`omm view --port 4000` shows them in a browser; the `omm-scan` skill refreshes them. The code
+and the READMEs stay the reference.
+
 ### Environments and resources
 
 Each environment has its own context graph on the shared DKG node

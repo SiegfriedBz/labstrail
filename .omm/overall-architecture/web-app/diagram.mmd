@@ -1,0 +1,6 @@
+graph LR
+    app["App Routes\napps/web/app/"] -->|"render, with flow logic from"| lib["Lib\napps/web/lib/"]
+    app -->|"compose pages from"| components["Components\napps/web/components/"]
+    components -->|"call pure helpers and messages in"| lib
+    classDef entry fill:#89b4fa,stroke:#89b4fa,color:#1e1e2e
+    class app entry

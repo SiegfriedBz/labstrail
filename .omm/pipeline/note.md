@@ -1,0 +1,1 @@
+Step ids carry the attempt number (read-paper-1, score-paper-2) and change when a step's result changes shape, so a run already going never reads an old result as a new one. Failures end with publish-failed:<reason> or rating-failed:<reason>, which the site reads.

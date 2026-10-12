@@ -1,0 +1,1 @@
+packages/core/src/publish/: submission.ts (the EIP-712 domain and typed data a submitter signs, the canonical context graph, and MAX_PDF_BYTES, 15 MB), tei.ts (parseTeiHeader: title, authors, abstract and DOI from GROBID's TEI header) and target-ka.ts (targetKaQuads: the Target KA's schema.org triples plus the submitter, signature and deadline under urn:verisci:).

@@ -1,0 +1,1 @@
+Where a Knowledge Asset stands on the DKG node, as packages/dkg's readAsset answers for a name in a graph. Both runs start each attempt by reading it and do only what is left (ADR 0007); a stored or minted asset keeps its first content, which is why a paper keeps its first submitter (ADR 0010).

@@ -1,0 +1,13 @@
+graph LR
+    home["Home\napp/page.tsx"] -->|"Publish a paper"| publish["Publish\napp/publish/page.tsx"]
+    home -->|"Browse papers"| papers["Papers List\napp/papers/page.tsx"]
+    home -->|"a latest paper's row"| paper["Paper Page\napp/papers/[cid]/page.tsx"]
+    papers -->|"a row"| paper
+    publish -->|"requestUpload, submitPaper"| server-actions["Server Actions\napp/actions.ts"]
+    publish -->|"after submitting, ?event=<id>"| paper
+    paper -->|"polls while publishing"| api-papers["Paper Status\napp/api/papers/[cid]/route.ts"]
+    inngest["Inngest\nexternal"] -->|"calls the served functions"| inngest-route["Inngest Route\napp/api/inngest/route.ts"]
+    classDef entry fill:#89b4fa,stroke:#89b4fa,color:#1e1e2e
+    classDef external fill:#585b70,stroke:#585b70,color:#cdd6f4
+    class home,inngest-route entry
+    class inngest external

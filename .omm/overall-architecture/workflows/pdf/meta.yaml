@@ -1,0 +1,9 @@
+created: 2026-10-12T05:43:44.741Z
+updated: 2026-10-12T05:43:44.741Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: pdf
+children: []
+parentPath:
+  - workflows

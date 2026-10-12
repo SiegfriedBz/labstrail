@@ -19,7 +19,8 @@ Check, against the diff (`git diff <base>...HEAD`) and the files around it:
 
 **Docs** (each one blocks the PR)
 
-Docs go stale outside the diff, so do not stop at the changed lines:
+Docs go stale outside the diff, so do not stop at the changed lines (`.omm/` is a dated
+snapshot of generated diagrams, refreshed on demand: never report it stale):
 1. List what the diff changes that docs can mention: exports, commands and scripts,
    env variables, file paths, config, and behaviour (what fails, what a page shows).
    Grep each one across every `README.md`, `CLAUDE.md`, `CONTRIBUTING.md`,

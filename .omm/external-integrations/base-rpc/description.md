@@ -1,0 +1,1 @@
+Base Sepolia through CHAIN_RPC_URL, with viem: smart-contract wallet signatures are verified on chain (ERC-1271, ERC-6492), rating requests are read, and the oracle sends its transactions. Locally, rating runs use an Anvil chain instead (LOCAL_CHAIN_RPC_URL, ADR 0036). The DKG node reaches Base through the RPC proxy.

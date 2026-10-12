@@ -1,0 +1,1 @@
+events.ts: ratingRequestedEvent builds verisci/rating.requested from the contract's Phase1Requested log, with the event id rating:<request id>, so Inngest drops a duplicate. The rate-paper dev script uses it today; the webhook route will (ADR 0017).

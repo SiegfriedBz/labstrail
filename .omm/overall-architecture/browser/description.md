@@ -1,0 +1,1 @@
+The researcher's browser: it connects a wallet with Reown AppKit and wagmi on Base Sepolia (ADR 0034), uploads a PDF straight to Pinata with a short-lived signed URL, signs the EIP-712 statement of its CID, and follows the paper's page until it is minted. No session: the signature authorizes each submission.

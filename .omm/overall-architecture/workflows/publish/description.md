@@ -1,0 +1,1 @@
+src/publish/: the publish-paper function (a singleton per CID) that turns a submitted PDF into a Target KA (ADR 0010), and what it uses: the submission check (signature, deadline, graph), GROBID's header parse, the Pinata adapter, and submit-paper (the server-side check before the event is sent). The pipeline perspective shows its steps.

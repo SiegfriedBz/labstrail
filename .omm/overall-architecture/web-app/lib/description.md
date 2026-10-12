@@ -1,0 +1,1 @@
+apps/web/lib/: each flow's logic, pure or with its IO passed in, so unit tests cover it without a browser. Grouped like components: publish/ and papers/; only helpers several areas share sit at the root (web-env, server, theme, shorten, utils, empty-module). lib/layout.test.ts enforces the layout.

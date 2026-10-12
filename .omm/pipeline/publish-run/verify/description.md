@@ -1,0 +1,1 @@
+Step verify: checks the event's EIP-712 signature against the submitter's address, the deadline against when Inngest received the event (so retries during an outage never expire a valid signature), and the context graph. A bad one ends the run refused; an unreachable chain is retried, then fails chain-unreachable.

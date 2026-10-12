@@ -1,0 +1,1 @@
+Nothing in the app stores these states: the DKG node holds the assets' states, the chain the requests', and Inngest the runs' (ADR 0035). Every write reads its state first and treats "already done" as success, so a retry or a second run converges (ADR 0007).

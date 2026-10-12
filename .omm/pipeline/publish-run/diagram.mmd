@@ -1,0 +1,11 @@
+graph LR
+    verify["Verify\nstep verify"] -->|"signature, deadline, graph valid"| read-state["Read State\nstep read-n"]
+    read-state -->|"missing: the paper is read"| read-paper["Read Paper\nstep read-paper-n"]
+    read-state -->|"draft: shared as sealed"| store["Store\nstep store-n"]
+    read-state -->|"minted: done"| done["Published\nTarget KA minted"]
+    read-paper -->|"Target KA triples"| store
+    store -->|"stored on the node"| mint["Mint\nstep mint-n"]
+    mint -->|"not seen within 10 s"| poll["Poll\nsteps wait-n-k, poll-n-k"]
+    mint -->|"minted"| done
+    poll -->|"minted"| done
+    poll -.->|"not seen after 10 minutes: mint again"| mint

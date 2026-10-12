@@ -1,0 +1,1 @@
+Every service VeriSci depends on, what for, and through which file. All are used on free tiers or testnets (the MVP pays for nothing), and each adapter returns typed results for its expected failures so a run can retry, refuse or stop on purpose (ADR 0021).

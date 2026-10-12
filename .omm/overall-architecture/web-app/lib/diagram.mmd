@@ -1,0 +1,3 @@
+graph LR
+    publish["Publish Flow\nlib/publish/"] -->|"settings, the upload limits"| helpers["Shared Helpers\nlib/web-env.ts, server.ts, theme.ts, shorten.ts, utils.ts"]
+    papers["Papers\nlib/papers/"] -.->|"used beside them on the same pages"| helpers

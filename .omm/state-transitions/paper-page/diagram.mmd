@@ -1,0 +1,7 @@
+graph LR
+    in-progress["In Progress\nreading, saving, minting, following"] -->|"the asset is minted"| published["Published\nthe proof shows"]
+    in-progress -->|"the run refused the paper"| refused["Refused\nwhy, in plain words"]
+    in-progress -->|"the run failed"| failed["Failed\nits reason, publish again"]
+    in-progress -->|"no run and nothing stored"| not-found["Not Found\nor not published"]
+    in-progress -->|"the node or Inngest did not answer"| unavailable["Unavailable\nasked again on the next poll"]
+    unavailable -->|"next poll answers"| in-progress

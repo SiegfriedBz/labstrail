@@ -1,0 +1,1 @@
+Step store-<n>: seals the Target KA's triples in the node's working memory and shares them, leaving the asset stored and ready to mint; a draft an earlier run sealed is shared as it is, without reading the paper again. Storing an asset already minted returns it.

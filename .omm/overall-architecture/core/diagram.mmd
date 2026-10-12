@@ -1,0 +1,8 @@
+graph LR
+    publish["Publish\nsrc/publish/"] -->|"chain id of the signed domain"| assets["Assets\nsrc/assets/"]
+    papers["Papers\nsrc/papers/"] -->|"Target KA predicates"| publish
+    papers -->|"UALs, CIDs, asset names, graph rows"| assets
+    rating["Rating\nsrc/rating/"] -->|"R-KA names, target UALs, CIDs"| assets
+    rating -->|"the paper's record"| papers
+    rating -->|"triple helpers"| publish
+    fixtures["Fixtures\nsrc/fixtures/"] -.->|"test data"| rating

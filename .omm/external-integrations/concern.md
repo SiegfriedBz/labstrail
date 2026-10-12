@@ -1,0 +1,2 @@
+- On Gemini's free tier, Google may use prompts and answers to improve its products; the scorer sends only papers already public.
+- PDFs uploaded but never published stay pinned until the unpin cron of the intake and recovery plan exists.

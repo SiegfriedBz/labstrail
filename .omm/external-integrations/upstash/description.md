@@ -1,0 +1,1 @@
+Upstash Redis (UPSTASH_REDIS_REST_URL and TOKEN): counts upload URLs per connection and submissions per signing address over 24 hours, the app's only state (ADR 0035). Locally, counters live in memory.

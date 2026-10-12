@@ -1,0 +1,1 @@
+The Next.js 16 App Router site (apps/web/): the home page, the publish page, the papers list and each paper's page, two server actions (requestUpload, submitPaper), the route that serves the Inngest functions and the one a paper's page polls. Server reads and actions return typed results (ADR 0021). It imports all five packages, compiled through transpilePackages.

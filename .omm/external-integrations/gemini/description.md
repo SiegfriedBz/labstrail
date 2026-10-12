@@ -1,0 +1,1 @@
+The Gemini API's generateContent (GEMINI_API_KEY in the x-goog-api-key header): gemini-3.8-flash on the free tier scores each paper in one request with a JSON schema (ADR 0018). Failures map to rate-limited (429), refused (other 4xx), unreachable and invalid-output.

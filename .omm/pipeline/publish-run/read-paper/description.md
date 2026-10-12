@@ -1,0 +1,1 @@
+Step read-paper-<n>: fetches the PDF through the gateway and has GROBID read its header; core's parseTeiHeader gives title, authors, abstract and DOI, and targetKaQuads the triples with the submitter's address, signature and deadline. Not a PDF, too large, unparseable or no title end the run refused.

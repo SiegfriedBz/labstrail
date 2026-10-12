@@ -1,0 +1,1 @@
+The OriginTrail DKG V10 node (DKG_URL, a bearer token): stores and mints Knowledge Assets and answers SPARQL over the verisci-staging and verisci-prod context graphs. One node and one admin token serve both environments, so the dkg package refuses the production graph outside production (ADR 0005).

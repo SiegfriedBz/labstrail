@@ -1,0 +1,1 @@
+script/DeployRatingController.s.sol and HelperConfig.s.sol (forge scripts: the owner and oracle per network, Anvil's accounts locally) and tools/ (generate-abi.ts writes the ABI module; record-deployment.ts records a broadcast's address in deployments/base-sepolia.json, changed only by a reviewed PR).

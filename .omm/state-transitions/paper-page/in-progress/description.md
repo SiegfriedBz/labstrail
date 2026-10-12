@@ -1,0 +1,1 @@
+reading, saving or minting follow the run's steps; following means the event started no run because another run holds the PDF (the function is a singleton per CID), so the page follows the paper on the node for up to the run's 45-minute budget.

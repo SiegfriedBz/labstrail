@@ -1,0 +1,1 @@
+/ (app/page.tsx): what VeriSci does, the publish flow as a live demo, the latest papers (streamed in, so the hero never waits for the DKG node), how publishing and rating work, and what a paper asset holds.

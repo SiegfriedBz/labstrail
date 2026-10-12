@@ -1,0 +1,3 @@
+- Gemini's free tier: 20 gemini-3.8-flash requests a day per project; getting around the limit with more keys or projects is against Google's terms.
+- Inngest's free plan: 50,000 executions a month; Vercel Hobby: 300 s per function.
+- Pinata, GROBID and the DKG node must all be up to publish; Pinata and the node to rate.

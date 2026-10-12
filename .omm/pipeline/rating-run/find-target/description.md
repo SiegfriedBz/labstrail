@@ -1,0 +1,1 @@
+Step find-target: the target's UAL must be canonical and name our node (classifyTarget), and our node must list it among its published papers (publishedPaperQuery); otherwise the request is cancelled invalid-target at once (ADRs 0011, 0031).

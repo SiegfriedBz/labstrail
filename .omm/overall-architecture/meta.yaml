@@ -1,0 +1,18 @@
+created: 2026-10-12T05:41:14.825Z
+updated: 2026-10-12T05:41:36.217Z
+update_count: 7
+last_field: note
+git_commit: dff0db5
+git_branch: refactor/024-folder-reorg
+children:
+  - base-sepolia
+  - browser
+  - contracts
+  - core
+  - dkg-client
+  - dkg-node
+  - env
+  - inngest
+  - rpc-proxy
+  - web-app
+  - workflows

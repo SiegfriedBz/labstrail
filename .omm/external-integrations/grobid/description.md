@@ -1,0 +1,1 @@
+GROBID 0.9.1 (GROBID_URL) beside the DKG node: the publish run sends it the PDF and reads the paper's title, authors, abstract and DOI from its TEI header. Metadata is read by code, with no LLM, so the same PDF always gives the same Target KA (ADR 0010).

@@ -1,0 +1,1 @@
+Pinata (PINATA_JWT, PINATA_GATEWAY_URL): the browser uploads each PDF straight to it with a short-lived signed URL, so the file never passes through a Vercel function; both runs read it back through the dedicated gateway by CID. One pinning account for every environment.

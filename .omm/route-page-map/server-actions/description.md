@@ -1,0 +1,1 @@
+app/actions.ts: requestUpload (a short-lived signed Pinata upload URL, limited per connection) and submitPaper (checks the signed submission, limited per signing address, and sends verisci/paper.submitted). Both return typed answers the form turns into messages.

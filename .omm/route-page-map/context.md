@@ -1,0 +1,1 @@
+Pages read the DKG node on the server, in an async component inside Suspense with a skeleton shaped like the result, so the page never waits for the node to show its frame. What a page polls is a route handler, not a server action, since Next runs server actions one at a time per client. The layout renders per request, so the Reown project id comes from the server's settings.

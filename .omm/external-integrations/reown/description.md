@@ -1,0 +1,1 @@
+Reown AppKit with wagmi (REOWN_PROJECT_ID, read from the server's settings at request time): connects the visitor's wallet on Base Sepolia and asks it to sign the submission (ADR 0034). Without a project id the pages still render and say the wallet is not set up.

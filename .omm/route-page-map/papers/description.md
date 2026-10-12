@@ -1,0 +1,1 @@
+/papers (app/papers/page.tsx): every published paper, newest first, 20 a page (?page=n), read from the graph on the server with each submitter's signature checked; a TanStack table over shadcn's table.
