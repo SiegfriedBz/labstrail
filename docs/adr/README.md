@@ -16,7 +16,7 @@ decisions were taken, so a later ADR can sit in an earlier group.
 
 | ADR | Decision |
 | --- | --- |
-| [0037. VeriSci publishes and rates life-science and health papers](0037-verisci-rates-life-science-and-health-papers.md) | Biology, medicine and health research; publishing refuses a paper outside the field, and the scorer cancels a request to rate one |
+| [0037. VeriSci publishes and rates life-science and health papers](0037-verisci-rates-life-science-and-health-papers.md) | Biology, medicine and health research; publishing refuses a paper outside the field, and a request to rate one is cancelled |
 
 ## Tools
 
@@ -111,6 +111,7 @@ Not decided yet. Each becomes an ADR in the plan that first needs the answer; th
 | Where do alerts go? | One chat-bot channel behind a single `notify()`, fed by a scheduled check (wallet balances, orphans, age of the oldest pending request) and an uptime check on the node's `/api/status`. | intake and recovery plan |
 | Who may request phases 2 and 3? | Anyone, not only the phase-1 requester. Whoever requests, our node writes the R-KA update, since it owns the R-KA ([0012](0012-three-phases-settled-by-the-oracle.md)). Also open: whether a later phase's request gets its own id or reuses the rating's. | phase-2 plan |
 | Where does phases 2 and 3's human input wait before the oracle scores it? | None yet: on the DKG, as a draft the node holds, or in a store of the app's own, which would amend [0035](0035-limits-are-the-apps-only-state.md) ([0012](0012-three-phases-settled-by-the-oracle.md)). | phase-2 plan |
+| How are phase-2 reviewers drawn with Chainlink VRF? | None yet: the draw's contract, its VRF subscription and who funds it. It may touch [0023](0023-a-fix-is-a-redeploy-owner-powers-fixed.md) (the owner's powers), [0015](0015-rating-requests-are-free-on-testnet.md) (who pays) and [0019](0019-oracle-transactions-are-serialized.md) (oracle transactions) ([0012](0012-three-phases-settled-by-the-oracle.md)). | phase-2 plan |
 | Who holds the DKG node's credential? | Caddy keeps the daemon's admin token on the host and checks one credential per environment, so each can be revoked alone. The `-prod` guard stays ([0005](0005-staging-and-production-are-isolated.md)). | node server plan |
 
 ## Adding an ADR

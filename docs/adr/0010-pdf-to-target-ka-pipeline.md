@@ -21,7 +21,7 @@ Papers enter verisci as PDFs and must become Target KAs. Parsing and the DKG wri
 - A retry starts again from what the node holds and redoes only what is not there yet ([0007](0007-all-writes-converge.md)): the paper is read and parsed again only when nothing was stored.
 - Nothing on chain tracks a publish, so a publish that fails after its retries is recovered by submitting the same PDF again.
 - Publishing needs a connected wallet and one signature, but no gas.
-- A paper outside the field is refused; publishing makes one free-tier Gemini request per new paper.
+- Publishing makes one free-tier Gemini request per new paper; what its answer decides is [0037](0037-verisci-rates-life-science-and-health-papers.md)'s.
 - A signature proves an address, not a person. Every publish costs money (pinning, parsing, node funds), so issuing upload URLs is still rate-limited.
 - Pinata and GROBID (current choices, not part of the decision) must both be up to publish. A paper GROBID reads badly gets a poor KA; an LLM cleanup step can be added then. Pinata holds the only copy of each PDF until a second pin is added.
 
@@ -35,3 +35,4 @@ Papers enter verisci as PDFs and must become Target KAs. Parsing and the DKG wri
 - 2026-10-10: a file that fails the server's check is unpinned only if it is not a PDF and no asset points at it, so an environment with a stricter size limit never unpins a PDF another one published; this ADR did not say when a file is unpinned (branch review, user's choice).
 - 2026-10-11: rating is open to papers verisci published, not to any KA (ADR 0011, rating run review).
 - 2026-10-12: before a new paper is stored, a small Gemini model checks its field (ADR 0037); the metadata is still read by code, so the same PDF still gives the same KA, and publishing now makes one free-tier model request per new paper (scope and branding plan, user's choice).
+- 2026-10-12: the field check's outcomes are left to ADR 0037, which states them all, rather than said here as "refused" (ADR sweep, user's choice).
