@@ -24,7 +24,8 @@ layout, toolchain versions and commands.
 - `tools/*.ts` run with Node's type stripping; `erasableSyntaxOnly` in the root
   `tsconfig.base.json` makes `tsc` reject syntax Node cannot strip.
 - Tests deploy `RatingController` through `script/DeployRatingController.s.sol`, so they
-  run the deploy path; only constructor tests call `new RatingController` directly.
+  run the deploy path; only constructor tests call `new RatingController` directly, and
+  tests that need it at a chosen address use `deployCodeTo`.
   Per-environment settings live in `script/HelperConfig.s.sol`.
 - Contracts follow the Solidity style guide's order of layout. Types, events and errors
   go in an interface (`src/interfaces/I<Name>.sol`) with their NatSpec; the contract

@@ -40,7 +40,7 @@ pending on it
   ([ADR 0011](../../docs/adr/0011-a-rating-is-a-separate-r-ka.md)), or whose paper
   is outside the life sciences and health
   ([ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)), or
-  whose PDF cannot be read for its text, such as a scan
+  whose PDF cannot be read for its text, such as a scan or a file over the size limit
   ([ADR 0011](../../docs/adr/0011-a-rating-is-a-separate-r-ka.md)).
 - **Fulfil.** The oracle calls `fulfilPhase1(requestId, score, rKaUal)` with a
   score from 0 to 100 and the R-KA's UAL. The record holds the phase-1 score;
@@ -219,7 +219,8 @@ repeat those of the one before.
   Base Sepolia, selected by `DEPLOY_ENV`.
 - `script/DeployRatingController.s.sol` deploys from that configuration. The
   account that signs the broadcast becomes the owner. The Foundry test suites
-  deploy through the same script.
+  deploy through the same script, except tests that need the contract at a
+  chosen address, which use `deployCodeTo`.
 - `record-deployment` reads the run file written by `--broadcast`
   (`broadcast/DeployRatingController.s.sol/84532/run-latest.json`). The new
   contract becomes the environment's `current` deployment, and the previous

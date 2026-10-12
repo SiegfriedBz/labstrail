@@ -15,8 +15,9 @@ const REQUEST_ID = /^0x[0-9a-f]{64}$/;
 
 /**
  * The DKG asset name of a rating's R-KA: `verisci-rka-<request id>`, the phase-1 request id
- * as `0x` + 64 lowercase hex (ADR 0016). The id hashes the chain id and contract address, so
- * each deployment's requests have their own names. Later phases keep this name (ADR 0011).
+ * as `0x` + 64 lowercase hex (ADR 0016). The id hashes the chain id, the contract's address and
+ * its deploy time, so each deployment's requests have their own names, even on a contract
+ * redeployed at the same address. Later phases keep this name (ADR 0011).
  *
  * Accepts any case and surrounding whitespace. Returns a result for every input.
  */
