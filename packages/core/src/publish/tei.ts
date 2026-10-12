@@ -42,9 +42,9 @@ const SPACING_ACCENTS: Readonly<Record<string, string>> = {
 };
 /** A spacing accent opening a name part, before a lowercase letter ("´ramo ´n"). */
 const OPENING_ACCENT = new RegExp(`^[${Object.keys(SPACING_ACCENTS).join("")}](?=\\p{Ll})`, "u");
-/** The dotless letters a LaTeX accent is drawn on, and the letter they stand for. */
-const DOTLESS: Readonly<Record<string, string>> = { "\u0131": "i", "\u0237": "j" };
-/** The marks a dotless letter after them takes ("Garc ´ıa"); a breve stays with the letter before ("Yag˘ız"). */
+/** The dotless i a LaTeX accent is drawn on, and the letter it stands for. */
+const DOTLESS: Readonly<Record<string, string>> = { "\u0131": "i" };
+/** The marks a dotless `ı` after them takes ("Garc ´ıa"); a breve stays with the letter before ("Yag ˘ız"). */
 const ON_DOTLESS = new Set(["\u0301", "\u0300", "\u0308", "\u0302"]);
 const LETTER = /^\p{L}$/u;
 const UPPERCASE = /^\p{Lu}$/u;
@@ -133,15 +133,19 @@ function text(element: Element | undefined): string {
 /**
  * A person's name from its parts, in order, with its split accents joined back. GROBID gives
  * an accent after its letter, so one opening a part before a lowercase letter ("Jose",
- * "´ramo ´n Banegas") belongs to the letter ending the part before, when that letter takes it.
+ * "´ramo ´n Banegas") goes to the last letter of the part before, when that part is more than
+ * an initial and its letter takes the accent; after an initial, the accent joins inside the
+ * name ("A", "´lvarez" → "Álvarez").
  */
 function nameOf(parts: readonly Element[]): string {
   const texts = parts.map((part) => collapse(part.textContent ?? "").normalize("NFC"));
   for (let index = 1; index < texts.length; index++) {
     const opening = OPENING_ACCENT.exec(texts[index] as string)?.[0];
-    const previous = texts[index - 1] as string;
-    if (opening === undefined || accented([...previous].at(-1), opening) === undefined) continue;
-    texts[index - 1] = previous + opening;
+    const previous = [...(texts[index - 1] as string)];
+    if (opening === undefined || previous.length < 2) continue;
+    const joined = accented(previous.at(-1), SPACING_ACCENTS[opening] as string);
+    if (joined === undefined) continue;
+    texts[index - 1] = [...previous.slice(0, -1), joined].join("");
     texts[index] = (texts[index] as string).slice(opening.length);
   }
   return joinAccents(collapse(texts.join(" ")));
@@ -152,11 +156,13 @@ function collapse(value: string): string {
 }
 
 /**
- * Joins each spacing accent in a name to its letter: an acute, grave, diaeresis or circumflex
- * before a dotless `ı` goes to the `ı` ("Garc ´ıa"); any other goes to the letter before it, at
- * most one space away, when the two make one Latin letter, and that space goes. An accent before
- * a capital is an apostrophe ("O´Brien"), and one with no letter to take it stays as it is: an
- * accent never moves to a letter after it otherwise.
+ * Joins each spacing accent in a name to its letter, in the shapes GROBID gives: an acute,
+ * grave, diaeresis or circumflex before a dotless `ı` goes to the `ı` ("Garc ´ıa"); any other
+ * goes to the letter before it when a space or a dotless `ı` stands between them ("Bele ´n",
+ * "Rodrı´guez"), and the space goes. It joins only when the two make one letter of Latin-1
+ * Supplement to Latin Extended-B. Anything else stays as it is: an accent before a capital or
+ * right after another letter is an apostrophe ("O´Brien", "N´diaye"), and an accent never
+ * moves to a letter after it otherwise.
  */
 function joinAccents(name: string): string {
   const chars = [...name];
@@ -165,14 +171,15 @@ function joinAccents(name: string): string {
     const char = chars[index] as string;
     const mark = SPACING_ACCENTS[char];
     const next = chars[index + 1];
-    const spaceBefore = out.at(-1) === " ";
-    const before = letterAt(out, out.length - (spaceBefore ? 2 : 1));
     if (mark === undefined || (next !== undefined && UPPERCASE.test(next))) {
       out.push(char);
       continue;
     }
+    const spaceBefore = out.at(-1) === " ";
+    const before = letterAt(out, out.length - (spaceBefore ? 2 : 1));
     const onDotless = next !== undefined && next in DOTLESS && ON_DOTLESS.has(mark);
-    const joined = onDotless ? accented(next, mark) : accented(before, mark);
+    const onBefore = spaceBefore || (before !== undefined && before in DOTLESS);
+    const joined = onDotless ? accented(next, mark) : onBefore ? accented(before, mark) : undefined;
     if (joined === undefined) {
       out.push(char);
       continue;
@@ -190,10 +197,9 @@ function letterAt(chars: readonly string[], index: number): string | undefined {
   return char !== undefined && LETTER.test(char) ? char : undefined;
 }
 
-/** `letter` with the spacing accent's or combining `mark`, when the two compose into one Latin letter. */
+/** `letter` with the combining `mark`, when there is a letter and the two compose into one Latin letter. */
 function accented(letter: string | undefined, mark: string): string | undefined {
   if (letter === undefined) return undefined;
-  const combining = SPACING_ACCENTS[mark] ?? mark;
-  const composed = `${DOTLESS[letter] ?? letter}${combining}`.normalize("NFC");
+  const composed = `${DOTLESS[letter] ?? letter}${mark}`.normalize("NFC");
   return ACCENTED_LETTER.test(composed) ? composed : undefined;
 }

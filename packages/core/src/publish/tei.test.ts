@@ -82,10 +82,10 @@ describe("parseTeiHeader", () => {
   });
 
   describe("accents GROBID splits from the letters of authors' names", () => {
-    const named = (forename: string, surname: string) =>
+    const named = (...parts: [string, string][]) =>
       parseTeiHeader(
         tei({
-          analytic: `<author><persName><forename>${forename}</forename><surname>${surname}</surname></persName></author>`,
+          analytic: `<author><persName>${parts.map(([tag, part]) => `<${tag}>${part}</${tag}>`).join("")}</persName></author>`,
         }),
       );
     const authors = (...names: string[]) =>
@@ -98,74 +98,82 @@ describe("parseTeiHeader", () => {
       );
 
     it("joins a spacing acute after a dotless i, and drops the space before it", () => {
-      expect(authors("Montserrat Rodrı ´guez-Ayala")).toMatchObject({
-        metadata: { authors: ["Montserrat Rodríguez-Ayala"] },
+      expect(authors("Montserrat Rodr\u0131 \u00b4guez-Ayala")).toMatchObject({
+        metadata: { authors: ["Montserrat Rodr\u00edguez-Ayala"] },
       });
     });
 
-    it("joins an accent to the letter before it, inside a word", () => {
-      expect(authors("Bele ´n Moreno-Franco", "Je ´re ´mie")).toMatchObject({
-        metadata: { authors: ["Belén Moreno-Franco", "Jérémie"] },
+    it("joins an accent after a space to the letter before it", () => {
+      expect(authors("Bele \u00b4n Moreno-Franco", "Je \u00b4re \u00b4mie")).toMatchObject({
+        metadata: { authors: ["Bel\u00e9n Moreno-Franco", "J\u00e9r\u00e9mie"] },
       });
     });
 
-    it("joins an accent with no space before it", () => {
-      expect(authors("Rodrı´guez")).toMatchObject({
-        metadata: { authors: ["Rodríguez"] },
+    it("joins an accent right after a dotless i", () => {
+      expect(authors("Rodr\u0131\u00b4guez")).toMatchObject({
+        metadata: { authors: ["Rodr\u00edguez"] },
       });
     });
 
     it("gives an acute before a dotless i to the i", () => {
-      expect(authors("Garc ´ıa")).toMatchObject({
-        metadata: { authors: ["García"] },
+      expect(authors("Garc \u00b4\u0131a")).toMatchObject({
+        metadata: { authors: ["Garc\u00eda"] },
       });
     });
 
     it.each([
-      ["a diaeresis", "Mu¨ller", "Müller"],
-      ["a cedilla", "Franc¸ois", "François"],
-      ["a caron", "Dvorˇák", "Dvořák"],
-      ["a breve before a Turkish dotless i", "Yag˘ız", "Yağız"],
+      ["a diaeresis", "Mu \u00a8ller", "M\u00fcller"],
+      ["a cedilla", "Franc \u00b8ois", "Fran\u00e7ois"],
+      ["a caron", "Dvor \u02c7\u00e1k", "Dvo\u0159\u00e1k"],
+      ["a breve before a Turkish dotless i", "Yag \u02d8\u0131z", "Ya\u011f\u0131z"],
     ])("joins %s", (_, split, whole) => {
       expect(authors(split)).toMatchObject({ metadata: { authors: [whole] } });
     });
 
     it("composes a letter and a combining accent into one letter", () => {
-      const result = authors("José");
+      const result = authors("Jose\u0301");
 
-      expect(result).toMatchObject({ metadata: { authors: ["José"] } });
+      expect(result).toMatchObject({ metadata: { authors: ["Jos\u00e9"] } });
       expect(result.ok && result.metadata.authors[0]).toHaveLength(4);
     });
 
     it("gives an accent that opens a lowercase surname to the end of the forename", () => {
-      expect(named("Jose", "´ramo ´n Banegas")).toMatchObject({
-        metadata: { authors: ["José ramón Banegas"] },
+      expect(named(["forename", "Jose"], ["surname", "\u00b4ramo \u00b4n Banegas"])).toMatchObject({
+        metadata: { authors: ["Jos\u00e9 ram\u00f3n Banegas"] },
       });
     });
 
+    it("joins an accent after a one-letter part inside the word it opens", () => {
+      expect(
+        named(["forename", "Maria"], ["forename", "A"], ["surname", "\u00b4lvarez"]),
+      ).toMatchObject({ metadata: { authors: ["Maria \u00c1lvarez"] } });
+    });
+
     it("keeps an accent that opens a capitalised surname where it is", () => {
-      expect(named("Juan", "´Alvarez")).toMatchObject({
-        metadata: { authors: ["Juan ´Alvarez"] },
+      expect(named(["forename", "Juan"], ["surname", "\u00b4Alvarez"])).toMatchObject({
+        metadata: { authors: ["Juan \u00b4Alvarez"] },
       });
     });
 
     it("keeps the space after an accent its letter before takes", () => {
-      expect(authors("Rene ´ Descartes")).toMatchObject({
-        metadata: { authors: ["René Descartes"] },
+      expect(authors("Rene \u00b4 Descartes")).toMatchObject({
+        metadata: { authors: ["Ren\u00e9 Descartes"] },
       });
     });
 
     it.each([
-      ["an apostrophe before a capital", "O´Brien"],
-      ["a letter before that takes no such accent", "Nguyê ˜n"],
-      ["no letter before it", "Li 3´"],
-    ])("keeps an accent with %s", (_, name) => {
+      ["an apostrophe before a capital", "O\u00b4Brien"],
+      ["an apostrophe before a lowercase letter", "N\u00b4diaye Sa\u00b4id Dell\u00b4acqua"],
+      ["a letter before that takes no such accent", "Nguy\u00ea \u02dcn"],
+      ["no letter before it", "Li 3\u00b4"],
+      ["ASCII ^, ~ or a backtick", "A^b C~d E`f"],
+    ])("keeps %s", (_, name) => {
       expect(authors(name)).toMatchObject({ metadata: { authors: [name] } });
     });
 
     it("leaves the title and the abstract as GROBID gives them", () => {
-      const title = "Alzheimer´s disease and the 3´ UTR";
-      const abstract = "The ´normal´ group, in ˜30% of cases.";
+      const title = "Alzheimer\u00b4s disease and the 3\u00b4 UTR";
+      const abstract = "The \u00b4normal\u00b4 group, in \u02dc30% of cases.";
       const result = parseTeiHeader(
         tei({ profile: `<abstract><p>${abstract}</p></abstract>` }).replace("A Title", title),
       );
@@ -175,7 +183,7 @@ describe("parseTeiHeader", () => {
 
     it("gives the same metadata for the same header", () => {
       const xml = tei({
-        analytic: "<author><persName><surname>Bele ´n</surname></persName></author>",
+        analytic: "<author><persName><surname>Bele \u00b4n</surname></persName></author>",
       });
 
       expect(parseTeiHeader(xml)).toEqual(parseTeiHeader(xml));
