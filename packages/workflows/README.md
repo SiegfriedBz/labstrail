@@ -370,4 +370,6 @@ stuck transaction are checked on `develop`; the unit tests cover every branch wi
 | `pnpm --filter @verisci/workflows rate-paper <target UAL> [--raw]` | Dev only, `APP_ENV=local`: requests a rating on the Anvil contract from a throwaway requester and sends `verisci/rating.requested` to the local dev server |
 | `pnpm --filter @verisci/workflows score-papers [id…]` | Dev only, `APP_ENV=local`: scores the reference papers with Gemini and compares each with what is expected (Measuring the scorer above) |
 
-Ships TypeScript source (`src/index.ts`, `src/env.ts`), with no build step.
+Ships TypeScript source (`src/index.ts`, `src/env.ts`), with no build step. The source is
+grouped by feature: `src/publish/`, `src/rating/`, `src/pdf/` and `src/site/` (`CLAUDE.md`
+here).

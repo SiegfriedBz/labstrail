@@ -220,4 +220,5 @@ request id (Asset names above).
 | `pnpm --filter @verisci/core typecheck` | Typechecks the package |
 | `pnpm --filter @verisci/core test` | Runs its Vitest project (`vitest run`) |
 
-Ships TypeScript source (`src/index.ts`), with no build step.
+Ships TypeScript source (`src/index.ts`), with no build step. The source is grouped by
+feature: `src/assets/`, `src/publish/`, `src/papers/` and `src/rating/` (`CLAUDE.md` here).

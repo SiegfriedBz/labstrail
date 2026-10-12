@@ -1,5 +1,5 @@
 import { getUploadService } from "@verisci/workflows";
-import { readProgress } from "../../lib/upload-actions.ts";
+import { readProgress } from "../../lib/publish/upload-actions.ts";
 import { PaperProgress } from "./paper-progress.tsx";
 
 /**

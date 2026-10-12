@@ -8,7 +8,7 @@ import {
   parsePaperListing,
 } from "@verisci/core";
 import type { DkgClient, DkgFailure } from "@verisci/dkg";
-import { signatureMatches, type VerifyOptions } from "./publish/verify-submission.ts";
+import { signatureMatches, type VerifyOptions } from "../publish/verify-submission.ts";
 
 /** The largest page `listPapers` reads. */
 const MAX_PAGE_SIZE = 50;

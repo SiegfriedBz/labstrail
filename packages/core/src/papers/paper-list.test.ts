@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { authorRows, countRows, pageRows } from "./fixtures/paper-list-rows.ts";
+import { authorRows, countRows, pageRows } from "../fixtures/paper-list-rows.ts";
 import {
   paperAuthorsQuery,
   paperCountQuery,

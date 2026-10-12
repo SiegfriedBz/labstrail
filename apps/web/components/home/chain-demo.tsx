@@ -2,7 +2,7 @@
 
 import { FilePdf } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
-import type { PaperStage } from "../../lib/progress.ts";
+import type { PaperStage } from "../../lib/publish/progress.ts";
 import { ProgressChain } from "../paper/progress-chain.tsx";
 
 const LOOP: PaperStage["stage"][] = ["reading", "saving", "minting", "published"];

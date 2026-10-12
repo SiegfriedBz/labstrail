@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { QueryBinding } from "./paper-record.ts";
+import type { QueryBinding } from "../papers/paper-record.ts";
+import type { Triple } from "../publish/target-ka.ts";
 import {
   classifyTarget,
   paperPdfQuery,
@@ -11,7 +12,6 @@ import {
   triplesFromBindings,
 } from "./rating.ts";
 import { SCORER_PROMPT_VERSION, type ScorerOutput } from "./scorer.ts";
-import type { Triple } from "./target-ka.ts";
 
 const GRAPH = "0xD701ed157232ad5E14BC4134a8D10D64D86f13B3/verisci-staging";
 const AGENT = "0xd701ed157232ad5e14bc4134a8d10d64d86f13b3";

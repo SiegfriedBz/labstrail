@@ -17,7 +17,7 @@ import {
   scoreChecks,
 } from "@verisci/core";
 import { createSharedEnv, defineEnv } from "@verisci/env";
-import { paperTextOf } from "../src/rating/paper-text.ts";
+import { paperTextOf } from "../src/pdf/paper-text.ts";
 import { RATING_SETTINGS } from "../src/rating/rate-paper.ts";
 import { askScorer, type ScoreFailureResult } from "../src/rating/scorer.ts";
 import { geminiSchema } from "../src/rating-env.ts";

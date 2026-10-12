@@ -14,3 +14,10 @@ Pure domain logic. See `README.md` here.
   `multiformats/hashes/sha1` and `multiformats/hashes/sha2` load `node:crypto`. From
   `@xmldom/xmldom` (pure JS, no dependencies), core uses `DOMParser`. From `zod`, core uses
   its schemas, to check the scorer's answers (`parseScorerAnswer`).
+- **Layout:** source sits in feature folders: `assets/` (UALs, asset and graph names, CIDs,
+  chains, OriginTrail's contracts: what every feature addresses), `publish/` (the signed
+  submission, the TEI header, the Target KA), `papers/` (a published record and the list),
+  `rating/` (the paper's text, checklists, scorer, R-KA); `fixtures/` holds test data. Only
+  `index.ts`, which exports everything, sits at the root. A file two features use goes in
+  `assets/`, never in one feature's folder; `src/layout.test.ts` enforces the layout and
+  the entry's exports.

@@ -1,5 +1,5 @@
 import { parseTeiHeader } from "@verisci/core";
-import { type FetchPdfOptions, fetchPdf } from "./fetch-pdf.ts";
+import { type FetchPdfOptions, fetchPdf } from "../pdf/fetch-pdf.ts";
 import { type GrobidOptions, parseHeader } from "./grobid.ts";
 import type { ReadPaperResult } from "./publish-paper.ts";
 

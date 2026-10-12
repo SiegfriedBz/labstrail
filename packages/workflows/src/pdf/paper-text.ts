@@ -1,6 +1,6 @@
 import { type PaperText, preparePaperText } from "@verisci/core";
 import { extractText, getDocumentProxy } from "unpdf";
-import { type FetchPdfOptions, fetchPdf } from "../publish/fetch-pdf.ts";
+import { type FetchPdfOptions, fetchPdf } from "./fetch-pdf.ts";
 
 /**
  * The result of {@link readPaperText}. `no-text` (a PDF with almost no letters, such as a scan)

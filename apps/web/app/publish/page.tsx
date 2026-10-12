@@ -3,7 +3,7 @@ import { getUploadService, PUBLISH_SETTINGS, UPLOAD_SETTINGS } from "@verisci/wo
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import { PublishForm } from "../../components/publish/publish-form.tsx";
-import { UPLOAD_LIMITS } from "../../lib/limits.ts";
+import { UPLOAD_LIMITS } from "../../lib/publish/limits.ts";
 
 export const metadata: Metadata = {
   title: "Publish a paper · VeriSci",

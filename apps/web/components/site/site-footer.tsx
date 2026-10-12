@@ -1,7 +1,7 @@
 import { ArrowSquareOut } from "@phosphor-icons/react/dist/ssr";
 import { ORIGINTRAIL_CONTRACTS } from "@verisci/core";
 import Link from "next/link";
-import { addressUrl } from "../../lib/explorer.ts";
+import { addressUrl } from "../../lib/papers/explorer.ts";
 import { shorten } from "../../lib/shorten.ts";
 import { Logo } from "./logo.tsx";
 

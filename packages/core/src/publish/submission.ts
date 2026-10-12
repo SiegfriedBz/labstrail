@@ -1,4 +1,4 @@
-import { BASE_SEPOLIA_CHAIN_ID } from "./chains.ts";
+import { BASE_SEPOLIA_CHAIN_ID } from "../assets/chains.ts";
 
 /**
  * The largest PDF verisci publishes and rates: 15 MB. A paper published before the limit was

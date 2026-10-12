@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { AEROSOL_PAGES } from "./fixtures/aerosol-pages.ts";
-import { CITICOLINE_PAGES } from "./fixtures/citicoline-pages.ts";
+import { AEROSOL_PAGES } from "../fixtures/aerosol-pages.ts";
+import { CITICOLINE_PAGES } from "../fixtures/citicoline-pages.ts";
 import { normalizeForQuote, preparePaperText, quoteFound, quoteTextOf } from "./paper-text.ts";
 
 const WORDS = (count: number, word = "word") => Array.from({ length: count }, () => word).join(" ");

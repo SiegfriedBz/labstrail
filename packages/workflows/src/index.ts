@@ -9,13 +9,7 @@ export {
   servedFunctions,
 } from "./functions.ts";
 export { inngest } from "./inngest.ts";
-export type {
-  PaperListResult,
-  PaperSummary,
-  QueryProblem,
-  SignatureCheck,
-} from "./papers.ts";
-export type { UploadUrlResult } from "./pinata.ts";
+export type { UploadUrlResult } from "./publish/pinata.ts";
 export {
   PAPER_SUBMITTED,
   type PaperRefusal,
@@ -55,12 +49,18 @@ export {
   ratingSettingsRequired,
   servesRating,
 } from "./rating-env.ts";
-export type { ReadRunResult, RunState } from "./runs.ts";
+export type {
+  PaperListResult,
+  PaperSummary,
+  QueryProblem,
+  SignatureCheck,
+} from "./site/papers.ts";
+export type { ReadRunResult, RunState } from "./site/runs.ts";
 export {
   getUploadService,
   type PaperStatus,
   type PublishedRecord,
   UPLOAD_SETTINGS,
   type UploadService,
-} from "./upload.ts";
+} from "./site/upload.ts";
 export { createWorkflowsEnv, type WorkflowsEnv } from "./workflows-env.ts";

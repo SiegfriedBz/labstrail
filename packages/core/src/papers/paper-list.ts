@@ -1,9 +1,9 @@
-import { assetGraphIri, contextGraphIri } from "./asset-graph.ts";
-import { TARGET_KA_PREFIX } from "./asset-names.ts";
-import { canonicalCid } from "./cid.ts";
+import { assetGraphIri, contextGraphIri } from "../assets/asset-graph.ts";
+import { TARGET_KA_PREFIX } from "../assets/asset-names.ts";
+import { canonicalCid } from "../assets/cid.ts";
+import { normalizeUal } from "../assets/ual.ts";
+import { VERISCI_NS } from "../publish/target-ka.ts";
 import { type QueryBinding, unquote } from "./paper-record.ts";
-import { VERISCI_NS } from "./target-ka.ts";
-import { normalizeUal } from "./ual.ts";
 
 /** A published paper as the list shows it, read from its Target KA and the node's `_meta`. */
 export interface PaperListing {

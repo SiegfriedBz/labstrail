@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { type PaperSubmission, targetKaQuads } from "../publish/target-ka.ts";
 import { paperRecordQuery, parsePaperRecord, type QueryBinding } from "./paper-record.ts";
-import { type PaperSubmission, targetKaQuads } from "./target-ka.ts";
 
 const CID = "bafybeias652m2pfpmuaeze4dxmtcjvfwvr7dsteumagdd2vwaqrbkjokxu";
 const SUBMISSION: PaperSubmission = {

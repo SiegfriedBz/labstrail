@@ -6,22 +6,24 @@ export {
   type AssetNameResult,
   rKaName,
   targetKaName,
-} from "./asset-names.ts";
-export { BASE_SEPOLIA_CHAIN_ID } from "./chains.ts";
-export {
-  CHECKS,
-  type Check,
-  type CheckId,
-  checklistOf,
-  STUDY_TYPES,
-  type StudyType,
-} from "./checklists.ts";
-export { canonicalCid } from "./cid.ts";
+} from "./assets/asset-names.ts";
+export { BASE_SEPOLIA_CHAIN_ID } from "./assets/chains.ts";
+export { canonicalCid } from "./assets/cid.ts";
 export {
   knowledgeAssetToken,
   ORIGINTRAIL_CONTRACTS,
   type OriginTrailContracts,
-} from "./origintrail.ts";
+} from "./assets/origintrail.ts";
+export {
+  formatUal,
+  isSameUal,
+  type NormalizeUalResult,
+  normalizeUal,
+  type ParseUalResult,
+  parseUal,
+  type Ual,
+  type UalError,
+} from "./assets/ual.ts";
 export {
   type PaperListing,
   paperAuthorsQuery,
@@ -31,13 +33,35 @@ export {
   parsePaperCount,
   parsePaperListing,
   publishedPaperQuery,
-} from "./paper-list.ts";
+} from "./papers/paper-list.ts";
 export {
   type PaperRecord,
   paperRecordQuery,
   parsePaperRecord,
   type QueryBinding,
-} from "./paper-record.ts";
+} from "./papers/paper-record.ts";
+export {
+  canonicalContextGraph,
+  MAX_PDF_BYTES,
+  SUBMISSION_DOMAIN,
+  type SubmissionMessage,
+  submissionTypedData,
+} from "./publish/submission.ts";
+export {
+  type PaperSubmission,
+  type Triple,
+  targetKaQuads,
+  VERISCI_NS,
+} from "./publish/target-ka.ts";
+export { type PaperMetadata, parseTeiHeader, type TeiResult } from "./publish/tei.ts";
+export {
+  CHECKS,
+  type Check,
+  type CheckId,
+  checklistOf,
+  STUDY_TYPES,
+  type StudyType,
+} from "./rating/checklists.ts";
 export {
   normalizeForQuote,
   type PaperText,
@@ -46,7 +70,7 @@ export {
   type QuoteText,
   quoteFound,
   quoteTextOf,
-} from "./paper-text.ts";
+} from "./rating/paper-text.ts";
 export {
   classifyTarget,
   paperPdfQuery,
@@ -58,7 +82,7 @@ export {
   rKaQuads,
   type TargetClass,
   triplesFromBindings,
-} from "./rating.ts";
+} from "./rating/rating.ts";
 export {
   CHECK_ANSWERS,
   type CheckAnswer,
@@ -73,23 +97,4 @@ export {
   type ScorerOutput,
   scoreChecks,
   scorerPrompt,
-} from "./scorer.ts";
-export {
-  canonicalContextGraph,
-  MAX_PDF_BYTES,
-  SUBMISSION_DOMAIN,
-  type SubmissionMessage,
-  submissionTypedData,
-} from "./submission.ts";
-export { type PaperSubmission, type Triple, targetKaQuads, VERISCI_NS } from "./target-ka.ts";
-export { type PaperMetadata, parseTeiHeader, type TeiResult } from "./tei.ts";
-export {
-  formatUal,
-  isSameUal,
-  type NormalizeUalResult,
-  normalizeUal,
-  type ParseUalResult,
-  parseUal,
-  type Ual,
-  type UalError,
-} from "./ual.ts";
+} from "./rating/scorer.ts";

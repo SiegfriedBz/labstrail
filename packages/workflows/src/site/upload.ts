@@ -9,7 +9,26 @@ import {
 import { type AssetResult, createDkgClient } from "@verisci/dkg";
 import { createPublicClient, http } from "viem";
 import { baseSepolia } from "viem/chains";
-import { inngest } from "./inngest.ts";
+import { inngest } from "../inngest.ts";
+import {
+  createUploadUrl,
+  deleteFile,
+  findPublicFile,
+  type UploadUrlResult,
+} from "../publish/pinata.ts";
+import {
+  PUBLISH_SETTINGS,
+  type PublishFailure,
+  publishFailureReason,
+} from "../publish/publish-paper.ts";
+import {
+  type PaperSubmittedEvent,
+  type SubmitLimiter,
+  type SubmitResult,
+  submitPaper,
+} from "../publish/submit-paper.ts";
+import { verifySubmission } from "../publish/verify-submission.ts";
+import { createWorkflowsEnv, type WorkflowsEnv } from "../workflows-env.ts";
 import {
   checkSignature,
   listPapers,
@@ -17,21 +36,7 @@ import {
   queryProblem,
   type SignatureCheck,
 } from "./papers.ts";
-import { createUploadUrl, deleteFile, findPublicFile, type UploadUrlResult } from "./pinata.ts";
-import {
-  PUBLISH_SETTINGS,
-  type PublishFailure,
-  publishFailureReason,
-} from "./publish/publish-paper.ts";
-import {
-  type PaperSubmittedEvent,
-  type SubmitLimiter,
-  type SubmitResult,
-  submitPaper,
-} from "./publish/submit-paper.ts";
-import { verifySubmission } from "./publish/verify-submission.ts";
 import { type ReadRunResult, readRun } from "./runs.ts";
-import { createWorkflowsEnv, type WorkflowsEnv } from "./workflows-env.ts";
 
 /** The upload page's timings, in seconds. */
 export const UPLOAD_SETTINGS = {

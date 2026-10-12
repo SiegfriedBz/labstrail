@@ -1,9 +1,9 @@
 import { submissionTypedData, targetKaQuads } from "@verisci/core";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { describe, expect, it } from "vitest";
-import type { SubmitLimiter } from "./publish/submit-paper.ts";
+import type { SubmitLimiter } from "../publish/submit-paper.ts";
+import { createWorkflowsEnv, type WorkflowsEnv } from "../workflows-env.ts";
 import { createUploadService, type UploadIo } from "./upload.ts";
-import { createWorkflowsEnv, type WorkflowsEnv } from "./workflows-env.ts";
 
 const CID = "bafybeicrwkcuhyibpnbzadvjw46tl7s5pl5k5rbf4iaega4x3odats642m";
 const GRAPH = "0xD701ed157232ad5E14BC4134a8D10D64D86f13B3/verisci-staging";

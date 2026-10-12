@@ -1,11 +1,11 @@
-import { assetGraphIri } from "./asset-graph.ts";
-import { BASE_SEPOLIA_CHAIN_ID } from "./chains.ts";
+import { assetGraphIri } from "../assets/asset-graph.ts";
+import { BASE_SEPOLIA_CHAIN_ID } from "../assets/chains.ts";
+import { canonicalCid } from "../assets/cid.ts";
+import { normalizeUal, parseUal } from "../assets/ual.ts";
+import { type QueryBinding, unquote } from "../papers/paper-record.ts";
+import { integer, literal, type Triple, VERISCI_NS } from "../publish/target-ka.ts";
 import { checklistOf, STUDY_TYPES, type StudyType } from "./checklists.ts";
-import { canonicalCid } from "./cid.ts";
-import { type QueryBinding, unquote } from "./paper-record.ts";
 import { CHECK_ANSWERS, type CheckResult, type ScorerOutput } from "./scorer.ts";
-import { integer, literal, type Triple, VERISCI_NS } from "./target-ka.ts";
-import { normalizeUal, parseUal } from "./ual.ts";
 
 /** How a rating run treats a target UAL: `ours` is rated, `invalid` is cancelled. */
 export type TargetClass = "ours" | "invalid";

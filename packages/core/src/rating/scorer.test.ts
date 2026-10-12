@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { AEROSOL_PAGES } from "../fixtures/aerosol-pages.ts";
+import { CITICOLINE_PAGES } from "../fixtures/citicoline-pages.ts";
 import { CHECKS, type CheckId, checklistOf, STUDY_TYPES } from "./checklists.ts";
-import { AEROSOL_PAGES } from "./fixtures/aerosol-pages.ts";
-import { CITICOLINE_PAGES } from "./fixtures/citicoline-pages.ts";
 import { type PaperText, preparePaperText, quoteFound, quoteTextOf } from "./paper-text.ts";
 import {
   CHECK_ANSWERS,

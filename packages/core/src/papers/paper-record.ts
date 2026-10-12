@@ -1,6 +1,6 @@
-import { assetGraphIri } from "./asset-graph.ts";
-import { canonicalCid } from "./cid.ts";
-import { VERISCI_NS } from "./target-ka.ts";
+import { assetGraphIri } from "../assets/asset-graph.ts";
+import { canonicalCid } from "../assets/cid.ts";
+import { VERISCI_NS } from "../publish/target-ka.ts";
 
 /** One row of a SPARQL answer, as the DKG node gives it: IRIs bare, literals quoted. */
 export type QueryBinding = Readonly<Record<string, string>>;

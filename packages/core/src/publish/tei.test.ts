@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { attentionTei } from "./fixtures/attention-tei.ts";
+import { attentionTei } from "../fixtures/attention-tei.ts";
 import { parseTeiHeader } from "./tei.ts";
 
 /** A minimal GROBID header; `analytic` and `profile` are spliced into it. */

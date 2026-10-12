@@ -2,8 +2,8 @@ import { CheckCircle, Question, XCircle } from "@phosphor-icons/react/dist/ssr";
 import { createColumnHelper, tableFeatures } from "@tanstack/react-table";
 import type { PaperSummary, SignatureCheck } from "@verisci/workflows";
 import Link from "next/link";
-import { addressUrl } from "../../lib/explorer.ts";
-import { authorsLine, formatPublished, signatureLabel } from "../../lib/papers.ts";
+import { addressUrl } from "../../lib/papers/explorer.ts";
+import { authorsLine, formatPublished, signatureLabel } from "../../lib/papers/papers.ts";
 import { shorten } from "../../lib/shorten.ts";
 
 /*
