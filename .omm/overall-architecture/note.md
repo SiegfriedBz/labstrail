@@ -1,1 +1,1 @@
-Decisions are in docs/adr/ (index in docs/adr/README.md), facts about the DKG, chain, Inngest and Vercel in docs/domain.md. These diagrams are a dated snapshot, refreshed on demand with omm-scan; the code and the READMEs are the reference.
+Decisions are in docs/adr/ (index in docs/adr/README.md), facts about the DKG, chain, Inngest and Vercel in docs/domain.md. These views are kept current: /review-branch refreshes every element that names what a branch changed, and the reviewer reports one left stale (CONTRIBUTING.md → Docs). Each workspace README links to its views.
