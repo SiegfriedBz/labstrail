@@ -43,7 +43,7 @@ const RATE = [
   {
     icon: UsersThree,
     title: "Human review",
-    body: "Reviewers read the paper and score it. Their score is recorded next to the machine score, which stays as it was.",
+    body: "Reviewers, drawn at random with Chainlink VRF so anyone can check the draw was fair, read the paper and score it. Their score is recorded next to the first one, which stays as it was.",
   },
   {
     icon: Flask,
