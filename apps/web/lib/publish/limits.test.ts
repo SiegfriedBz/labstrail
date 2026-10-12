@@ -54,6 +54,22 @@ describe("counter", () => {
     await expect(counter(broken).count("a")).resolves.toBeUndefined();
     expect(await counter(timingOut).take("a")).toEqual({ unavailable: "timeout" });
   });
+  it("never logs the command Upstash echoes, which holds the visitor's IP", async () => {
+    const refused = new Error(
+      'WRONGPASS invalid password, command was: ["evalsha","abc",["verisci:upload-url:203.0.113.7"]]',
+    );
+    const broken: RateWindow = {
+      limit: () => Promise.reject(refused),
+      getRemaining: () => Promise.reject(refused),
+    };
+
+    expect(await counter(broken).take("203.0.113.7")).toEqual({
+      unavailable: "WRONGPASS invalid password",
+    });
+    expect(await counter(broken).check("203.0.113.7")).toEqual({
+      unavailable: "WRONGPASS invalid password",
+    });
+  });
 });
 
 describe("createLimits", () => {

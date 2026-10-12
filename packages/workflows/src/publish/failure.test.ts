@@ -12,6 +12,38 @@ describe("describeFailure", () => {
     );
   });
 
+  it("names a refused connection whose cause has no message, by its addresses' errors", () => {
+    const refused = Object.assign(
+      new AggregateError(
+        [
+          new Error("connect ECONNREFUSED ::1:8288"),
+          new Error("connect ECONNREFUSED 127.0.0.1:8288"),
+        ],
+        "",
+      ),
+      { code: "ECONNREFUSED" },
+    );
+
+    expect(describeFailure(new TypeError("fetch failed", { cause: refused }))).toBe(
+      "fetch failed (connect ECONNREFUSED ::1:8288)",
+    );
+  });
+
+  it("names a cause with no message by its code", () => {
+    const cause = Object.assign(new Error(""), { code: "ECONNRESET" });
+
+    expect(describeFailure(new Error("fetch failed", { cause }))).toBe("fetch failed (ECONNRESET)");
+  });
+
+  it("adds the HTTP status an error carries", () => {
+    const error = Object.assign(new Error("HTTP request failed.\n\nStatus: 429"), {
+      shortMessage: "HTTP request failed.",
+      status: 429,
+    });
+
+    expect(describeFailure(error)).toBe("HTTP request failed. (HTTP 429)");
+  });
+
   it("keeps a timeout's message", () => {
     expect(describeFailure(new DOMException("The operation was aborted due to timeout"))).toBe(
       "The operation was aborted due to timeout",

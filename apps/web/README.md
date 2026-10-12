@@ -53,7 +53,8 @@ A service that does not answer gives the visitor "A service we rely on didn't an
 the server logs one warning naming it: `upload-url-unavailable: <service>: <what came back>`
 (`upstash`, `pinata`) for an upload URL, `submit-unavailable: …` for a submission
 ([`packages/workflows`](../../packages/workflows/README.md#the-pages-calls)). The line never
-carries a key or a URL.
+carries a key, a URL or the visitor's IP: the limits drop the command Upstash echoes in its
+errors, whose key holds the IP.
 
 ### The papers list
 

@@ -118,7 +118,10 @@ export interface PublishSteps {
   sleep(id: string, duration: string): Promise<void>;
 }
 
-/** Where a publish run logs the field check's verdicts: Inngest's logger. */
+/**
+ * Where a publish run logs the field check's verdicts (Inngest's logger), and where a
+ * submission or an upload URL names a service that gave no answer (the server's console).
+ */
 export interface PublishLogger {
   info(message: string): void;
   warn(message: string): void;

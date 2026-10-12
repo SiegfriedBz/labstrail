@@ -78,7 +78,7 @@ upload page reads runs there, with no keys.
 | `UploadService`, `PaperStatus`, `PublishedRecord`, `UPLOAD_SETTINGS` | Their type, what `readPaper` returns (the Target KA's state and the run), and the upload URL's and signature's lifetimes |
 | `SubmitResult`, `SubmitRefusal`, `SubmitLimiter`, `LimitAnswer` | What `submitPaper` returns, why it refuses, the per-submitter limit the web app passes it, and the limit's answer (`unavailable` carries what the store threw) |
 | `UploadUrlResult`, `PinataUnavailable`, `ReadRunResult`, `RunState` | What `createUploadUrl` and the run read return; Pinata's `unavailable` carries what came back (`HTTP 503`, `unexpected answer`, or the error) |
-| `describeFailure(error)`, `PublishLogger` | A thrown value as one short log line, with its cause and with URLs, bearer tokens, JWTs and long hex removed; the logger a run or a submission warns through |
+| `describeFailure(error)`, `PublishLogger` | A thrown value as one short log line, with its HTTP status and up to three causes (a refused connection names its address and port), and with URLs, bearer tokens, JWTs and long hex removed; the logger a run or a submission warns through |
 | `PaperListResult`, `PaperSummary`, `SignatureCheck`, `QueryProblem` | What `listPapers` returns: a page of papers with the total, or why not (`unavailable`, `unreadable`); one listed paper; a signature check (`valid`, `invalid`, `unknown`) |
 | `env` (from `@verisci/workflows/env`); `createWorkflowsEnv(runtimeEnv)`, `WorkflowsEnv` (from either entry) | The validated settings, the function that builds them from a given object, and their type |
 

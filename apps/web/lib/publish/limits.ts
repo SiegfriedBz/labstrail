@@ -57,7 +57,7 @@ export function counter(window: RateWindow): Counter {
       try {
         return (await window.getRemaining(key)).remaining > 0 ? "allowed" : "limited";
       } catch (error) {
-        return { unavailable: describeFailure(error) };
+        return { unavailable: storeFailure(error) };
       }
     },
     count: async (key) => {
@@ -73,10 +73,18 @@ export function counter(window: RateWindow): Counter {
         if (hit.reason === "timeout") return { unavailable: "timeout" };
         return hit.success ? "allowed" : "limited";
       } catch (error) {
-        return { unavailable: describeFailure(error) };
+        return { unavailable: storeFailure(error) };
       }
     },
   };
+}
+
+/**
+ * What the store threw, for a log: Upstash ends its errors with the command it was sent,
+ * whose key holds the visitor's IP or address, so the line stops before it.
+ */
+function storeFailure(error: unknown): string {
+  return describeFailure(error).split(", command was:", 1)[0] ?? "";
 }
 
 /** Upstash's REST address and token, or none to count in memory. */

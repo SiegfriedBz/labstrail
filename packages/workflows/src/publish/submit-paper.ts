@@ -6,11 +6,14 @@ import type { SubmissionRefusal, VerifiedSubmission, VerifyResult } from "./veri
 
 /**
  * A limiter's answer: `unavailable` when its store could not be read, with what the store
- * threw, as `describeFailure` gives it, for a log.
+ * threw (as `describeFailure` gives it) or `timeout`, for a log.
  */
 export type LimitAnswer = "allowed" | "limited" | { readonly unavailable: string };
 
-/** How many papers each submitter may publish; the web app keeps the counts in Upstash (ADR 0035). */
+/**
+ * How many papers each submitter may publish; the web app keeps the counts, in Upstash or,
+ * locally without it, in memory (ADR 0035).
+ */
 export interface SubmitLimiter {
   /** Whether `address` may submit another paper now, without counting one. */
   check(address: string): Promise<LimitAnswer>;
