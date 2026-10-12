@@ -1,10 +1,10 @@
 graph LR
     publish["Publish\nsrc/publish/"] -->|"chain id of the signed domain"| assets["Assets\nsrc/assets/"]
-    papers["Papers\nsrc/papers/"] -->|"Target KA predicates and triple helpers"| publish
+    papers["Papers\nsrc/papers/"] -->|"the urn:verisci: namespace"| publish
     papers -->|"UALs, CIDs, asset names, graph IRIs"| assets
     rating["Rating\nsrc/rating/"] -->|"graph IRIs, chain ids, CIDs, UALs"| assets
     rating -->|"SPARQL row type, unquote"| papers
-    rating -->|"Target KA predicates and triple helpers"| publish
-    fixtures["Fixtures\nsrc/fixtures/"] -.->|"TEI and PDF pages for tests"| rating
+    rating -->|"the namespace and triple helpers"| publish
+    fixtures["Fixtures\nsrc/fixtures/"] -.->|"PDF pages for tests"| rating
     fixtures -.->|"SPARQL rows for tests"| papers
     fixtures -.->|"GROBID TEI for tests"| publish

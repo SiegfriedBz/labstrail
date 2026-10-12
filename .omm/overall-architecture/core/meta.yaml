@@ -1,6 +1,6 @@
 created: 2026-10-12T05:42:03.463Z
-updated: 2026-10-12T06:11:30.794Z
-update_count: 4
+updated: 2026-10-12T06:14:42.873Z
+update_count: 5
 last_field: diagram
 kind: nested-class
 title: core
@@ -14,9 +14,11 @@ parentPath: []
 prev_diagram: >
   graph LR
       publish["Publish\nsrc/publish/"] -->|"chain id of the signed domain"| assets["Assets\nsrc/assets/"]
-      papers["Papers\nsrc/papers/"] -->|"Target KA predicates"| publish
-      papers -->|"UALs, CIDs, asset names, graph rows"| assets
-      rating["Rating\nsrc/rating/"] -->|"R-KA names, target UALs, CIDs"| assets
-      rating -->|"the paper's record"| papers
-      rating -->|"triple helpers"| publish
-      fixtures["Fixtures\nsrc/fixtures/"] -.->|"test data"| rating
+      papers["Papers\nsrc/papers/"] -->|"Target KA predicates and triple helpers"| publish
+      papers -->|"UALs, CIDs, asset names, graph IRIs"| assets
+      rating["Rating\nsrc/rating/"] -->|"graph IRIs, chain ids, CIDs, UALs"| assets
+      rating -->|"SPARQL row type, unquote"| papers
+      rating -->|"Target KA predicates and triple helpers"| publish
+      fixtures["Fixtures\nsrc/fixtures/"] -.->|"TEI and PDF pages for tests"| rating
+      fixtures -.->|"SPARQL rows for tests"| papers
+      fixtures -.->|"GROBID TEI for tests"| publish
