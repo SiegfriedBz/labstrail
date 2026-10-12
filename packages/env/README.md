@@ -15,7 +15,7 @@ at once, and the web app on the request that reads them
 Status: `defineEnv`, the shared `NODE_ENV`/`APP_ENV` schema and `EnvError`, used by every
 workspace's env module.
 
-Architecture views: [`.omm/overall-architecture/env/`](../../.omm/overall-architecture/env/) (`omm view --port 4000` shows them; root README → Architecture).
+Architecture views: [`.omm/overall-architecture/env/`](../../.omm/overall-architecture/env/) (`pnpm exec omm view --port 4000` shows them; root README → Architecture).
 
 ## Depends on
 

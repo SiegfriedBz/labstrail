@@ -86,10 +86,11 @@ The diagrams below show the target design; the workspaces build it plan by plan.
 
 Architecture views (overall architecture, the publish and rating pipelines, external
 integrations, state machines, routes) are in [`.omm/`](.omm/), written with
-[oh-my-mermaid](https://github.com/oh-my-mermaid/oh-my-mermaid) (`npm install -g
-oh-my-mermaid`): each element describes a folder, a flow or a service, with a Mermaid diagram.
-`/review-branch` refreshes the elements a branch changes, so they stay current; each
-workspace README links to its own. `omm view --port 4000` shows them in a browser.
+[oh-my-mermaid](https://github.com/oh-my-mermaid/oh-my-mermaid), a pinned dev dependency:
+each element describes a folder, a flow or a service, with a Mermaid diagram. Each branch
+refreshes the elements it changes (`/implement`), and `/review-branch` blocks a PR that
+leaves one stale; each workspace README links to its own. `pnpm exec omm view --port 4000`
+shows them in a browser.
 
 ### Environments and resources
 
@@ -347,7 +348,7 @@ rules. `.claude/` holds the shared settings, hooks, skills and the read-only rev
 | --- | --- |
 | `/plan-feature <name>` | Writes `docs/plans/NNN-<name>.md` from the plan template |
 | `/implement <NNN>` | Branches from `develop`, writes the tests first, then implements until green |
-| `/review-branch` | Runs CI's checks, tests and builds, refreshes the architecture views the branch changed, then a read-only review; blocks on any failure, stale docs or ADR conflict, then drafts the PR |
+| `/review-branch` | Runs CI's checks, tests and builds, then a read-only review; blocks on any failure, stale docs (the architecture views included) or ADR conflict, then drafts the PR |
 | `/review-adrs` | On demand: checks every ADR against every other and reports conflicts for the maintainer to decide |
 
 Hooks format, lint and test each file Claude edits, block edits to generated files and

@@ -7,7 +7,7 @@ rating request and of the contract's oracle, and the calldata of the oracle's ca
 Status: `RatingController` v2 is implemented and tested. Deployed addresses are
 recorded in `deployments/base-sepolia.json`.
 
-Architecture views: [`.omm/overall-architecture/contracts/`](../../.omm/overall-architecture/contracts/), [`.omm/state-transitions/rating-request/`](../../.omm/state-transitions/rating-request/) (`omm view --port 4000` shows them; root README → Architecture).
+Architecture views: [`.omm/overall-architecture/contracts/`](../../.omm/overall-architecture/contracts/), [`.omm/state-transitions/rating-request/`](../../.omm/state-transitions/rating-request/) (`pnpm exec omm view --port 4000` shows them; root README → Architecture).
 
 ## Depends on
 

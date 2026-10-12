@@ -88,10 +88,10 @@ touches is true again.
   `@notice`, `@param` and `@return`, or uses `@inheritdoc`. `pnpm check`
   enforces this.
 - **Architecture views.** `.omm/` holds the architecture views written with oh-my-mermaid
-  (`omm`): each element describes a folder, a flow or a service, with a diagram. A PR
-  refreshes every element that names what it changed (a path, a step, a behaviour) and adds
-  one for a new folder or flow; `/review-branch` does it before the review, and the
-  reviewer reports an element left stale.
+  (`pnpm exec omm`, pinned in the root `package.json`): each element describes a folder, a
+  flow or a service, with a diagram. A branch refreshes every element that names what it
+  changed (a path, a step, a behaviour) and adds one for a new folder or flow; `/implement`
+  does it with the other docs, and `/review-branch` blocks the PR on an element left stale.
 - **ADRs.** A branch's code and ADRs agree with the accepted ADRs.
   `/review-branch` blocks the PR on a conflict until you decide to amend an
   ADR, supersede it, or change the code; `/review-adrs` checks all ADRs on
@@ -137,6 +137,6 @@ commit, brings the fix back.
 | Create branch | Proposes the name, runs `git switch -c` | Approve |
 | Commit | Writes the message, runs `git commit` (asks first) | Approve or edit |
 | Push | — (denied in settings) | `git push -u origin <branch>` |
-| Open PR | `/review-branch` runs CI's checks and builds, refreshes the architecture views the branch changed, reviews code, docs and ADRs, then drafts title and description | Decide any ADR conflict it reports; then `gh pr create` or GitHub UI |
+| Open PR | `/review-branch` runs CI's checks and builds, reviews code, docs (the architecture views included) and ADRs, then drafts title and description | Decide any ADR conflict it reports; then `gh pr create` or GitHub UI |
 | Merge | — | Squash and merge into `develop` when CI is green |
 | Release | Drafts the release PR | Merge commit into `main` |

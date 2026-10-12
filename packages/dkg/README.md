@@ -16,7 +16,7 @@ query (`query`), which reads a published paper's record back, lists the publishe
 (a page, the count and the page's first authors), and, in a rating run, reads a paper's PDF
 link and a rating back; and `checkGraph`, whether the node serves the graph.
 
-Architecture views: [`.omm/overall-architecture/dkg-client/`](../../.omm/overall-architecture/dkg-client/), [`.omm/state-transitions/asset-state/`](../../.omm/state-transitions/asset-state/) (`omm view --port 4000` shows them; root README → Architecture).
+Architecture views: [`.omm/overall-architecture/dkg-client/`](../../.omm/overall-architecture/dkg-client/), [`.omm/state-transitions/asset-state/`](../../.omm/state-transitions/asset-state/) (`pnpm exec omm view --port 4000` shows them; root README → Architecture).
 
 ## Depends on
 

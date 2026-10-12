@@ -8,7 +8,7 @@ a daily budget.
 Status: in use beside the DKG node on a developer's computer, started by hand; its server
 setup waits for the node server plan.
 
-Architecture views: [`.omm/overall-architecture/rpc-proxy/`](../../.omm/overall-architecture/rpc-proxy/) (`omm view --port 4000` shows them; root README → Architecture).
+Architecture views: [`.omm/overall-architecture/rpc-proxy/`](../../.omm/overall-architecture/rpc-proxy/) (`pnpm exec omm view --port 4000` shows them; root README → Architecture).
 
 ## Depends on
 
