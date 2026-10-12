@@ -81,6 +81,134 @@ describe("parseTeiHeader", () => {
     });
   });
 
+  describe("accents GROBID splits from the letters of authors' names", () => {
+    const named = (...parts: [string, string][]) =>
+      parseTeiHeader(
+        tei({
+          analytic: `<author><persName>${parts.map(([tag, part]) => `<${tag}>${part}</${tag}>`).join("")}</persName></author>`,
+        }),
+      );
+    const authors = (...names: string[]) =>
+      parseTeiHeader(
+        tei({
+          analytic: names
+            .map((name) => `<author><persName><surname>${name}</surname></persName></author>`)
+            .join(""),
+        }),
+      );
+
+    it("joins a spacing acute after a dotless i, and drops the space before it", () => {
+      expect(authors("Montserrat Rodr\u0131 \u00b4guez-Ayala")).toMatchObject({
+        metadata: { authors: ["Montserrat Rodr\u00edguez-Ayala"] },
+      });
+    });
+
+    it("joins an accent after a space to the letter before it", () => {
+      expect(authors("Bele \u00b4n Moreno-Franco", "Je \u00b4re \u00b4mie")).toMatchObject({
+        metadata: { authors: ["Bel\u00e9n Moreno-Franco", "J\u00e9r\u00e9mie"] },
+      });
+    });
+
+    it("joins an accent right after a dotless i", () => {
+      expect(authors("Rodr\u0131\u00b4guez")).toMatchObject({
+        metadata: { authors: ["Rodr\u00edguez"] },
+      });
+    });
+
+    it("gives an acute before a dotless i to the i", () => {
+      expect(authors("Garc \u00b4\u0131a")).toMatchObject({
+        metadata: { authors: ["Garc\u00eda"] },
+      });
+    });
+
+    it.each([
+      ["a diaeresis", "Mu \u00a8ller", "M\u00fcller"],
+      ["a cedilla", "Franc \u00b8ois", "Fran\u00e7ois"],
+      ["a caron", "Dvor \u02c7\u00e1k", "Dvo\u0159\u00e1k"],
+      ["a breve before a Turkish dotless i", "Yag \u02d8\u0131z", "Ya\u011f\u0131z"],
+    ])("joins %s", (_, split, whole) => {
+      expect(authors(split)).toMatchObject({ metadata: { authors: [whole] } });
+    });
+
+    it("composes a letter and a combining accent into one letter", () => {
+      const result = authors("Jose\u0301");
+
+      expect(result).toMatchObject({ metadata: { authors: ["Jos\u00e9"] } });
+      expect(result.ok && result.metadata.authors[0]).toHaveLength(4);
+    });
+
+    it("gives an accent that opens a lowercase surname to the end of the forename", () => {
+      expect(named(["forename", "Jose"], ["surname", "\u00b4ramo \u00b4n Banegas"])).toMatchObject({
+        metadata: { authors: ["Jos\u00e9 ram\u00f3n Banegas"] },
+      });
+    });
+
+    it("joins an accent after a one-letter part inside the word it opens", () => {
+      expect(
+        named(["forename", "Maria"], ["forename", "A"], ["surname", "\u00b4lvarez"]),
+      ).toMatchObject({ metadata: { authors: ["Maria \u00c1lvarez"] } });
+    });
+
+    it("joins an accent after an initial ending a longer forename inside the surname", () => {
+      expect(named(["forename", "Carlos A"], ["surname", "\u00b4lvarez"])).toMatchObject({
+        metadata: { authors: ["Carlos \u00c1lvarez"] },
+      });
+    });
+
+    it("gives an accent that opens a surname before a dotless i to the i, in one word", () => {
+      expect(named(["forename", "Garc"], ["surname", "\u00b4\u0131a-Esquinas"])).toMatchObject({
+        metadata: { authors: ["Garc\u00eda-Esquinas"] },
+      });
+    });
+
+    it("keeps an accent that opens a surname when the forename's letter cannot take it", () => {
+      expect(named(["forename", "Ahmad"], ["surname", "\u00b4ali"])).toMatchObject({
+        metadata: { authors: ["Ahmad \u00b4ali"] },
+      });
+    });
+
+    it("keeps an accent that opens a capitalised surname where it is", () => {
+      expect(named(["forename", "Juan"], ["surname", "\u00b4Alvarez"])).toMatchObject({
+        metadata: { authors: ["Juan \u00b4Alvarez"] },
+      });
+    });
+
+    it("keeps the space after an accent its letter before takes", () => {
+      expect(authors("Rene \u00b4 Descartes")).toMatchObject({
+        metadata: { authors: ["Ren\u00e9 Descartes"] },
+      });
+    });
+
+    it.each([
+      ["an apostrophe before a capital", "O\u00b4Brien"],
+      ["an apostrophe before a lowercase letter", "N\u00b4diaye Sa\u00b4id Dell\u00b4acqua"],
+      ["a letter before that takes no such accent", "Nguy\u00ea \u02dcn"],
+      ["no letter before it", "Li 3\u00b4"],
+      ["a space and no letter before it", "J. \u00b4a"],
+      ["ASCII ^, ~ or a backtick", "A^b C~d E`f"],
+    ])("keeps %s", (_, name) => {
+      expect(authors(name)).toMatchObject({ metadata: { authors: [name] } });
+    });
+
+    it("leaves the title and the abstract as GROBID gives them", () => {
+      const title = "Alzheimer\u00b4s disease and the 3\u00b4 UTR";
+      const abstract = "The \u00b4normal\u00b4 group, in \u02dc30% of cases.";
+      const result = parseTeiHeader(
+        tei({ profile: `<abstract><p>${abstract}</p></abstract>` }).replace("A Title", title),
+      );
+
+      expect(result).toMatchObject({ metadata: { title, abstract } });
+    });
+
+    it("gives the same metadata for the same header", () => {
+      const xml = tei({
+        analytic: "<author><persName><surname>Bele \u00b4n</surname></persName></author>",
+      });
+
+      expect(parseTeiHeader(xml)).toEqual(parseTeiHeader(xml));
+    });
+  });
+
   it("is ok with no abstract and no authors", () => {
     expect(parseTeiHeader(tei({}))).toEqual({
       ok: true,

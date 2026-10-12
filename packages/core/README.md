@@ -120,8 +120,19 @@ A Target KA describes a paper and who submitted it
 
 - **Metadata** comes from GROBID's TEI header, read by `parseTeiHeader`: the main title,
   each author's forenames and surname in document order, the abstract's paragraphs and the
-  DOI, each with its whitespace collapsed. A header with no title is refused, and so is XML
-  with any parse error (`not-tei`), without printing anything.
+  DOI, each with its whitespace collapsed. In authors' names (in Unicode NFC), an accent
+  GROBID gives apart from its letter is joined back in the shapes GROBID gives: after a space
+  or a dotless `ı`, to the letter before it (`Bele ´n` → `Belén`, `Rodrı ´guez` →
+  `Rodríguez`); an acute, grave, diaeresis or circumflex before a dotless `ı`, to the `ı`
+  (`Garc ´ıa` → `García`). It joins only when the two make one letter of Latin-1 Supplement to
+  Latin Extended-B (`é`, `ü`, `ç`, `ř`, `ő`), so a Vietnamese `ễ` stays split. An accent that
+  opens a surname before a lowercase letter goes to the forename's last letter, unless the
+  forename ends in an initial or its letter cannot take it; one before a dotless `ı` is left to
+  the `ı`. An accent right after a letter or before
+  a capital is an apostrophe and stays (`N´diaye`, `O´Brien`). The title and the abstract stay
+  as GROBID gives them: papers also write `´` as an apostrophe or a prime (`Alzheimer´s`,
+  `3´ UTR`). A header with no title is refused, and so is XML with any parse error
+  (`not-tei`), without printing anything.
 - **Triples:** the subject is `urn:verisci:paper:<cid>`, typed `schema:ScholarlyArticle`,
   with `schema:name`, `schema:url` (`ipfs://<cid>`), `schema:abstract`, `schema:sameAs`
   (`https://doi.org/<doi>`), and one `schema:author` node per author,
