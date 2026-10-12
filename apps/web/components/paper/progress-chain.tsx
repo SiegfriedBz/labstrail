@@ -13,7 +13,7 @@ const STEPS: readonly { label: string; layer?: "off-chain" | "on-chain"; detail:
   { label: "Published", detail: "Anyone can check who submitted it" },
 ];
 
-/** Classes per layer: emerald for the off-chain record, cyan for the on-chain asset. */
+/** Classes per layer: blue for the off-chain record, teal for the on-chain asset. */
 const TONE = {
   "off-chain": {
     text: "text-accent",
@@ -125,8 +125,8 @@ export function ProgressChain({
 }
 
 /**
- * Every step done, as a four-column stepper: a check per step on one line (emerald, then
- * emerald into cyan from the save to the mint), each label under its check. Four columns
+ * Every step done, as a four-column stepper: a check per step on one line (blue, then blue
+ * into teal from the save to the mint), each label under its check. Four columns
  * fit a phone, so the row never wraps.
  */
 function CompactChain() {

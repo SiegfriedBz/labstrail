@@ -17,10 +17,11 @@ import type { DkgClient, DkgFailure } from "@verisci/dkg";
 import { type Inngest, type InngestFunction, NonRetriableError } from "inngest";
 import type { Hex } from "viem";
 import { z } from "zod";
+import type { GeminiFailureResult } from "../gemini/gemini.ts";
 import type { ReadPaperTextResult } from "../pdf/paper-text.ts";
 import { RATING_REQUESTED } from "./events.ts";
 import type { OracleInput, OracleLogger, OracleResult } from "./oracle.ts";
-import type { ScoreFailureResult, ScoreResult } from "./scorer.ts";
+import type { ScoreResult } from "./scorer.ts";
 
 /** The rating run's settings (ADRs 0008, 0009, 0015, 0018, 0020). */
 export const RATING_SETTINGS = {
@@ -463,7 +464,7 @@ async function findPdf(attempt: number, run: RunContext): Promise<string | Attem
 }
 
 /** A Gemini call that did not answer: a refused request is ours to fix, the rest retried. */
-function geminiFailed(result: ScoreFailureResult): Attempt {
+function geminiFailed(result: GeminiFailureResult): Attempt {
   return result.reason === "refused"
     ? {
         kind: "fatal",

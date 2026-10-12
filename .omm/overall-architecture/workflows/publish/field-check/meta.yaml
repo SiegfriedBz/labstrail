@@ -1,0 +1,10 @@
+created: 2026-10-12T08:14:51.017Z
+updated: 2026-10-12T08:14:51.018Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: field-check
+children: []
+parentPath:
+  - workflows
+  - publish

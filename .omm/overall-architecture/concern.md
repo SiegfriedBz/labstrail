@@ -1,3 +1,3 @@
 - The DKG node, GROBID and the RPC proxy run on one host, today a developer's computer: when it is down, nothing can be published or rated.
-- Gemini's free tier allows 20 scorer requests a day per project, which bounds how many papers are rated a day.
+- Gemini's free tier allows 20 scorer requests a day per project, which bounds how many papers are rated a day; the publish run's field check uses another model with its own quota, and publishes a paper unchecked when Gemini cannot answer.
 - Pinata holds the only copy of each PDF until a second pin is added.

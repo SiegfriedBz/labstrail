@@ -116,8 +116,10 @@ stateDiagram-v2
 - A minted asset is `published` whatever the run says, so a second submitter of the same
   PDF sees it at once.
 - `refused` shows why (`lib/publish/messages.ts` → `refusalMessage`): not a PDF, too large,
-  unreadable, no title (with a hint for PDFs whose pages are pictures), or a submission
-  that failed its checks.
+  unreadable, no title or no text (with a hint for PDFs whose pages are pictures), a paper
+  outside the field (VeriSci publishes life-science and health papers only, the field named
+  as [ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md) names
+  it), or a submission that failed its checks.
 - `failed` shows why the run stopped (`failureMessage`): Base, the PDF, the DKG node or
   the mint not answering after every retry, or a problem on our side.
 - `following`: the event started no run a minute after it was sent (its time is read from
@@ -152,7 +154,8 @@ the EIP-712 domain and type to check the signature with.
 - `lib/`: each flow's logic, pure or with its IO passed in, tested in unit tests, in the
   flow's folder: `publish` (the upload, the publish form's steps, a paper's progress, the
   messages and the limits) and `papers` (the list and explorer links). Only helpers several
-  areas share sit at its root: `web-env`, `server`, `theme`, `shorten`, `utils` and
+  areas share sit at its root: `web-env`, `server`, `site` (the name and description the
+  metadata, the footer and the wallet window read), `theme`, `shorten`, `utils` and
   `empty-module`.
 - `components/`, grouped by area: `site` (the shell every page shares: logo, header links,
   theme button, footer, breadcrumbs), `wallet` (the wallet providers and button),
@@ -161,7 +164,7 @@ the EIP-712 domain and type to check the signature with.
 
 ## Design
 
-A lab instrument with a web3 edge, in Tailwind CSS v4 (`app/globals.css`):
+The "Clinical" look: a clinical record with an on-chain proof, in Tailwind CSS v4 (`app/globals.css`):
 
 - Two themes: light by default, dark once the visitor picks it with the sun and moon button
   in the header; the choice is kept in this browser (`localStorage`). `THEME_SCRIPT`
@@ -170,18 +173,21 @@ A lab instrument with a web3 edge, in Tailwind CSS v4 (`app/globals.css`):
   button's name is the same in both themes and CSS picks its icon, so it is right before
   JavaScript runs. AppKit's wallet window follows the same theme. Every colour is a token
   defined for both themes: light accents are dark enough for AA text contrast, and dark is
-  a dimmed graphite with solid panels one step lighter than the page.
-- An off-white page (graphite in dark), a soft wash across the top of each page (emerald
-  from the top left, cyan from the top right), one soft glow behind the hero. Raised panels
+  a deep blue-grey with solid panels one step lighter than the page. `app/globals.test.ts`
+  reads both themes' tokens and holds text to WCAG AA (4.5:1 on the page for ink, muted,
+  both accents and danger, accent text on its fill, white on `accent-deep`).
+- The "Clinical" look: a cool off-white page (deep blue-grey in dark), a soft wash across
+  the top of each page (blue from the top left, teal from the top right), one soft glow
+  behind the hero. Raised panels
   with hairline borders hold figures, tools, tables and lists: the hero's publish flow, the
   UAL figure, the example asset, the papers table and its messages, the paper page's verify
   and publish panels, the publish form and the footer's contracts. Elsewhere, coloured
   edges, timelines and hairline rules group the content, with one call to action per page.
-- Two signal colours with one meaning each: emerald for the off-chain record, cyan for the
-  on-chain asset. They blend only on the main action, live lines, and the line linking a
-  save to its mint in the publish chain. Text links are ink with an emerald underline
+- Two signal colours with one meaning each: blue for the off-chain record, teal for the
+  on-chain asset. They blend only on the logo, the main action, live lines, and the line
+  linking a save to its mint in the publish chain. Text links are ink with a blue underline
   (`link`); addresses in the papers list and the footer's contract links are muted and
-  turn cyan on hover. The header's wallet button is neutral, so each page's own call to
+  turn teal on hover. The header's wallet button is neutral, so each page's own call to
   action leads.
 - Sora for text, Martian Mono for on-chain values (`next/font`), Phosphor icons. One radius
   scale: `rounded-2xl` panels, `rounded-xl` buttons and inputs, `rounded-lg` small
@@ -199,10 +205,12 @@ A lab instrument with a web3 edge, in Tailwind CSS v4 (`app/globals.css`):
   first screen, so the next section starts below the fold; below `md`, the hero's text
   fills the first screen and its panel starts just under the fold. On-chain values show in
   short form with a copy button.
-- The product name is VeriSci; its mark (`components/site/logo.tsx`, and `app/icon.svg` for the
-  tab) is a check drawn as three linked graph nodes.
+- The product name is VeriSci, for life-science and health papers; its name and description
+  come from `lib/site.ts` (`SITE`). Its mark (`components/site/logo.tsx`, and `app/icon.svg`
+  for the tab, in fixed colours that read on light and dark tabs) is a heartbeat whose last
+  beat is a check, drawn from the record's blue into the proof's teal.
 - Keyboard users get a skip link and one accent focus ring; the header underlines the
-  current page's link in emerald. On phones the wallet button is a wallet icon (with a dot
+  current page's link in blue. On phones the wallet button is a wallet icon (with a dot
   once connected) beside the theme button, so the header keeps one line; once connected it
   is named by the short address it shows, and AppKit's own window opens from it.
 - What the DKG node answers loads behind a skeleton shaped like what replaces it, streamed
@@ -228,7 +236,7 @@ unless `APP_ENV` is `local`:
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis's REST address and token, for the limits: one database per environment, previews using staging's ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)). The token is secret |
 | `REOWN_PROJECT_ID` | The Reown project id for the wallet window, from one project shared by every environment, read on the server and handed to the page, so nothing is inlined at build time. Without it the pages say the wallet is not set up |
 
-The pages also need the workflows' settings (DKG, Pinata, chain, Inngest;
+The pages also need the workflows' settings (DKG, Pinata, chain, Gemini, Inngest;
 [`packages/workflows`](../../packages/workflows/README.md#environment)). With
 `APP_ENV=local`, `/api/inngest` and the upload page talk to the Inngest dev server.
 `instrumentation.ts` checks the workflows' and the web app's settings when a deployed server

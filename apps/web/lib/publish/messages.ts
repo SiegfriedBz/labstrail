@@ -71,6 +71,12 @@ export function refusalMessage(reason: RefusalReason): string {
       return "We couldn't read the first page of this PDF.";
     case "no-title":
       return "We couldn't find a title on the first page of this PDF. If its pages are pictures (a scan, or a PDF saved from a browser's viewer), we can't read them: use the publisher's original PDF.";
+    case "unreadable":
+      return "We couldn't read the text of this PDF, so it wasn't published: a paper we can't read can't be rated. Use the publisher's original PDF.";
+    case "no-text":
+      return "We found no text in this PDF. If its pages are pictures (a scan, or a PDF saved from a browser's viewer), we can't read them: use the publisher's original PDF.";
+    case "outside-field":
+      return "VeriSci publishes papers in the life sciences and health only: biology, medicine, neuroscience, pharmacology, public health and bioinformatics, and psychology when the study is about health. Our check placed this paper outside that field, so it wasn't published.";
     case "expired":
       return "The signature expired before the paper was read. Publish it again.";
     case "bad-signature":

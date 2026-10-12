@@ -1,9 +1,9 @@
-created: 2026-10-12T05:46:23.737Z
-updated: 2026-10-12T05:46:23.737Z
+created: 2026-10-12T08:13:31.540Z
+updated: 2026-10-12T08:13:31.541Z
 update_count: 1
 last_field: description
 kind: nested-class
-title: read-paper
+title: parse-paper
 children: []
 parentPath:
   - publish-run

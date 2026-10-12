@@ -40,9 +40,10 @@ export async function readPaperText(
 }
 
 /**
- * A PDF's text for the scorer: each page's text extracted with unpdf, then prepared with
- * `preparePaperText` and fitted to `maxChars`. `unreadable` for a PDF that does not parse,
- * `no-text` for one with no text layer. Never throws.
+ * A PDF's text for the scorer, and its opening for the publish run's field check: each
+ * page's text extracted with unpdf, then prepared with `preparePaperText` and fitted to
+ * `maxChars`. `unreadable` for a PDF that does not parse, `no-text` for one with no text
+ * layer. Never throws.
  */
 export async function paperTextOf(
   bytes: Uint8Array,

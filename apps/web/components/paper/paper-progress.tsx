@@ -36,7 +36,7 @@ const NOW: Partial<Record<PaperStage["stage"], string>> = {
   following:
     "Another submission of this PDF is being published right now, so yours started nothing new. This page follows that one and updates when the paper is saved and minted.",
   reading:
-    "We fetch your PDF from IPFS and read its first page: title, authors, abstract and DOI. Nothing is written yet.",
+    "We fetch your PDF from IPFS, read its title, authors, abstract and DOI, and check it's a life-science or health paper. Nothing is written yet. When our check is busy, this can take a few minutes.",
   saving:
     "The record is written to VeriSci's DKG node, then shared to the context graph's shared memory, where peer nodes acknowledge it.",
   minting:
@@ -221,7 +221,7 @@ function StageNote({ stage, resubmitted }: { stage: PaperView; resubmitted: bool
       return <Problem text={failureMessage(stage.reason)} />;
     case "not-published":
       return (
-        <Problem text="This paper didn't pass our checks. Make sure it's a readable PDF with a title on its first page, then publish it again." />
+        <Problem text="This paper wasn't published. Make sure it's a readable PDF of a life-science or health paper, with its title on the first page, then publish it again." />
       );
     case "not-found":
       return (

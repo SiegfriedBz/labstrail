@@ -1,9 +1,9 @@
 created: 2026-10-12T05:49:40.626Z
-updated: 2026-10-12T05:50:04.248Z
-update_count: 8
-last_field: diagram
-git_commit: dff0db5
-git_branch: refactor/024-folder-reorg
+updated: 2026-10-12T15:17:32.125Z
+update_count: 9
+last_field: note
+git_commit: c5f7a73
+git_branch: feat/023-scope-and-branding
 prev_diagram: >
   graph LR
       home["Home\napp/page.tsx"] -->|"Publish a paper"| publish["Publish\napp/publish/page.tsx"]

@@ -6,6 +6,7 @@ import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
 import { WagmiProvider } from "wagmi";
+import { SITE } from "../../lib/site.ts";
 import { useTheme } from "../site/theme-toggle.tsx";
 
 const WalletReady = createContext(false);
@@ -32,8 +33,8 @@ function walletAdapter(projectId: string): WagmiAdapter {
     networks: [baseSepolia],
     defaultNetwork: baseSepolia,
     metadata: {
-      name: "VeriSci",
-      description: "Publish a paper as a record anyone can verify.",
+      name: SITE.name,
+      description: SITE.description,
       url: typeof window === "undefined" ? "https://verisci.app" : window.location.origin,
       icons: [],
     },
@@ -44,7 +45,7 @@ function walletAdapter(projectId: string): WagmiAdapter {
         ? "dark"
         : "light",
     themeVariables: {
-      // AppKit writes white text on its accent: the darker emerald keeps the contrast.
+      // AppKit writes white text on its accent: the darker blue keeps the contrast.
       "--apkt-accent": "var(--accent-deep)",
       "--apkt-border-radius-master": "3px",
       "--apkt-font-family": "var(--font-sora), ui-sans-serif, system-ui, sans-serif",

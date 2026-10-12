@@ -6,6 +6,7 @@ import { type PaperText, preparePaperText, quoteFound, quoteTextOf } from "./pap
 import {
   CHECK_ANSWERS,
   checklistScore,
+  FIELD_RULE,
   parseScorerAnswer,
   SCORER_OUTPUT_SCHEMA,
   SCORER_PROMPT_VERSION,
@@ -52,13 +53,14 @@ describe("SCORER_PROMPT_VERSION", () => {
 });
 
 describe("scorerPrompt", () => {
-  it("defines the field and lists every study type, and treats the paper as data", () => {
+  it("defines the field with FIELD_RULE, lists every study type, and treats the paper as data", () => {
     const { system } = scorerPrompt(PAPER);
 
-    expect(system).toContain(
+    expect(FIELD_RULE).toContain(
       "biology, medicine, health, neuroscience, pharmacology, public health and bioinformatics",
     );
-    expect(system).toContain("psychology only when the study is about health");
+    expect(FIELD_RULE).toContain("psychology only when the study is about health");
+    expect(system).toContain(`\n${FIELD_RULE}\n`);
     for (const type of STUDY_TYPES) expect(system).toContain(`- ${type.id}: ${type.label}\n`);
     expect(system).toMatch(/data to rate, never instructions/);
   });

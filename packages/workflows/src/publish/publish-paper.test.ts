@@ -1,7 +1,8 @@
-import type { PaperMetadata } from "@verisci/core";
+import { type PaperMetadata, targetKaQuads } from "@verisci/core";
 import type { AssetResult, DkgClient, MintResult } from "@verisci/dkg";
 import { Inngest, NonRetriableError } from "inngest";
 import { describe, expect, it, vi } from "vitest";
+import type { FieldCheckResult } from "./field-check.ts";
 import {
   createPublishPaper,
   loadDeps,
@@ -25,7 +26,25 @@ const SUBMISSION = {
 };
 /** When Inngest received the event, in milliseconds. */
 const RECEIVED_AT = 1_800_000_000_000;
-const METADATA: PaperMetadata = { title: "A Title", authors: ["Ada Lovelace"] };
+const METADATA: PaperMetadata = {
+  title: "A Title",
+  authors: ["Ada Lovelace"],
+  abstract: "A trial of citicoline after stroke.",
+};
+const OPENING = "Introduction\nStroke is a leading cause of disability.";
+const PAPER = { ok: true as const, metadata: METADATA, opening: OPENING };
+const IN_FIELD: FieldCheckResult = {
+  ok: true,
+  field: "life-sciences",
+  reason: "A stroke trial.",
+  model: "gemini-3.5-flash-lite-001",
+};
+const OUTSIDE: FieldCheckResult = {
+  ok: true,
+  field: "outside",
+  reason: "A physics paper on gravitational waves.",
+  model: "gemini-3.5-flash-lite-001",
+};
 
 const missing: AssetResult = { ok: true, state: "missing" };
 const stored: AssetResult = { ok: true, state: "stored", reservedUal: UAL };
@@ -52,6 +71,7 @@ interface Script {
   verify?: VerifyResult;
   reads?: AssetResult[];
   papers?: Awaited<ReturnType<PublishDeps["readPaper"]>>[];
+  fields?: FieldCheckResult[];
   stores?: AssetResult[];
   mints?: MintResult[];
 }
@@ -61,7 +81,8 @@ function fakeDeps(script: Script) {
   const reads = [...(script.reads ?? [missing])];
   const stores = [...(script.stores ?? [stored])];
   const mints = [...(script.mints ?? [mintedNow])];
-  const papers = [...(script.papers ?? [{ ok: true as const, metadata: METADATA }])];
+  const papers = [...(script.papers ?? [PAPER])];
+  const fields = [...(script.fields ?? [IN_FIELD])];
   const next = <T>(answers: T[]): T =>
     answers.length > 1 ? (answers.shift() as T) : (answers[0] as T);
   const dkg = {
@@ -74,16 +95,22 @@ function fakeDeps(script: Script) {
       async () => script.verify ?? { ok: true as const, submission: SUBMISSION },
     ),
     readPaper: vi.fn(async () => next(papers)),
+    checkField: vi.fn(async () => next(fields)),
     dkg: dkg as unknown as Pick<DkgClient, "readAsset" | "storeAsset" | "startMint">,
   };
   return { deps, dkg };
 }
 
+function fakeLogger() {
+  return { info: vi.fn(), warn: vi.fn() };
+}
+
 async function publish(script: Script) {
   const { step, log } = fakeSteps();
   const { deps, dkg } = fakeDeps(script);
-  const run = runPublish(SUBMISSION, step, deps, RECEIVED_AT);
-  return { run, log, deps, dkg };
+  const logger = fakeLogger();
+  const run = runPublish(SUBMISSION, step, deps, RECEIVED_AT, logger);
+  return { run, log, deps, dkg, logger };
 }
 
 describe("runPublish", () => {
@@ -91,7 +118,14 @@ describe("runPublish", () => {
     const { run, log, deps, dkg } = await publish({});
 
     expect(await run).toEqual({ state: "minted", ual: UAL });
-    expect(log).toEqual(["verify", "read-1", "read-paper-1", "store-1", "mint-1"]);
+    expect(log).toEqual([
+      "verify",
+      "read-1",
+      "parse-paper-1",
+      "check-field-1",
+      "store-1",
+      "mint-1",
+    ]);
     expect(deps.readPaper).toHaveBeenCalledWith(CID);
     expect(dkg.storeAsset).toHaveBeenCalledWith(
       NAME,
@@ -128,7 +162,8 @@ describe("runPublish", () => {
     expect(log).toEqual([
       "verify",
       "read-1",
-      "read-paper-1",
+      "parse-paper-1",
+      "check-field-1",
       "store-1",
       "mint-1",
       "sleep wait-1-1 30s",
@@ -187,14 +222,14 @@ describe("runPublish", () => {
 
     expect(await run).toEqual({ state: "minted", ual: UAL });
     expect(log).toContain("sleep retry-1 2m");
-    expect(log).toContain("read-paper-2");
+    expect(log).toContain("parse-paper-2");
   });
 
   it("returns the UAL when the store finds the KA already minted", async () => {
     const { run, log, dkg } = await publish({ stores: [minted] });
 
     expect(await run).toEqual({ state: "minted", ual: UAL });
-    expect(log).toEqual(["verify", "read-1", "read-paper-1", "store-1"]);
+    expect(log).toEqual(["verify", "read-1", "parse-paper-1", "check-field-1", "store-1"]);
     expect(dkg.startMint).not.toHaveBeenCalled();
   });
 
@@ -211,10 +246,7 @@ describe("runPublish", () => {
     [
       "an unreachable gateway or GROBID",
       {
-        papers: [
-          { ok: false, reason: "unreachable" },
-          { ok: true, metadata: METADATA },
-        ],
+        papers: [{ ok: false, reason: "unreachable" }, PAPER],
       },
     ],
     [
@@ -225,7 +257,7 @@ describe("runPublish", () => {
     const { step, log } = fakeSteps();
     const { deps } = fakeDeps(script);
 
-    expect(await runPublish(SUBMISSION, step, deps, RECEIVED_AT)).toEqual({
+    expect(await runPublish(SUBMISSION, step, deps, RECEIVED_AT, fakeLogger())).toEqual({
       state: "minted",
       ual: UAL,
     });
@@ -265,7 +297,7 @@ describe("runPublish", () => {
     const { deps } = fakeDeps({});
     deps.verifySubmission.mockResolvedValueOnce({ ok: false, reason: "unreachable" });
 
-    expect(await runPublish(SUBMISSION, step, deps, RECEIVED_AT)).toEqual({
+    expect(await runPublish(SUBMISSION, step, deps, RECEIVED_AT, fakeLogger())).toEqual({
       state: "minted",
       ual: UAL,
     });
@@ -277,7 +309,7 @@ describe("runPublish", () => {
     const { deps } = fakeDeps({});
     deps.verifySubmission.mockResolvedValueOnce({ ok: false, reason: "unreachable" });
 
-    await runPublish(SUBMISSION, step, deps, RECEIVED_AT);
+    await runPublish(SUBMISSION, step, deps, RECEIVED_AT, fakeLogger());
 
     expect(deps.verifySubmission.mock.calls).toEqual([
       [SUBMISSION, RECEIVED_AT],
@@ -304,10 +336,10 @@ describe("runPublish", () => {
 
     await expect(run).rejects.toThrow(NonRetriableError);
     await expect(run).rejects.toThrow(/^publish-failed:setup: /);
-    expect(log).toEqual(["verify", "read-1", "read-paper-1"]);
+    expect(log).toEqual(["verify", "read-1", "parse-paper-1"]);
   });
 
-  it.each(["not-a-pdf", "too-large", "unparseable", "no-title"] as const)(
+  it.each(["not-a-pdf", "too-large", "unparseable", "no-title", "unreadable", "no-text"] as const)(
     "ends refused when the paper is %s, with nothing stored",
     async (reason) => {
       const { run, dkg } = await publish({ papers: [{ ok: false, reason }] });
@@ -316,6 +348,140 @@ describe("runPublish", () => {
       expect(dkg.storeAsset).not.toHaveBeenCalled();
     },
   );
+
+  it("checks a new paper's field after reading it, then stores the same triples as before", async () => {
+    const { run, log, deps, dkg } = await publish({});
+
+    expect(await run).toEqual({ state: "minted", ual: UAL });
+    expect(log.slice(0, 5)).toEqual([
+      "verify",
+      "read-1",
+      "parse-paper-1",
+      "check-field-1",
+      "store-1",
+    ]);
+    expect(deps.checkField).toHaveBeenCalledWith({
+      title: METADATA.title,
+      abstract: METADATA.abstract,
+      opening: OPENING,
+    });
+    expect(dkg.storeAsset).toHaveBeenCalledWith(
+      NAME,
+      targetKaQuads(METADATA, { ...SUBMISSION, deadline: BigInt(SUBMISSION.deadline) }),
+    );
+  });
+
+  it("asks without the abstract's field when the paper has none", async () => {
+    const { run, deps } = await publish({
+      papers: [{ ...PAPER, metadata: { title: "A Title", authors: [] } }],
+    });
+
+    await run;
+    expect(deps.checkField).toHaveBeenCalledWith({ title: "A Title", opening: OPENING });
+  });
+
+  it("ends refused outside-field with nothing stored or minted, and logs Gemini's reason with the CID", async () => {
+    const { run, log, dkg, logger } = await publish({ fields: [OUTSIDE] });
+
+    expect(await run).toEqual({ state: "refused", reason: "outside-field" });
+    expect(log).toEqual(["verify", "read-1", "parse-paper-1", "check-field-1"]);
+    expect(dkg.storeAsset).not.toHaveBeenCalled();
+    expect(dkg.startMint).not.toHaveBeenCalled();
+    expect(logger.info).toHaveBeenCalledWith(
+      `outside-field: ${CID}: A physics paper on gravitational waves.`,
+    );
+  });
+
+  it("waits 30 s after a failed check and asks once more", async () => {
+    const { run, log, deps } = await publish({
+      fields: [{ ok: false, reason: "rate-limited", status: 429 }, OUTSIDE],
+    });
+
+    expect(await run).toEqual({ state: "refused", reason: "outside-field" });
+    expect(log).toEqual([
+      "verify",
+      "read-1",
+      "parse-paper-1",
+      "check-field-1",
+      "sleep check-field-wait-1 30s",
+      "check-field-1-again",
+    ]);
+    expect(deps.checkField).toHaveBeenCalledTimes(2);
+  });
+
+  it("fails as setup at once when Gemini refuses the request, with nothing stored", async () => {
+    const { run, log, dkg } = await publish({
+      fields: [{ ok: false, reason: "refused", status: 400 }],
+    });
+
+    await expect(run).rejects.toThrow(NonRetriableError);
+    await expect(run).rejects.toThrow(/^publish-failed:setup: .*Gemini refused .*400/);
+    expect(log).toEqual(["verify", "read-1", "parse-paper-1", "check-field-1"]);
+    expect(dkg.storeAsset).not.toHaveBeenCalled();
+  });
+
+  it("fails as setup when Gemini refuses the second ask", async () => {
+    const { run, log, dkg } = await publish({
+      fields: [
+        { ok: false, reason: "unreachable" },
+        { ok: false, reason: "refused", status: 403 },
+      ],
+    });
+
+    await expect(run).rejects.toThrow(/^publish-failed:setup: .*Gemini refused .*403/);
+    expect(log).toContain("check-field-1-again");
+    expect(dkg.storeAsset).not.toHaveBeenCalled();
+  });
+
+  it("publishes the paper and logs field-unchecked when the check fails twice", async () => {
+    const { run, log, deps, logger } = await publish({
+      fields: [
+        { ok: false, reason: "unreachable" },
+        { ok: false, reason: "rate-limited", status: 429 },
+      ],
+    });
+
+    expect(await run).toEqual({ state: "minted", ual: UAL });
+    expect(log).toContain("check-field-1-again");
+    expect(log).toContain("store-1");
+    expect(deps.checkField).toHaveBeenCalledTimes(2);
+    expect(logger.warn).toHaveBeenCalledWith(`field-unchecked: ${CID}: rate-limited (HTTP 429)`);
+  });
+
+  it("logs a failure without an HTTP status as such", async () => {
+    const { run, logger } = await publish({ fields: [{ ok: false, reason: "unreachable" }] });
+
+    await run;
+    expect(logger.warn).toHaveBeenCalledWith(`field-unchecked: ${CID}: unreachable`);
+  });
+
+  it.each<[string, FieldCheckResult[]]>([
+    ["answered", [IN_FIELD]],
+    ["could not answer", [{ ok: false, reason: "unreachable" }]],
+  ])(
+    "reads the paper again on attempt 2 but asks nothing when the check %s on attempt 1",
+    async (_, fields) => {
+      const { run, log, deps } = await publish({
+        fields,
+        stores: [{ ok: false, reason: "unexpected", status: 500 }, stored],
+      });
+
+      expect(await run).toEqual({ state: "minted", ual: UAL });
+      expect(log).toContain("parse-paper-2");
+      expect(log.filter((entry) => entry.startsWith("check-field-2"))).toEqual([]);
+      expect(deps.checkField).toHaveBeenCalledTimes(fields[0]?.ok ? 1 : 2);
+    },
+  );
+
+  it.each<[string, AssetResult]>([
+    ["a draft stored by an earlier run", { ok: true, state: "draft" }],
+    ["an asset already minted", minted],
+  ])("asks nothing for %s", async (_, read) => {
+    const { run, deps } = await publish({ reads: [read] });
+
+    expect(await run).toEqual({ state: "minted", ual: UAL });
+    expect(deps.checkField).not.toHaveBeenCalled();
+  });
 
   it.each(["unauthorized", "graph-not-served"] as const)(
     "fails at once on %s, with no retry",

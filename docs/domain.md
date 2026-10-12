@@ -335,6 +335,13 @@ score the same day (plan 021).
   100 s. Its answers carry a `thoughtSignature` beside the text, and some gave no
   `modelVersion`. On the free tier, some calls failed within seconds and succeeded when
   tried again 30 s later.
+- **The publish run's field check uses `gemini-3.5-flash-lite`,** free of charge on the
+  pricing page (2026-10-11). Each model has its own daily quota (the 429 above names it
+  `…PerModel-FreeTier`), so the field check leaves the scorer's 20 requests a day alone. On
+  2026-10-12 it classified all 14 reference papers right from their title, abstract and first
+  6,000 characters (`score-papers --field`), with the same request shape as the scorer.
+- **A model Google is short of capacity for answers 503** (2026-10-12, `gemini-3.8-flash`): two
+  papers got 503 on three tries 30 s apart, while Flash-Lite answered at the same time.
 
 ## Chain
 

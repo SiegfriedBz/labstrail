@@ -11,6 +11,7 @@ const runtimeEnv = {
   PINATA_GATEWAY_URL: "https://example.mypinata.cloud",
   CHAIN_RPC_URL: "https://sepolia.base.org",
   PINATA_JWT: "secret-pinata-jwt",
+  GEMINI_API_KEY: "secret-gemini",
   INNGEST_EVENT_KEY: "secret-event-key",
   INNGEST_SIGNING_KEY: "signkey-test-0123",
 };
@@ -24,6 +25,13 @@ describe("createWorkflowsEnv", () => {
     expect(env.CHAIN_RPC_URL).toBe("https://sepolia.base.org");
     expect(env.DKG_CONTEXT_GRAPH).toBe(runtimeEnv.DKG_CONTEXT_GRAPH);
     expect(env.APP_ENV).toBe("staging");
+  });
+
+  it("requires the Gemini key, which the publish run's field check reads", () => {
+    expect(createWorkflowsEnv(runtimeEnv).GEMINI_API_KEY).toBe("secret-gemini");
+    expect(() => createWorkflowsEnv({ ...runtimeEnv, GEMINI_API_KEY: undefined })).toThrow(
+      /GEMINI_API_KEY/,
+    );
   });
 
   it("names every missing or invalid variable", () => {

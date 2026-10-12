@@ -14,7 +14,8 @@ Architecture views: [`.omm/overall-architecture/workflows/`](../../.omm/overall-
 
 `@verisci/core`, `@verisci/env`, `@verisci/dkg`, `@verisci/contracts`; Inngest, viem
 (signature checks, the rating contract, the oracle's transactions), Zod and unpdf (a PDF's
-text, for the scorer). The scorer calls the Gemini API over `fetch`, with no SDK.
+text, for the scorer and the field check). The scorer and the publish run's field check call
+the Gemini API over `fetch` (`src/gemini/`), with no SDK.
 
 ## Environment
 
@@ -32,10 +33,11 @@ server (`APP_ENV` other than `local`) checks them when it starts, through
 | `PINATA_GATEWAY_URL` | The Pinata account's dedicated gateway, `https://<name>.mypinata.cloud`, through which the publish and rating runs read PDFs; one account serves every environment ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)) |
 | `CHAIN_RPC_URL` | A Base Sepolia RPC URL, to check smart-contract wallets' signatures and, on staging and production, to read and write the rating contract |
 | `PINATA_JWT` | A Pinata API key (JWT) allowed to upload, list and delete files; the `publish-pdf` dev script reads it too. Secret |
+| `GEMINI_API_KEY` | A Gemini API key from Google AI Studio, for the publish run's field check ([ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)) and the rating functions' scorer ([ADR 0018](../../docs/adr/0018-phase-1-scorer-output-contract.md)); the `score-papers` dev script reads it too. Every deployment checks it at start, previews included. Secret |
 | `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY` | Inngest's keys, required unless `APP_ENV` is `local`: the SDK reads them itself, and the signing key also reads runs for the upload page. Secret |
 | `VERCEL_GIT_COMMIT_REF` | Set by Vercel: on staging, the branch, which names the Inngest branch environment runs are read from |
 
-The rating functions read four more, declared in `src/rating-env.ts`
+The rating functions read three more, declared in `src/rating-env.ts`
 (`createRatingEnv`) and validated with the settings above in one pass, so one `EnvError`
 names every bad variable. A deployment serves the rating and oracle functions only when
 `ORACLE_PRIVATE_KEY` is set (`servesRating`); a deployed server checks these at start in
@@ -45,7 +47,6 @@ production, which refuses to start without the key, and on staging when the key 
 | Variable | Value |
 | --- | --- |
 | `ORACLE_PRIVATE_KEY` | The oracle's key, `0x` and 64 hex: on Vercel only `develop` (staging's, scoped to that branch) and production hold one; locally, Anvil's second default account's key. Secret |
-| `GEMINI_API_KEY` | A Gemini API key from Google AI Studio, for the scorer ([ADR 0018](../../docs/adr/0018-phase-1-scorer-output-contract.md)). Secret |
 | `LOCAL_CHAIN_RPC_URL`, `LOCAL_RATING_CONTRACT` | Required only when `APP_ENV=local`: Anvil's URL (`http://127.0.0.1:8546`) and the RatingController deployed there ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)). Elsewhere the contracts come from the committed deployments file, current and past ([ADR 0028](../../docs/adr/0028-deployed-addresses-are-committed.md)) |
 
 `DKG_CONTEXT_GRAPH` must spell its address in EIP-55 checksum case, as the node lists it
@@ -97,13 +98,28 @@ starts nothing. Its steps:
 2. **read**: the Target KA's state. Minted ends the run with its UAL; stored goes to the
    mint; a draft (sealed, not shared) goes to the store, which only shares it. A KA already
    stored or minted keeps its first submitter.
-3. **read-paper**: fetches the PDF through the gateway and has GROBID parse its header, in
-   one step, so the PDF's bytes are never a step output. A file that is not a PDF, is over
+3. **parse-paper**: fetches the PDF through the gateway, has GROBID parse its header and
+   reads the start of its text (`openingChars`, 6,000 characters) with the rating's reader,
+   in one step, so the PDF's bytes are never a step output. A file that is not a PDF, is over
    15 MB, that GROBID cannot parse (204, a 4xx other than 401, 403, 408 and 429, or an
-   answer that is not well-formed TEI) or that has no readable title ends the run, refused.
-   GROBID's 401 and 403 fail the run; 408 and 429 are retried. A DOI is kept only if it
-   looks like one.
-4. **store**, then **mint**: `startMint` listens 10 s, then the run polls the state every
+   answer that is not well-formed TEI), that has no readable title, that the rating's reader
+   cannot parse (`unreadable`) or that has no text layer (`no-text`) ends the run, refused,
+   so every published paper can be rated. GROBID's 401 and 403 fail the run; 408 and 429 are
+   retried. A DOI is kept only if it looks like one.
+4. **check-field**: asks `gemini-3.5-flash-lite` (`fieldModel`, free tier) whether the paper
+   is in VeriSci's field, from its title, abstract and opening (`checkField`, with core's
+   `fieldCheckPrompt`; [ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)).
+   A paper `outside` ends the run `refused: outside-field` before anything is stored, and the
+   run logs Gemini's reason with the CID. A check that gets no answer (a rate limit, an outage,
+   an answer that does not parse) waits 30 s (`fieldRetryWait`, `check-field-wait-<n>`) and
+   asks once more (`check-field-<n>-again`); when that fails too, the paper is published, its
+   rating checking the field again, and the run logs `field-unchecked` with the failure and
+   its HTTP status. Gemini refusing the request (a bad key, a model it no longer serves) is a
+   setup error: the run fails (`setup`) with nothing stored. The verdict is asked once per
+   run, on the first attempt whose paper is read: a later attempt reads the paper again but
+   asks nothing, and a draft or a minted asset is never checked. Gemini gets 60 s (`fieldTimeoutMs`). The check reads untrusted text: a paper
+   written to fool it is published, and its rating still checks the field.
+5. **store**, then **mint**: `startMint` listens 10 s, then the run polls the state every
    30 s with `step.sleep`. A mint not seen after 10 minutes is started again
    ([ADR 0008](../../docs/adr/0008-mints-are-async-polled-in-short-steps.md)).
 
@@ -111,14 +127,18 @@ Retries ([ADR 0009](../../docs/adr/0009-retries-are-spaced-with-step-sleep.md)):
 
 - **verify:** a chain that does not answer (for a smart-wallet signature) waits 2 minutes
   and runs verify again, up to 5 times, then fails the run.
-- **read, read-paper, store, mint:** a quorum failure, a node, gateway or GROBID that
+- **read, parse-paper, store, mint:** a quorum failure, a node, gateway or GROBID that
   does not answer, or a draft gone before the store (`no-content`) waits 2 minutes and
   starts a new attempt from the read, which reads the paper again only when nothing is
   stored ([ADR 0010](../../docs/adr/0010-pdf-to-target-ka-pipeline.md)); a mint not seen
   after 10 minutes starts a new attempt at once. Up to 5 attempts.
+- **check-field:** one more ask after 30 s, not 2 minutes: free-tier Gemini calls that
+  failed within seconds answered 30 s later (`docs/domain.md` → Gemini), and a paper is
+  published anyway when the second ask fails, so a longer wait would only hold it back.
 - The run has 45 minutes in all, which can end it before its 5 attempts.
 - It fails at once when its settings are missing or invalid, when the node or GROBID refuses
-  our credential, or when the node does not serve the graph. A run that fails is recovered
+  our credential or Gemini the field check's request, or when the node does not serve the
+  graph. A run that fails is recovered
   by publishing the same PDF again.
 
 ## Rating a paper
@@ -226,8 +246,13 @@ results improve. It needs `GEMINI_API_KEY` and `APP_ENV=local`, downloads each P
 robot check, is not kept: save the PDF there by hand), and writes the run's answers there
 after each paper. It never publishes, stores or rates anything.
 
-Each paper costs one Gemini request, and the free tier allows 20 a day per Google project
-(`docs/domain.md` → Gemini): a full run uses 14 of them. To try a change within a day, run
+`score-papers --field [id…]` runs only the publish run's field check instead: it reads each
+cached PDF as the publish run does (GROBID's header and the start of the text, so it also
+needs `GROBID_URL`), asks `checkField`, and prints the expected and the found field with
+Gemini's reason. Each paper costs one Flash-Lite request, which has its own daily limit.
+
+A scoring run costs one `gemini-3.8-flash` request per paper, and the free tier allows 20 of
+those a day per Google project (`docs/domain.md` → Gemini): a full run uses 14 of them. To try a change within a day, run
 only the papers it should fix (`score-papers <id> <id>`), then the whole set once more before
 keeping it. Google's terms forbid getting around the limit, so more keys or projects are not
 an option; a paid tier is.
@@ -370,8 +395,8 @@ stuck transaction are checked on `develop`; the unit tests cover every branch wi
 | `pnpm --filter @verisci/workflows test` | Runs its Vitest project (`vitest run`) with mocked adapters |
 | `pnpm --filter @verisci/workflows publish-pdf <file.pdf>` | Dev only: pins a PDF, signs it and sends `verisci/paper.submitted` to the local dev server |
 | `pnpm --filter @verisci/workflows rate-paper <target UAL> [--raw]` | Dev only, `APP_ENV=local`: requests a rating on the Anvil contract from a throwaway requester and sends `verisci/rating.requested` to the local dev server |
-| `pnpm --filter @verisci/workflows score-papers [id…]` | Dev only, `APP_ENV=local`: scores the reference papers with Gemini and compares each with what is expected (Measuring the scorer above) |
+| `pnpm --filter @verisci/workflows score-papers [--field] [id…]` | Dev only, `APP_ENV=local`: scores the reference papers with Gemini and compares each with what is expected, or with `--field` runs only the publish run's field check on them (Measuring the scorer above) |
 
 Ships TypeScript source (`src/index.ts`, `src/env.ts`), with no build step. The source is
-grouped by feature: `src/publish/`, `src/rating/`, `src/pdf/` and `src/site/` (`CLAUDE.md`
-here).
+grouped by feature: `src/publish/`, `src/rating/`, `src/pdf/`, `src/gemini/` and `src/site/`
+(`CLAUDE.md` here).
