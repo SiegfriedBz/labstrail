@@ -15,7 +15,7 @@ const BEFORE = [
   {
     icon: Heartbeat,
     title: "Life sciences and health only",
-    body: "Biology, medicine, neuroscience, pharmacology, public health and bioinformatics, and psychology when the study is about health. After you sign, an AI model reads the title, the abstract and the start of the text, and a paper outside the field is refused before anything is recorded.",
+    body: "Biology, medicine, neuroscience, pharmacology, public health and bioinformatics, and psychology when the study is about health. After you sign, an AI model reads the title, the abstract and the start of the text, and a paper our check places outside the field is refused before anything is recorded.",
   },
   {
     icon: Eye,

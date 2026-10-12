@@ -7,7 +7,7 @@ import type { Metadata } from "next";
 export const SITE = {
   name: "VeriSci",
   description:
-    "VeriSci publishes life-science and health papers on the OriginTrail DKG, signed by their submitter, and rates whether each gives what others need to reproduce it.",
+    "VeriSci publishes life-science and health papers on the OriginTrail DKG, signed by their submitter, and will rate whether each gives what others need to reproduce it.",
 } as const;
 
 /** The layout's metadata: the title, the description, Open Graph and the Twitter card. */
