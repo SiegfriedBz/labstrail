@@ -446,7 +446,7 @@ function fingerprint(text: string): string {
   return hash.toString(16).padStart(8, "0");
 }
 
-/** A fixed text, with a page header, reference numbers and accents a PDF writes apart. */
+/** A fixed text, with a page header, reference numbers, accents a PDF writes apart and a line of whole sentences. */
 const QUOTE_TEXT = [
   "Patients were randomly assigned [12] to citicoline or placebo with a computer-",
   "PLOS ONE | https://doi.org/10.1371/journal.pone.0269224 June 3, 2022 5 / 14",
@@ -456,6 +456,7 @@ const QUOTE_TEXT = [
   "None.",
   ...Array.from({ length: 400 }, (_, line) => `Line ${line} of the results.`),
   "Data are available from the corresponding author on reasonable request.",
+  "Written informed consent was obtained from all participants. They could leave at any time. All data were anonymized before the analysis.",
 ].join("\n");
 /** Quotes matched against {@link QUOTE_TEXT}, found or not, so quote matching is fingerprinted. */
 const QUOTES = [
@@ -468,7 +469,8 @@ const QUOTES = [
   "Patients were randomly assigned … with a computer-generated sequence.",
   "generated sequence. Data are available from the corresponding author on reasonable request.",
   "Line 3 of the results. Line 2 of the results.",
-  "Patients were randomly assigned [12] to citicoline … The outcome assessors were not blinded to allocation.",
+  "Written informed consent was obtained from all participants. … All data were anonymized before the analysis.",
+  "Patients were randomly assigned to citicoline or placebo with a computer-generated sequence. The outcome assessors were … blinded to allocation.",
 ];
 
 /**
@@ -478,7 +480,7 @@ const QUOTES = [
  * When this test fails, raise SCORER_PROMPT_VERSION and add the new version's fingerprint (an
  * unreleased version's may be updated).
  */
-const RELEASED: Readonly<Record<string, string>> = { "2": "72754c07", "3": "c75f09e6" };
+const RELEASED: Readonly<Record<string, string>> = { "2": "72754c07", "3": "c229e3fa" };
 
 describe("SCORER_PROMPT_VERSION", () => {
   it("changes whenever the prompt, a checklist, the scoring, quote matching or the text changes", () => {
@@ -512,7 +514,7 @@ describe("SCORER_PROMPT_VERSION", () => {
     ];
     const prepared = texts.map((text) => (text.ok ? text.paper.text : text.reason));
 
-    expect(found).toEqual([1, 0, 1, 1, 0, 1, 0, 0, 0, 1]);
+    expect(found).toEqual([1, 0, 1, 1, 0, 1, 0, 0, 0, 1, 0]);
     expect(
       fingerprint([system, user, scores.join(","), found.join(""), ...prepared].join("\n")),
     ).toBe(RELEASED[SCORER_PROMPT_VERSION]);

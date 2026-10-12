@@ -31,13 +31,14 @@ const MAX_GAP = 6_000;
 /** The most places tried for one passage, when the paper holds it more than once. */
 const MAX_PLACES = 50;
 /**
- * An ellipsis in a quote (`…`, `...`, `. . .`, bracketed or not) marks text it leaves out: up to
- * `MAX_ELLIPSES` of them, each standing for punctuation only or at least `MIN_ELIDED_CHARS`
- * letters and digits, so an ellipsis never hides a word or two, such as "not".
+ * An ellipsis in a quote (`…`, `...`, `. . .`, bracketed or not) marks whole sentences it leaves
+ * out, up to `MAX_ELLIPSES` between its parts: each sentence a quote keeps is the paper's, word
+ * for word, so an ellipsis never changes what a sentence says, such as by hiding its "not".
  */
 const ELLIPSIS = /[[(]?\s*(?:…|\.(?:\s?\.){2,})\s*[\])]?/gu;
 const MAX_ELLIPSES = 2;
-const MIN_ELIDED_CHARS = 20;
+/** The end of a sentence in the paper's text. */
+const SENTENCE_END = /[.!?]/u;
 /** Letters Unicode does not decompose, as a PDF or a model may write them another way. */
 const FOLDED: Readonly<Record<string, string>> = {
   ı: "i",
@@ -217,19 +218,22 @@ export function quoteTextOf(text: string): QuoteText {
  * statement such text interrupts is found; a quote that leaves out a word, such as "not", or
  * part of one, or that the scorer made up, is not.
  *
- * An ellipsis in the quote marks text it leaves out: up to two of them split it into parts, each
- * found this way in order, at most about a page after the one before, and each ellipsis must
- * stand for punctuation only or at least 20 letters and digits. A part before an ellipsis is at
- * least 20 letters and digits long.
+ * A quote not found whole may leave out whole sentences, each gap marked by an ellipsis: its
+ * parts, at most three, are found in order this way, each within about a page of the one before,
+ * and the paper's text between two parts ends one sentence and holds only whole sentences (or
+ * what may lie between two passages). A part before an ellipsis ends in a passage of at least 20
+ * letters and digits.
  */
 export function quoteFound(paper: QuoteText, quote: string): boolean {
+  const whole = normalizeForQuote(quote);
+  if (whole.length < MIN_QUOTE_CHARS) return false;
+  if (passagesFrom(paper, whole, 0, undefined, 1, true, () => true)) return true;
   const parts = quote
     .split(ELLIPSIS)
     .map(normalizeForQuote)
     .filter((part) => part.length > 0);
-  const length = parts.reduce((sum, part) => sum + part.length, 0);
-  if (length < MIN_QUOTE_CHARS || parts.length > MAX_ELLIPSES + 1) return false;
-  return partsFrom(paper, parts, 0, undefined);
+  if (parts.length < 2 || parts.length > MAX_ELLIPSES + 1) return false;
+  return partsFrom(paper, parts, 0, undefined, new Set());
 }
 
 /** Where a passage may be found: after the previous passage of its part, or past an ellipsis. */
@@ -240,19 +244,27 @@ interface After {
   readonly elided: boolean;
 }
 
-/** True when the quote's parts from `index` are found in order, the first of them after `after`. */
+/**
+ * True when the quote's parts from `index` are found in order, the first of them after `after`.
+ * `failed` holds the (part, place) pairs already tried in vain, so each is searched once.
+ */
 function partsFrom(
   paper: QuoteText,
   parts: readonly string[],
   index: number,
   after: After | undefined,
+  failed: Set<string>,
 ): boolean {
   const part = parts[index];
   if (part === undefined) return true;
+  const key = `${index}:${after?.at}`;
+  if (failed.has(key)) return false;
   const final = index === parts.length - 1;
-  return passagesFrom(paper, part, 0, after, 1, final, (end) =>
-    partsFrom(paper, parts, index + 1, { at: end, elided: true }),
+  const found = passagesFrom(paper, part, 0, after, 1, final, (end) =>
+    partsFrom(paper, parts, index + 1, { at: end, elided: true }, failed),
   );
+  if (!found) failed.add(key);
+  return found;
 }
 
 /** One character as quotes are matched: see {@link normalizeForQuote}. */
@@ -319,7 +331,7 @@ function longestPassage(
 /**
  * Up to `limit` places where the paper's normalized text holds `piece`: anywhere for a quote's
  * first passage, else from `after` to `MAX_GAP` later, with only {@link skippable} text before,
- * or past an ellipsis also at least `MIN_ELIDED_CHARS` letters and digits.
+ * or past an ellipsis also {@link wholeSentences}.
  */
 function placesOf(
   paper: QuoteText,
@@ -333,13 +345,26 @@ function placesOf(
   while (at >= 0 && at <= end && places.length < limit) {
     if (
       after === undefined ||
-      skippable(paper, after.at, at) ||
-      (after.elided && at - after.at >= MIN_ELIDED_CHARS)
+      (after.elided && wholeSentences(paper, after.at, at)) ||
+      skippable(paper, after.at, at)
     )
       places.push(at);
     at = paper.normalized.indexOf(piece, at + 1);
   }
   return places;
+}
+
+/**
+ * True when the paper's text from `after` to `at` in its normalized text is whole sentences: a
+ * sentence ends before its first letter or digit, and another after its last one.
+ */
+function wholeSentences(paper: QuoteText, after: number, at: number): boolean {
+  if (at <= after) return false;
+  const first = paper.origins[after] ?? paper.text.length;
+  const last = paper.origins[at - 1] ?? -1;
+  const before = paper.text.slice((paper.origins[after - 1] ?? -1) + 1, first);
+  const behind = paper.text.slice(last + 1, paper.origins[at]);
+  return SENTENCE_END.test(before) && SENTENCE_END.test(behind);
 }
 
 /**

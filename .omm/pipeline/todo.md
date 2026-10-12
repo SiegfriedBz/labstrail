@@ -1,2 +1,2 @@
 - Rate long papers on their whole text, with Inngest's step.ai.infer taking the request off the 300 s clock if its free plan allows it.
-- Polish the scorer (plan 022's polish, after plan 023): on 2026-10-12 the reference set scored 7 of 11 in range; quotes Gemini wrote with "…" lost their points. Then run two local ratings before the first deploy of the rating functions.
+- Before the first deploy of the rating functions: score the reference paper Gemini's quota stopped on 2026-10-12 (inclisiran) and run two local ratings. Quotes with "…" for whole sentences count since scorer version 3; 3 of 11 papers still score just outside their range, from how Gemini judges them.
