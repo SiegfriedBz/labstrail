@@ -1,0 +1,1 @@
+Events and step outputs carry CIDs, UALs and request ids, never a PDF's bytes (ADR 0010). Asset names derive from the CID and the request id, so any retry or restart finds the same asset (ADR 0016). A run is a singleton per CID or per request id; a retry waits with step.sleep and starts again from the state it reads (ADRs 0008, 0009, 0020).

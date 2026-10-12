@@ -1,0 +1,1 @@
+Step read-score-<n>: reads the score back from the minted R-KA (parseRating, which also reads v1 R-KAs), so the score on chain always equals the R-KA's (ADRs 0014, 0018). A score that does not parse stops the run (rating-unreadable).

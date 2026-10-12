@@ -1,0 +1,3 @@
+- Move the DKG node to a server and deploy the rating functions (node server plan, deployment setup).
+- Ingest rating requests with a signed webhook and a reconciler that restarts stuck runs (intake and recovery plan, ADRs 0017 and 0020).
+- Rating pages on the site (rating UI plan); later, phases 2 (human review) and 3 (wet-lab replication).

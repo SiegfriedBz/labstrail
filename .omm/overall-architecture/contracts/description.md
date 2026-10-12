@@ -1,0 +1,1 @@
+The RatingController contract and its TypeScript bindings (packages/contracts/): Solidity 0.8.37 with Foundry and Soldeer, full NatSpec, the generated ABI, and the committed deployed addresses of staging and production, current and past (ADR 0028). Requesters ask for ratings there; only the oracle fulfils or cancels them (ADRs 0012, 0020).

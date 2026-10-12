@@ -1,0 +1,1 @@
+Base's testnet: OriginTrail's contracts mint every Knowledge Asset there, and the RatingController records each rating request and its scores. Requests are free on testnet: requesters pay only gas (ADR 0015).

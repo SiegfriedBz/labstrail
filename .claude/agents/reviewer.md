@@ -19,7 +19,10 @@ Check, against the diff (`git diff <base>...HEAD`) and the files around it:
 
 **Docs** (each one blocks the PR)
 
-Docs go stale outside the diff, so do not stop at the changed lines:
+Docs go stale outside the diff, so do not stop at the changed lines. The architecture views
+in `.omm/` (each element's `description.md`, `diagram.mmd` and other fields) count as docs:
+grep them too, and report an element that names a path, step or behaviour the diff changed
+and still describes the old one, or a new folder or flow with no element:
 1. List what the diff changes that docs can mention: exports, commands and scripts,
    env variables, file paths, config, and behaviour (what fails, what a page shows).
    Grep each one across every `README.md`, `CLAUDE.md`, `CONTRIBUTING.md`,

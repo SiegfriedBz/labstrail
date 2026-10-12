@@ -13,8 +13,8 @@ import type { AssetResult, DkgFailure, MintResult, QueryResult } from "@verisci/
 import { Inngest, NonRetriableError } from "inngest";
 import type { Hex } from "viem";
 import { describe, expect, it, vi } from "vitest";
+import type { ReadPaperTextResult } from "../pdf/paper-text.ts";
 import type { OracleInput, OracleResult } from "./oracle.ts";
-import type { ReadPaperTextResult } from "./paper-text.ts";
 import {
   createRatePaper,
   loadRatingDeps,

@@ -7,7 +7,7 @@ import {
 } from "@verisci/core";
 import type { PublishedRecord } from "@verisci/workflows";
 import type { ReactNode } from "react";
-import { addressUrl, assetTokenUrl, ipfsUrl } from "../../lib/explorer.ts";
+import { addressUrl, assetTokenUrl, ipfsUrl } from "../../lib/papers/explorer.ts";
 import { CopyValue } from "./copy-value.tsx";
 import { VERIFY_GROUPS, VERIFY_INTRO, VERIFY_LABELS, VERIFY_TITLE } from "./labels.ts";
 

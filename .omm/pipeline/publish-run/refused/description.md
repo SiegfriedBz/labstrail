@@ -1,0 +1,1 @@
+The run's outcome { state: "refused", reason } for a submission or a paper that retrying cannot change: a malformed event, a bad CID, another graph, an expired deadline or a bad signature (verify), or a file that is not a PDF, too large, unparseable or with no title (read-paper). Nothing is stored; the paper's page says why in plain words.

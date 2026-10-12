@@ -1,0 +1,1 @@
+defineEnv and the shared settings (packages/env/): each workspace declares the variables it reads in its env module and validates them against one root env file; messages name a bad variable, never its value (ADR 0004). A deployed server checks its settings when it starts.

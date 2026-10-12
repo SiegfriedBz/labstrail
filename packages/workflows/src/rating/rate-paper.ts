@@ -17,9 +17,9 @@ import type { DkgClient, DkgFailure } from "@verisci/dkg";
 import { type Inngest, type InngestFunction, NonRetriableError } from "inngest";
 import type { Hex } from "viem";
 import { z } from "zod";
+import type { ReadPaperTextResult } from "../pdf/paper-text.ts";
 import { RATING_REQUESTED } from "./events.ts";
 import type { OracleInput, OracleLogger, OracleResult } from "./oracle.ts";
-import type { ReadPaperTextResult } from "./paper-text.ts";
 import type { ScoreFailureResult, ScoreResult } from "./scorer.ts";
 
 /** The rating run's settings (ADRs 0008, 0009, 0015, 0018, 0020). */

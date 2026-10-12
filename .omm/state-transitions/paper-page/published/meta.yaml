@@ -1,0 +1,9 @@
+created: 2026-10-12T05:49:02.620Z
+updated: 2026-10-12T05:49:02.620Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: published
+children: []
+parentPath:
+  - paper-page

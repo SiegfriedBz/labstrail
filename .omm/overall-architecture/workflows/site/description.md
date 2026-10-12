@@ -1,0 +1,1 @@
+src/site/: the service the web app's server code calls (upload.ts, getUploadService): a signed Pinata upload URL, a submission checked and sent as verisci/paper.submitted, a paper's status from the DKG node and the publish run (runs.ts reads the run's state from Inngest's API), and the published papers list read from the graph with each signature checked (papers.ts).

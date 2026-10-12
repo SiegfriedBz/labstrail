@@ -1,0 +1,1 @@
+The three state machines VeriSci's flows move through: a Knowledge Asset on the DKG node, a rating request on the contract, and the stage a paper's page shows while it follows a publish. The runs read the first two before acting; the page derives the third from the asset and the run.

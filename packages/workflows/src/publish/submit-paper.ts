@@ -1,5 +1,5 @@
 import type { AssetResult } from "@verisci/dkg";
-import type { DeleteFileResult, FindFileResult } from "../pinata.ts";
+import type { DeleteFileResult, FindFileResult } from "./pinata.ts";
 import { PAPER_SUBMITTED } from "./publish-paper.ts";
 import type { SubmissionRefusal, VerifiedSubmission, VerifyResult } from "./verify-submission.ts";
 

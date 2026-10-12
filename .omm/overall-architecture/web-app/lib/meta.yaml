@@ -1,0 +1,16 @@
+created: 2026-10-12T05:42:57.668Z
+updated: 2026-10-12T06:11:16.737Z
+update_count: 4
+last_field: diagram
+kind: nested-class
+title: lib
+children:
+  - helpers
+  - papers
+  - publish
+parentPath:
+  - web-app
+prev_diagram: >
+  graph LR
+      publish["Publish Flow\nlib/publish/"] -->|"settings, the upload limits"| helpers["Shared Helpers\nlib/web-env.ts, server.ts, theme.ts, shorten.ts, utils.ts"]
+      papers["Papers\nlib/papers/"] -.->|"used beside them on the same pages"| helpers

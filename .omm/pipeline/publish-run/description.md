@@ -1,0 +1,1 @@
+The publish-paper function (workflows/src/publish/publish-paper.ts), a singleton per CID: it checks the submission, then reads the Target KA's state and does only what is left, so publishing the same PDF again converges on the same asset and keeps its first submitter (ADR 0010).

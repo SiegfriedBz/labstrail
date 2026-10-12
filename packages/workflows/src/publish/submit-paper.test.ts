@@ -1,6 +1,6 @@
 import type { AssetResult } from "@verisci/dkg";
 import { describe, expect, it } from "vitest";
-import type { DeleteFileResult, FindFileResult } from "../pinata.ts";
+import type { DeleteFileResult, FindFileResult } from "./pinata.ts";
 import { PAPER_SUBMITTED } from "./publish-paper.ts";
 import { type SubmitDeps, type SubmitLimiter, submitPaper } from "./submit-paper.ts";
 import type { VerifiedSubmission, VerifyResult } from "./verify-submission.ts";

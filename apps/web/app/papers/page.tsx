@@ -4,7 +4,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { PapersResults } from "../../components/papers/papers-results.tsx";
 import { PapersTableSkeleton } from "../../components/papers/papers-table-skeleton.tsx";
-import { PAPERS_PER_PAGE, parsePageParam } from "../../lib/papers.ts";
+import { PAPERS_PER_PAGE, parsePageParam } from "../../lib/papers/papers.ts";
 
 type SearchParams = Promise<{ page?: string | string[] }>;
 

@@ -1,0 +1,9 @@
+created: 2026-10-12T05:44:44.706Z
+updated: 2026-10-12T05:45:10.650Z
+update_count: 2
+last_field: description
+kind: nested-class
+title: assets
+children: []
+parentPath:
+  - core

@@ -1,0 +1,1 @@
+apps/web/lib/papers/: papers.ts (the papers list's view from the site service's answer, its pages and page links, dates, authors and signature labels) and explorer.ts (links to a PDF on IPFS, an address on Basescan and a Knowledge Asset's ERC-721 token).

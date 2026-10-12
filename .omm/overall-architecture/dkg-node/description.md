@@ -1,0 +1,1 @@
+An OriginTrail DKG V10 node on its own host (ADR 0006), behind authentication, with GROBID beside it: it stores each asset's triples, mints it on Base Sepolia as an ERC-721 token with the merkle root of its statements, and answers SPARQL over the staging and production context graphs. Its publisher wallets pay the mint fees.

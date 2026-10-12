@@ -1,0 +1,1 @@
+submit-paper.ts: the server side of a submission, before any run. It verifies the signed CID, checks the file is pinned and public on Pinata, unpins one that is not a PDF when no asset points at it (ADR 0010), and sends verisci/paper.submitted. Returns a typed refusal for every expected problem.

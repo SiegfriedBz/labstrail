@@ -1,0 +1,5 @@
+graph LR
+    missing["Missing\nnever stored under this name"] -->|"storeAsset: seal the triples, then share"| stored["Stored\nshared, reservedUal known"]
+    missing -->|"sealed, but sharing failed"| draft["Draft\nsealed in working memory"]
+    draft -->|"storeAsset again shares the sealed content"| stored
+    stored -->|"startMint, then polled"| minted["Minted\nERC-721 token and merkle root on Base"]

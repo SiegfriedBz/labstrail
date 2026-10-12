@@ -1,0 +1,10 @@
+created: 2026-10-12T05:44:14.694Z
+updated: 2026-10-12T05:44:14.694Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: publish-paper
+children: []
+parentPath:
+  - workflows
+  - publish

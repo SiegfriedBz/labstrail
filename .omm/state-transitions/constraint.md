@@ -1,0 +1,2 @@
+- Fulfilled and cancelled requests are final; only the oracle moves a request out of pending (ADR 0020).
+- A stored or minted asset keeps its first content; the paper's asset is never modified by a rating (ADR 0011).

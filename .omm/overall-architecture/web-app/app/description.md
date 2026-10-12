@@ -1,0 +1,1 @@
+apps/web/app/: the pages (/, /papers, /papers/[cid], /publish), the layout with the header, footer and theme, the server actions in actions.ts (requestUpload, submitPaper), and two route handlers: /api/inngest serves the workflows' functions, /api/papers/[cid] gives a paper's status to the page that polls it. The route-page-map perspective details them.

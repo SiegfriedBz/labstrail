@@ -15,6 +15,8 @@ rating's content: a paper's text prepared for the scorer, each study type's chec
 scorer's prompt and the check of its answer, the score, the R-KA's triples, and the queries
 that find a target's PDF and read a rating back.
 
+Architecture views: [`.omm/overall-architecture/core/`](../../.omm/overall-architecture/core/) (`pnpm exec omm view --port 4000` shows them; root README → Architecture).
+
 ## Depends on
 
 The `multiformats` library, to parse CIDs, `@xmldom/xmldom`, to read TEI, Zod, to check the
@@ -220,4 +222,5 @@ request id (Asset names above).
 | `pnpm --filter @verisci/core typecheck` | Typechecks the package |
 | `pnpm --filter @verisci/core test` | Runs its Vitest project (`vitest run`) |
 
-Ships TypeScript source (`src/index.ts`), with no build step.
+Ships TypeScript source (`src/index.ts`), with no build step. The source is grouped by
+feature: `src/assets/`, `src/publish/`, `src/papers/` and `src/rating/` (`CLAUDE.md` here).

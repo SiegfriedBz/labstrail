@@ -1,0 +1,3 @@
+- Server reads and actions return typed results, never throw an expected failure to the client (ADR 0021).
+- Every page works at 360, 768 and 1280 px in light and dark themes, with no horizontal scroll.
+- /api/inngest may run 300 s (maxDuration), Vercel Hobby's limit.

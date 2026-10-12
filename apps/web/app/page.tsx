@@ -14,7 +14,7 @@ import { Suspense } from "react";
 import { ChainDemo } from "../components/home/chain-demo.tsx";
 import { LatestPapers } from "../components/home/latest-papers.tsx";
 import { PapersTableSkeleton } from "../components/papers/papers-table-skeleton.tsx";
-import { LATEST_PAPERS } from "../lib/papers.ts";
+import { LATEST_PAPERS } from "../lib/papers/papers.ts";
 
 const HOW = [
   {

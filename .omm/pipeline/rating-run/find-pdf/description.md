@@ -1,0 +1,1 @@
+Step find-pdf-<n>: reads the paper's ipfs:// link from its own asset graph (paperPdfQuery). A link that is not an IPFS CID cancels invalid-target; no link yet (the node still loading the paper) is retried as node-unreachable.

@@ -1,0 +1,14 @@
+created: 2026-10-12T05:43:45.081Z
+updated: 2026-10-12T06:11:32.639Z
+update_count: 3
+last_field: description
+kind: nested-class
+title: publish
+children:
+  - pinata
+  - publish-paper
+  - read-paper
+  - submit-paper
+  - verify-submission
+parentPath:
+  - workflows

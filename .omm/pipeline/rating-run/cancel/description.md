@@ -1,0 +1,1 @@
+step.invoke of the oracle-transaction function with cancelRequest(requestId, InvalidTarget or Expired). Only the oracle cancels (ADR 0020); a cancel is final, so the run cancels only when the paper is at fault or the request is past its age.

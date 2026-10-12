@@ -6,8 +6,8 @@ import { type DragEvent, useId, useState } from "react";
 import { BaseError, UserRejectedRequestError } from "viem";
 import { useAccount, useSignTypedData, useSwitchChain } from "wagmi";
 import { requestUpload, submitPaper } from "../../app/actions.ts";
-import { type PublishProblem, publishProblemMessage } from "../../lib/messages.ts";
-import { type Phase, publishFile, uploadToSignedUrl } from "../../lib/publish-flow.ts";
+import { type PublishProblem, publishProblemMessage } from "../../lib/publish/messages.ts";
+import { type Phase, publishFile, uploadToSignedUrl } from "../../lib/publish/publish-flow.ts";
 import { useWalletReady } from "../wallet/providers.tsx";
 
 const BASE_SEPOLIA = 84532;

@@ -1,0 +1,3 @@
+- Rating pages (Papers / title / Rating), a rating's score and phase on the list, and the home page's "Rate a paper" link (rating UI plan).
+- The webhook route for rating requests (intake and recovery plan, ADR 0017).
+- Server-rendered metadata, a sitemap and an Open Graph image (SEO plan).

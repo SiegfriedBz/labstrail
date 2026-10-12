@@ -1,0 +1,2 @@
+- Rating requests reach the rating run only through the rate-paper dev script today; the webhook and the reconciler that restarts stuck runs are the next plan's (ADRs 0017, 0020).
+- The scorer reads at most 150,000 characters of a paper; a longer one is cut, which can cost it points (the R-KA records textShortened).

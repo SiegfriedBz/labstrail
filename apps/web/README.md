@@ -7,6 +7,8 @@ follows it until its Target KA is minted and verifies its record; the list of pu
 papers; and `/api/inngest`, which serves the workflows' Inngest functions
 ([ADR 0003](../../docs/adr/0003-inngest-functions-live-in-workflows.md)).
 
+Architecture views: [`.omm/overall-architecture/web-app/`](../../.omm/overall-architecture/web-app/), [`.omm/route-page-map/`](../../.omm/route-page-map/), [`.omm/state-transitions/paper-page/`](../../.omm/state-transitions/paper-page/) (`pnpm exec omm view --port 4000` shows them; root README → Architecture).
+
 ## Depends on
 
 All five packages: `@verisci/env`, `@verisci/core`, `@verisci/dkg`,
@@ -35,14 +37,14 @@ The publish form calls two server actions (`app/actions.ts`): `requestUpload()` 
 Pinata upload URL within the connection's daily limit, and `submitPaper(input)` checks the
 signed submission and starts its publish run within the address's daily limit
 ([ADR 0035](../../docs/adr/0035-limits-are-the-apps-only-state.md)). The browser
-(`lib/publish-flow.ts`) first refuses a file that is not a PDF (by its type, or, when the
+(`lib/publish/publish-flow.ts`) first refuses a file that is not a PDF (by its type, or, when the
 picker gives none, by the `%PDF-` it must start with) or is over 15 MB, before spending an
 upload URL. It then uploads the PDF straight to Pinata, canonicalizes the CID it answers,
 and has the wallet sign `{ cid, contextGraph, deadline }` with a deadline 10 minutes ahead.
 The work itself is `@verisci/workflows`' `getUploadService()`
 ([`packages/workflows`](../../packages/workflows/README.md#the-pages-calls)).
 
-Limits (`lib/limits.ts`): 10 upload URLs per connection (IP) and 5 submissions per signing
+Limits (`lib/publish/limits.ts`): 10 upload URLs per connection (IP) and 5 submissions per signing
 address, each per rolling day, in Upstash; in memory with `APP_ENV=local` and no Upstash
 settings, reset when the server restarts. A limit store that does not answer refuses
 rather than letting requests through.
@@ -85,7 +87,7 @@ the verify panel's otherwise (`components/paper/labels.ts` holds the labels both
 `components/paper/paper-progress.tsx` then follows the paper from that first view: unless it
 is final, it asks `/api/papers/<cid>` every 5 s and stops on a final stage. It shows and asks
 by the CID's canonical spelling, the one the signature covers, whatever spelling the address
-has. `lib/progress.ts` (`paperProgress`, pure) maps the
+has. `lib/publish/progress.ts` (`paperProgress`, pure) maps the
 asset's state on the node, the run Inngest started for the event, and why that run stopped
 to one stage:
 
@@ -113,7 +115,7 @@ stateDiagram-v2
 
 - A minted asset is `published` whatever the run says, so a second submitter of the same
   PDF sees it at once.
-- `refused` shows why (`lib/messages.ts` → `refusalMessage`): not a PDF, too large,
+- `refused` shows why (`lib/publish/messages.ts` → `refusalMessage`): not a PDF, too large,
   unreadable, no title (with a hint for PDFs whose pages are pictures), or a submission
   that failed its checks.
 - `failed` shows why the run stopped (`failureMessage`): Base, the PDF, the DKG node or
@@ -139,7 +141,7 @@ Beside it, a "Verify it yourself" panel (`components/paper/verify-panel.tsx`) sh
 signature checked when read, then two groups: "The submission" (the submitter, the
 signature, its deadline and the context graph) and "The asset" (the agent address the asset
 is minted to, which is our node and the UAL's author; the asset's ERC-721 token in
-OriginTrail's `DKGKnowledgeAssets`, `lib/explorer.ts` → `assetTokenUrl`; the UAL; and the
+OriginTrail's `DKGKnowledgeAssets`, `lib/papers/explorer.ts` → `assetTokenUrl`; the UAL; and the
 PDF's CID, linked through Pinata's public gateway, `ipfsUrl`, since ipfs.io no longer
 serves files). Addresses and the token link to Basescan. "How to check this record" gives
 the EIP-712 domain and type to check the signature with.
@@ -147,7 +149,11 @@ the EIP-712 domain and type to check the signature with.
 ## Code layout
 
 - `app/`: the pages, the route handlers and the server actions.
-- `lib/`: each flow's logic, pure or with its IO passed in, tested in unit tests.
+- `lib/`: each flow's logic, pure or with its IO passed in, tested in unit tests, in the
+  flow's folder: `publish` (the upload, the publish form's steps, a paper's progress, the
+  messages and the limits) and `papers` (the list and explorer links). Only helpers several
+  areas share sit at its root: `web-env`, `server`, `theme`, `shorten`, `utils` and
+  `empty-module`.
 - `components/`, grouped by area: `site` (the shell every page shares: logo, header links,
   theme button, footer, breadcrumbs), `wallet` (the wallet providers and button),
   `home`, `papers` (the papers list), `paper` (one paper's page), `publish`, and `ui`

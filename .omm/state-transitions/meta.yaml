@@ -1,0 +1,10 @@
+created: 2026-10-12T05:47:50.449Z
+updated: 2026-10-12T05:49:17.689Z
+update_count: 7
+last_field: note
+git_commit: dff0db5
+git_branch: refactor/024-folder-reorg
+children:
+  - asset-state
+  - paper-page
+  - rating-request

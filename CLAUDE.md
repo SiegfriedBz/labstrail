@@ -60,7 +60,8 @@ planning; cite them rather than re-arguing them.
 
 1. `/plan-feature <name>` writes `docs/plans/NNN-<name>.md` (gitignored local notes).
 2. `/implement <NNN>` branches from `origin/develop`, writes the tests first and shows them
-   failing, then implements until green, committing in small steps.
+   failing, then implements until green, updates the docs and the architecture views in
+   `.omm/`, committing in small steps.
 3. `/review-branch` runs CI's checks, tests and builds, then the read-only reviewer; it
    blocks on any failure, stale docs or ADR conflict, then drafts the PR.
 4. `/review-adrs`, on demand: checks every ADR against every other and reports conflicts
@@ -82,7 +83,8 @@ squash-merged; releases go `develop` → `main` with a merge commit.
 
 Before calling a branch ready, update everything the diff made false or incomplete: the
 workspace README, the root README (it links to workspace READMEs rather than repeating
-them), comments, TSDoc on every export, NatSpec on every contract. `/review-branch` refuses
+them), comments, TSDoc on every export, NatSpec on every contract, and the architecture views
+in `.omm/` (`pnpm exec omm`). `/review-branch` refuses
 to draft a PR while docs findings remain.
 
 ## Hooks (.claude/hooks)

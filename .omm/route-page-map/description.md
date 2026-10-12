@@ -1,0 +1,1 @@
+The web app's pages, the server actions and the route handlers (apps/web/app/), and how a visitor moves between them: from the home page to publishing, the papers list, or one paper's page, which follows a publish until it is minted. The header's links (Papers, Publish) and breadcrumbs reach every page.

@@ -1,0 +1,9 @@
+created: 2026-10-12T05:44:45.203Z
+updated: 2026-10-12T06:14:43.315Z
+update_count: 4
+last_field: description
+kind: nested-class
+title: rating
+children: []
+parentPath:
+  - core

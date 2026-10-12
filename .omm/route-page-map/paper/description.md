@@ -1,0 +1,1 @@
+/papers/[cid] (app/papers/[cid]/page.tsx): one paper by its PDF's CID. Published, it leads with the title, authors and abstract, then the proof (submitter, signature, token, UAL, CID); while a publish runs (?event=), it shows the run's steps and polls the paper's status until it settles (state-transitions → paper-page).

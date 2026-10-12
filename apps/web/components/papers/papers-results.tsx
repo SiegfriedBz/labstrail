@@ -1,7 +1,7 @@
 import { getUploadService } from "@verisci/workflows";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { PAPERS_PER_PAGE, pageHref, papersView } from "../../lib/papers.ts";
+import { PAPERS_PER_PAGE, pageHref, papersView } from "../../lib/papers/papers.ts";
 import { Pager } from "./pager.tsx";
 import { PapersTable } from "./papers-table.tsx";
 

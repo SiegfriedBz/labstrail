@@ -1,0 +1,1 @@
+The two Inngest pipelines and how they connect: a paper is uploaded and signed, the publish run turns it into a Target KA on the DKG, someone asks the RatingController to rate it, the rating run scores it and mints its R-KA, and the oracle function records the score on chain. Each run does only what is left after reading the state (ADR 0007), one step at a time.

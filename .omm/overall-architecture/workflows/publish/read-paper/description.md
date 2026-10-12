@@ -1,0 +1,1 @@
+read-paper.ts and grobid.ts: fetch the pinned PDF (src/pdf/), send it to GROBID's processHeaderDocument, and read title, authors, abstract and DOI from the TEI with core's parseTeiHeader, in one step so the PDF's bytes never become a step output. GROBID's answer maps to unparseable, unauthorized or unreachable.

@@ -1,0 +1,9 @@
+created: 2026-10-12T05:43:44.417Z
+updated: 2026-10-12T05:43:44.417Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: wiring
+children: []
+parentPath:
+  - workflows

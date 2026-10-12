@@ -1,5 +1,5 @@
 import { getUploadService } from "@verisci/workflows";
-import { readProgress } from "../../../../lib/upload-actions.ts";
+import { readProgress } from "../../../../lib/publish/upload-actions.ts";
 
 /**
  * Where a paper stands, as JSON (`PaperView`), for its page to poll: a read, so a route

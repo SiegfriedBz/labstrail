@@ -1,0 +1,10 @@
+created: 2026-10-12T05:44:15.363Z
+updated: 2026-10-12T05:44:15.363Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: scorer
+children: []
+parentPath:
+  - workflows
+  - rating

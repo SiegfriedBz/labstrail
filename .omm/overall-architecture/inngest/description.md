@@ -1,0 +1,1 @@
+Inngest runs the workflows: it receives events (verisci/paper.submitted, verisci/rating.requested), calls the functions the web app serves at /api/inngest, and memoizes each step's result so a retry or a replay redoes only what is left. Locally its dev server; deployed, Inngest Cloud's free plan, one environment per deployment (ADR 0005).

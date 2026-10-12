@@ -1,0 +1,1 @@
+Step read-<n>: asks the DKG node for the Target KA named from the CID (verisci-tka-<cid>): missing, draft, stored or minted. Each attempt starts here, so a retry redoes only what is left (ADR 0007). A node that refuses the token or does not serve the graph stops the run (setup).
