@@ -1,3 +1,2 @@
-- Publishing checks the paper's field with a small Gemini model and refuses papers outside it (plan 023).
 - Rate long papers on their whole text, with Inngest's step.ai.infer taking the request off the 300 s clock if its free plan allows it.
-- Run the scorer on the reference set with real Gemini and two local ratings before the first deploy of the rating functions.
+- Polish the scorer (plan 022's polish, after plan 023): on 2026-10-12 the reference set scored 7 of 11 in range; quotes Gemini wrote with "…" lost their points. Then run two local ratings before the first deploy of the rating functions.

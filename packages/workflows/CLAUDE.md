@@ -11,7 +11,7 @@ Inngest workflows that combine `core` logic with the `dkg` and `contracts` adapt
   are spaced with `step.sleep` (0009), the backend's oracle transactions go only through
   the oracle function, which checks receipts in later steps (0019), one singleton run per
   request (0020), the scorer's output contract (0018), a publish run is a singleton per
-  CID and keeps a KA's first submitter (0010), a refused file is unpinned only if it is not
+  CID, keeps a KA's first submitter and refuses a paper outside the field (0010, 0037), a refused file is unpinned only if it is not
   a PDF (0010, 0005), local rating runs target a contract on Anvil (0036). The rating run
   also applies: a rating is its own R-KA (0011), phases settled by the oracle (0012), the
   contract owns scores and the DKG content (0014), requests free and throttled on testnet
@@ -26,10 +26,11 @@ Inngest workflows that combine `core` logic with the `dkg` and `contracts` adapt
   it, and `next build` must pass with only `APP_ENV` set.
 - **Layout:** `src/publish/` (the publish run and its adapters: GROBID, Pinata),
   `src/rating/` (the rating run, the scorer, the oracle), `src/pdf/` (fetching a pinned PDF
-  and reading its text, which both runs use), `src/site/` (the service the web app calls:
+  and reading its text, which both runs use), `src/gemini/` (the Gemini call the scorer and
+  the publish run's field check share), `src/site/` (the service the web app calls:
   upload URLs, submissions, a paper's status, the papers list). At the root only the entry
   (`index.ts`), the settings (`env.ts`, `*-env.ts`), the wiring (`functions.ts`) and the
-  Inngest client. What both runs use goes in a shared folder such as `pdf/`; a folder may
+  Inngest client. What both runs use goes in a shared folder such as `pdf/` or `gemini/`; a folder may
   import from another (the site service checks submissions with `publish/`).
   `src/layout.test.ts` checks that each file sits in one of these folders (any `*-env.ts` at
   the root) and that the entry exports the same names.

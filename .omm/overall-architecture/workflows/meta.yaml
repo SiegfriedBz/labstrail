@@ -1,10 +1,11 @@
 created: 2026-10-12T05:42:03.295Z
-updated: 2026-10-12T05:42:38.412Z
-update_count: 3
-last_field: diagram
+updated: 2026-10-12T08:14:49.439Z
+update_count: 5
+last_field: description
 kind: nested-class
 title: workflows
 children:
+  - gemini
   - pdf
   - publish
   - rating
@@ -16,9 +17,9 @@ prev_diagram: >
   graph LR
       wiring["Wiring\nsrc/functions.ts, inngest.ts, *-env.ts"] -->|"builds adapters for"| publish["Publish\nsrc/publish/"]
       wiring -->|"builds adapters for"| rating["Rating\nsrc/rating/"]
-      site["Site Service\nsrc/site/"] -->|"sends verisci/paper.submitted, checks submissions with"| publish
+      site["Site Service\nsrc/site/"] -->|"checks and sends submissions with"| publish
       publish -->|"fetches the pinned PDF with"| pdf["PDF Reader\nsrc/pdf/"]
       rating -->|"fetches the PDF and reads its text with"| pdf
-      scripts["Dev Scripts\nscripts/"] -->|"publish, rate and score locally through"| rating
+      scripts["Dev Scripts\nscripts/"] -->|"request and score ratings locally with"| rating
       classDef entry fill:#89b4fa,stroke:#89b4fa,color:#1e1e2e
       class wiring,site entry

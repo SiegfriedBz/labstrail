@@ -3,7 +3,7 @@ graph LR
     verisci -->|"paper header TEI"| grobid["GROBID\nworkflows/src/publish/grobid.ts"]
     verisci -->|"signed upload URLs, gateway reads"| pinata["Pinata\nworkflows/src/publish/pinata.ts, pdf/fetch-pdf.ts"]
     verisci -->|"signatures, requests, oracle transactions"| base-rpc["Base Sepolia RPC\nviem in workflows and web"]
-    verisci -->|"one scoring request per paper"| gemini["Gemini API\nworkflows/src/rating/scorer.ts"]
+    verisci -->|"one field check per new paper, one scoring request per rating"| gemini["Gemini API\nworkflows/src/gemini/gemini.ts"]
     verisci -->|"events, steps, run state"| inngest["Inngest\nworkflows/src/inngest.ts, site/runs.ts"]
     verisci -->|"rate-limit counters"| upstash["Upstash Redis\napps/web/lib/publish/limits.ts"]
     verisci -->|"wallet connection"| reown["Reown AppKit\napps/web/components/wallet/"]

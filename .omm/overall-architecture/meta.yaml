@@ -1,9 +1,9 @@
 created: 2026-10-12T05:41:14.825Z
-updated: 2026-10-12T06:11:50.150Z
-update_count: 9
-last_field: note
-git_commit: d74a386
-git_branch: refactor/024-folder-reorg
+updated: 2026-10-12T08:15:26.400Z
+update_count: 10
+last_field: concern
+git_commit: d1f319a
+git_branch: feat/023-scope-and-branding
 children:
   - base-sepolia
   - browser

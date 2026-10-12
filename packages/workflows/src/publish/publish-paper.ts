@@ -241,7 +241,9 @@ async function publishOnce(context: AttemptContext): Promise<Attempt> {
     // A draft is sealed with its content: storing it only shares it, so its paper is not read again.
     let quads: Triple[] = [];
     if (read.state === "missing") {
-      const paper = await step.run(`read-paper-${attempt}`, () => deps.readPaper(submission.cid));
+      // `parse-paper` replaced `read-paper` when the result gained the text's opening, so a run
+      // already going never reads an old result as a new one.
+      const paper = await step.run(`parse-paper-${attempt}`, () => deps.readPaper(submission.cid));
       if (!paper.ok) {
         if (paper.reason === "unreachable")
           return { kind: "retry", reason: "paper unreachable", failure: "paper-unreachable" };

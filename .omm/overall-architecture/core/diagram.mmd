@@ -1,8 +1,9 @@
 graph LR
     publish["Publish\nsrc/publish/"] -->|"chain id of the signed domain"| assets["Assets\nsrc/assets/"]
+    publish -->|"the field's rule and answer helpers, for the field check"| rating["Rating\nsrc/rating/"]
     papers["Papers\nsrc/papers/"] -->|"the urn:verisci: namespace"| publish
     papers -->|"UALs, CIDs, asset names, graph IRIs"| assets
-    rating["Rating\nsrc/rating/"] -->|"graph IRIs, chain ids, CIDs, UALs"| assets
+    rating -->|"graph IRIs, chain ids, CIDs, UALs"| assets
     rating -->|"SPARQL row type, unquote"| papers
     rating -->|"the namespace and triple helpers"| publish
     fixtures["Fixtures\nsrc/fixtures/"] -.->|"PDF pages for tests"| rating

@@ -2,8 +2,8 @@
 
 [![CI](https://github.com/SiegfriedBz/verisci/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/SiegfriedBz/verisci/actions/workflows/ci.yml)
 
-VeriSci gives life-science and health papers an open quality rating that anyone can
-request, read and verify
+VeriSci publishes life-science and health papers and gives them an open quality rating
+that anyone can request, read and verify
 ([ADR 0037](docs/adr/0037-verisci-rates-life-science-and-health-papers.md)).
 
 ## Why
@@ -36,9 +36,11 @@ Everything runs on testnets.
 Built:
 
 - **A paper becomes a Target KA.** Its submitter signs it with their wallet; the
-  PDF is parsed, its metadata read, and it is published to the DKG as a
-  Knowledge Asset that records who submitted it
-  ([ADR 0010](docs/adr/0010-pdf-to-target-ka-pipeline.md)). A publish that fails
+  PDF is parsed, its metadata read, a small Gemini model checks it is a life-science or
+  health paper, and it is published to the DKG as a Knowledge Asset that records who
+  submitted it ([ADR 0010](docs/adr/0010-pdf-to-target-ka-pipeline.md),
+  [ADR 0037](docs/adr/0037-verisci-rates-life-science-and-health-papers.md)). A paper
+  outside the field is refused before anything is stored. A publish that fails
   after its retries is recovered by publishing the same PDF again.
 - **Every write is safe to retry.** Each step checks what is already done
   before acting, so a retry never duplicates anything
@@ -154,6 +156,7 @@ sequenceDiagram
   participant A as App server
   participant R as Publish run (Inngest)
   participant G as GROBID (node host)
+  participant M as Gemini Flash-Lite
   participant N as DKG node
   U->>A: ask for an upload URL
   A-->>U: short-lived signed upload URL
@@ -170,7 +173,8 @@ sequenceDiagram
     R->>N: read the Target KA's state (stop if already minted)
     R->>P: fetch the PDF by its CID
     R->>G: parse the PDF
-    R->>R: read metadata from the TEI (refuse with a reason if unreadable)
+    R->>R: read metadata from the TEI and the start of the text (refuse with a reason if unreadable)
+    R->>M: title, abstract and start of the text: in the field? (refuse if outside)
     R->>N: store with the submitter address and signature, then mint and poll
     N-->>R: Target KA UAL, ready to be rated
   end

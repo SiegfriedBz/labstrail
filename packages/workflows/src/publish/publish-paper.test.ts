@@ -118,7 +118,14 @@ describe("runPublish", () => {
     const { run, log, deps, dkg } = await publish({});
 
     expect(await run).toEqual({ state: "minted", ual: UAL });
-    expect(log).toEqual(["verify", "read-1", "read-paper-1", "check-field-1", "store-1", "mint-1"]);
+    expect(log).toEqual([
+      "verify",
+      "read-1",
+      "parse-paper-1",
+      "check-field-1",
+      "store-1",
+      "mint-1",
+    ]);
     expect(deps.readPaper).toHaveBeenCalledWith(CID);
     expect(dkg.storeAsset).toHaveBeenCalledWith(
       NAME,
@@ -155,7 +162,7 @@ describe("runPublish", () => {
     expect(log).toEqual([
       "verify",
       "read-1",
-      "read-paper-1",
+      "parse-paper-1",
       "check-field-1",
       "store-1",
       "mint-1",
@@ -215,14 +222,14 @@ describe("runPublish", () => {
 
     expect(await run).toEqual({ state: "minted", ual: UAL });
     expect(log).toContain("sleep retry-1 2m");
-    expect(log).toContain("read-paper-2");
+    expect(log).toContain("parse-paper-2");
   });
 
   it("returns the UAL when the store finds the KA already minted", async () => {
     const { run, log, dkg } = await publish({ stores: [minted] });
 
     expect(await run).toEqual({ state: "minted", ual: UAL });
-    expect(log).toEqual(["verify", "read-1", "read-paper-1", "check-field-1", "store-1"]);
+    expect(log).toEqual(["verify", "read-1", "parse-paper-1", "check-field-1", "store-1"]);
     expect(dkg.startMint).not.toHaveBeenCalled();
   });
 
@@ -329,7 +336,7 @@ describe("runPublish", () => {
 
     await expect(run).rejects.toThrow(NonRetriableError);
     await expect(run).rejects.toThrow(/^publish-failed:setup: /);
-    expect(log).toEqual(["verify", "read-1", "read-paper-1"]);
+    expect(log).toEqual(["verify", "read-1", "parse-paper-1"]);
   });
 
   it.each(["not-a-pdf", "too-large", "unparseable", "no-title", "unreadable", "no-text"] as const)(
@@ -349,7 +356,7 @@ describe("runPublish", () => {
     expect(log.slice(0, 5)).toEqual([
       "verify",
       "read-1",
-      "read-paper-1",
+      "parse-paper-1",
       "check-field-1",
       "store-1",
     ]);
@@ -377,7 +384,7 @@ describe("runPublish", () => {
     const { run, log, dkg, logger } = await publish({ fields: [OUTSIDE] });
 
     expect(await run).toEqual({ state: "refused", reason: "outside-field" });
-    expect(log).toEqual(["verify", "read-1", "read-paper-1", "check-field-1"]);
+    expect(log).toEqual(["verify", "read-1", "parse-paper-1", "check-field-1"]);
     expect(dkg.storeAsset).not.toHaveBeenCalled();
     expect(dkg.startMint).not.toHaveBeenCalled();
     expect(logger.info).toHaveBeenCalledWith(
@@ -394,7 +401,7 @@ describe("runPublish", () => {
     expect(log).toEqual([
       "verify",
       "read-1",
-      "read-paper-1",
+      "parse-paper-1",
       "check-field-1",
       "sleep check-field-wait-1 30s",
       "check-field-1-again",
@@ -436,7 +443,7 @@ describe("runPublish", () => {
       });
 
       expect(await run).toEqual({ state: "minted", ual: UAL });
-      expect(log).toContain("read-paper-2");
+      expect(log).toContain("parse-paper-2");
       expect(log.filter((entry) => entry.startsWith("check-field-2"))).toEqual([]);
       expect(deps.checkField).toHaveBeenCalledTimes(fields[0]?.ok ? 1 : 2);
     },
