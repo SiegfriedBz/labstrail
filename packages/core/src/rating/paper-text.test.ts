@@ -227,12 +227,147 @@ describe("quoteFound", () => {
       "The outcome assessors were blinded to the treatment allocation.",
     ],
     [
-      "words, behind an ellipsis",
-      SPLIT,
-      "The full original protocol … the corresponding author, after approval of a proposal.",
+      "a word behind an ellipsis, such as not",
+      "The outcome assessors were not blinded to the treatment allocation.",
+      "The outcome assessors were … blinded to the treatment allocation.",
     ],
   ])("does not find a quote that leaves out %s", (_, paper, quote) => {
     expect(found(paper, quote)).toBe(false);
+  });
+
+  const ETHICS = [
+    "The protocol of the study was approved by the Comité de Protection des Personnes",
+    "Île-de-France III on October 26, 2017 (no. Am8977-6-3447). All participants were told",
+    "the study's aims and procedures. They could leave the study at any time without giving a",
+    "reason. Written informed consent was obtained from all participants.",
+  ].join("\n");
+
+  it.each(["…", "...", "[…]", "(...)", ". . ."])(
+    "finds a quote whose %s stands for whole sentences it leaves out, each part in order",
+    (ellipsis) => {
+      expect(
+        found(
+          ETHICS,
+          `The protocol of the study was approved by the Comité de Protection des Personnes Île-de-France III on October 26, 2017 (no. Am8977-6-3447).${ellipsis} Written informed consent was obtained from all participants.`,
+        ),
+      ).toBe(true);
+    },
+  );
+
+  it("finds a quote with two ellipses, each for whole sentences", () => {
+    expect(
+      found(
+        `${ETHICS}\nParticipants received no payment for taking part in the study.`,
+        "The protocol of the study was approved by the Comité de Protection des Personnes Île-de-France III on October 26, 2017 (no. Am8977-6-3447). … They could leave the study at any time without giving a reason. … Participants received no payment.",
+      ),
+    ).toBe(true);
+  });
+
+  it("finds a quote whose ellipsis stands for punctuation only, or starts or ends it", () => {
+    expect(
+      found(
+        ETHICS,
+        "approved by the Comité de Protection des Personnes Île-de-France III on October 26, 2017 (no. Am8977-6-3447)... All participants were told the study's aims",
+      ),
+    ).toBe(true);
+    expect(found(ETHICS, "…Written informed consent was obtained from all participants…")).toBe(
+      true,
+    );
+  });
+
+  it("finds a quote whose ellipsis follows a sentence ending in a citation", () => {
+    const paper =
+      "Outcome assessors were blinded to group allocation [12]. Blinding was checked at each visit (3, 4). Data were analysed in R.";
+
+    expect(
+      found(
+        paper,
+        "Outcome assessors were blinded to group allocation. … Data were analysed in R.",
+      ),
+    ).toBe(true);
+  });
+
+  it("finds a quote copied whole from a paper that writes an ellipsis of its own", () => {
+    const paper = "Doses of 1, 2, ..., 10 mg/kg were given to each group of mice.";
+
+    expect(found(paper, paper)).toBe(true);
+  });
+
+  it.each([
+    [
+      "words inside a sentence, however many",
+      "Outcome assessors were, owing to the nature of the surgical intervention, not blinded to group allocation.",
+      "Outcome assessors were … blinded to group allocation.",
+    ],
+    [
+      "the end of one sentence and the start of another",
+      "The outcome assessors were not blinded. The participants were blinded to the treatment allocation.",
+      "The outcome assessors were … blinded to the treatment allocation.",
+    ],
+    [
+      "words inside a sentence, between whole ones",
+      ETHICS,
+      "The protocol of the study was approved by the Comité de Protection des Personnes … Written informed consent was obtained from all participants.",
+    ],
+    [
+      "words after an abbreviation's full stop",
+      "Outcome assessors were blinded as described by Smith et al. In the first year only, blinding was not maintained. Allocation was concealed by central randomization.",
+      "Outcome assessors were blinded as described by Smith et al. … Allocation was concealed by central randomization.",
+    ],
+    [
+      "words after a number's abbreviation",
+      ETHICS,
+      "The protocol of the study was approved by the Comité de Protection des Personnes Île-de-France III on October 26, 2017 (no. … Written informed consent was obtained from all participants.",
+    ],
+    [
+      "words after an initial",
+      "The analysis plan was written by J. Smith before unblinding, and was not followed. Data were analysed in R.",
+      "The analysis plan was written by J. … Data were analysed in R.",
+    ],
+    [
+      "words after a decimal point",
+      "The difference between groups was significant at p < 0.05 only in the per-protocol analysis. The trial was registered.",
+      "The difference between groups was significant at p < 0. … The trial was registered.",
+    ],
+  ])("does not find a quote whose ellipsis stands for %s", (_, paper, quote) => {
+    expect(found(paper, quote)).toBe(false);
+  });
+
+  it.each([
+    [
+      "parts out of order",
+      "Written informed consent was obtained from all participants. … The protocol of the study was approved by the Comité",
+    ],
+    [
+      "a part the paper does not hold",
+      "Written informed consent was obtained from all participants. … The sample size was calculated with a power of 80%.",
+    ],
+    [
+      "a short part before an ellipsis",
+      "Am8977-6-3447). … Written informed consent was obtained from all",
+    ],
+    [
+      "more than two ellipses",
+      "The protocol of the study was approved by the Comité de Protection des Personnes Île-de-France III on October 26, 2017 (no. Am8977-6-3447). … the study's aims and procedures. … reason. … Written informed consent was obtained from all participants.",
+    ],
+  ])("does not find a quote with an ellipsis and %s", (_, quote) => {
+    expect(found(ETHICS, quote)).toBe(false);
+  });
+
+  it("does not find a quote whose parts around an ellipsis lie over a page apart", () => {
+    const pages = Array.from({ length: 400 }, (_, line) => `Line ${line} of the paper's results.`);
+    const paper = [
+      "The protocol of the study was approved by the ethics committee.",
+      ...pages,
+      "Written informed consent was obtained from all participants.",
+    ].join("\n");
+
+    expect(
+      found(
+        paper,
+        "The protocol of the study was approved by the ethics committee. … Written informed consent was obtained from all participants.",
+      ),
+    ).toBe(false);
   });
 
   it("does not find a quote whose passages come out of order, or over a page apart", () => {

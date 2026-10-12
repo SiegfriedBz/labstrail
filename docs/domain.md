@@ -342,6 +342,10 @@ score the same day (plan 021).
   6,000 characters (`score-papers --field`), with the same request shape as the scorer.
 - **A model Google is short of capacity for answers 503** (2026-10-12, `gemini-3.8-flash`): two
   papers got 503 on three tries 30 s apart, while Flash-Lite answered at the same time.
+- **`gemini-3.8-flash` shortens some quotes with "…" or "..." although the prompt forbids it**
+  (2026-10-12: 3 quotes across the 11 reference papers scored, each skipping text between two
+  real passages), which is why quote matching accepts an ellipsis that stands for whole
+  sentences.
 
 ## Chain
 
