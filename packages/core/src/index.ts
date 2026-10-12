@@ -41,6 +41,12 @@ export {
   type QueryBinding,
 } from "./papers/paper-record.ts";
 export {
+  FIELD_OUTPUT_SCHEMA,
+  type FieldCheckInput,
+  fieldCheckPrompt,
+  parseFieldAnswer,
+} from "./publish/field-check.ts";
+export {
   canonicalContextGraph,
   MAX_PDF_BYTES,
   SUBMISSION_DOMAIN,
@@ -88,6 +94,7 @@ export {
   type CheckAnswer,
   type CheckResult,
   checklistScore,
+  FIELD_RULE,
   FIELDS,
   type Field,
   parseScorerAnswer,
