@@ -457,6 +457,7 @@ const QUOTE_TEXT = [
   ...Array.from({ length: 400 }, (_, line) => `Line ${line} of the results.`),
   "Data are available from the corresponding author on reasonable request.",
   "Written informed consent was obtained from all participants. They could leave at any time. All data were anonymized before the analysis.",
+  "Assessors were blinded as described by Smith et al. In year one, blinding was not kept. Allocation was concealed centrally.",
 ].join("\n");
 /** Quotes matched against {@link QUOTE_TEXT}, found or not, so quote matching is fingerprinted. */
 const QUOTES = [
@@ -471,6 +472,7 @@ const QUOTES = [
   "Line 3 of the results. Line 2 of the results.",
   "Written informed consent was obtained from all participants. … All data were anonymized before the analysis.",
   "Patients were randomly assigned to citicoline or placebo with a computer-generated sequence. The outcome assessors were … blinded to allocation.",
+  "Assessors were blinded as described by Smith et al. … Allocation was concealed centrally.",
 ];
 
 /**
@@ -480,7 +482,7 @@ const QUOTES = [
  * When this test fails, raise SCORER_PROMPT_VERSION and add the new version's fingerprint (an
  * unreleased version's may be updated).
  */
-const RELEASED: Readonly<Record<string, string>> = { "2": "72754c07", "3": "c229e3fa" };
+const RELEASED: Readonly<Record<string, string>> = { "2": "72754c07", "3": "71e5ec76" };
 
 describe("SCORER_PROMPT_VERSION", () => {
   it("changes whenever the prompt, a checklist, the scoring, quote matching or the text changes", () => {
@@ -514,7 +516,7 @@ describe("SCORER_PROMPT_VERSION", () => {
     ];
     const prepared = texts.map((text) => (text.ok ? text.paper.text : text.reason));
 
-    expect(found).toEqual([1, 0, 1, 1, 0, 1, 0, 0, 0, 1, 0]);
+    expect(found).toEqual([1, 0, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0]);
     expect(
       fingerprint([system, user, scores.join(","), found.join(""), ...prepared].join("\n")),
     ).toBe(RELEASED[SCORER_PROMPT_VERSION]);

@@ -31,14 +31,74 @@ const MAX_GAP = 6_000;
 /** The most places tried for one passage, when the paper holds it more than once. */
 const MAX_PLACES = 50;
 /**
- * An ellipsis in a quote (`…`, `...`, `. . .`, bracketed or not) marks whole sentences it leaves
- * out, up to `MAX_ELLIPSES` between its parts: each sentence a quote keeps is the paper's, word
- * for word, so an ellipsis never changes what a sentence says, such as by hiding its "not".
+ * An ellipsis in a quote (`…`, `...`, `. . .`, bracketed or not) may stand only for whole
+ * sentences left out, up to `MAX_ELLIPSES` between its parts: it never removes words from inside
+ * a sentence the quote keeps, such as its "not". A quote may still start or end inside a
+ * sentence, as any quote may.
  */
 const ELLIPSIS = /[[(]?\s*(?:…|\.(?:\s?\.){2,})\s*[\])]?/gu;
 const MAX_ELLIPSES = 2;
-/** The end of a sentence in the paper's text. */
-const SENTENCE_END = /[.!?]/u;
+/**
+ * A sentence's end in the paper's text, right after its last word: a citation such as `[12]`
+ * may come first, then a full stop, question or exclamation mark, closing quotes or brackets,
+ * and a space. A decimal point is followed by no space, so it never ends a sentence.
+ */
+const SENTENCE_END = /^(?:\s*[[(][\d\s,–-]*[\])])?[)"'”’\]]*[.!?]["'”’)\]]*\s+/u;
+/** The same end, read back from the start of the next sentence, with the word before it. */
+const SENTENCE_END_BEFORE =
+  /([\p{L}\p{N}]+)(?:\s*[[(][\d\s,–-]*[\])])?[)"'”’\]]*[.!?]["'”’)\]]*\s+$/u;
+/** The last word of a text. */
+const LAST_WORD = /[\p{L}\p{N}]+$/u;
+/** A sentence starts with a capital letter or a digit. */
+const SENTENCE_START = /^[\p{Lu}\p{N}]/u;
+/** Words whose full stop ends no sentence, lowercase; a single letter (an initial, `e.g.`) neither. */
+const ABBREVIATIONS: ReadonlySet<string> = new Set([
+  "al",
+  "approx",
+  "ca",
+  "cf",
+  "ch",
+  "co",
+  "cv",
+  "dept",
+  "dr",
+  "ed",
+  "eds",
+  "eq",
+  "eqs",
+  "fig",
+  "figs",
+  "inc",
+  "jr",
+  "ltd",
+  "mr",
+  "mrs",
+  "ms",
+  "no",
+  "nos",
+  "pp",
+  "prof",
+  "ref",
+  "refs",
+  "resp",
+  "sec",
+  "sect",
+  "sp",
+  "spp",
+  "sr",
+  "st",
+  "subsp",
+  "suppl",
+  "tab",
+  "univ",
+  "var",
+  "viz",
+  "vol",
+  "vols",
+  "vs",
+]);
+/** The most (part, place) pairs a quote with ellipses tries before it is not found. */
+const MAX_TRIES = 2_000;
 /** Letters Unicode does not decompose, as a PDF or a model may write them another way. */
 const FOLDED: Readonly<Record<string, string>> = {
   ı: "i",
@@ -219,10 +279,10 @@ export function quoteTextOf(text: string): QuoteText {
  * part of one, or that the scorer made up, is not.
  *
  * A quote not found whole may leave out whole sentences, each gap marked by an ellipsis: its
- * parts, at most three, are found in order this way, each within about a page of the one before,
- * and the paper's text between two parts ends one sentence and holds only whole sentences (or
- * what may lie between two passages). A part before an ellipsis ends in a passage of at least 20
- * letters and digits.
+ * parts, at most three, are each found this way (up to three passages each), in order, each
+ * within about a page of the one before. Across an ellipsis, the part before ends a sentence and
+ * the part after starts one ({@link wholeSentences}), or only what may lie between two passages
+ * is left out. A part before an ellipsis ends in a passage of at least 20 letters and digits.
  */
 export function quoteFound(paper: QuoteText, quote: string): boolean {
   const whole = normalizeForQuote(quote);
@@ -258,7 +318,7 @@ function partsFrom(
   const part = parts[index];
   if (part === undefined) return true;
   const key = `${index}:${after?.at}`;
-  if (failed.has(key)) return false;
+  if (failed.has(key) || failed.size >= MAX_TRIES) return false;
   const final = index === parts.length - 1;
   const found = passagesFrom(paper, part, 0, after, 1, final, (end) =>
     partsFrom(paper, parts, index + 1, { at: end, elided: true }, failed),
@@ -355,16 +415,32 @@ function placesOf(
 }
 
 /**
- * True when the paper's text from `after` to `at` in its normalized text is whole sentences: a
- * sentence ends before its first letter or digit, and another after its last one.
+ * True when the paper's text from `after` to `at` in its normalized text is whole sentences: the
+ * passage before it ends a sentence, and the passage after it starts one. A full stop ends a
+ * sentence only when a space and a capital letter or digit follow it and the word before it is
+ * neither an abbreviation (`et al.`, `Fig.`, `no.`, …) nor a single letter.
  */
 function wholeSentences(paper: QuoteText, after: number, at: number): boolean {
-  if (at <= after) return false;
-  const first = paper.origins[after] ?? paper.text.length;
-  const last = paper.origins[at - 1] ?? -1;
-  const before = paper.text.slice((paper.origins[after - 1] ?? -1) + 1, first);
-  const behind = paper.text.slice(last + 1, paper.origins[at]);
-  return SENTENCE_END.test(before) && SENTENCE_END.test(behind);
+  const end = paper.origins[after - 1];
+  const start = paper.origins[at];
+  if (at <= after || end === undefined || start === undefined) return false;
+  const { text } = paper;
+  const ended = SENTENCE_END.exec(text.slice(end + 1, start));
+  const first = ended && text.slice(end + 1 + ended[0].length);
+  const startsNext = SENTENCE_END_BEFORE.exec(text.slice(end + 1, start));
+  return (
+    first !== null &&
+    SENTENCE_START.test(first) &&
+    endsSentence(LAST_WORD.exec(text.slice(0, end + 1))?.[0]) &&
+    startsNext !== null &&
+    SENTENCE_START.test(text.slice(start)) &&
+    endsSentence(startsNext[1])
+  );
+}
+
+/** True when a full stop after `word` may end a sentence: see {@link wholeSentences}. */
+function endsSentence(word: string | undefined): boolean {
+  return word !== undefined && word.length > 1 && !ABBREVIATIONS.has(word.toLowerCase());
 }
 
 /**

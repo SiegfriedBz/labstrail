@@ -275,6 +275,18 @@ describe("quoteFound", () => {
     );
   });
 
+  it("finds a quote whose ellipsis follows a sentence ending in a citation", () => {
+    const paper =
+      "Outcome assessors were blinded to group allocation [12]. Blinding was checked at each visit (3, 4). Data were analysed in R.";
+
+    expect(
+      found(
+        paper,
+        "Outcome assessors were blinded to group allocation. … Data were analysed in R.",
+      ),
+    ).toBe(true);
+  });
+
   it("finds a quote copied whole from a paper that writes an ellipsis of its own", () => {
     const paper = "Doses of 1, 2, ..., 10 mg/kg were given to each group of mice.";
 
@@ -296,6 +308,26 @@ describe("quoteFound", () => {
       "words inside a sentence, between whole ones",
       ETHICS,
       "The protocol of the study was approved by the Comité de Protection des Personnes … Written informed consent was obtained from all participants.",
+    ],
+    [
+      "words after an abbreviation's full stop",
+      "Outcome assessors were blinded as described by Smith et al. In the first year only, blinding was not maintained. Allocation was concealed by central randomization.",
+      "Outcome assessors were blinded as described by Smith et al. … Allocation was concealed by central randomization.",
+    ],
+    [
+      "words after a number's abbreviation",
+      ETHICS,
+      "The protocol of the study was approved by the Comité de Protection des Personnes Île-de-France III on October 26, 2017 (no. … Written informed consent was obtained from all participants.",
+    ],
+    [
+      "words after an initial",
+      "The analysis plan was written by J. Smith before unblinding, and was not followed. Data were analysed in R.",
+      "The analysis plan was written by J. … Data were analysed in R.",
+    ],
+    [
+      "words after a decimal point",
+      "The difference between groups was significant at p < 0.05 only in the per-protocol analysis. The trial was registered.",
+      "The difference between groups was significant at p < 0. … The trial was registered.",
     ],
   ])("does not find a quote whose ellipsis stands for %s", (_, paper, quote) => {
     expect(found(paper, quote)).toBe(false);

@@ -64,7 +64,7 @@ so an import of another `@verisci/*` package fails to typecheck.
 | `paperPdfQuery(contextGraph, ual)`, `pdfCidOf(bindings)` | The SPARQL reading the `schema:url` of a paper our node minted, from its own graph (`undefined` for another author or a malformed graph id), and the canonical CID of the `ipfs://` PDF it links, or `undefined` |
 | `triplesFromBindings(bindings)` | The `Triple`s in the rows of a `SELECT ?s ?p ?o` |
 | `preparePaperText(pages, maxChars)`, `PaperText`, `PreparePaperResult` | A paper's text from its PDF's pages, cleaned and fitted to `maxChars` (the reference list left out first, then the end cut, marked `[…]`), or `no-text` for pages holding almost no letters |
-| `normalizeForQuote(text)`, `quoteTextOf(text)`, `QuoteText`, `quoteFound(paper, quote)` | The letters and digits a quote is matched on (lowercase, accents and ligatures undone, letters such as `ı` or `ß` folded), a paper's text prepared once for matching, and whether a quote is made of up to three passages of the paper in order, each long enough to show something, with only numbers or whole lines between them; a quote not found whole may leave out whole sentences, each gap marked by an ellipsis (`…`, `...`), up to two, so every sentence it keeps is the paper's word for word |
+| `normalizeForQuote(text)`, `quoteTextOf(text)`, `QuoteText`, `quoteFound(paper, quote)` | The letters and digits a quote is matched on (lowercase, accents and ligatures undone, letters such as `ı` or `ß` folded), a paper's text prepared once for matching, and whether a quote is made of up to three passages of the paper in order, each long enough to show something, with only numbers or whole lines between them; a quote not found whole may leave out whole sentences, each gap marked by an ellipsis (`…`, `...`, `. . .`, bracketed or not), up to two: the part before ends a sentence and the part after starts one, a full stop counting only before a space and a capital or digit and never after an abbreviation (`et al.`, `Fig.`, `no.`) or an initial, so an ellipsis never removes words from inside a sentence the quote keeps |
 | `STUDY_TYPES`, `StudyType`, `CHECKS`, `CheckId`, `Check`, `checklistOf(type)` | The eight kinds of study the scorer tells apart, with the checklist each draws on, what each check asks, and a study type's checks in prompt order, each `required` or `conditional` |
 | `scorerPrompt(paper)`, `SCORER_OUTPUT_SCHEMA` | The scorer's system and user text for a paper, one request per paper, and the JSON Schema its answer must match |
 | `parseScorerAnswer(text)`, `ScorerAnswer`, `FIELDS`, `Field`, `CHECK_ANSWERS`, `CheckAnswer`, `CheckResult` | The scorer's answer checked: the field (`life-sciences` or `outside`), the study type and a reason, and for a paper in the field an answer to every check of its study type (`shown`, `partly`, `missing` or `not-applicable`) with its quote, and a rationale. Checks of another study type are left out, a repeated check keeps its first answer, and a reason, quote or rationale over its limit (500, 300 and 2,000 characters) is cut at a word rather than refused |
@@ -200,10 +200,10 @@ request id (Asset names above).
   run across what a PDF prints inside a statement (a page header, reference numbers, the box
   beside a first page, up to about a page of it), but never leave out a word: "the assessors
   were blinded" is not found in a paper that says "were not blinded". An ellipsis in a quote
-  may stand only for whole sentences left out, so every sentence a quote keeps is the paper's
-  word for word (version 3). Such a check
-  keeps what the model claimed (`claimed`), so the record tells "the paper does not say it"
-  from "the model quoted something the paper does not hold". The way the
+  may stand only for whole sentences left out, so it never removes words from inside a
+  sentence the quote keeps; a quote may still start or end inside a sentence (version 3).
+  Such a check keeps what the model claimed (`claimed`), so the record tells "the paper does
+  not say it" from "the model quoted something the paper does not hold". The way the
   expectations depend on the kind of study, and the credit for a statement that a check does
   not apply, follow the Rigor and Transparency Index (Menke et al., iScience 2020; JMIR 2022).
 - **Triples:** the subject is `urn:verisci:rating:<request id>`, typed `schema:Review`, with
