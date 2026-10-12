@@ -1,6 +1,7 @@
 import { canonicalCid } from "@verisci/core";
 import type {
   PublishedRecord,
+  PublishLogger,
   SubmitLimiter,
   SubmitResult,
   UploadService,
@@ -25,16 +26,24 @@ export type PaperView = PaperStage & {
 /** Inngest's event ids are ULIDs. */
 const EVENT_ID = /^[0-9A-Z]{26}$/;
 
-/** Signs an upload URL for a connection under its daily limit, counted by IP (ADR 0035). */
+/**
+ * Signs an upload URL for a connection under its daily limit, counted by IP (ADR 0035). A
+ * service that gives no answer is logged once, as `upload-url-unavailable: <service>: <what
+ * came back>`, never with a key or a URL.
+ */
 export async function requestUploadUrl(
   ip: string,
-  deps: { service: UploadService; urls: Counter },
+  deps: { service: UploadService; urls: Counter; logger: Pick<PublishLogger, "warn"> },
 ): Promise<UploadUrlAnswer> {
+  const unavailable = (service: "upstash" | "pinata", detail: string): UploadUrlAnswer => {
+    deps.logger.warn(`upload-url-unavailable: ${service}: ${detail}`);
+    return { ok: false, reason: "unavailable" };
+  };
   const allowed = await deps.urls.take(ip);
   if (allowed === "limited") return { ok: false, reason: "rate-limited" };
-  if (allowed === "unavailable") return { ok: false, reason: "unavailable" };
+  if (typeof allowed === "object") return unavailable("upstash", allowed.unavailable);
   const signed = await deps.service.createUploadUrl();
-  return signed.ok ? signed : { ok: false, reason: "unavailable" };
+  return signed.ok ? signed : unavailable("pinata", signed.detail);
 }
 
 /** Checks a signed submission and starts its publish run, under the per-address limit. */

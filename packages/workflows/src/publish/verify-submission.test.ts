@@ -162,7 +162,11 @@ describe("verifySubmission", () => {
   it("reports unreachable when the chain cannot be asked about a non-EOA signature", async () => {
     const data = { ...(await signed()), submitter: SMART_WALLET };
 
-    expect(await verify(data, client().publicClient)).toEqual({ ok: false, reason: "unreachable" });
+    expect(await verify(data, client().publicClient)).toEqual({
+      ok: false,
+      reason: "unreachable",
+      detail: expect.stringContaining("rpc down"),
+    });
   });
 
   it.each([

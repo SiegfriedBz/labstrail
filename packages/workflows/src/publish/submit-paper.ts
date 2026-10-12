@@ -1,12 +1,22 @@
 import type { AssetResult } from "@verisci/dkg";
+import { describeFailure } from "./failure.ts";
 import type { DeleteFileResult, FindFileResult } from "./pinata.ts";
-import { PAPER_SUBMITTED } from "./publish-paper.ts";
+import { PAPER_SUBMITTED, type PublishLogger } from "./publish-paper.ts";
 import type { SubmissionRefusal, VerifiedSubmission, VerifyResult } from "./verify-submission.ts";
 
-/** How many papers each submitter may publish; the web app keeps the counts (ADR 0035). */
+/**
+ * A limiter's answer: `unavailable` when its store could not be read, with what the store
+ * threw (as `describeFailure` gives it) or `timeout`, for a log.
+ */
+export type LimitAnswer = "allowed" | "limited" | { readonly unavailable: string };
+
+/**
+ * How many papers each submitter may publish; the web app keeps the counts, in Upstash or,
+ * locally without it, in memory (ADR 0035).
+ */
 export interface SubmitLimiter {
   /** Whether `address` may submit another paper now, without counting one. */
-  check(address: string): Promise<"allowed" | "limited" | "unavailable">;
+  check(address: string): Promise<LimitAnswer>;
   /** Counts one accepted submission for `address`; a failure to count is not reported. */
   count(address: string): Promise<void>;
 }
@@ -32,7 +42,12 @@ export interface SubmitDeps {
   /** Sends the event and returns Inngest's id for it; throws when Inngest refuses it. */
   send(event: PaperSubmittedEvent): Promise<string>;
   readonly maxBytes: number;
+  /** Where a service that gave no answer is named: the server's log. */
+  readonly logger: Pick<PublishLogger, "warn">;
 }
+
+/** The services a submission depends on, as its log names them. */
+type SubmitService = "chain-rpc" | "upstash" | "pinata" | "inngest";
 
 /** Why a submission is refused; none of them changes on a retry, except `rate-limited` a day later. */
 export type SubmitRefusal =
@@ -60,19 +75,25 @@ export type SubmitResult =
  * read leaves the check to the run. A file over `maxBytes` or not detected as a PDF is
  * refused; one that is not a PDF is also unpinned, when its asset is known to be missing
  * (ADR 0005). Only a submission whose event was sent is counted. Never throws for an
- * expected failure.
+ * expected failure; a service that gives no answer is logged once, as
+ * `submit-unavailable: <service>: <what came back>`, never with a key, a URL or the
+ * signature.
  *
  * Each signature sends its own event, but the publish function is a singleton per CID: while
  * a run for this PDF is active, Inngest starts no run for the new event, and the paper's page
  * follows the paper on the node instead.
  */
 export async function submitPaper(input: unknown, deps: SubmitDeps): Promise<SubmitResult> {
+  const unavailable = (service: SubmitService, detail: string): SubmitResult => {
+    deps.logger.warn(`submit-unavailable: ${service}: ${detail}`);
+    return { ok: false, reason: "unavailable" };
+  };
+
   const verified = await deps.verify(input);
   if (!verified.ok) {
-    return {
-      ok: false,
-      reason: verified.reason === "unreachable" ? "unavailable" : verified.reason,
-    };
+    return verified.reason === "unreachable"
+      ? unavailable("chain-rpc", verified.detail)
+      : { ok: false, reason: verified.reason };
   }
   const { submission } = verified;
 
@@ -81,12 +102,15 @@ export async function submitPaper(input: unknown, deps: SubmitDeps): Promise<Sub
     return { ok: true, cid: submission.cid, ual: asset.ual };
 
   const allowed = await deps.limiter.check(submission.submitter);
-  if (allowed === "unavailable") return { ok: false, reason: "unavailable" };
+  if (typeof allowed === "object") return unavailable("upstash", allowed.unavailable);
   if (allowed === "limited") return { ok: false, reason: "rate-limited" };
 
   const found = await deps.findFile(submission.cid);
-  if (!found.ok)
-    return { ok: false, reason: found.reason === "missing" ? "not-pinned" : "unavailable" };
+  if (!found.ok) {
+    return found.reason === "missing"
+      ? { ok: false, reason: "not-pinned" }
+      : unavailable("pinata", found.detail);
+  }
   // The refusal and the unpin share this one test of a PDF, so whatever a file is refused
   // as, only one the refusal counts as not a PDF is ever unpinned.
   const pdf = found.file.mimeType === "application/pdf";
@@ -108,8 +132,8 @@ export async function submitPaper(input: unknown, deps: SubmitDeps): Promise<Sub
       name: PAPER_SUBMITTED,
       data: submission,
     });
-  } catch {
-    return { ok: false, reason: "unavailable" };
+  } catch (error) {
+    return unavailable("inngest", describeFailure(error));
   }
   await deps.limiter.count(submission.submitter);
   return { ok: true, cid: submission.cid, eventId };

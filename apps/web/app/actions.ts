@@ -15,6 +15,7 @@ export async function requestUpload(): Promise<UploadUrlAnswer> {
   return requestUploadUrl(clientIp(await headers()), {
     service: getUploadService(),
     urls: getLimits().urls,
+    logger: console,
   });
 }
 

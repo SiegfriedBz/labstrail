@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { describeFailure } from "./failure.ts";
 
 /** How the Pinata adapter reaches Pinata's v3 API. */
 export interface PinataOptions {
@@ -17,10 +18,18 @@ export interface UploadUrlOptions extends PinataOptions {
   readonly now: () => number;
 }
 
+/**
+ * Pinata gave no usable answer: `detail` says what came back (`HTTP 503`, `unexpected
+ * answer`, or the error, as {@link describeFailure} gives it), for a log.
+ */
+export interface PinataUnavailable {
+  readonly ok: false;
+  readonly reason: "unavailable";
+  readonly detail: string;
+}
+
 /** The result of {@link createUploadUrl}. */
-export type UploadUrlResult =
-  | { readonly ok: true; readonly url: string }
-  | { readonly ok: false; readonly reason: "unavailable" };
+export type UploadUrlResult = { readonly ok: true; readonly url: string } | PinataUnavailable;
 
 /** A file pinned on Pinata's public network, as {@link findPublicFile} reads it. */
 export interface PinnedFile {
@@ -33,12 +42,11 @@ export interface PinnedFile {
 /** The result of {@link findPublicFile}: `unavailable` is worth trying again. */
 export type FindFileResult =
   | { readonly ok: true; readonly file: PinnedFile }
-  | { readonly ok: false; readonly reason: "missing" | "unavailable" };
+  | { readonly ok: false; readonly reason: "missing" }
+  | PinataUnavailable;
 
 /** The result of {@link deleteFile}. */
-export type DeleteFileResult =
-  | { readonly ok: true }
-  | { readonly ok: false; readonly reason: "unavailable" };
+export type DeleteFileResult = { readonly ok: true } | PinataUnavailable;
 
 const UPLOADS = "https://uploads.pinata.cloud/v3";
 const API = "https://api.pinata.cloud/v3";
@@ -58,7 +66,7 @@ const listed = z.object({
  * detected type) and pins with `cid_version` `v1`, the setting the `publish-pdf` dev script
  * uses, so one PDF keeps one CID (`docs/domain.md` → IPFS). The browser chooses the
  * network at upload, so the server checks the pinned file before publishing it.
- * Never throws: any failure is `unavailable`, and never carries the key or Pinata's answer.
+ * Never throws: any failure is `unavailable`, and its detail never carries the key or a URL.
  */
 export async function createUploadUrl(options: UploadUrlOptions): Promise<UploadUrlResult> {
   const body = await call(`${UPLOADS}/files/sign`, options, {
@@ -72,10 +80,9 @@ export async function createUploadUrl(options: UploadUrlOptions): Promise<Upload
       cid_version: "v1",
     }),
   });
-  const parsed = signed.safeParse(body);
-  return parsed.success
-    ? { ok: true, url: parsed.data.data }
-    : { ok: false, reason: "unavailable" };
+  if (!body.ok) return body;
+  const parsed = signed.safeParse(body.json);
+  return parsed.success ? { ok: true, url: parsed.data.data } : UNEXPECTED;
 }
 
 /**
@@ -85,9 +92,9 @@ export async function createUploadUrl(options: UploadUrlOptions): Promise<Upload
  */
 export async function findPublicFile(cid: string, options: PinataOptions): Promise<FindFileResult> {
   const body = await call(`${API}/files/public?cid=${encodeURIComponent(cid)}`, options, {});
-  if (body === undefined) return { ok: false, reason: "unavailable" };
-  const parsed = listed.safeParse(body);
-  if (!parsed.success) return { ok: false, reason: "unavailable" };
+  if (!body.ok) return body;
+  const parsed = listed.safeParse(body.json);
+  if (!parsed.success) return UNEXPECTED;
   const file = parsed.data.data.files.find((listedFile) => listedFile.cid === cid);
   if (!file) return { ok: false, reason: "missing" };
   return { ok: true, file: { id: file.id, size: file.size, mimeType: file.mime_type } };
@@ -101,37 +108,55 @@ export async function deleteFile(id: string, options: PinataOptions): Promise<De
   const status = await callStatus(`${API}/files/public/${encodeURIComponent(id)}`, options, {
     method: "DELETE",
   });
-  return status !== undefined && ((status >= 200 && status < 300) || status === 404)
-    ? { ok: true }
-    : { ok: false, reason: "unavailable" };
+  if (typeof status !== "number") return status;
+  return (status >= 200 && status < 300) || status === 404 ? { ok: true } : httpStatus(status);
 }
 
-/** The JSON body of a 2xx answer, or undefined for anything else. */
-async function call(url: string, options: PinataOptions, init: RequestInit): Promise<unknown> {
+const UNEXPECTED: PinataUnavailable = {
+  ok: false,
+  reason: "unavailable",
+  detail: "unexpected answer",
+};
+
+function httpStatus(status: number): PinataUnavailable {
+  return { ok: false, reason: "unavailable", detail: `HTTP ${status}` };
+}
+
+function thrown(error: unknown, options: PinataOptions): PinataUnavailable {
+  const detail = describeFailure(error).replaceAll(options.jwt, "<redacted>");
+  return { ok: false, reason: "unavailable", detail };
+}
+
+/** The JSON body of a 2xx answer, or why there is none. */
+async function call(
+  url: string,
+  options: PinataOptions,
+  init: RequestInit,
+): Promise<{ readonly ok: true; readonly json: unknown } | PinataUnavailable> {
   try {
     const response = await send(url, options, init);
     if (!response.ok) {
       await response.body?.cancel();
-      return undefined;
+      return httpStatus(response.status);
     }
-    return await response.json();
-  } catch {
-    return undefined;
+    return { ok: true, json: await response.json() };
+  } catch (error) {
+    return thrown(error, options);
   }
 }
 
-/** The status of the answer, or undefined when none came. */
+/** The status of the answer, or why none came. */
 async function callStatus(
   url: string,
   options: PinataOptions,
   init: RequestInit,
-): Promise<number | undefined> {
+): Promise<number | PinataUnavailable> {
   try {
     const response = await send(url, options, init);
     await response.body?.cancel();
     return response.status;
-  } catch {
-    return undefined;
+  } catch (error) {
+    return thrown(error, options);
   }
 }
 

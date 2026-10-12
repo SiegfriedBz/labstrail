@@ -33,6 +33,7 @@ function env(overrides: Record<string, string | undefined> = {}): WorkflowsEnv {
 function io(runs: unknown[] = [{ status: "Running" }]) {
   const requests: { url: string; init: RequestInit | undefined }[] = [];
   const sent: unknown[] = [];
+  const warned: string[] = [];
   const fetch = async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input);
     requests.push({ url, init });
@@ -54,8 +55,9 @@ function io(runs: unknown[] = [{ status: "Running" }]) {
       return EVENT_ID;
     },
     now: () => NOW_MS,
+    logger: { warn: (message) => warned.push(message) },
   };
-  return { uploadIo, requests, sent };
+  return { uploadIo, requests, sent, warned };
 }
 
 const limiter: SubmitLimiter = { check: async () => "allowed", count: async () => {} };
@@ -105,6 +107,35 @@ describe("createUploadService", () => {
 
     expect(result).toEqual({ ok: true, cid: CID, eventId: EVENT_ID });
     expect(sent).toHaveLength(1);
+  });
+
+  it("logs that Inngest gave no answer to a submission, through its logger", async () => {
+    const { uploadIo, warned } = io();
+    const account = privateKeyToAccount(generatePrivateKey());
+    const deadline = BigInt(NOW_MS / 1000 + 600);
+    const signature = await account.signTypedData(
+      submissionTypedData({ cid: CID, contextGraph: GRAPH, deadline }),
+    );
+    const down = new TypeError("fetch failed", {
+      cause: new Error("connect ECONNREFUSED 127.0.0.1:8288"),
+    });
+    const service = createUploadService(env(), { ...uploadIo, send: () => Promise.reject(down) });
+
+    const result = await service.submitPaper(
+      {
+        cid: CID,
+        contextGraph: GRAPH,
+        deadline: deadline.toString(),
+        submitter: account.address,
+        signature,
+      },
+      limiter,
+    );
+
+    expect(result).toEqual({ ok: false, reason: "unavailable" });
+    expect(warned).toEqual([
+      "submit-unavailable: inngest: fetch failed (connect ECONNREFUSED 127.0.0.1:8288)",
+    ]);
   });
 
   it("reads the asset's state and the run, in the staging branch's Inngest environment", async () => {
