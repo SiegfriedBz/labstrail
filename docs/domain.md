@@ -274,6 +274,11 @@ Observed on `lfoppiano/grobid:0.9.1-crf`, 2026-10-09, except where a fact cites 
   listed "Google Brain" and "Google Research" among the ten authors, and found no DOI
   (the arXiv PDF prints none). A Target KA carries what GROBID read
   ([ADR 0010](adr/0010-pdf-to-target-ka-pipeline.md)).
+- **The header can give an accent apart from its letter** (2026-10-12): a cohort study's TEI
+  listed "Montserrat Rodrı ´guez-Ayala" and "Bele ´n Moreno-Franco", the accent as a spacing
+  `´` (U+00B4) after a space, and the `i` as a dotless `ı` (U+0131), the base LaTeX draws an
+  accent on. `parseTeiHeader` joins such accents back (`packages/core` → Target KAs); papers
+  published before that fix keep the split names in their KAs.
 - **`POST /api/processFulltextDocument` drops statements printed beside a paper's first page**
   (2026-10-11): on a PLOS ONE trial (e0269224, 12 pages, 11 s), the TEI held the body's
   sections as flat `div`s, each with its `head`, and the funding and data availability
