@@ -104,7 +104,7 @@ Each was folded into the ADR that covers its topic. Their numbers stay retired, 
 
 ## Open questions
 
-Not decided yet. Each becomes an ADR in the plan that first needs the answer; the leaning is a starting point, not a decision.
+Not decided yet. The plan that first needs an answer records it, in a new ADR or in the ADR whose topic it belongs to, and removes the row in the same commit; the leaning is a starting point, not a decision.
 
 | Question | Leaning | Decided in |
 | --- | --- | --- |
@@ -127,6 +127,7 @@ An ADR states what is decided today, so each topic reads in one file.
 
 - **A new topic gets a new ADR.**
 - **A new choice on a topic an ADR already covers, a change to part of its decision, or a correction** goes into that ADR: rewrite it so it reads as the current decision, and add a dated line under `## History` at its end (`- 2026-10-07: what changed, and why`). A correction that keeps the decision, such as a forgotten word or an incomplete list, says "corrected". A choice that touches two ADRs' topics updates both, each with its History line.
+- **A change that answers an open question** removes that row in the same commit.
 - **A whole decision replaced** gets a new ADR: the old one's status becomes `Superseded by NNNN`, and the new one's header gets `- Supersedes: NNNN`.
 - **Folding:** when one ADR's topic is part of another's, its text moves into that ADR, with a History line, its file is deleted, and its number is listed under Folded ADRs. Each number names one ADR for good.
 - Every change is the user's call and goes through a reviewed PR; amending an ADR, in [0025](0025-reviews-gate-on-adrs-and-lint.md)'s sense, means this in-place change. Git keeps the full text of each version.
