@@ -34,7 +34,8 @@ Next.js 16 App Router app. See `README.md` here for scripts and status.
   colour. Teal marks on-chain assets only; blue marks off-chain records and is the
   brand's accent: focus rings, `link` underlines, the current page, and live or connected
   states. The two blend, blue into teal, only on the logo, the main action
-  (`signal-gradient`) and live lines. `rounded-2xl` panels, `rounded-xl` buttons and
+  (`signal-gradient`), live lines and the line linking a save to its mint
+  (`link-gradient`). `rounded-2xl` panels, `rounded-xl` buttons and
   inputs, `rounded-lg` small controls, `rounded-md` flags. Check every page in both themes
   at 360, 768 and 1280 px with no horizontal scroll. Page copy follows the
   `design-taste-frontend` and humanizer skills: plain words, no em dashes.

@@ -40,8 +40,9 @@ Built:
   health paper, and it is published to the DKG as a Knowledge Asset that records who
   submitted it ([ADR 0010](docs/adr/0010-pdf-to-target-ka-pipeline.md),
   [ADR 0037](docs/adr/0037-verisci-rates-life-science-and-health-papers.md)). A paper
-  outside the field is refused before anything is stored. A publish that fails
-  after its retries is recovered by publishing the same PDF again.
+  the check places outside the field is refused before anything is stored; when Gemini
+  cannot answer, the paper is published and its rating checks the field. A publish that
+  fails after its retries is recovered by publishing the same PDF again.
 - **Every write is safe to retry.** Each step checks what is already done
   before acting, so a retry never duplicates anything
   ([ADR 0007](docs/adr/0007-all-writes-converge.md)).

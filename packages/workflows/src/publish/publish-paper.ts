@@ -14,7 +14,7 @@ import type { SubmissionRefusal, VerifiedSubmission, VerifyResult } from "./veri
 /** The event that starts a publish: `{ cid, contextGraph, deadline, submitter, signature }`. */
 export const PAPER_SUBMITTED = "verisci/paper.submitted";
 
-/** The publish run's limits (ADR 0008, ADR 0009). */
+/** The publish run's limits and its field check's settings (ADR 0008, ADR 0009, ADR 0037). */
 export const PUBLISH_SETTINGS = {
   /** Largest PDF read from the gateway. */
   maxPdfBytes: MAX_PDF_BYTES,

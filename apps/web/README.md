@@ -174,8 +174,8 @@ The "Clinical" look: a clinical record with an on-chain proof, in Tailwind CSS v
   JavaScript runs. AppKit's wallet window follows the same theme. Every colour is a token
   defined for both themes: light accents are dark enough for AA text contrast, and dark is
   a deep blue-grey with solid panels one step lighter than the page. `app/globals.test.ts`
-  reads both themes' tokens and holds text to WCAG AA (4.5:1 on the page, accent text on
-  its fill, white on `accent-deep`) and icons to 3:1.
+  reads both themes' tokens and holds text to WCAG AA (4.5:1 on the page for ink, muted,
+  both accents and danger, accent text on its fill, white on `accent-deep`).
 - The "Clinical" look: a cool off-white page (deep blue-grey in dark), a soft wash across
   the top of each page (blue from the top left, teal from the top right), one soft glow
   behind the hero. Raised panels
@@ -184,8 +184,8 @@ The "Clinical" look: a clinical record with an on-chain proof, in Tailwind CSS v
   and publish panels, the publish form and the footer's contracts. Elsewhere, coloured
   edges, timelines and hairline rules group the content, with one call to action per page.
 - Two signal colours with one meaning each: blue for the off-chain record, teal for the
-  on-chain asset. They blend only on the main action, live lines, and the line linking a
-  save to its mint in the publish chain. Text links are ink with a blue underline
+  on-chain asset. They blend only on the logo, the main action, live lines, and the line
+  linking a save to its mint in the publish chain. Text links are ink with a blue underline
   (`link`); addresses in the papers list and the footer's contract links are muted and
   turn teal on hover. The header's wallet button is neutral, so each page's own call to
   action leads.
