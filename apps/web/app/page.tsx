@@ -25,7 +25,7 @@ const HOW = [
   {
     icon: FilePdf,
     title: "Drop your PDF",
-    body: "It's stored on IPFS, and we read its title, authors and abstract.",
+    body: "It's stored on IPFS. We read its title, authors and abstract, and check it's a life-science or health paper.",
   },
   {
     icon: PenNib,
@@ -37,8 +37,8 @@ const HOW = [
 const RATE = [
   {
     icon: Robot,
-    title: "Machine score",
-    body: "An AI model reads the whole paper and checks it against the checklist for its kind of study, from 0 to 100. The score goes on-chain, the answers and quotes into the rating's asset.",
+    title: "Reproducibility readiness",
+    body: "An AI model reads the whole paper and checks, against the checklist for its kind of study, whether it gives what others need to check and reproduce the work. The score, from 0 to 100, goes on-chain, the answers and quotes into the rating's asset. It doesn't say whether the results hold, and it can't catch a made-up paper that states every right thing.",
   },
   {
     icon: UsersThree,
@@ -100,11 +100,12 @@ export default function Home() {
       <section className="grid items-center gap-10 md:min-h-[calc(100dvh-8rem)] md:grid-cols-[1.3fr_1fr] md:content-center md:gap-14">
         <div className="enter grid min-h-[calc(100dvh-6.5rem)] content-center gap-7 sm:min-h-[calc(100dvh-8rem)] md:min-h-0">
           <h1 className="text-4xl font-semibold leading-[1.08] tracking-tight md:text-[2.75rem] lg:text-5xl">
-            Publish your paper as a record anyone can <span className="text-accent">verify</span>
+            Publish your life-science paper as a record anyone can{" "}
+            <span className="text-accent">verify</span>
           </h1>
           <p className="max-w-[46ch] text-lg leading-relaxed text-muted">
-            Drop a PDF and sign with your wallet. VeriSci records it on the knowledge graph, with
-            you as its submitter.
+            For research in biology, medicine and health. Drop a PDF and sign with your wallet.
+            VeriSci records it on the knowledge graph, with you as its submitter.
           </p>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
             <Link
@@ -240,7 +241,7 @@ export default function Home() {
           <Track
             label="Rate"
             badge="coming soon"
-            intro="Anyone will be able to ask for a rating of a published paper. Each phase records its own score on-chain, so earlier scores stay as they were."
+            intro="Anyone will be able to ask for a rating of a published paper. The first score measures reproducibility readiness, not whether the work is right. Each phase records its own score on-chain, so earlier scores stay as they were."
             steps={RATE}
             muted
           />

@@ -1,12 +1,14 @@
 // Dev only: scores the reference papers (reference-papers.json) as a rating run would, reading
 // each PDF's text and asking Gemini for its field, study type and checks in one request, and
 // prints how each compares with what is expected. It never publishes, stores or rates anything.
+// With --field, it runs only the publish run's field check instead: GROBID's header and the
+// text's opening, then one Flash-Lite request per paper.
 //
-//   pnpm --filter @verisci/workflows score-papers [id…]
+//   pnpm --filter @verisci/workflows score-papers [--field] [id…]
 //
-// Reads GEMINI_API_KEY from the root .env.local (packages/workflows README). Downloads each PDF
-// once into node_modules/.cache/verisci-reference/, and writes each run's answers there too,
-// after each paper, so a run that stops keeps the answers it paid for.
+// Reads GEMINI_API_KEY (and GROBID_URL with --field) from the root .env.local (packages/workflows
+// README). Downloads each PDF once into node_modules/.cache/verisci-reference/, and writes each
+// run's answers there too, after each paper, so a run that stops keeps the answers it paid for.
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { setTimeout as sleep } from "node:timers/promises";
 import {
@@ -17,8 +19,12 @@ import {
   scoreChecks,
 } from "@verisci/core";
 import { createSharedEnv, defineEnv } from "@verisci/env";
+import { z } from "zod";
 import type { GeminiFailureResult } from "../src/gemini/gemini.ts";
 import { paperTextOf } from "../src/pdf/paper-text.ts";
+import { checkField } from "../src/publish/field-check.ts";
+import { PUBLISH_SETTINGS } from "../src/publish/publish-paper.ts";
+import { readPaper } from "../src/publish/read-paper.ts";
 import { RATING_SETTINGS } from "../src/rating/rate-paper.ts";
 import { askScorer } from "../src/rating/scorer.ts";
 import { geminiSchema } from "../src/workflows-env.ts";
@@ -38,9 +44,11 @@ if (shared.APP_ENV !== "local") {
   console.error("score-papers runs only with APP_ENV=local");
   process.exit(1);
 }
+const args = process.argv.slice(2);
+const fieldOnly = args.includes("--field");
 const env = defineEnv({
   extends: [shared],
-  server: geminiSchema,
+  server: { ...geminiSchema, GROBID_URL: fieldOnly ? z.url() : z.string().optional() },
   runtimeEnv: process.env,
 });
 const gemini = {
@@ -52,7 +60,7 @@ const gemini = {
 const all = readReferencePapers(
   JSON.parse(await readFile(new URL("./reference-papers.json", import.meta.url), "utf8")),
 );
-const wanted = process.argv.slice(2);
+const wanted = args.filter((arg) => arg !== "--field");
 const unknown = wanted.filter((id) => !all.some((paper) => paper.id === id));
 if (unknown.length > 0) {
   console.error(`Not in reference-papers.json: ${unknown.join(", ")}`);
@@ -75,7 +83,14 @@ interface Found {
   readonly failure?: string;
 }
 
-const file = new URL(`results-${new Date().toISOString().replaceAll(":", "-")}.json`, CACHE);
+const file = new URL(
+  `${fieldOnly ? "field" : "results"}-${new Date().toISOString().replaceAll(":", "-")}.json`,
+  CACHE,
+);
+if (fieldOnly) {
+  await checkFields(papers);
+  process.exit(0);
+}
 const results: Found[] = [];
 for (const paper of papers) {
   const result = await score(paper).catch(
@@ -113,28 +128,103 @@ async function score(paper: ReferencePaper): Promise<Found> {
   return { ...base, found: answer.studyType, seconds, asked: answer, output };
 }
 
+/** What the field check gave for one paper. */
+interface FieldFound {
+  readonly id: string;
+  readonly expected: "life-sciences" | "outside";
+  readonly found?: string;
+  readonly reason?: string;
+  readonly failure?: string;
+}
+
 /**
- * The paper's text, from its PDF downloaded once into the cache. A file that is not a PDF, such
- * as the page a publisher shows a robot, is never cached: save the PDF there by hand.
+ * Runs the publish run's field check on each paper, reading it as the publish run does
+ * (`readPaper`: GROBID's header and the opening of the text) from the cached PDF, then
+ * `checkField`, and prints the expected and the found field.
  */
+async function checkFields(list: readonly ReferencePaper[]): Promise<void> {
+  const found: FieldFound[] = [];
+  for (const paper of list) {
+    const result = await checkOne(paper).catch(
+      (error: unknown): FieldFound => ({
+        id: paper.id,
+        expected: paper.field,
+        failure: `stopped: ${String(error)}`,
+      }),
+    );
+    found.push(result);
+    const verdict = result.failure
+      ? `FAILED: ${result.failure}`
+      : result.found === result.expected
+        ? "right"
+        : "WRONG";
+    console.log(
+      `\n${paper.id}\n  expected ${result.expected} · found ${result.found ?? "-"} · ${verdict}`,
+    );
+    if (result.reason) console.log(`  ${result.reason}`);
+    await writeFile(file, `${JSON.stringify(found, null, 2)}\n`);
+  }
+  const right = found.filter((result) => result.found === result.expected).length;
+  console.log(`\nSummary\n  field right: ${right} of ${found.length}`);
+  console.log(`\nAnswers written to ${file.pathname}`);
+}
+
+async function checkOne(paper: ReferencePaper): Promise<FieldFound> {
+  const base = { id: paper.id, expected: paper.field };
+  const bytes = await pdfBytes(paper);
+  if (typeof bytes === "string") return { ...base, failure: bytes };
+  // readPaper fetches by CID from the gateway: the cached PDF stands in for it.
+  const gatewayUrl = "https://cache.invalid";
+  const read = await readPaper("cached", {
+    gatewayUrl,
+    grobidUrl: String(env.GROBID_URL),
+    fetch: async (input: string | URL | Request, init?: RequestInit) =>
+      String(input).startsWith(gatewayUrl)
+        ? new Response(bytes.slice() as Uint8Array<ArrayBuffer>)
+        : fetch(input, init),
+    maxBytes: PUBLISH_SETTINGS.maxPdfBytes,
+    timeoutMs: 120_000,
+    openingChars: PUBLISH_SETTINGS.openingChars,
+  });
+  if (!read.ok) return { ...base, failure: `read ${read.reason}` };
+  const { title, abstract } = read.metadata;
+  const checked = await withRetries(() =>
+    checkField(
+      { title, ...(abstract ? { abstract } : {}), opening: read.opening },
+      { ...gemini, model: PUBLISH_SETTINGS.fieldModel, timeoutMs: PUBLISH_SETTINGS.fieldTimeoutMs },
+    ),
+  );
+  if (!checked.ok) return { ...base, failure: `field check ${describe(checked)}` };
+  return { ...base, found: checked.field, reason: checked.reason };
+}
+
+/** The paper's text, as a rating run prepares it, from its PDF in the cache ({@link pdfBytes}). */
 async function paperText(
   paper: ReferencePaper,
 ): Promise<{ ok: true; paper: PaperText } | { ok: false; failure: string }> {
+  const bytes = await pdfBytes(paper);
+  if (typeof bytes === "string") return { ok: false, failure: bytes };
+  const text = await paperTextOf(bytes, RATING_SETTINGS.maxTextChars);
+  if (text.ok) return text;
+  return { ok: false, failure: text.reason === "no-text" ? "the PDF has no text" : "unreadable" };
+}
+
+/**
+ * The paper's PDF, downloaded once into the cache, or why not. A file that is not a PDF, such as
+ * the page a publisher shows a robot, is never cached: save the PDF there by hand.
+ */
+async function pdfBytes(paper: ReferencePaper): Promise<Uint8Array | string> {
   const path = new URL(`${paper.id}.pdf`, CACHE);
   const cached = await readFile(path).then(
     (file) => new Uint8Array(file),
     () => undefined,
   );
   const bytes = cached ?? (await download(paper.url));
-  if (typeof bytes === "string") return { ok: false, failure: bytes };
-  if (!isPdf(bytes)) {
-    return { ok: false, failure: `not a PDF (a robot check?): save the PDF as ${path.pathname}` };
-  }
-  // unpdf takes the bytes over, so they are written to the cache first.
+  if (typeof bytes === "string") return bytes;
+  if (!isPdf(bytes)) return `not a PDF (a robot check?): save the PDF as ${path.pathname}`;
+  // unpdf takes the bytes over, so they are written to the cache before anything reads them.
   if (!cached) await writeFile(path, bytes);
-  const text = await paperTextOf(bytes, RATING_SETTINGS.maxTextChars);
-  if (text.ok) return text;
-  return { ok: false, failure: text.reason === "no-text" ? "the PDF has no text" : "unreadable" };
+  return bytes;
 }
 
 /** The file at `url`, or why it did not come. */

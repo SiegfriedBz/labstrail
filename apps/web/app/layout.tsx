@@ -10,6 +10,7 @@ import { SiteFooter } from "../components/site/site-footer.tsx";
 import { ThemeToggle } from "../components/site/theme-toggle.tsx";
 import { Providers } from "../components/wallet/providers.tsx";
 import { WalletButton } from "../components/wallet/wallet-button.tsx";
+import { SITE, siteMetadata } from "../lib/site.ts";
 import { THEME_SCRIPT } from "../lib/theme.ts";
 import { createWebEnv } from "../lib/web-env.ts";
 import "./globals.css";
@@ -17,15 +18,7 @@ import "./globals.css";
 const sans = Sora({ subsets: ["latin"], variable: "--font-sora" });
 const mono = Martian_Mono({ subsets: ["latin"], variable: "--font-martian" });
 
-const DESCRIPTION =
-  "Publish a paper as a Knowledge Asset on the OriginTrail DKG, signed by your wallet, so anyone can verify who submitted it.";
-
-export const metadata: Metadata = {
-  title: "VeriSci",
-  description: DESCRIPTION,
-  openGraph: { title: "VeriSci", description: DESCRIPTION, siteName: "VeriSci", type: "website" },
-  twitter: { card: "summary", title: "VeriSci", description: DESCRIPTION },
-};
+export const metadata: Metadata = siteMetadata;
 
 /**
  * The shell: header with the theme and wallet buttons, then the page. Rendered per request,
@@ -59,7 +52,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <Providers projectId={REOWN_PROJECT_ID}>
           <header className="sticky top-0 z-20 border-b border-line bg-page/70 backdrop-blur-xl">
             <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-              <Link href="/" aria-label="VeriSci home">
+              <Link href="/" aria-label={`${SITE.name} home`}>
                 <Logo />
               </Link>
               <nav className="flex items-center gap-2.5 sm:gap-5">

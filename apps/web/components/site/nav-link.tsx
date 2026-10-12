@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
-/** A header link that shows when its page is the one open: brighter, underlined in emerald. */
+/** A header link that shows when its page is the one open: brighter, underlined in blue. */
 export function NavLink({ href, children }: { href: string; children: ReactNode }) {
   const current = usePathname() === href;
   return (

@@ -3,6 +3,7 @@ import { ORIGINTRAIL_CONTRACTS } from "@verisci/core";
 import Link from "next/link";
 import { addressUrl } from "../../lib/papers/explorer.ts";
 import { shorten } from "../../lib/shorten.ts";
+import { SITE } from "../../lib/site.ts";
 import { Logo } from "./logo.tsx";
 
 /** Base Sepolia, where every environment runs until mainnet (ADR 0015). */
@@ -60,9 +61,7 @@ export function SiteFooter({ ratingController }: { ratingController: string | un
           <Link href="/" aria-label="VeriSci home" className="w-fit">
             <Logo />
           </Link>
-          <p className="max-w-[34ch] text-sm leading-relaxed text-muted">
-            Papers published as Knowledge Assets on the OriginTrail DKG, signed by their submitter.
-          </p>
+          <p className="max-w-[40ch] text-sm leading-relaxed text-muted">{SITE.description}</p>
           <p className="w-fit rounded-md border border-line px-2.5 py-1 font-mono text-xs text-muted">
             Base Sepolia testnet · chain {CHAIN_ID}
           </p>
@@ -117,7 +116,9 @@ export function SiteFooter({ ratingController }: { ratingController: string | un
       </div>
       <div className="border-t border-line">
         <div className="mx-auto flex max-w-6xl flex-wrap justify-between gap-x-6 gap-y-1 px-4 py-4 text-xs text-muted sm:px-6">
-          <p>© {new Date().getFullYear()} VeriSci</p>
+          <p>
+            © {new Date().getFullYear()} {SITE.name}
+          </p>
           <p>Built on the OriginTrail DKG, IPFS and Base.</p>
         </div>
       </div>
