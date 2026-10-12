@@ -28,6 +28,9 @@ const refusals: RefusalReason[] = [
   "too-large",
   "unparseable",
   "no-title",
+  "unreadable",
+  "no-text",
+  "outside-field",
   "expired",
   "bad-signature",
   "malformed",
@@ -56,6 +59,28 @@ describe("messages", () => {
 describe("refusalMessage", () => {
   it("tells a no-title refusal that pages saved as pictures cannot be read", () => {
     expect(refusalMessage("no-title")).toMatch(/pictures/);
+  });
+
+  it("tells a no-text refusal that pages saved as pictures cannot be read", () => {
+    expect(refusalMessage("no-text")).toMatch(/pictures/);
+  });
+
+  it("says VeriSci publishes life-science and health papers only, names the field and says this one was not published", () => {
+    const message = refusalMessage("outside-field");
+
+    expect(message).toMatch(/life sciences and health only/);
+    for (const field of [
+      "biology",
+      "medicine",
+      "neuroscience",
+      "pharmacology",
+      "public health",
+      "bioinformatics",
+      "psychology when the study is about health",
+    ])
+      expect(message).toContain(field);
+    expect(message).toMatch(/wasn't published/);
+    expect(message).not.toMatch(/[—–]/);
   });
 });
 

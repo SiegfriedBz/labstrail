@@ -17,10 +17,11 @@ const workflows = {
   PINATA_GATEWAY_URL: "https://example.mypinata.cloud",
   CHAIN_RPC_URL: "https://sepolia.base.org",
   PINATA_JWT: "secret-pinata-jwt",
+  GEMINI_API_KEY: "secret-gemini",
   INNGEST_EVENT_KEY: "secret-event-key",
   INNGEST_SIGNING_KEY: "signkey-test-0123",
 };
-const rating = { ...workflows, ORACLE_PRIVATE_KEY: ORACLE_KEY, GEMINI_API_KEY: "secret-gemini" };
+const rating = { ...workflows, ORACLE_PRIVATE_KEY: ORACLE_KEY };
 const local = {
   ...rating,
   APP_ENV: "local",
@@ -119,8 +120,8 @@ describe("ratingSettingsRequired", () => {
 describe("checkRatingSettings", () => {
   it("checks the rating settings only where they are required", () => {
     expect(() => checkRatingSettings({ ...workflows })).not.toThrow();
-    expect(() => checkRatingSettings({ ...workflows, ORACLE_PRIVATE_KEY: ORACLE_KEY })).toThrow(
-      /GEMINI_API_KEY/,
+    expect(() => checkRatingSettings({ ...workflows, ORACLE_PRIVATE_KEY: "0x12" })).toThrow(
+      /ORACLE_PRIVATE_KEY/,
     );
     expect(() => checkRatingSettings(rating)).not.toThrow();
   });

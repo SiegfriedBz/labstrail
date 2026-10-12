@@ -56,6 +56,6 @@ describe("workflows' layout", () => {
     const root = ["index", "env", "functions", "inngest", "layout"];
 
     expect(files.length).toBeGreaterThan(20);
-    expect(misplaced(files, root, ["publish", "rating", "pdf", "site"])).toEqual([]);
+    expect(misplaced(files, root, ["publish", "rating", "pdf", "site", "gemini"])).toEqual([]);
   });
 });

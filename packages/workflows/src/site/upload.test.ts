@@ -21,6 +21,7 @@ function env(overrides: Record<string, string | undefined> = {}): WorkflowsEnv {
     PINATA_GATEWAY_URL: "https://example.mypinata.cloud",
     CHAIN_RPC_URL: "http://chain.test",
     PINATA_JWT: "secret-pinata-jwt",
+    GEMINI_API_KEY: "secret-gemini",
     INNGEST_EVENT_KEY: "secret-event-key",
     INNGEST_SIGNING_KEY: "signkey-test-0123",
     VERCEL_GIT_COMMIT_REF: "develop",

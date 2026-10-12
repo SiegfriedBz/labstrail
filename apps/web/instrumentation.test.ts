@@ -16,6 +16,7 @@ const settings = {
   PINATA_GATEWAY_URL: "https://example.mypinata.cloud",
   CHAIN_RPC_URL: "https://sepolia.base.org",
   PINATA_JWT: "secret-pinata-jwt",
+  GEMINI_API_KEY: "secret-gemini",
   INNGEST_EVENT_KEY: "secret-event-key",
   INNGEST_SIGNING_KEY: "signkey-test-0123",
   UPSTASH_REDIS_REST_URL: "https://example.upstash.io",
@@ -34,6 +35,13 @@ describe("checkServerSettings", () => {
 
     expect(start).toThrow(EnvError);
     expect(start).toThrow(/GROBID_URL/);
+  });
+
+  it("refuses to start a deployed server without the Gemini key, a preview included", () => {
+    const start = () =>
+      checkServerSettings({ APP_ENV: "staging", ...settings, GEMINI_API_KEY: undefined });
+
+    expect(start).toThrow(/GEMINI_API_KEY/);
   });
 
   it("refuses to start a deployed server without the web app's settings", () => {
@@ -59,7 +67,7 @@ describe("checkServerSettings", () => {
 });
 
 describe("checkRatingSettings", () => {
-  const rating = { ORACLE_PRIVATE_KEY: `0x${"59c6".repeat(16)}`, GEMINI_API_KEY: "secret-gemini" };
+  const rating = { ORACLE_PRIVATE_KEY: `0x${"59c6".repeat(16)}` };
   const production = {
     APP_ENV: "production",
     ...settings,
@@ -67,7 +75,7 @@ describe("checkRatingSettings", () => {
   };
 
   it("refuses to start production without the oracle key (ADR 0019)", () => {
-    const start = () => checkServerSettings({ ...production, GEMINI_API_KEY: "secret-gemini" });
+    const start = () => checkServerSettings(production);
 
     expect(start).toThrow(EnvError);
     expect(start).toThrow(/ORACLE_PRIVATE_KEY/);
@@ -83,9 +91,9 @@ describe("checkRatingSettings", () => {
       checkServerSettings({
         APP_ENV: "staging",
         ...settings,
-        ORACLE_PRIVATE_KEY: rating.ORACLE_PRIVATE_KEY,
+        ORACLE_PRIVATE_KEY: "0x12",
       }),
-    ).toThrow(/GEMINI_API_KEY/);
+    ).toThrow(/ORACLE_PRIVATE_KEY/);
   });
 });
 

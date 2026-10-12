@@ -6,8 +6,16 @@ import { z } from "zod";
 export const pinataSchema = { PINATA_JWT: z.string().min(1) };
 
 /**
+ * The Gemini key, read by the publish run's field check (ADR 0037), the rating functions'
+ * scorer (ADR 0018) and the `score-papers` dev script. Secret.
+ */
+export const geminiSchema = {
+  GEMINI_API_KEY: z.string().min(1),
+};
+
+/**
  * Validates the workflows' settings from `runtimeEnv` (default `process.env`): GROBID, the
- * Pinata gateway and key, a Base Sepolia RPC URL, and Inngest's event and signing keys
+ * Pinata gateway and key, the Gemini key, a Base Sepolia RPC URL, and Inngest's event and signing keys
  * outside `local` (the dev server needs none), plus the DKG node's (`dkgSchema`, in the
  * same pass, with the context graph's address in the node's checksum case) and the shared
  * ones. The Inngest SDK reads its keys itself; they are checked
@@ -33,6 +41,7 @@ export function workflowsSchema(appEnv: SharedEnv["APP_ENV"]) {
     PINATA_GATEWAY_URL: z.url(),
     CHAIN_RPC_URL: z.url(),
     ...pinataSchema,
+    ...geminiSchema,
     INNGEST_EVENT_KEY: inngestKey,
     INNGEST_SIGNING_KEY: inngestKey,
     /** Set by Vercel: the branch, which names a staging deployment's Inngest environment. */

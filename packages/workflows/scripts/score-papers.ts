@@ -17,10 +17,11 @@ import {
   scoreChecks,
 } from "@verisci/core";
 import { createSharedEnv, defineEnv } from "@verisci/env";
+import type { GeminiFailureResult } from "../src/gemini/gemini.ts";
 import { paperTextOf } from "../src/pdf/paper-text.ts";
 import { RATING_SETTINGS } from "../src/rating/rate-paper.ts";
-import { askScorer, type ScoreFailureResult } from "../src/rating/scorer.ts";
-import { geminiSchema } from "../src/rating-env.ts";
+import { askScorer } from "../src/rating/scorer.ts";
+import { geminiSchema } from "../src/workflows-env.ts";
 import { type ReferencePaper, readReferencePapers } from "./reference-papers.ts";
 
 const CACHE = new URL("../node_modules/.cache/verisci-reference/", import.meta.url);
@@ -152,7 +153,7 @@ function isPdf(bytes: Uint8Array): boolean {
 }
 
 /** Calls Gemini, retrying a rate limit or an outage, and an answer the check refuses once. */
-async function withRetries<T extends { ok: true } | ScoreFailureResult>(call: () => Promise<T>) {
+async function withRetries<T extends { ok: true } | GeminiFailureResult>(call: () => Promise<T>) {
   let unusable = 0;
   for (let attempt = 1; ; attempt++) {
     await sleep(PAUSE_MS);
@@ -165,7 +166,7 @@ async function withRetries<T extends { ok: true } | ScoreFailureResult>(call: ()
   }
 }
 
-function describe(failure: ScoreFailureResult): string {
+function describe(failure: GeminiFailureResult): string {
   return failure.status === undefined
     ? failure.reason
     : `${failure.reason} (HTTP ${failure.status})`;

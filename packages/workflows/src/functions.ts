@@ -6,6 +6,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { anvil, baseSepolia } from "viem/chains";
 import { inngest } from "./inngest.ts";
 import { readPaperText } from "./pdf/paper-text.ts";
+import { checkField } from "./publish/field-check.ts";
 import { createPublishPaper, PUBLISH_SETTINGS, type PublishDeps } from "./publish/publish-paper.ts";
 import { readPaper } from "./publish/read-paper.ts";
 import { verifySubmission } from "./publish/verify-submission.ts";
@@ -32,6 +33,7 @@ function getPublishDeps(): PublishDeps {
     fetch: (input: string | URL | Request, init?: RequestInit) => fetch(input, init),
     maxBytes: PUBLISH_SETTINGS.maxPdfBytes,
     timeoutMs: IO_TIMEOUT_MS,
+    openingChars: PUBLISH_SETTINGS.openingChars,
   };
   publishDeps = {
     verifySubmission: (data, receivedAt) =>
@@ -41,6 +43,13 @@ function getPublishDeps(): PublishDeps {
         now: () => receivedAt,
       }),
     readPaper: (cid) => readPaper(cid, paperOptions),
+    checkField: (paper) =>
+      checkField(paper, {
+        apiKey: env.GEMINI_API_KEY,
+        model: PUBLISH_SETTINGS.fieldModel,
+        fetch: (input: string | URL | Request, init?: RequestInit) => fetch(input, init),
+        timeoutMs: PUBLISH_SETTINGS.fieldTimeoutMs,
+      }),
     dkg: createDkgClient({
       url: env.DKG_URL,
       token: env.DKG_TOKEN,
