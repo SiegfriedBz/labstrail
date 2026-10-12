@@ -295,7 +295,11 @@ describe("runPublish", () => {
   it("retries a submission whose signature could not be checked", async () => {
     const { step, log } = fakeSteps();
     const { deps } = fakeDeps({});
-    deps.verifySubmission.mockResolvedValueOnce({ ok: false, reason: "unreachable" });
+    deps.verifySubmission.mockResolvedValueOnce({
+      ok: false,
+      reason: "unreachable",
+      detail: "rpc down",
+    });
 
     expect(await runPublish(SUBMISSION, step, deps, RECEIVED_AT, fakeLogger())).toEqual({
       state: "minted",
@@ -307,7 +311,11 @@ describe("runPublish", () => {
   it("checks every verify attempt against the time the event was received", async () => {
     const { step } = fakeSteps();
     const { deps } = fakeDeps({});
-    deps.verifySubmission.mockResolvedValueOnce({ ok: false, reason: "unreachable" });
+    deps.verifySubmission.mockResolvedValueOnce({
+      ok: false,
+      reason: "unreachable",
+      detail: "rpc down",
+    });
 
     await runPublish(SUBMISSION, step, deps, RECEIVED_AT, fakeLogger());
 
@@ -318,7 +326,9 @@ describe("runPublish", () => {
   });
 
   it("fails when the signature still cannot be checked after 5 attempts", async () => {
-    const { run, log } = await publish({ verify: { ok: false, reason: "unreachable" } });
+    const { run, log } = await publish({
+      verify: { ok: false, reason: "unreachable", detail: "rpc down" },
+    });
 
     await expect(run).rejects.toThrow(NonRetriableError);
     await expect(run).rejects.toThrow(/^publish-failed:chain-unreachable: /);

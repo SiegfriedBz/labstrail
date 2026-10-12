@@ -1,4 +1,4 @@
-import type { PaperStatus, SubmitLimiter, UploadService } from "@verisci/workflows";
+import type { LimitAnswer, PaperStatus, SubmitLimiter, UploadService } from "@verisci/workflows";
 import { describe, expect, it } from "vitest";
 import type { Counter } from "./limits.ts";
 import { clientIp, readProgress, requestUploadUrl, sendSubmission } from "./upload-actions.ts";
@@ -28,7 +28,7 @@ function fakeService(overrides: Partial<UploadService> = {}) {
   return { service, calls };
 }
 
-function fakeCounter(answer: "allowed" | "limited" | "unavailable"): Counter & { keys: string[] } {
+function fakeCounter(answer: LimitAnswer): Counter & { keys: string[] } {
   const keys: string[] = [];
   return {
     keys,
@@ -41,41 +41,54 @@ function fakeCounter(answer: "allowed" | "limited" | "unavailable"): Counter & {
   };
 }
 
+function fakeLogger() {
+  const warned: string[] = [];
+  return { warned, logger: { warn: (message: string) => warned.push(message) } };
+}
+
 describe("requestUploadUrl", () => {
   it("signs a URL for a connection under its limit, counting it by IP", async () => {
     const { service } = fakeService();
     const urls = fakeCounter("allowed");
+    const { logger, warned } = fakeLogger();
 
-    expect(await requestUploadUrl("203.0.113.7", { service, urls })).toEqual({
+    expect(await requestUploadUrl("203.0.113.7", { service, urls, logger })).toEqual({
       ok: true,
       url: "https://uploads.pinata.cloud/v3/files/x",
     });
     expect(urls.keys).toEqual(["203.0.113.7"]);
+    expect(warned).toEqual([]);
   });
 
   it("refuses a connection over its limit, signing nothing", async () => {
     const { service, calls } = fakeService();
+    const { logger, warned } = fakeLogger();
 
-    expect(await requestUploadUrl("ip", { service, urls: fakeCounter("limited") })).toEqual({
-      ok: false,
-      reason: "rate-limited",
-    });
+    expect(await requestUploadUrl("ip", { service, urls: fakeCounter("limited"), logger })).toEqual(
+      { ok: false, reason: "rate-limited" },
+    );
     expect(calls.urls).toBe(0);
+    expect(warned).toEqual([]);
   });
 
-  it("answers unavailable when the limits cannot be read, or Pinata does not sign", async () => {
+  it("answers unavailable when the limits cannot be read, or Pinata does not sign, and logs which", async () => {
     const { service } = fakeService({
-      createUploadUrl: async () => ({ ok: false, reason: "unavailable" }),
+      createUploadUrl: async () => ({ ok: false, reason: "unavailable", detail: "HTTP 503" }),
     });
+    const { logger, warned } = fakeLogger();
+    const down = fakeCounter({ unavailable: "fetch failed" });
 
-    expect(await requestUploadUrl("ip", { service, urls: fakeCounter("unavailable") })).toEqual({
+    expect(await requestUploadUrl("ip", { service, urls: down, logger })).toEqual({
       ok: false,
       reason: "unavailable",
     });
-    expect(await requestUploadUrl("ip", { service, urls: fakeCounter("allowed") })).toEqual({
-      ok: false,
-      reason: "unavailable",
-    });
+    expect(await requestUploadUrl("ip", { service, urls: fakeCounter("allowed"), logger })).toEqual(
+      { ok: false, reason: "unavailable" },
+    );
+    expect(warned).toEqual([
+      "upload-url-unavailable: upstash: fetch failed",
+      "upload-url-unavailable: pinata: HTTP 503",
+    ]);
   });
 });
 

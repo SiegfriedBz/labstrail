@@ -35,6 +35,7 @@ describe("workflows' layout", () => {
       "checkRatingSettings",
       "createRatingEnv",
       "createWorkflowsEnv",
+      "describeFailure",
       "functions",
       "getUploadService",
       "inngest",

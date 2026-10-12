@@ -76,8 +76,9 @@ upload page reads runs there, with no keys.
 | `PublishFailure`, `publishFailureReason(output)` | Why a run stopped instead (`chain-unreachable`, `paper-unreachable`, `node-unreachable`, `mint-not-confirmed`, `setup`): each error it throws starts `publish-failed:<reason>:`, and the reader finds it in a failed run's output however Inngest nests it |
 | `getUploadService()` | The pages' calls, built on first use from the settings: `contextGraph`, `createUploadUrl()`, `submitPaper(input, limiter)`, `readPaper(cid, eventId?)`, `listPapers({ page, pageSize })` (below) |
 | `UploadService`, `PaperStatus`, `PublishedRecord`, `UPLOAD_SETTINGS` | Their type, what `readPaper` returns (the Target KA's state and the run), and the upload URL's and signature's lifetimes |
-| `SubmitResult`, `SubmitRefusal`, `SubmitLimiter` | What `submitPaper` returns, why it refuses, and the per-submitter limit the web app passes it |
-| `UploadUrlResult`, `ReadRunResult`, `RunState` | What `createUploadUrl` and the run read return |
+| `SubmitResult`, `SubmitRefusal`, `SubmitLimiter`, `LimitAnswer` | What `submitPaper` returns, why it refuses, the per-submitter limit the web app passes it, and the limit's answer (`unavailable` carries what the store threw) |
+| `UploadUrlResult`, `PinataUnavailable`, `ReadRunResult`, `RunState` | What `createUploadUrl` and the run read return; Pinata's `unavailable` carries what came back (`HTTP 503`, `unexpected answer`, or the error) |
+| `describeFailure(error)`, `PublishLogger` | A thrown value as one short log line, with its cause and with URLs, bearer tokens, JWTs and long hex removed; the logger a run or a submission warns through |
 | `PaperListResult`, `PaperSummary`, `SignatureCheck`, `QueryProblem` | What `listPapers` returns: a page of papers with the total, or why not (`unavailable`, `unreadable`); one listed paper; a signature check (`valid`, `invalid`, `unknown`) |
 | `env` (from `@verisci/workflows/env`); `createWorkflowsEnv(runtimeEnv)`, `WorkflowsEnv` (from either entry) | The validated settings, the function that builds them from a given object, and their type |
 
@@ -311,8 +312,11 @@ papers list:
   24 hours. A new signature starts a run unless one for that CID is active (the singleton),
   and the paper's page then follows the paper on the node. It returns Inngest's event id.
   Only a sent submission is counted. A chain, Pinata, limit store or Inngest that does not
-  answer gives `unavailable`; a node that does not answer leaves the already-minted check to
-  the run.
+  answer gives `unavailable` and logs one warning naming it, `submit-unavailable: <service>:
+  <what came back>` (`chain-rpc`, `upstash`, `pinata`, `inngest`), for example
+  `submit-unavailable: inngest: fetch failed (connect ECONNREFUSED 127.0.0.1:8288)`; the line
+  never carries a key, a URL or the signature. A node that does not answer leaves the
+  already-minted check to the run.
 - **`readPaper(cid, eventId?)`** reads the Target KA's state on the node and, given the
   event id, the run Inngest started for it (REST, from the dev server locally). Once the KA
   is minted, it also reads the record back from the asset's own graph (SPARQL through the
@@ -353,7 +357,11 @@ papers list:
    relative path is read from the directory you type the command in.
    The run's steps and result show in the dev server.
 5. Or publish through the page: open http://localhost:3000/publish with `REOWN_PROJECT_ID`
-   set ([`apps/web`](../../apps/web/README.md#environment)).
+   set ([`apps/web`](../../apps/web/README.md#environment)). When the page says a service
+   didn't answer, the `pnpm dev` terminal names it in a `submit-unavailable` or
+   `upload-url-unavailable` warning: `inngest` with `ECONNREFUSED 127.0.0.1:8288` means the
+   Inngest dev server is not running. A run that stops later names its reason in the dev
+   server instead (GROBID down shows as `paper-unreachable`).
 
 ## Running a rating locally
 

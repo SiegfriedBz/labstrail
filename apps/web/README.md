@@ -49,6 +49,12 @@ address, each per rolling day, in Upstash; in memory with `APP_ENV=local` and no
 settings, reset when the server restarts. A limit store that does not answer refuses
 rather than letting requests through.
 
+A service that does not answer gives the visitor "A service we rely on didn't answer", and
+the server logs one warning naming it: `upload-url-unavailable: <service>: <what came back>`
+(`upstash`, `pinata`) for an upload URL, `submit-unavailable: …` for a submission
+([`packages/workflows`](../../packages/workflows/README.md#the-pages-calls)). The line never
+carries a key or a URL.
+
 ### The papers list
 
 `/papers` reads one page from the DKG node per request (`listPapers`,

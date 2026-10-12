@@ -38,20 +38,21 @@ describe("counter", () => {
     expect(await limiter.take("a")).toBe("limited");
   });
 
-  it("reads a store that fails or times out as unavailable, and never throws on count", async () => {
+  it("reads a store that fails or times out as unavailable, with why, and never throws on count", async () => {
+    const down = new Error("redis down at https://eu1-x.upstash.io");
     const broken: RateWindow = {
-      limit: () => Promise.reject(new Error("redis down")),
-      getRemaining: () => Promise.reject(new Error("redis down")),
+      limit: () => Promise.reject(down),
+      getRemaining: () => Promise.reject(down),
     };
     const timingOut: RateWindow = {
       limit: async () => ({ success: true, reason: "timeout" }),
       getRemaining: async () => ({ remaining: 1 }),
     };
 
-    expect(await counter(broken).check("a")).toBe("unavailable");
-    expect(await counter(broken).take("a")).toBe("unavailable");
+    expect(await counter(broken).check("a")).toEqual({ unavailable: "redis down at <url>" });
+    expect(await counter(broken).take("a")).toEqual({ unavailable: "redis down at <url>" });
     await expect(counter(broken).count("a")).resolves.toBeUndefined();
-    expect(await counter(timingOut).take("a")).toBe("unavailable");
+    expect(await counter(timingOut).take("a")).toEqual({ unavailable: "timeout" });
   });
 });
 
