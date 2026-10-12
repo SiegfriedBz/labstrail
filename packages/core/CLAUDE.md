@@ -18,6 +18,8 @@ Pure domain logic. See `README.md` here.
   chains, OriginTrail's contracts: what every feature addresses), `publish/` (the signed
   submission, the TEI header, the Target KA), `papers/` (a published record and the list),
   `rating/` (the paper's text, checklists, scorer, R-KA); `fixtures/` holds test data. Only
-  `index.ts`, which exports everything, sits at the root. A file two features use goes in
-  `assets/`, never in one feature's folder; `src/layout.test.ts` enforces the layout and
-  the entry's exports.
+  `index.ts`, which exports everything, sits at the root. A feature may import from
+  another's folder (papers and rating build on the Target KA's predicates in `publish/`,
+  rating reads SPARQL rows with `papers/`); what addresses things for every feature goes in
+  `assets/`. `src/layout.test.ts` checks that each file sits in one of these folders and that
+  the entry exports the same names.

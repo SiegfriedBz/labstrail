@@ -29,8 +29,10 @@ Inngest workflows that combine `core` logic with the `dkg` and `contracts` adapt
   and reading its text, which both runs use), `src/site/` (the service the web app calls:
   upload URLs, submissions, a paper's status, the papers list). At the root only the entry
   (`index.ts`), the settings (`env.ts`, `*-env.ts`), the wiring (`functions.ts`) and the
-  Inngest client. A file two runs use goes in a shared folder such as `pdf/`;
-  `src/layout.test.ts` enforces the layout and the entry's exports.
+  Inngest client. What both runs use goes in a shared folder such as `pdf/`; a folder may
+  import from another (the site service checks submissions with `publish/`).
+  `src/layout.test.ts` checks that each file sits in one of these folders (any `*-env.ts` at
+  the root) and that the entry exports the same names.
 - Step ids are unique per run (`read-1`, `wait-1-3`, `poll-1-3`); every wait is a
   `step.sleep`, never a sleep inside a step. A step whose result changes shape gets a new id
   (`score-paper-1` replaced `score-1`), so a run already going never reads an old result as a

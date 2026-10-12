@@ -8,14 +8,18 @@ declare global {
   }
 }
 
-/** The files at the root other than `root`'s modules (and their tests), or in another folder. */
+/**
+ * The files at the root other than `root`'s modules, settings modules (`*-env.ts`) and their
+ * tests, or in another folder.
+ */
 function misplaced(files: readonly string[], root: readonly string[], folders: readonly string[]) {
   return files
     .map((file) => file.replace(/^\.\//, ""))
     .filter((file) => {
       const [first = "", ...rest] = file.split("/");
       if (rest.length > 0) return !folders.includes(first);
-      return !root.includes(first.replace(/(\.test)?\.ts$/, ""));
+      const name = first.replace(/(\.test)?\.ts$/, "");
+      return !root.includes(name) && !name.endsWith("-env");
     });
 }
 
@@ -49,7 +53,7 @@ describe("workflows' layout", () => {
 
   it("keeps every source file in a feature folder, with only the entry, settings and wiring at the root", () => {
     const files = Object.keys(import.meta.glob("./**/*.ts"));
-    const root = ["index", "env", "workflows-env", "rating-env", "functions", "inngest", "layout"];
+    const root = ["index", "env", "functions", "inngest", "layout"];
 
     expect(files.length).toBeGreaterThan(20);
     expect(misplaced(files, root, ["publish", "rating", "pdf", "site"])).toEqual([]);

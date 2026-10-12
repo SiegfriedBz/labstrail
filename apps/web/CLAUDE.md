@@ -26,8 +26,8 @@ Next.js 16 App Router app. See `README.md` here for scripts and status.
   `requestUploadUrl`), and keep components and `app/actions.ts` thin.
 - `lib/` is grouped by flow like `components/`: `lib/publish/` and `lib/papers/`; only
   helpers several areas share (`web-env`, `server`, `theme`, `shorten`, `utils`,
-  `empty-module`) sit at its root. `lib/layout.test.ts` fails on a file anywhere else, so a
-  new flow adds its folder there.
+  `empty-module`) sit at its root. `lib/layout.test.ts` fails on a `.ts` or `.tsx` file
+  anywhere else, so a new flow adds its folder there.
 - Styling is Tailwind v4 with the tokens and classes in `app/globals.css` (`glass`,
   `signal-gradient`, `link`, `text-muted`, `text-accent`…): light (the default) and dark
   themes, so every colour is a token defined for both (`<html data-theme>`), never a raw
