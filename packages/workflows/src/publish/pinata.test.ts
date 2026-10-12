@@ -52,17 +52,18 @@ describe("createUploadUrl", () => {
   });
 
   it.each([
-    ["a refused key", () => new Response("no", { status: 401 })],
-    ["a server error", () => new Response("busy", { status: 500 })],
-    ["an answer with no URL", () => Response.json({ data: 42 })],
-    ["a body that is not JSON", () => new Response("<html>")],
-    ["a network error", networkError],
-  ])("reports unavailable on %s", async (_, response) => {
+    ["a refused key", () => new Response("no", { status: 401 }), "HTTP 401"],
+    ["a server error", () => new Response("busy", { status: 500 }), "HTTP 500"],
+    ["an answer with no URL", () => Response.json({ data: 42 }), "unexpected answer"],
+    ["a body that is not JSON", () => new Response("<html>"), expect.stringContaining("JSON")],
+    ["a network error", networkError, "fetch failed"],
+  ])("reports unavailable on %s, with what came back", async (_, response, detail) => {
     const { fetch } = fakeFetch(response);
 
     expect(await createUploadUrl({ ...options(fetch), ...upload })).toEqual({
       ok: false,
       reason: "unavailable",
+      detail,
     });
   });
 
@@ -70,7 +71,18 @@ describe("createUploadUrl", () => {
     expect(await createUploadUrl({ jwt: JWT, fetch: hang, timeoutMs: 10, ...upload })).toEqual({
       ok: false,
       reason: "unavailable",
+      detail: expect.stringContaining("timeout"),
     });
+  });
+
+  it("never puts the key or a URL in what came back", async () => {
+    const { fetch } = fakeFetch(() =>
+      Promise.reject(new Error(`refused Bearer ${JWT} at ${SIGNED_URL}`)),
+    );
+    const result = await createUploadUrl({ ...options(fetch), ...upload });
+
+    expect(JSON.stringify(result)).not.toContain(JWT);
+    expect(JSON.stringify(result)).not.toContain("https://");
   });
 });
 
@@ -118,16 +130,21 @@ describe("findPublicFile", () => {
   });
 
   it.each([
-    ["a refused key", () => new Response("no", { status: 401 })],
-    ["a server error", () => new Response("busy", { status: 503 })],
-    ["an unexpected shape", () => Response.json({ data: { files: [{ id: 1 }] } })],
-    ["a network error", networkError],
-  ])("reports unavailable on %s", async (_, response) => {
+    ["a refused key", () => new Response("no", { status: 401 }), "HTTP 401"],
+    ["a server error", () => new Response("busy", { status: 503 }), "HTTP 503"],
+    [
+      "an unexpected shape",
+      () => Response.json({ data: { files: [{ id: 1 }] } }),
+      "unexpected answer",
+    ],
+    ["a network error", networkError, "fetch failed"],
+  ])("reports unavailable on %s, with what came back", async (_, response, detail) => {
     const { fetch } = fakeFetch(response);
 
     expect(await findPublicFile(CID, options(fetch))).toEqual({
       ok: false,
       reason: "unavailable",
+      detail,
     });
   });
 });
@@ -148,14 +165,15 @@ describe("deleteFile", () => {
   });
 
   it.each([
-    ["a server error", () => new Response("busy", { status: 500 })],
-    ["a network error", networkError],
-  ])("reports unavailable on %s", async (_, response) => {
+    ["a server error", () => new Response("busy", { status: 500 }), "HTTP 500"],
+    ["a network error", networkError, "fetch failed"],
+  ])("reports unavailable on %s, with what came back", async (_, response, detail) => {
     const { fetch } = fakeFetch(response);
 
     expect(await deleteFile("file-1", options(fetch))).toEqual({
       ok: false,
       reason: "unavailable",
+      detail,
     });
   });
 });

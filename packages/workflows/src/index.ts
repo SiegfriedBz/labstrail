@@ -9,16 +9,19 @@ export {
   servedFunctions,
 } from "./functions.ts";
 export { inngest } from "./inngest.ts";
-export type { UploadUrlResult } from "./publish/pinata.ts";
+export { describeFailure } from "./publish/failure.ts";
+export type { PinataUnavailable, UploadUrlResult } from "./publish/pinata.ts";
 export {
   PAPER_SUBMITTED,
   type PaperRefusal,
   PUBLISH_SETTINGS,
   type PublishFailure,
+  type PublishLogger,
   type PublishOutcome,
   publishFailureReason,
 } from "./publish/publish-paper.ts";
 export type {
+  LimitAnswer,
   SubmitLimiter,
   SubmitRefusal,
   SubmitResult,

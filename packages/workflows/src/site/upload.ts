@@ -19,6 +19,7 @@ import {
 import {
   PUBLISH_SETTINGS,
   type PublishFailure,
+  type PublishLogger,
   publishFailureReason,
 } from "../publish/publish-paper.ts";
 import {
@@ -106,6 +107,8 @@ export interface UploadIo {
   /** Sends an event and returns Inngest's id for it. */
   send(event: PaperSubmittedEvent): Promise<string>;
   readonly now: () => number;
+  /** Where a submission names a service that gave no answer: the server's log. */
+  readonly logger: Pick<PublishLogger, "warn">;
 }
 
 /** Builds the pages' calls from validated settings. */
@@ -187,6 +190,7 @@ export function createUploadService(env: WorkflowsEnv, io: UploadIo): UploadServ
         deleteFile: (id) => deleteFile(id, pinata),
         send: io.send,
         maxBytes: PUBLISH_SETTINGS.maxPdfBytes,
+        logger: io.logger,
       }),
     readPaper: async (cid, eventId) => {
       const name = targetKaName(cid);
@@ -231,6 +235,7 @@ export function getUploadService(): UploadService {
       return id;
     },
     now: Date.now,
+    logger: console,
   });
   return service;
 }

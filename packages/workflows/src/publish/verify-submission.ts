@@ -7,6 +7,7 @@ import {
   recoverTypedDataAddress,
 } from "viem";
 import { z } from "zod";
+import { describeFailure } from "./failure.ts";
 
 /** A submission whose signature checked out, as recorded in its Target KA. */
 export interface VerifiedSubmission {
@@ -28,10 +29,14 @@ export type SubmissionRefusal =
   | "expired"
   | "bad-signature";
 
-/** The result of {@link verifySubmission}: `unreachable` (the chain could not be asked) is worth a retry. */
+/**
+ * The result of {@link verifySubmission}: `unreachable` (the chain could not be asked) is
+ * worth a retry, and its `detail` says what the chain's call threw, for a log.
+ */
 export type VerifyResult =
   | { readonly ok: true; readonly submission: VerifiedSubmission }
-  | { readonly ok: false; readonly reason: SubmissionRefusal | "unreachable" };
+  | { readonly ok: false; readonly reason: SubmissionRefusal }
+  | { readonly ok: false; readonly reason: "unreachable"; readonly detail: string };
 
 /** What {@link verifySubmission} checks against. */
 export interface VerifyOptions {
@@ -86,7 +91,9 @@ export async function verifySubmission(
   const verified =
     (await signedBy(address, typedData, signature as Hex)) ||
     (await askChain(options.client, address, typedData, signature as Hex));
-  if (verified === "unreachable") return { ok: false, reason: "unreachable" };
+  if (typeof verified === "object") {
+    return { ok: false, reason: "unreachable", detail: verified.unreachable };
+  }
   if (!verified) return { ok: false, reason: "bad-signature" };
 
   return {
@@ -128,10 +135,10 @@ export async function signatureMatches(
   });
   const address = signed.submitter.toLowerCase() as Address;
   const signature = signed.signature as Hex;
-  return (
+  const matches =
     (await signedBy(address, typedData, signature)) ||
-    askChain(client, address, typedData, signature)
-  );
+    (await askChain(client, address, typedData, signature));
+  return typeof matches === "object" ? "unreachable" : matches;
 }
 
 async function signedBy(address: Address, typedData: TypedData, signature: Hex): Promise<boolean> {
@@ -147,7 +154,7 @@ async function askChain(
   address: Address,
   typedData: TypedData,
   signature: Hex,
-): Promise<boolean | "unreachable"> {
+): Promise<boolean | { readonly unreachable: string }> {
   try {
     if (await client.verifyTypedData({ ...typedData, address, signature })) return true;
   } catch {
@@ -157,7 +164,7 @@ async function askChain(
   try {
     await client.getBlockNumber({ cacheTime: 0 });
     return false;
-  } catch {
-    return "unreachable";
+  } catch (error) {
+    return { unreachable: describeFailure(error) };
   }
 }

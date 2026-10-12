@@ -38,20 +38,37 @@ describe("counter", () => {
     expect(await limiter.take("a")).toBe("limited");
   });
 
-  it("reads a store that fails or times out as unavailable, and never throws on count", async () => {
+  it("reads a store that fails or times out as unavailable, with why, and never throws on count", async () => {
+    const down = new Error("redis down at https://eu1-x.upstash.io");
     const broken: RateWindow = {
-      limit: () => Promise.reject(new Error("redis down")),
-      getRemaining: () => Promise.reject(new Error("redis down")),
+      limit: () => Promise.reject(down),
+      getRemaining: () => Promise.reject(down),
     };
     const timingOut: RateWindow = {
       limit: async () => ({ success: true, reason: "timeout" }),
       getRemaining: async () => ({ remaining: 1 }),
     };
 
-    expect(await counter(broken).check("a")).toBe("unavailable");
-    expect(await counter(broken).take("a")).toBe("unavailable");
+    expect(await counter(broken).check("a")).toEqual({ unavailable: "redis down at <url>" });
+    expect(await counter(broken).take("a")).toEqual({ unavailable: "redis down at <url>" });
     await expect(counter(broken).count("a")).resolves.toBeUndefined();
-    expect(await counter(timingOut).take("a")).toBe("unavailable");
+    expect(await counter(timingOut).take("a")).toEqual({ unavailable: "timeout" });
+  });
+  it("never logs the command Upstash echoes, which holds the visitor's IP", async () => {
+    const refused = new Error(
+      'WRONGPASS invalid password, command was: ["evalsha","abc",["verisci:upload-url:203.0.113.7"]]',
+    );
+    const broken: RateWindow = {
+      limit: () => Promise.reject(refused),
+      getRemaining: () => Promise.reject(refused),
+    };
+
+    expect(await counter(broken).take("203.0.113.7")).toEqual({
+      unavailable: "WRONGPASS invalid password",
+    });
+    expect(await counter(broken).check("203.0.113.7")).toEqual({
+      unavailable: "WRONGPASS invalid password",
+    });
   });
 });
 

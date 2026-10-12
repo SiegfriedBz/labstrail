@@ -1,6 +1,6 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
-import type { SubmitLimiter } from "@verisci/workflows";
+import { describeFailure, type LimitAnswer, type SubmitLimiter } from "@verisci/workflows";
 
 /** How much one visitor may ask for, per rolling day (ADR 0035). */
 export const UPLOAD_LIMITS = {
@@ -21,7 +21,7 @@ export interface RateWindow {
 /** A {@link SubmitLimiter} that can also check and count in one call. */
 export interface Counter extends SubmitLimiter {
   /** Counts one hit if the key is under its limit. */
-  take(key: string): Promise<"allowed" | "limited" | "unavailable">;
+  take(key: string): Promise<LimitAnswer>;
 }
 
 /**
@@ -47,17 +47,17 @@ export function memoryWindow(limit: number, windowMs: number, now = Date.now): R
 }
 
 /**
- * A limiter over a window. A store that fails or times out reads as `unavailable`
- * (Upstash's `Ratelimit` lets a timed-out call pass, with reason `timeout`); `count` never
- * throws, since the submission it counts has already been sent.
+ * A limiter over a window. A store that fails or times out reads as `unavailable`, with
+ * what it threw or `timeout` (Upstash's `Ratelimit` lets a timed-out call pass, with reason
+ * `timeout`); `count` never throws, since the submission it counts has already been sent.
  */
 export function counter(window: RateWindow): Counter {
   return {
     check: async (key) => {
       try {
         return (await window.getRemaining(key)).remaining > 0 ? "allowed" : "limited";
-      } catch {
-        return "unavailable";
+      } catch (error) {
+        return { unavailable: storeFailure(error) };
       }
     },
     count: async (key) => {
@@ -70,13 +70,21 @@ export function counter(window: RateWindow): Counter {
     take: async (key) => {
       try {
         const hit = await window.limit(key);
-        if (hit.reason === "timeout") return "unavailable";
+        if (hit.reason === "timeout") return { unavailable: "timeout" };
         return hit.success ? "allowed" : "limited";
-      } catch {
-        return "unavailable";
+      } catch (error) {
+        return { unavailable: storeFailure(error) };
       }
     },
   };
+}
+
+/**
+ * What the store threw, for a log: Upstash ends its errors with the command it was sent,
+ * whose key holds the visitor's IP or address, so the line stops before it.
+ */
+function storeFailure(error: unknown): string {
+  return describeFailure(error).split(", command was:", 1)[0] ?? "";
 }
 
 /** Upstash's REST address and token, or none to count in memory. */

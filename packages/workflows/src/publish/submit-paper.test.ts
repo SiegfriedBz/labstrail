@@ -38,6 +38,7 @@ function deps(fakes: Fakes = {}) {
     deleted: [] as string[],
     sent: [] as unknown[],
     read: [] as string[],
+    warned: [] as string[],
   };
   const submitDeps: SubmitDeps = {
     verify: async (data) => {
@@ -70,6 +71,7 @@ function deps(fakes: Fakes = {}) {
       return fakes.send ? fakes.send() : "event-1";
     },
     maxBytes: 30_000_000,
+    logger: { warn: (message) => calls.warned.push(message) },
   };
   return { submitDeps, calls };
 }
@@ -195,15 +197,66 @@ describe("submitPaper", () => {
     },
   );
 
+  it.each<[string, Fakes, string]>([
+    [
+      "the chain cannot be asked",
+      { verify: { ok: false, reason: "unreachable", detail: "HTTP request failed." } },
+      "submit-unavailable: chain-rpc: HTTP request failed.",
+    ],
+    [
+      "the limits cannot be read",
+      { check: { unavailable: "fetch failed" } },
+      "submit-unavailable: upstash: fetch failed",
+    ],
+    [
+      "Pinata cannot be asked",
+      { file: { ok: false, reason: "unavailable", detail: "HTTP 503" } },
+      "submit-unavailable: pinata: HTTP 503",
+    ],
+    [
+      "Inngest refuses the event",
+      {
+        send: () =>
+          Promise.reject(
+            new TypeError("fetch failed", {
+              cause: new Error("connect ECONNREFUSED 127.0.0.1:8288"),
+            }),
+          ),
+      },
+      "submit-unavailable: inngest: fetch failed (connect ECONNREFUSED 127.0.0.1:8288)",
+    ],
+  ])(
+    "answers unavailable, counting nothing, when %s, and logs which service failed",
+    async (_, fakes, warning) => {
+      const { submitDeps, calls } = deps(fakes);
+
+      expect(await submitPaper(INPUT, submitDeps)).toEqual({ ok: false, reason: "unavailable" });
+      expect(calls.counted).toEqual([]);
+      expect(calls.warned).toEqual([warning]);
+    },
+  );
+
+  it("never logs the event key or a URL when Inngest refuses the event", async () => {
+    const error = new Error("Failed to send event to https://inn.gs/e/secret-event-key: 401");
+    const { submitDeps, calls } = deps({ send: () => Promise.reject(error) });
+
+    await submitPaper(INPUT, submitDeps);
+
+    expect(calls.warned).toEqual([
+      "submit-unavailable: inngest: Failed to send event to <url> 401",
+    ]);
+  });
+
   it.each<[string, Fakes]>([
-    ["the chain cannot be asked", { verify: { ok: false, reason: "unreachable" } }],
-    ["the limits cannot be read", { check: "unavailable" }],
-    ["Pinata cannot be asked", { file: { ok: false, reason: "unavailable" } }],
-    ["Inngest refuses the event", { send: () => Promise.reject(new Error("401")) }],
-  ])("answers unavailable, counting nothing, when %s", async (_, fakes) => {
+    ["is sent", {}],
+    ["is over the limit", { check: "limited" }],
+    ["has no pinned file", { file: { ok: false, reason: "missing" } }],
+    ["has a bad signature", { verify: { ok: false, reason: "bad-signature" } }],
+  ])("logs nothing for a submission that %s", async (_, fakes) => {
     const { submitDeps, calls } = deps(fakes);
 
-    expect(await submitPaper(INPUT, submitDeps)).toEqual({ ok: false, reason: "unavailable" });
-    expect(calls.counted).toEqual([]);
+    await submitPaper(INPUT, submitDeps);
+
+    expect(calls.warned).toEqual([]);
   });
 });
