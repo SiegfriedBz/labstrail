@@ -1,9 +1,11 @@
 import {
-  parseScorerOutput,
+  type PaperText,
+  parseScorerAnswer,
   SCORER_OUTPUT_SCHEMA,
+  type ScorerAnswer,
   type ScorerOutput,
+  scoreChecks,
   scorerPrompt,
-  type Triple,
 } from "@verisci/core";
 import { z } from "zod";
 
@@ -14,6 +16,7 @@ export interface ScorerOptions {
   /** The model id, such as `gemini-3.8-flash`. */
   readonly model: string;
   readonly fetch: typeof fetch;
+  /** How long Gemini gets to answer. */
   readonly timeoutMs: number;
 }
 
@@ -24,10 +27,36 @@ export interface ScorerOptions {
  */
 export type ScoreFailure = "rate-limited" | "refused" | "unreachable" | "invalid-output";
 
-/** The result of {@link scorePaper}; a `refused` failure carries Gemini's HTTP status. */
+/** A call that did not answer, with Gemini's HTTP status when it answered with an error. */
+export type ScoreFailureResult = {
+  readonly ok: false;
+  readonly reason: ScoreFailure;
+  readonly status?: number;
+};
+
+/** The result of {@link askScorer}: Gemini's answer, checked, its quotes not yet checked. */
+export type AskResult =
+  | { readonly ok: true; readonly answer: ScorerAnswer; readonly model: string }
+  | ScoreFailureResult;
+
+/**
+ * The result of {@link scorePaper}: a paper in the field with its score, as `scoreChecks`
+ * computed it, or a paper outside the field (ADR 0037) with the reason Gemini gave.
+ */
 export type ScoreResult =
-  | { readonly ok: true; readonly output: ScorerOutput; readonly model: string }
-  | { readonly ok: false; readonly reason: ScoreFailure; readonly status?: number };
+  | {
+      readonly ok: true;
+      readonly field: "life-sciences";
+      readonly output: ScorerOutput;
+      readonly model: string;
+    }
+  | {
+      readonly ok: true;
+      readonly field: "outside";
+      readonly reason: string;
+      readonly model: string;
+    }
+  | ScoreFailureResult;
 
 const API = "https://generativelanguage.googleapis.com/v1beta/models";
 
@@ -50,29 +79,57 @@ const answer = z.object({
 });
 
 /**
- * Scores a target's triples with Gemini (ADR 0018): the prompt from `scorerPrompt`,
- * temperature 0, and JSON output held to `SCORER_OUTPUT_SCHEMA`, then checked again with
- * `parseScorerOutput`, so nothing else reaches the chain. Returns the output and the model
- * version Gemini reports, which the R-KA records. Never throws; a failure carries neither the
- * key nor Gemini's text.
+ * Asks Gemini, in one request, for a paper's field and kind of study and, for a paper in the
+ * field, the answer to each check of its study type, with quotes (ADRs 0018, 0037): the prompt
+ * from `scorerPrompt`, temperature 0, JSON output held to `SCORER_OUTPUT_SCHEMA` and checked
+ * again with `parseScorerAnswer`. Returns the answer, its quotes not yet checked against the
+ * paper, and the model version Gemini reports. Never throws; a failure carries neither the key
+ * nor Gemini's text.
  */
-export async function scorePaper(
-  triples: readonly Triple[],
+export async function askScorer(paper: PaperText, options: ScorerOptions): Promise<AskResult> {
+  const answer = await generate(scorerPrompt(paper), SCORER_OUTPUT_SCHEMA, options);
+  if (!answer.ok) return answer;
+  const parsed = parseScorerAnswer(answer.text);
+  return parsed.ok
+    ? { ok: true, answer: parsed.answer, model: answer.model }
+    : { ok: false, reason: "invalid-output" };
+}
+
+/**
+ * Scores a paper with one Gemini request ({@link askScorer}): a paper outside the field comes
+ * back with Gemini's reason; one in the field is scored by `scoreChecks`, which checks each
+ * quote against the paper and computes the score, so nothing else reaches the chain.
+ * Never throws.
+ */
+export async function scorePaper(paper: PaperText, options: ScorerOptions): Promise<ScoreResult> {
+  const asked = await askScorer(paper, options);
+  if (!asked.ok) return asked;
+  const { answer, model } = asked;
+  return answer.field === "outside"
+    ? { ok: true, field: "outside", reason: answer.reason, model }
+    : { ok: true, field: "life-sciences", output: scoreChecks(paper, answer), model };
+}
+
+/** One `generateContent` call: the answer's text, leaving out thoughts, and the model version. */
+async function generate(
+  prompt: { readonly system: string; readonly user: string },
+  schema: object,
   options: ScorerOptions,
-): Promise<ScoreResult> {
-  const { system, user } = scorerPrompt(triples);
+): Promise<
+  { readonly ok: true; readonly text: string; readonly model: string } | ScoreFailureResult
+> {
   let response: Response;
   try {
     response = await options.fetch(`${API}/${options.model}:generateContent`, {
       method: "POST",
       headers: { "content-type": "application/json", "x-goog-api-key": options.apiKey },
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: system }] },
-        contents: [{ role: "user", parts: [{ text: user }] }],
+        systemInstruction: { parts: [{ text: prompt.system }] },
+        contents: [{ role: "user", parts: [{ text: prompt.user }] }],
         generationConfig: {
           temperature: 0,
           responseMimeType: "application/json",
-          responseJsonSchema: SCORER_OUTPUT_SCHEMA,
+          responseJsonSchema: schema,
         },
       }),
       signal: AbortSignal.timeout(options.timeoutMs),
@@ -82,10 +139,7 @@ export async function scorePaper(
   }
   if (!response.ok) {
     await response.body?.cancel();
-    const reason = failureOf(response.status);
-    return reason === "refused"
-      ? { ok: false, reason, status: response.status }
-      : { ok: false, reason };
+    return { ok: false, reason: failureOf(response.status), status: response.status };
   }
 
   let body: unknown;
@@ -103,9 +157,7 @@ export async function scorePaper(
     .filter((part) => !part.thought)
     .map((part) => part.text ?? "")
     .join("");
-  const output = parseScorerOutput(text);
-  if (!output.ok) return { ok: false, reason: "invalid-output" };
-  return { ok: true, output: output.output, model: parsed.data.modelVersion ?? options.model };
+  return { ok: true, text, model: parsed.data.modelVersion ?? options.model };
 }
 
 /**

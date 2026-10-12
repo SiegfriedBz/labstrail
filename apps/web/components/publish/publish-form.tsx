@@ -148,7 +148,9 @@ function PublishFlow({ contextGraph, maxBytes, signatureLifetimeS }: PublishSett
               <UploadSimple size={28} />
             </span>
             <p className="font-medium">Drop your paper here, or tap to choose a PDF</p>
-            <p className="font-mono text-xs text-muted">application/pdf · max 30 MB</p>
+            <p className="font-mono text-xs text-muted">
+              application/pdf · max {maxBytes / 1024 / 1024} MB
+            </p>
           </div>
         )}
         <input

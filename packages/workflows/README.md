@@ -11,8 +11,8 @@ dev script starts the rating run; on staging, the Alchemy webhook will (next pla
 ## Depends on
 
 `@verisci/core`, `@verisci/env`, `@verisci/dkg`, `@verisci/contracts`; Inngest, viem
-(signature checks, the rating contract, the oracle's transactions) and Zod. The scorer calls
-the Gemini API over `fetch`, with no SDK.
+(signature checks, the rating contract, the oracle's transactions), Zod and unpdf (a PDF's
+text, for the scorer). The scorer calls the Gemini API over `fetch`, with no SDK.
 
 ## Environment
 
@@ -27,7 +27,7 @@ server (`APP_ENV` other than `local`) checks them when it starts, through
 | Variable | Value |
 | --- | --- |
 | `GROBID_URL` | GROBID's base URL: `http://127.0.0.1:8070` locally ([`docs/node-host.md`](../../docs/node-host.md) → GROBID) |
-| `PINATA_GATEWAY_URL` | The Pinata account's dedicated gateway, `https://<name>.mypinata.cloud`; one account serves every environment ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)) |
+| `PINATA_GATEWAY_URL` | The Pinata account's dedicated gateway, `https://<name>.mypinata.cloud`, through which the publish and rating runs read PDFs; one account serves every environment ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)) |
 | `CHAIN_RPC_URL` | A Base Sepolia RPC URL, to check smart-contract wallets' signatures and, on staging and production, to read and write the rating contract |
 | `PINATA_JWT` | A Pinata API key (JWT) allowed to upload, list and delete files; the `publish-pdf` dev script reads it too. Secret |
 | `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY` | Inngest's keys, required unless `APP_ENV` is `local`: the SDK reads them itself, and the signing key also reads runs for the upload page. Secret |
@@ -97,7 +97,7 @@ starts nothing. Its steps:
    stored or minted keeps its first submitter.
 3. **read-paper**: fetches the PDF through the gateway and has GROBID parse its header, in
    one step, so the PDF's bytes are never a step output. A file that is not a PDF, is over
-   30 MB, that GROBID cannot parse (204, a 4xx other than 401, 403, 408 and 429, or an
+   15 MB, that GROBID cannot parse (204, a 4xx other than 401, 403, 408 and 429, or an
    answer that is not well-formed TEI) or that has no readable title ends the run, refused.
    GROBID's 401 and 403 fail the run; 408 and 429 are retried. A DOI is kept only if it
    looks like one.
@@ -124,7 +124,7 @@ Retries ([ADR 0009](../../docs/adr/0009-retries-are-spaced-with-step-sleep.md)):
 `verisci/rating.requested` carries `{ contract, requestId }`: a RatingController's lowercase
 address and a phase-1 request id. The `rate-paper` run is a singleton per request id in mode
 `skip` ([ADR 0020](../../docs/adr/0020-stuck-requests-recovered-only-oracle-cancels.md)),
-has 150 minutes, enough for every attempt and the oracle, and outside `APP_ENV=local` is
+has 180 minutes, enough for every attempt and the oracle, and outside `APP_ENV=local` is
 throttled to 3 starts an hour with a burst of 3, against Inngest's free plan
 ([ADR 0015](../../docs/adr/0015-rating-requests-are-free-on-testnet.md)). It does only what
 is left ([ADR 0007](../../docs/adr/0007-all-writes-converge.md)):
@@ -149,9 +149,25 @@ is left ([ADR 0007](../../docs/adr/0007-all-writes-converge.md)):
 3. **read-rka:** the R-KA `verisci-rka-<request id>`. Minted goes to the read-back. Stored is
    minted at once, with no wait for a mint an earlier run may have started
    ([ADR 0008](../../docs/adr/0008-mints-are-async-polled-in-short-steps.md)). A draft is
-   shared, then minted. Missing: **read-target** reads up to 200 of the target's triples
-   from its own asset graph, **score** asks Gemini once, and **store** writes the R-KA
-   (`packages/core` → Ratings). A score that came back is kept for every later attempt.
+   shared, then minted. Missing is scored, then **store** writes the R-KA
+   (`packages/core` → Ratings):
+   - **find-pdf** reads the `ipfs://` link to the paper's PDF from its own asset graph. A
+     link that is not an `ipfs://` CID cancels `invalid-target`. No link is retried:
+     **find-target** found the paper in this graph, so the node is still loading it.
+   - **read-paper** fetches the PDF through the gateway and extracts its text with unpdf
+     (`packages/core` → Ratings → The paper's text), up to 150,000 characters. A PDF with no
+     text layer (a scan), or one over the size limit (published before the limit was
+     lowered from 30 to 15 MB), cancels `invalid-target`
+     ([ADR 0011](../../docs/adr/0011-a-rating-is-a-separate-r-ka.md)). A file that is not a
+     PDF or does not parse is read again on the next attempt, since the gateway may have given
+     another file; after 3 such reads it cancels `invalid-target`.
+   - **score-paper** asks Gemini, in one request, for the paper's field and study type and the
+     answer to each of that type's checks, with quotes; `scoreChecks` checks the quotes and
+     computes the score. A paper outside the life sciences and health cancels
+     `invalid-target`
+     ([ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)).
+
+   Each of these is done once per run: a later attempt starts from the first one missing.
 4. **mint**, then **poll** every 30 s; a mint not seen after 10 minutes is started again.
 5. **read-score** reads the score back from the minted R-KA, and the oracle function fulfils
    with it, so the score on chain equals the R-KA's
@@ -164,22 +180,55 @@ cancelled meanwhile, is an orphan: the outcome names it, and the run logs it as 
 
 Retries ([ADR 0009](../../docs/adr/0009-retries-are-spaced-with-step-sleep.md)): a chain
 that does not answer is read again every 2 minutes, up to 5 times. A node that does not
-answer or gives no rows yet, a quorum failure, or a scorer that is unreachable, rate-limited
-or gives an answer the output check refuses waits 2 minutes and starts a new attempt from
-the R-KA's read, up to 5 attempts, then fails (`node-unreachable`, `scorer-unavailable`;
-`mint-not-confirmed` when the mint is never seen). A node that does not answer is never
+answer or gives no rows yet, a quorum failure, a gateway that does not give the PDF, a file
+that does not read as a PDF (fewer than 3 times), or a Gemini call that is unreachable or
+rate-limited waits 2 minutes and starts a new attempt from the R-KA's read, up to 5 attempts,
+then fails (`node-unreachable`, `paper-unreachable`, `paper-unreadable`, `scorer-unavailable`;
+`mint-not-confirmed` when the mint is never seen). A Gemini answer the check refuses is asked
+for again once, then the run fails `scorer-unusable`: the same paper and prompt tend to give
+the same answer, and each answer uses one of the free tier's 20 requests a day. A node that does not answer is never
 taken for a missing paper. It fails at once (`setup`) on missing or invalid settings, a node that
 refuses our key, Gemini refusing the request (the detail names its status), or a node that
 does not serve the graph, and
 (`rating-unreadable`) on a minted R-KA whose score does not parse. A failed run leaves the
 request pending; the reconciler of the next plan restarts it.
 
-The scorer sends the prompt from `packages/core` (`scorerPrompt`), temperature 0 and the
-output's JSON Schema to `gemini-3.8-flash`, and checks the answer again with
-`parseScorerOutput`. A 429 is `rate-limited`; any other 4xx is `refused`, with its status
-(a bad key is 400, a key without access 401 or 403, a model Gemini no longer serves 404); a
-5xx, a network error or 60 s without an answer is `unreachable`; no candidate, a blocked
-answer or text the check refuses is `invalid-output`. No failure carries the key.
+The scorer makes one request to `gemini-3.8-flash` per paper, since the free tier allows 20
+a day (`docs/domain.md` → Gemini): `scorePaper` sends `scorerPrompt`, temperature 0 and
+`SCORER_OUTPUT_SCHEMA`, checks the answer with `parseScorerAnswer` (`askScorer`), then scores
+a paper in the field with `scoreChecks`. A 429 is `rate-limited`; any other 4xx is
+`refused`; a 5xx, a network error or no answer within 240 s is `unreachable`; each failure
+Gemini answered carries its HTTP status (a bad key is 400, a key without access 401 or 403, a
+model Gemini no longer serves 404). No candidate, a blocked or unfinished answer, or text
+the check refuses (`parseScorerAnswer`: a check of the study type left unanswered, say) is
+`invalid-output`; a quote, reason or rationale over its limit is cut, not refused. No failure
+carries the key.
+
+### Measuring the scorer
+
+`scripts/reference-papers.json` holds 14 open-access papers: 12 in the life sciences and
+health, covering every study type, some well reported and some poorly, and 2 outside the
+field. For each in-field paper it records the answer a careful reader gives to each check,
+and a score range 10 points either side of the score those answers give; a test keeps it
+consistent with the checklists. The expectations were written before the scorer first read
+the papers, and change only on purpose.
+
+`pnpm --filter @verisci/workflows score-papers [id…]` scores them as a rating run would:
+the PDF's text, then one request to Gemini, asked again as a rating run would. It prints,
+for each paper, the study type found, the score against its range and, when the type is the
+expected one, each check answered otherwise than expected, with why an answer lost its point:
+its quote is not in the paper, it has none, or it says a check that always applies does not.
+Run it whenever a prompt, a checklist or the model changes, and keep the change only if the
+results improve. It needs `GEMINI_API_KEY` and `APP_ENV=local`, downloads each PDF once into
+`node_modules/.cache/verisci-reference/` (a file that is not a PDF, such as a publisher's
+robot check, is not kept: save the PDF there by hand), and writes the run's answers there
+after each paper. It never publishes, stores or rates anything.
+
+Each paper costs one Gemini request, and the free tier allows 20 a day per Google project
+(`docs/domain.md` → Gemini): a full run uses 14 of them. To try a change within a day, run
+only the papers it should fix (`score-papers <id> <id>`), then the whole set once more before
+keeping it. Google's terms forbid getting around the limit, so more keys or projects are not
+an option; a paid tier is.
 
 ## The oracle function
 
@@ -219,13 +268,13 @@ Errors logged with a fixed tag (`oracle-at-fee-cap`, `oracle-conflict`, `oracle-
 papers list:
 
 - **`createUploadUrl()`** signs a Pinata upload URL, valid 5 minutes, for one file of at most
-  30 MB detected as `application/pdf`, pinned with `cid_version` `v1` like `publish-pdf`, so
+  15 MB detected as `application/pdf`, pinned with `cid_version` `v1` like `publish-pdf`, so
   one PDF keeps one CID (`docs/domain.md` → IPFS).
 - **`submitPaper(input, limiter)`** checks a signed `{ cid, contextGraph, deadline,
   submitter, signature }` as the run does. A PDF whose Target KA is already minted starts
   nothing and counts nothing: the result gives its UAL instead of an event id. Otherwise it
   checks the submitter's limit (`rate-limited`), then the file pinned under that CID on
-  Pinata's public network (`not-pinned` when there is none). A file over 30 MB or not a PDF
+  Pinata's public network (`not-pinned` when there is none). A file over 15 MB or not a PDF
   is refused (`too-large`, `not-a-pdf`). A file that is not a PDF is also unpinned when its
   Target KA is known missing; a PDF stays pinned, since every environment shares Pinata's
   one file per CID and their size limits may differ
@@ -319,5 +368,6 @@ stuck transaction are checked on `develop`; the unit tests cover every branch wi
 | `pnpm --filter @verisci/workflows test` | Runs its Vitest project (`vitest run`) with mocked adapters |
 | `pnpm --filter @verisci/workflows publish-pdf <file.pdf>` | Dev only: pins a PDF, signs it and sends `verisci/paper.submitted` to the local dev server |
 | `pnpm --filter @verisci/workflows rate-paper <target UAL> [--raw]` | Dev only, `APP_ENV=local`: requests a rating on the Anvil contract from a throwaway requester and sends `verisci/rating.requested` to the local dev server |
+| `pnpm --filter @verisci/workflows score-papers [id…]` | Dev only, `APP_ENV=local`: scores the reference papers with Gemini and compares each with what is expected (Measuring the scorer above) |
 
 Ships TypeScript source (`src/index.ts`, `src/env.ts`), with no build step.

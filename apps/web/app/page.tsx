@@ -38,7 +38,7 @@ const RATE = [
   {
     icon: Robot,
     title: "Machine score",
-    body: "An AI model scores the paper's record (title, authors, abstract) from 0 to 100. The score goes on-chain, its reasons into the rating's asset.",
+    body: "An AI model reads the whole paper and checks it against the checklist for its kind of study, from 0 to 100. The score goes on-chain, the answers and quotes into the rating's asset.",
   },
   {
     icon: UsersThree,

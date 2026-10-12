@@ -10,6 +10,7 @@ import { readPaper } from "./publish/read-paper.ts";
 import { verifySubmission } from "./publish/verify-submission.ts";
 import { createOracleTransaction, ORACLE_SETTINGS, type OracleChain } from "./rating/oracle.ts";
 import { createOracleChain } from "./rating/oracle-chain.ts";
+import { readPaperText } from "./rating/paper-text.ts";
 import { createRatePaper, RATING_SETTINGS, type RatingDeps } from "./rating/rate-paper.ts";
 import { scorePaper } from "./rating/scorer.ts";
 import { createRatingEnv, type RatingEnv, servesRating } from "./rating-env.ts";
@@ -114,8 +115,16 @@ function getRatingDeps(): RatingDeps {
       token: env.DKG_TOKEN,
       contextGraphId: env.DKG_CONTEXT_GRAPH,
     }),
-    score: (triples) =>
-      scorePaper(triples, {
+    readPaper: (cid) =>
+      readPaperText(cid, {
+        gatewayUrl: env.PINATA_GATEWAY_URL,
+        fetch: (input: string | URL | Request, init?: RequestInit) => fetch(input, init),
+        maxBytes: RATING_SETTINGS.maxPdfBytes,
+        timeoutMs: RATING_SETTINGS.pdfTimeoutMs,
+        maxChars: RATING_SETTINGS.maxTextChars,
+      }),
+    score: (paper) =>
+      scorePaper(paper, {
         apiKey: env.GEMINI_API_KEY,
         model: RATING_SETTINGS.model,
         fetch: (input: string | URL | Request, init?: RequestInit) => fetch(input, init),

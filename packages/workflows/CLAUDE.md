@@ -16,7 +16,8 @@ Inngest workflows that combine `core` logic with the `dkg` and `contracts` adapt
   also applies: a rating is its own R-KA (0011), phases settled by the oracle (0012), the
   contract owns scores and the DKG content (0014), requests free and throttled on testnet
   (0015), the R-KA named from the request id (0016), events taken at least once (0017), a
-  fix is a redeploy, so past contracts are still served (0023), canonical UALs (0031).
+  fix is a redeploy, so past contracts are still served (0023), canonical UALs (0031),
+  only life-science and health papers rated (0037).
   See [`docs/adr/`](../../docs/adr/README.md).
 - Workflow logic takes its step tools and adapters as arguments (`PublishSteps`,
   `PublishDeps`, `RatingSteps`, `RatingDeps`, `OracleSteps`, `OracleChain`), so tests run
@@ -24,11 +25,14 @@ Inngest workflows that combine `core` logic with the `dkg` and `contracts` adapt
   on a function's first run. Never import `src/env.ts` from the main entry: `web` imports
   it, and `next build` must pass with only `APP_ENV` set.
 - Step ids are unique per run (`read-1`, `wait-1-3`, `poll-1-3`); every wait is a
-  `step.sleep`, never a sleep inside a step.
+  `step.sleep`, never a sleep inside a step. A step whose result changes shape gets a new id
+  (`score-paper-1` replaced `score-1`), so a run already going never reads an old result as a
+  new one.
 - Adapters return typed results and never throw for an expected failure, as ADR 0021
   asks of server reads. A run throws `NonRetriableError` only when its settings or
   its invocation's data are invalid (`loadDeps`, `loadRatingDeps`, the oracle's `setup`),
-  when the node or GROBID refuses our credential or Gemini the request, when the node does
+  when the node or GROBID refuses our credential or Gemini the request, when Gemini gives
+  two answers the check refuses (`scorer-unusable`), when the node does
   not serve the graph, when a minted R-KA's score does not parse (`rating-unreadable`),
   when the oracle function fails or finds the request fulfilled with another R-KA
   (`oracle-failed`, `oracle-conflict`), and when its attempts or budget run out; its message starts `publish-failed:<reason>:` (`PublishFailure`, which the paper's

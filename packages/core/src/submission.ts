@@ -1,5 +1,12 @@
 import { BASE_SEPOLIA_CHAIN_ID } from "./chains.ts";
 
+/**
+ * The largest PDF verisci publishes and rates: 15 MB. A paper published before the limit was
+ * lowered from 30 MB, and over it, is cancelled when someone asks to rate it (ADR 0011). The
+ * scorer's reference papers weigh 0.4 to 12.4 MB.
+ */
+export const MAX_PDF_BYTES = 15 * 1024 * 1024;
+
 /** What a submitter signs to publish a PDF (ADR 0010). */
 export interface SubmissionMessage {
   /** The PDF's CID, canonical CIDv1 base32 (as in its Target KA name). */

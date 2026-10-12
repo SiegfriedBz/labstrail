@@ -13,8 +13,8 @@ package (`docs/domain.md` → DKG).
 
 Status: a client to read an asset's state, store it, start its mint, and run a SPARQL
 query (`query`), which reads a published paper's record back, lists the published papers
-(a page, the count and the page's first authors), and, in a rating run, reads a target's
-triples and a rating back; and `checkGraph`, whether the node serves the graph.
+(a page, the count and the page's first authors), and, in a rating run, reads a paper's PDF
+link and a rating back; and `checkGraph`, whether the node serves the graph.
 
 ## Depends on
 

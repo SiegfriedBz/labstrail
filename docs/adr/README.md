@@ -8,9 +8,15 @@ An ADR states the decision and its reason. The mechanics (timeouts, fee bumps, r
 lists in chunks, exact checks) belong in the plan that builds them, where code and tests
 confirm them.
 
-Groups follow reading order: tools, environments, how writes behave, then the publish
-flow before the rating flow that builds on it. Numbers follow the order decisions were
-taken, so a later ADR can sit in an earlier group.
+Groups follow reading order: what VeriSci covers, tools, environments, how writes behave,
+then the publish flow before the rating flow that builds on it. Numbers follow the order
+decisions were taken, so a later ADR can sit in an earlier group.
+
+## Scope
+
+| ADR | Decision |
+| --- | --- |
+| [0037. VeriSci rates life-science and health papers](0037-verisci-rates-life-science-and-health-papers.md) | Biology, medicine and health research; the scorer decides a paper's field, and a request to rate a paper outside it is cancelled |
 
 ## Tools
 
@@ -55,7 +61,7 @@ A PDF becomes a Target KA.
 
 | ADR | Decision |
 | --- | --- |
-| [0011. A rating is a separate R-KA, linked by schema:about](0011-a-rating-is-a-separate-r-ka.md) | Each rating is its own R-KA pointing at the paper; the paper is never modified; only papers verisci published are rated |
+| [0011. A rating is a separate R-KA, linked by schema:about](0011-a-rating-is-a-separate-r-ka.md) | Each rating is its own R-KA pointing at the paper; the paper is never modified; only papers verisci published, in its field, are rated |
 | [0012. Ratings evolve in three phases, each settled by the oracle](0012-three-phases-settled-by-the-oracle.md) | Machine score, human review, wet-lab; the oracle records every phase's score |
 | [0013. A paper can have several ratings](0013-several-ratings-per-paper.md) | A rating is identified by its request id and its R-KA's UAL |
 | [0014. The contract owns scores, the DKG owns content](0014-contract-owns-scores-dkg-owns-content.md) | The UI shows the contract's score and flags a gap with the DKG |
@@ -71,7 +77,7 @@ In the order a request lives: requested, named, ingested, scored, fulfilled, and
 | [0015. Rating requests are free on testnet](0015-rating-requests-are-free-on-testnet.md) | Requesters pay only gas; a cap and a throttle bound spend until mainnet |
 | [0016. Asset names derive from the on-chain request id](0016-asset-names-derive-from-request-id.md) | Each phase-1 request has an on-chain id; any process computes the rating's name and its recovery from it alone |
 | [0017. Chain events are ingested at least once](0017-chain-events-are-ingested-at-least-once.md) | Signed webhooks, one event per request id, acked only after hand-off; the reconciler heals what is missed |
-| [0018. The phase-1 scorer has a fixed output contract](0018-phase-1-scorer-output-contract.md) | The scorer returns `{ score, rationale, observed, missing }`, computed once and read back; Gemini scores, on its free tier |
+| [0018. The phase-1 scorer has a fixed output contract](0018-phase-1-scorer-output-contract.md) | The scorer reads the paper's text and answers its study type's checks with quotes; code computes the score; it returns `{ score, rationale, studyType, checks }`, computed once and read back; Gemini, on its free tier |
 | [0019. Oracle transactions are serialized](0019-oracle-transactions-are-serialized.md) | One function sends every oracle transaction the backend sends, one at a time, checking receipts in later steps; only `main` and `develop` hold the oracle keys |
 | [0020. Stuck requests are recovered, and only the oracle cancels](0020-stuck-requests-recovered-only-oracle-cancels.md) | One run per request finishes what is left; a cron restarts stuck ones; only the oracle cancels |
 

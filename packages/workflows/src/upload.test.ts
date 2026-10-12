@@ -66,7 +66,7 @@ describe("createUploadService", () => {
     );
   });
 
-  it("signs upload URLs with the Pinata key, for 30 MB and 5 minutes", async () => {
+  it("signs upload URLs with the Pinata key, for 15 MB and 5 minutes", async () => {
     const { uploadIo, requests } = io();
 
     expect(await createUploadService(env(), uploadIo).createUploadUrl()).toEqual({
@@ -79,7 +79,7 @@ describe("createUploadService", () => {
     expect(JSON.parse(String(requests[0]?.init?.body))).toMatchObject({
       date: NOW_MS / 1000,
       expires: 300,
-      max_file_size: 30 * 1024 * 1024,
+      max_file_size: 15 * 1024 * 1024,
     });
   });
 

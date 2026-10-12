@@ -1,16 +1,29 @@
-import { SCORER_OUTPUT_SCHEMA, type ScorerOutput, scorerPrompt, type Triple } from "@verisci/core";
+import { checklistOf, type PaperText, SCORER_OUTPUT_SCHEMA, scorerPrompt } from "@verisci/core";
 import { describe, expect, it, vi } from "vitest";
-import { scorePaper } from "./scorer.ts";
+import { askScorer, scorePaper } from "./scorer.ts";
 
 const KEY = "secret-gemini-key";
-const TRIPLES: Triple[] = [
-  { subject: "urn:verisci:paper:x", predicate: "http://schema.org/name", object: '"A title"' },
-];
-const OUTPUT: ScorerOutput = {
-  score: 64,
-  rationale: "The record states a claim and names its authors.",
-  observed: ["claim", "authors"],
-  missing: ["methods", "data", "results", "limitations", "availability", "identifier"],
+const PAPER: PaperText = {
+  text: "A case of thyroiditis after vaccination.\nFunding: none.\nThe patient consented.",
+  shortened: false,
+};
+const IN_FIELD = {
+  field: "life-sciences",
+  studyType: "other",
+  reason: "A case report of thyroiditis after a vaccine.",
+  rationale: "It states its funding and little else.",
+  checks: checklistOf("other").map(({ id }) => ({
+    id,
+    answer: id === "funding" ? "shown" : "missing",
+    quote: id === "funding" ? "Funding: none." : "",
+  })),
+};
+const OUTSIDE = {
+  field: "outside",
+  studyType: "computational",
+  reason: "A machine translation model.",
+  checks: [],
+  rationale: "",
 };
 
 function answer(body: unknown, status = 200): Response {
@@ -30,13 +43,13 @@ function geminiAnswer(text: string, extra: Record<string, unknown> = {}) {
 
 function scorer(reply: () => Promise<Response>) {
   const fetch = vi.fn(reply);
-  const options = { apiKey: KEY, model: "gemini-3.8-flash", fetch, timeoutMs: 60_000 };
-  return { fetch, score: () => scorePaper(TRIPLES, options) };
+  const options = { apiKey: KEY, model: "gemini-3.8-flash", fetch, timeoutMs: 240_000 };
+  return { fetch, score: () => scorePaper(PAPER, options), ask: () => askScorer(PAPER, options) };
 }
 
 describe("scorePaper", () => {
   it("asks Gemini once, with the prompt, temperature 0 and the output schema", async () => {
-    const { fetch, score } = scorer(async () => answer(geminiAnswer(JSON.stringify(OUTPUT))));
+    const { fetch, score } = scorer(async () => answer(geminiAnswer(JSON.stringify(IN_FIELD))));
 
     await score();
 
@@ -47,7 +60,7 @@ describe("scorePaper", () => {
     );
     expect(init.method).toBe("POST");
     expect(new Headers(init.headers).get("x-goog-api-key")).toBe(KEY);
-    const { system, user } = scorerPrompt(TRIPLES);
+    const { system, user } = scorerPrompt(PAPER);
     expect(JSON.parse(String(init.body))).toEqual({
       systemInstruction: { parts: [{ text: system }] },
       contents: [{ role: "user", parts: [{ text: user }] }],
@@ -60,22 +73,45 @@ describe("scorePaper", () => {
     expect(init.signal).toBeInstanceOf(AbortSignal);
   });
 
-  it("returns the checked output and the model version Gemini reports", async () => {
-    const { score } = scorer(async () => answer(geminiAnswer(JSON.stringify(OUTPUT))));
+  it("scores a paper in the field with the score code computes, and the model version", async () => {
+    const { score } = scorer(async () => answer(geminiAnswer(JSON.stringify(IN_FIELD))));
+    const result = await score();
 
-    expect(await score()).toEqual({ ok: true, output: OUTPUT, model: "gemini-3.8-flash-001" });
+    // `other`: 8 checks, none said not to apply; funding shown: 1 / 8.
+    expect(result).toMatchObject({
+      ok: true,
+      field: "life-sciences",
+      model: "gemini-3.8-flash-001",
+      output: { score: 13, studyType: "other", rationale: IN_FIELD.rationale },
+    });
+    expect(
+      result.ok &&
+        result.field === "life-sciences" &&
+        result.output.checks.find((check) => check.id === "funding"),
+    ).toEqual({ id: "funding", answer: "shown", quote: "Funding: none." });
+  });
+
+  it("gives a paper outside the field with Gemini's reason, and no score", async () => {
+    const { score } = scorer(async () => answer(geminiAnswer(JSON.stringify(OUTSIDE))));
+
+    expect(await score()).toEqual({
+      ok: true,
+      field: "outside",
+      reason: "A machine translation model.",
+      model: "gemini-3.8-flash-001",
+    });
   });
 
   it("names the model asked for when Gemini reports none", async () => {
     const { score } = scorer(async () =>
-      answer({ ...geminiAnswer(JSON.stringify(OUTPUT)), modelVersion: undefined }),
+      answer({ ...geminiAnswer(JSON.stringify(OUTSIDE)), modelVersion: undefined }),
     );
 
     expect(await score()).toMatchObject({ ok: true, model: "gemini-3.8-flash" });
   });
 
   it("reads the answer's text across its parts, leaving out thoughts", async () => {
-    const text = JSON.stringify(OUTPUT);
+    const text = JSON.stringify(OUTSIDE);
     const { score } = scorer(async () =>
       answer({
         candidates: [
@@ -93,13 +129,20 @@ describe("scorePaper", () => {
       }),
     );
 
-    expect(await score()).toMatchObject({ ok: true, output: OUTPUT });
+    expect(await score()).toMatchObject({ ok: true, field: "outside" });
   });
 
   it.each([
-    ["429", async () => answer({ error: { code: 429 } }, 429), "rate-limited"],
-    ["500", async () => answer({}, 500), "unreachable"],
-    ["503", async () => answer({}, 503), "unreachable"],
+    ["429", 429, "rate-limited"],
+    ["500", 500, "unreachable"],
+    ["503", 503, "unreachable"],
+  ])("gives HTTP %s as %s, with its status", async (_, status, reason) => {
+    const { score } = scorer(async () => answer({ error: { code: status } }, status));
+
+    expect(await score()).toEqual({ ok: false, reason, status });
+  });
+
+  it.each([
     ["a network error", () => Promise.reject(new TypeError("fetch failed")), "unreachable"],
     [
       "a timeout",
@@ -118,8 +161,9 @@ describe("scorePaper", () => {
       "invalid-output",
     ],
     [
-      "text the output check refuses",
-      async () => answer(geminiAnswer(JSON.stringify({ ...OUTPUT, score: 101 }))),
+      "an answer the check refuses",
+      async () =>
+        answer(geminiAnswer(JSON.stringify({ ...IN_FIELD, checks: IN_FIELD.checks.slice(1) }))),
       "invalid-output",
     ],
     [
@@ -128,9 +172,7 @@ describe("scorePaper", () => {
       "invalid-output",
     ],
   ])("gives %s as %s", async (_, reply, reason) => {
-    const { score } = scorer(reply);
-
-    expect(await score()).toEqual({ ok: false, reason });
+    expect(await scorer(reply).score()).toEqual({ ok: false, reason });
   });
 
   it.each([
@@ -140,9 +182,11 @@ describe("scorePaper", () => {
     ["404, a model Gemini no longer serves", 404],
     ["413", 413],
   ])("answers refused with the status for %s", async (_, status) => {
-    const { score } = scorer(async () => answer({}, status));
-
-    expect(await score()).toEqual({ ok: false, reason: "refused", status });
+    expect(await scorer(async () => answer({}, status)).score()).toEqual({
+      ok: false,
+      reason: "refused",
+      status,
+    });
   });
 
   it("never carries the key in a result", async () => {
@@ -150,8 +194,39 @@ describe("scorePaper", () => {
       async () => answer({ error: { message: `bad key ${KEY}` } }, 400),
       () => Promise.reject(new Error(`failed with ${KEY}`)),
     ]) {
-      const { score } = scorer(reply);
-      expect(JSON.stringify(await score())).not.toContain(KEY);
+      expect(JSON.stringify(await scorer(reply).score())).not.toContain(KEY);
     }
+  });
+});
+
+describe("askScorer", () => {
+  it("gives Gemini's answer before its quotes are checked against the paper", async () => {
+    const made = {
+      ...IN_FIELD,
+      checks: IN_FIELD.checks.map((check) =>
+        check.id === "conflicts"
+          ? { ...check, answer: "shown", quote: "No competing interests." }
+          : check,
+      ),
+    };
+    const { ask, score } = scorer(async () => answer(geminiAnswer(JSON.stringify(made))));
+
+    const asked = await ask();
+    const scored = await score();
+
+    expect(asked.ok && asked.answer.checks.find((check) => check.id === "conflicts")).toEqual({
+      id: "conflicts",
+      answer: "shown",
+      quote: "No competing interests.",
+    });
+    expect(
+      scored.ok &&
+        scored.field === "life-sciences" &&
+        scored.output.checks.find((check) => check.id === "conflicts"),
+    ).toEqual({
+      id: "conflicts",
+      answer: "missing",
+      claimed: { answer: "shown", quote: "No competing interests." },
+    });
   });
 });

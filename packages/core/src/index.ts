@@ -8,6 +8,14 @@ export {
   targetKaName,
 } from "./asset-names.ts";
 export { BASE_SEPOLIA_CHAIN_ID } from "./chains.ts";
+export {
+  CHECKS,
+  type Check,
+  type CheckId,
+  checklistOf,
+  STUDY_TYPES,
+  type StudyType,
+} from "./checklists.ts";
 export { canonicalCid } from "./cid.ts";
 export {
   knowledgeAssetToken,
@@ -31,25 +39,44 @@ export {
   type QueryBinding,
 } from "./paper-record.ts";
 export {
+  normalizeForQuote,
+  type PaperText,
+  type PreparePaperResult,
+  preparePaperText,
+  type QuoteText,
+  quoteFound,
+  quoteTextOf,
+} from "./paper-text.ts";
+export {
   classifyTarget,
-  PHASE1_SIGNALS,
-  type Phase1Signal,
+  paperPdfQuery,
   parseRating,
-  parseScorerOutput,
+  pdfCidOf,
   type RatingContent,
   type RatingRecord,
   ratingQuery,
   rKaQuads,
-  SCORER_OUTPUT_SCHEMA,
-  SCORER_PROMPT_VERSION,
-  type ScorerOutput,
-  scorerPrompt,
   type TargetClass,
-  targetTriplesQuery,
   triplesFromBindings,
 } from "./rating.ts";
 export {
+  CHECK_ANSWERS,
+  type CheckAnswer,
+  type CheckResult,
+  checklistScore,
+  FIELDS,
+  type Field,
+  parseScorerAnswer,
+  SCORER_OUTPUT_SCHEMA,
+  SCORER_PROMPT_VERSION,
+  type ScorerAnswer,
+  type ScorerOutput,
+  scoreChecks,
+  scorerPrompt,
+} from "./scorer.ts";
+export {
   canonicalContextGraph,
+  MAX_PDF_BYTES,
   SUBMISSION_DOMAIN,
   type SubmissionMessage,
   submissionTypedData,

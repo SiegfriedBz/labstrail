@@ -1,6 +1,10 @@
+import { MAX_PDF_BYTES } from "@verisci/core";
 import type { PublishFailure, SubmitResult } from "@verisci/workflows";
 import type { RefusalReason } from "./progress.ts";
 import type { UploadUrlAnswer } from "./upload-actions.ts";
+
+/** The largest PDF verisci publishes, in MB, as the messages name it. */
+const MAX_PDF_MB = MAX_PDF_BYTES / 1024 / 1024;
 
 /** Why the publish form stopped, from the browser's own checks to the server's answers. */
 export type PublishProblem =
@@ -27,7 +31,7 @@ export function publishProblemMessage(problem: PublishProblem): string {
     case "expired":
       return "The signature expired before it reached us. Sign again.";
     case "too-large":
-      return "This file is over 30 MB. Try a smaller PDF.";
+      return `This file is over ${MAX_PDF_MB} MB. Try a smaller PDF.`;
     case "not-a-pdf":
     case "wrong-file":
       return "This file isn't a PDF. Choose a PDF of your paper.";
@@ -62,7 +66,7 @@ export function refusalMessage(reason: RefusalReason): string {
     case "not-a-pdf":
       return "The file isn't a readable PDF.";
     case "too-large":
-      return "The file is over 30 MB.";
+      return `The file is over ${MAX_PDF_MB} MB.`;
     case "unparseable":
       return "We couldn't read the first page of this PDF.";
     case "no-title":

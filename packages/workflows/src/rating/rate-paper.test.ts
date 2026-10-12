@@ -1,18 +1,20 @@
 import type { RatingRequestState, ReadRequestResult } from "@verisci/contracts";
 import {
+  type PaperText,
+  paperPdfQuery,
   publishedPaperQuery,
   type QueryBinding,
   rKaQuads,
   SCORER_PROMPT_VERSION,
   type ScorerOutput,
   type Triple,
-  targetTriplesQuery,
 } from "@verisci/core";
 import type { AssetResult, DkgFailure, MintResult, QueryResult } from "@verisci/dkg";
 import { Inngest, NonRetriableError } from "inngest";
 import type { Hex } from "viem";
 import { describe, expect, it, vi } from "vitest";
 import type { OracleInput, OracleResult } from "./oracle.ts";
+import type { ReadPaperTextResult } from "./paper-text.ts";
 import {
   createRatePaper,
   loadRatingDeps,
@@ -38,15 +40,18 @@ const OLD = NOW / 1000 - 25 * 3600;
 const EVENT = { contract: CONTRACT, requestId: REQUEST_ID };
 const ELSEWHERE = "did:dkg:base:84532/0x9a17ec95e96f8a7c40b7ac1411e8a844c7bf9111/3";
 
+const CID = "bafkreigh2akiscaildcqabsyg3dfr6chu3fgpregiymsck7e7aqa4s52zy";
+const PAPER: PaperText = {
+  text: "A trial.\nWe needed 60 patients for 80% power.",
+  shortened: false,
+};
 const OUTPUT: ScorerOutput = {
   score: 72,
-  rationale: "The record states a claim and its methods.",
-  observed: ["claim", "methods", "identifier", "authors"],
-  missing: ["data", "results", "limitations", "availability"],
+  rationale: "The paper reports its sample size.",
+  studyType: "randomized-trial",
+  checks: [{ id: "sample-size", answer: "shown", quote: "We needed 60 patients for 80% power." }],
 };
-const TARGET_TRIPLES: Triple[] = [
-  { subject: "urn:verisci:paper:x", predicate: "http://schema.org/name", object: '"A title"' },
-];
+const MODEL = "gemini-3.8-flash-001";
 const rows = (triples: readonly Triple[]): QueryBinding[] =>
   triples.map((t) => ({ s: t.subject, p: t.predicate, o: t.object }));
 const ratingRows = (score: number) =>
@@ -56,8 +61,9 @@ const ratingRows = (score: number) =>
       targetUal: TARGET,
       contract: `eip155:31337:${CONTRACT}`,
       output: { ...OUTPUT, score },
-      model: "gemini-3.8-flash-001",
+      model: MODEL,
       promptVersion: SCORER_PROMPT_VERSION,
+      textShortened: false,
     }),
   );
 
@@ -112,8 +118,9 @@ interface Script {
   mints?: MintResult[];
   found?: QueryResult[];
   graph?: ({ ok: true } | DkgFailure)[];
-  targetRows?: QueryResult[];
+  pdfRows?: QueryResult[];
   ratingRows?: QueryResult[];
+  papers?: ReadPaperTextResult[];
   scores?: ScoreResult[];
   oracleAnswer?: (input: OracleInput) => OracleResult;
 }
@@ -134,15 +141,16 @@ function rate(script: Script, data: unknown = EVENT) {
   const mints = [...(script.mints ?? [mintedNow])];
   const found = [...(script.found ?? [{ ok: true, bindings: [{ ka: TARGET }] }])];
   const graph = [...(script.graph ?? [{ ok: true as const }])];
-  const targetRows = [...(script.targetRows ?? [{ ok: true, bindings: rows(TARGET_TRIPLES) }])];
+  const pdfRows = [...(script.pdfRows ?? [{ ok: true, bindings: [{ url: `ipfs://${CID}` }] }])];
   const ratingRowsAnswers = [
     ...(script.ratingRows ?? [{ ok: true, bindings: ratingRows(OUTPUT.score) }]),
   ];
+  const papers = [...(script.papers ?? [{ ok: true, paper: PAPER }])];
   const scores = [
-    ...(script.scores ?? [{ ok: true, output: OUTPUT, model: "gemini-3.8-flash-001" }]),
+    ...(script.scores ?? [{ ok: true, field: "life-sciences", output: OUTPUT, model: MODEL }]),
   ];
   const foundQuery = publishedPaperQuery(GRAPH, TARGET);
-  const targetQuery = targetTriplesQuery(GRAPH, TARGET, RATING_SETTINGS.maxTriples);
+  const pdfQuery = paperPdfQuery(GRAPH, TARGET);
   const dkg = {
     readAsset: vi.fn(async () => next(reads)),
     storeAsset: vi.fn(async () => next(stores)),
@@ -150,7 +158,7 @@ function rate(script: Script, data: unknown = EVENT) {
     checkGraph: vi.fn(async () => next(graph)),
     query: vi.fn(async (sparql: string) => {
       if (sparql === foundQuery) return next(found);
-      return sparql === targetQuery ? next(targetRows) : next(ratingRowsAnswers);
+      return sparql === pdfQuery ? next(pdfRows) : next(ratingRowsAnswers);
     }),
   };
   const deps = {
@@ -162,6 +170,7 @@ function rate(script: Script, data: unknown = EVENT) {
     readRequest: vi.fn(async () => next(requests)),
     readOracle: vi.fn(async () => ({ ok: true as const, oracle: script.oracle ?? ORACLE })),
     dkg: dkg as unknown as RatingDeps["dkg"],
+    readPaper: vi.fn(async () => next(papers)),
     score: vi.fn(async () => next(scores)),
   } satisfies RatingDeps;
   const { step, log, oracleCalls } = fakeSteps(script.oracleAnswer ?? settles);
@@ -209,7 +218,7 @@ describe("runRating: which requests it takes", () => {
 
     expect(await run).toEqual({ state: "skipped", reason: "not-pending" });
     expect(dkg.readAsset).not.toHaveBeenCalled();
-    expect(deps.score).not.toHaveBeenCalled();
+    expect(deps.readPaper).not.toHaveBeenCalled();
     expect(oracleCalls).toEqual([]);
   });
 
@@ -218,7 +227,7 @@ describe("runRating: which requests it takes", () => {
 
     expect(await run).toEqual({ state: "skipped", reason: "not-our-oracle" });
     expect(dkg.readAsset).not.toHaveBeenCalled();
-    expect(deps.score).not.toHaveBeenCalled();
+    expect(deps.readPaper).not.toHaveBeenCalled();
     expect(oracleCalls).toEqual([]);
   });
 
@@ -231,7 +240,7 @@ describe("runRating: which requests it takes", () => {
 
     expect(await run).toEqual({ state: "cancelled", reason: "invalid-target" });
     expect(oracleCalls).toEqual([cancel("invalid-target")]);
-    expect(deps.score).not.toHaveBeenCalled();
+    expect(deps.readPaper).not.toHaveBeenCalled();
     expect(dkg.readAsset).not.toHaveBeenCalled();
   });
 
@@ -242,7 +251,7 @@ describe("runRating: which requests it takes", () => {
 
     expect(await run).toEqual({ state: "cancelled", reason: "invalid-target" });
     expect(oracleCalls).toEqual([cancel("invalid-target")]);
-    expect(deps.score).not.toHaveBeenCalled();
+    expect(deps.readPaper).not.toHaveBeenCalled();
     expect(dkg.readAsset).not.toHaveBeenCalled();
   });
 
@@ -251,7 +260,7 @@ describe("runRating: which requests it takes", () => {
 
     expect(await run).toEqual({ state: "cancelled", reason: "invalid-target" });
     expect(oracleCalls).toEqual([cancel("invalid-target")]);
-    expect(deps.score).not.toHaveBeenCalled();
+    expect(deps.readPaper).not.toHaveBeenCalled();
     expect(dkg.readAsset).not.toHaveBeenCalled();
     expect(dkg.query).toHaveBeenCalledWith(publishedPaperQuery(GRAPH, TARGET));
     expect(log).toEqual(["read-request", "find-target", "check-graph", "oracle cancel"]);
@@ -311,7 +320,7 @@ describe("runRating: which requests it takes", () => {
 });
 
 describe("runRating: rating a paper", () => {
-  it("scores once, stores the R-KA, mints it and fulfils with the score read back", async () => {
+  it("reads the paper, scores it once, stores, mints and fulfils with the score read back", async () => {
     const { run, deps, dkg, log, oracleCalls } = rate({
       ratingRows: [{ ok: true, bindings: ratingRows(64) }],
     });
@@ -321,15 +330,17 @@ describe("runRating: rating a paper", () => {
       "read-request",
       "find-target",
       "read-rka-1",
-      "read-target-1",
-      "score-1",
+      "find-pdf-1",
+      "read-paper-1",
+      "score-paper-1",
       "store-1",
       "mint-1",
       "read-score-1",
       "oracle fulfil",
     ]);
-    expect(deps.score).toHaveBeenCalledOnce();
-    expect(deps.score).toHaveBeenCalledWith(TARGET_TRIPLES);
+    expect(dkg.query).toHaveBeenCalledWith(paperPdfQuery(GRAPH, TARGET));
+    expect(deps.readPaper).toHaveBeenCalledExactlyOnceWith(CID);
+    expect(deps.score).toHaveBeenCalledExactlyOnceWith(PAPER);
     expect(dkg.storeAsset).toHaveBeenCalledWith(
       NAME,
       rKaQuads({
@@ -337,19 +348,77 @@ describe("runRating: rating a paper", () => {
         targetUal: TARGET,
         contract: `eip155:31337:${CONTRACT}`,
         output: OUTPUT,
-        model: "gemini-3.8-flash-001",
+        model: MODEL,
         promptVersion: SCORER_PROMPT_VERSION,
+        textShortened: false,
       }),
     );
     expect(dkg.startMint).toHaveBeenCalledWith(NAME, { listenMs: RATING_SETTINGS.listenMs });
     expect(oracleCalls).toEqual([fulfil(64)]);
   });
 
-  it("reads at most 200 of the target's triples", async () => {
-    const { run, dkg } = rate({});
+  it("records in the R-KA that a paper's text was shortened to fit", async () => {
+    const { run, dkg } = rate({ papers: [{ ok: true, paper: { ...PAPER, shortened: true } }] });
 
     await run;
-    expect(dkg.query).toHaveBeenCalledWith(targetTriplesQuery(GRAPH, TARGET, 200));
+    expect(dkg.storeAsset).toHaveBeenCalledWith(
+      NAME,
+      expect.arrayContaining([
+        {
+          subject: `urn:verisci:rating:${REQUEST_ID}/phase/1`,
+          predicate: "urn:verisci:textShortened",
+          object: '"true"^^<http://www.w3.org/2001/XMLSchema#boolean>',
+        },
+      ]),
+    );
+  });
+
+  it("cancels invalid-target a paper outside the field, storing nothing", async () => {
+    const { run, dkg, log, oracleCalls } = rate({
+      scores: [{ ok: true, field: "outside", reason: "Machine translation.", model: MODEL }],
+    });
+
+    expect(await run).toEqual({ state: "cancelled", reason: "invalid-target" });
+    expect(oracleCalls).toEqual([cancel("invalid-target")]);
+    expect(dkg.storeAsset).not.toHaveBeenCalled();
+    expect(log.slice(-2)).toEqual(["score-paper-1", "oracle cancel"]);
+  });
+
+  it("cancels invalid-target a paper whose PDF holds no text, such as a scan, scoring nothing", async () => {
+    const { run, deps, dkg, oracleCalls } = rate({ papers: [{ ok: false, reason: "no-text" }] });
+
+    expect(await run).toEqual({ state: "cancelled", reason: "invalid-target" });
+    expect(oracleCalls).toEqual([cancel("invalid-target")]);
+    expect(deps.score).not.toHaveBeenCalled();
+    expect(dkg.storeAsset).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["a link that is not ipfs://", [{ url: `https://example.org/${CID}.pdf` }]],
+    ["an invalid CID", [{ url: "ipfs://not-a-cid" }]],
+  ])(
+    "cancels invalid-target a paper whose PDF link is %s, reading nothing",
+    async (_, bindings) => {
+      const { run, deps, oracleCalls } = rate({ pdfRows: [{ ok: true, bindings }] });
+
+      expect(await run).toEqual({ state: "cancelled", reason: "invalid-target" });
+      expect(oracleCalls).toEqual([cancel("invalid-target")]);
+      expect(deps.readPaper).not.toHaveBeenCalled();
+    },
+  );
+
+  it("asks again, never cancelling, when the node gives no PDF link for the paper it listed", async () => {
+    const { run, log, oracleCalls } = rate({
+      pdfRows: [
+        { ok: true, bindings: [] },
+        { ok: true, bindings: [{ url: `ipfs://${CID}` }] },
+      ],
+    });
+
+    expect(await run).toMatchObject({ state: "fulfilled" });
+    expect(log).toContain("sleep retry-1 2m");
+    expect(log).toContain("find-pdf-2");
+    expect(oracleCalls).toEqual([fulfil(72)]);
   });
 
   it("fulfils an R-KA already minted with its score read back, never scoring", async () => {
@@ -363,7 +432,7 @@ describe("runRating: rating a paper", () => {
       "read-score-1",
       "oracle fulfil",
     ]);
-    expect(deps.score).not.toHaveBeenCalled();
+    expect(deps.readPaper).not.toHaveBeenCalled();
     expect(oracleCalls).toEqual([fulfil(72)]);
   });
 
@@ -387,7 +456,7 @@ describe("runRating: rating a paper", () => {
       "oracle fulfil",
     ]);
     expect(dkg.storeAsset).not.toHaveBeenCalled();
-    expect(deps.score).not.toHaveBeenCalled();
+    expect(deps.readPaper).not.toHaveBeenCalled();
   });
 
   it("shares a draft R-KA, mints it and fulfils, never scoring", async () => {
@@ -395,7 +464,7 @@ describe("runRating: rating a paper", () => {
 
     expect(await run).toEqual({ state: "fulfilled", score: 72, rKaUal: R_KA });
     expect(dkg.storeAsset).toHaveBeenCalledWith(NAME, []);
-    expect(deps.score).not.toHaveBeenCalled();
+    expect(deps.readPaper).not.toHaveBeenCalled();
   });
 
   it("names the R-KA as an orphan when the request was cancelled meanwhile", async () => {
@@ -453,7 +522,7 @@ describe("runRating: past the maximum age", () => {
     const { run, deps, oracleCalls } = rate({ requests: [old], reads: [read] });
 
     expect(await run).toEqual({ state: "cancelled", reason: "expired" });
-    expect(deps.score).not.toHaveBeenCalled();
+    expect(deps.readPaper).not.toHaveBeenCalled();
     expect(oracleCalls).toEqual([cancel("expired")]);
   });
 
@@ -464,55 +533,153 @@ describe("runRating: past the maximum age", () => {
 
     const past = rate({ requests: [pending({ requestedAt: NOW / 1000 - 24 * 3600 - 1 })] });
     expect(await past.run).toEqual({ state: "cancelled", reason: "expired" });
-    expect(past.deps.score).not.toHaveBeenCalled();
+    expect(past.deps.readPaper).not.toHaveBeenCalled();
   });
 });
 
 describe("runRating: retries", () => {
-  it("reads the target again when a paper the node lists gives no rows yet", async () => {
+  it("waits 2 minutes and asks for the PDF's link again when the node does not answer", async () => {
     const { run, log } = rate({
-      targetRows: [
-        { ok: true, bindings: [] },
-        { ok: true, bindings: rows(TARGET_TRIPLES) },
+      pdfRows: [unreachable, { ok: true, bindings: [{ url: `ipfs://${CID}` }] }],
+    });
+
+    expect(await run).toMatchObject({ state: "fulfilled" });
+    expect(log).toContain("sleep retry-1 2m");
+    expect(log).toContain("find-pdf-2");
+  });
+
+  it("reads the PDF again after 2 minutes when the gateway does not give it", async () => {
+    const { run, deps, log } = rate({
+      papers: [
+        { ok: false, reason: "unreachable" },
+        { ok: true, paper: PAPER },
       ],
     });
 
     expect(await run).toMatchObject({ state: "fulfilled" });
     expect(log).toContain("sleep retry-1 2m");
-    expect(log).toContain("read-target-2");
+    expect(log).toContain("read-paper-2");
+    expect(log).not.toContain("find-pdf-2");
+    expect(deps.readPaper).toHaveBeenCalledTimes(2);
   });
 
-  it("waits 2 minutes and reads the target again when the node does not answer", async () => {
-    const { run, log } = rate({
-      targetRows: [unreachable, { ok: true, bindings: rows(TARGET_TRIPLES) }],
+  it("fails paper-unreachable, with no cancel, when the PDF never comes", async () => {
+    const { run, deps, oracleCalls } = rate({ papers: [{ ok: false, reason: "unreachable" }] });
+
+    await expect(run).rejects.toThrow(/^rating-failed:paper-unreachable: /);
+    expect(deps.readPaper).toHaveBeenCalledTimes(RATING_SETTINGS.attempts);
+    expect(oracleCalls).toEqual([]);
+  });
+
+  it("fails node-unreachable, with no cancel, when the node never gives the PDF link", async () => {
+    const { run, oracleCalls } = rate({ pdfRows: [{ ok: true, bindings: [] }] });
+
+    await expect(run).rejects.toThrow(/^rating-failed:node-unreachable: /);
+    expect(oracleCalls).toEqual([]);
+  });
+
+  it("cancels invalid-target a PDF that reads badly three times, scoring nothing", async () => {
+    const { run, deps, dkg, oracleCalls, log } = rate({
+      papers: [{ ok: false, reason: "unreadable" }],
+    });
+
+    expect(await run).toEqual({ state: "cancelled", reason: "invalid-target" });
+    expect(deps.readPaper).toHaveBeenCalledTimes(RATING_SETTINGS.unreadableReads);
+    expect(log).toContain(`sleep retry-${RATING_SETTINGS.unreadableReads - 1} 2m`);
+    expect(deps.score).not.toHaveBeenCalled();
+    expect(dkg.storeAsset).not.toHaveBeenCalled();
+    expect(oracleCalls).toEqual([cancel("invalid-target")]);
+  });
+
+  it("fails paper-unreadable, with no cancel, when the attempts run out before three bad reads", async () => {
+    const { run, deps, oracleCalls } = rate({
+      papers: [
+        { ok: false, reason: "unreachable" },
+        { ok: false, reason: "unreachable" },
+        { ok: false, reason: "unreachable" },
+        { ok: false, reason: "unreachable" },
+        { ok: false, reason: "unreadable" },
+      ],
+    });
+
+    await expect(run).rejects.toThrow(/^rating-failed:paper-unreadable: /);
+    expect(deps.readPaper).toHaveBeenCalledTimes(RATING_SETTINGS.attempts);
+    expect(oracleCalls).toEqual([]);
+  });
+
+  it("scores a PDF that reads on a later attempt after not reading as one", async () => {
+    const { run, deps } = rate({
+      papers: [
+        { ok: false, reason: "unreadable" },
+        { ok: true, paper: PAPER },
+      ],
     });
 
     expect(await run).toMatchObject({ state: "fulfilled" });
-    expect(log).toContain("sleep retry-1 2m");
-    expect(log).toContain("read-target-2");
+    expect(deps.readPaper).toHaveBeenCalledTimes(2);
   });
 
-  it.each([
-    ["unreachable", { ok: false, reason: "unreachable" } as const],
-    ["rate-limited", { ok: false, reason: "rate-limited" } as const],
-    ["invalid-output", { ok: false, reason: "invalid-output" } as const],
-  ])("retries a scorer that is %s, then fails scorer-unavailable", async (_, failure) => {
-    const { run, deps } = rate({ scores: [failure] });
+  it("cancels invalid-target at once a PDF over the size limit, reading it once", async () => {
+    const { run, deps, dkg, oracleCalls } = rate({ papers: [{ ok: false, reason: "too-large" }] });
 
-    await expect(run).rejects.toThrow(/^rating-failed:scorer-unavailable: /);
-    expect(deps.score).toHaveBeenCalledTimes(RATING_SETTINGS.attempts);
+    expect(await run).toEqual({ state: "cancelled", reason: "invalid-target" });
+    expect(deps.readPaper).toHaveBeenCalledTimes(1);
+    expect(deps.score).not.toHaveBeenCalled();
+    expect(dkg.storeAsset).not.toHaveBeenCalled();
+    expect(oracleCalls).toEqual([cancel("invalid-target")]);
   });
 
-  it("scores again after a failed score, then rates", async () => {
+  it("asks Gemini at most twice for an answer the check refuses, then fails scorer-unusable", async () => {
+    const { run, deps, oracleCalls } = rate({ scores: [{ ok: false, reason: "invalid-output" }] });
+
+    await expect(run).rejects.toThrow(/^rating-failed:scorer-unusable: /);
+    expect(deps.score).toHaveBeenCalledTimes(RATING_SETTINGS.unusableAnswers);
+    expect(oracleCalls).toEqual([]);
+  });
+
+  it("scores after one answer the check refuses when the next one is usable", async () => {
     const { run, deps } = rate({
       scores: [
-        { ok: false, reason: "rate-limited" },
-        { ok: true, output: OUTPUT, model: "gemini-3.8-flash-001" },
+        { ok: false, reason: "invalid-output" },
+        { ok: true, field: "life-sciences", output: OUTPUT, model: MODEL },
       ],
     });
 
     expect(await run).toMatchObject({ state: "fulfilled" });
     expect(deps.score).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ["unreachable", { ok: false, reason: "unreachable" } as const],
+    ["rate-limited", { ok: false, reason: "rate-limited" } as const],
+  ])("retries a scorer that is %s, then fails scorer-unavailable", async (_, failure) => {
+    const { run, deps } = rate({ scores: [failure] });
+
+    await expect(run).rejects.toThrow(/^rating-failed:scorer-unavailable: /);
+    expect(deps.score).toHaveBeenCalledTimes(RATING_SETTINGS.attempts);
+    expect(deps.readPaper).toHaveBeenCalledOnce();
+  });
+
+  it("names Gemini's status when the scorer stays unavailable", async () => {
+    const { run } = rate({ scores: [{ ok: false, reason: "unreachable", status: 503 }] });
+
+    await expect(run).rejects.toThrow(/scorer unreachable \(HTTP 503\)/);
+  });
+
+  it("scores again after a failed score, reading the paper only once", async () => {
+    const { run, deps, log } = rate({
+      scores: [
+        { ok: false, reason: "rate-limited", status: 429 },
+        { ok: true, field: "life-sciences", output: OUTPUT, model: MODEL },
+      ],
+    });
+
+    expect(await run).toMatchObject({ state: "fulfilled" });
+    expect(deps.score).toHaveBeenCalledTimes(2);
+    expect(deps.readPaper).toHaveBeenCalledOnce();
+    expect(log).toContain("score-paper-2");
+    expect(log).not.toContain("find-pdf-2");
+    expect(log).not.toContain("read-paper-2");
   });
 
   it("never scores again once a score came back, even when the store fails", async () => {
@@ -522,10 +689,11 @@ describe("runRating: retries", () => {
     });
 
     expect(await run).toMatchObject({ state: "fulfilled" });
+    expect(deps.readPaper).toHaveBeenCalledOnce();
     expect(deps.score).toHaveBeenCalledOnce();
     expect(dkg.storeAsset).toHaveBeenCalledTimes(2);
     expect(log).toContain("store-2");
-    expect(log).not.toContain("score-2");
+    expect(log).not.toContain("score-paper-2");
   });
 
   it("retries a node that does not answer, then fails node-unreachable", async () => {
@@ -672,7 +840,7 @@ describe("createRatePaper", () => {
     expect(fn.opts.id).toBe("rate-paper");
     expect(fn.opts.triggers).toEqual([{ event: "verisci/rating.requested" }]);
     expect(fn.opts.singleton).toEqual({ key: "event.data.requestId", mode: "skip" });
-    expect(fn.opts.timeouts).toEqual({ finish: "150m" });
+    expect(fn.opts.timeouts).toEqual({ finish: "180m" });
   });
 
   it("throttles to 3 starts an hour in a deployment, and not locally", () => {

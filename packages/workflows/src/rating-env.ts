@@ -11,6 +11,11 @@ export const localChainSchema = {
   LOCAL_RATING_CONTRACT: z.string().regex(/^0x[0-9a-fA-F]{40}$/, "must be a 0x address"),
 };
 
+/** The Gemini key (ADR 0018), read by the rating functions and the `score-papers` dev script. */
+export const geminiSchema = {
+  GEMINI_API_KEY: z.string().min(1),
+};
+
 /**
  * The rating functions' own variables for `appEnv`: the oracle's key (ADR 0019) and the
  * Gemini key (ADR 0018), and locally Anvil's URL and the contract deployed there (ADR 0036),
@@ -20,7 +25,7 @@ export function ratingSchema(appEnv: SharedEnv["APP_ENV"]) {
   const local = appEnv === "local";
   return {
     ORACLE_PRIVATE_KEY: z.string().regex(/^0x[0-9a-fA-F]{64}$/, "must be 0x and 64 hex digits"),
-    GEMINI_API_KEY: z.string().min(1),
+    ...geminiSchema,
     LOCAL_CHAIN_RPC_URL: local ? localChainSchema.LOCAL_CHAIN_RPC_URL : z.string().optional(),
     LOCAL_RATING_CONTRACT: local ? localChainSchema.LOCAL_RATING_CONTRACT : z.string().optional(),
   };
