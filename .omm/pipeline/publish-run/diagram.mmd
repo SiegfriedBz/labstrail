@@ -5,7 +5,7 @@ graph LR
     read-state -->|"draft: shared as sealed"| store["Store\nstep store-n"]
     read-state -->|"stored: minted at once"| mint["Mint\nstep mint-n"]
     read-state -->|"minted: done"| done["Published\nTarget KA minted"]
-    parse-paper -->|"title, abstract, opening (first attempt only)"| check-field["Check Field\nstep check-field-n"]
+    parse-paper -->|"title, abstract, opening (once per run)"| check-field["Check Field\nstep check-field-n"]
     parse-paper -->|"Target KA triples, field already checked"| store
     parse-paper -->|"not a PDF, too large, unparseable, no title, unreadable, no text"| refused
     check-field -->|"in the field, or no answer twice"| store

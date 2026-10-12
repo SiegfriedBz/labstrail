@@ -7,5 +7,6 @@ graph LR
     publish -->|"checks a new paper's field with"| gemini["Gemini Call\nsrc/gemini/"]
     rating -->|"scores the paper with"| gemini
     scripts["Dev Scripts\nscripts/"] -->|"request and score ratings locally with"| rating
+    scripts -->|"publish a PDF, and run the field check on the reference set, with"| publish
     classDef entry fill:#89b4fa,stroke:#89b4fa,color:#1e1e2e
     class wiring,site entry

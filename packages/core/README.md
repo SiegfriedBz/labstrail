@@ -21,7 +21,7 @@ Architecture views: [`.omm/overall-architecture/core/`](../../.omm/overall-archi
 ## Depends on
 
 The `multiformats` library, to parse CIDs, `@xmldom/xmldom`, to read TEI, Zod, to check the
-scorer's answers, and no other workspace. pnpm does not hoist undeclared workspace packages,
+scorer's and the field check's answers, and no other workspace. pnpm does not hoist undeclared workspace packages,
 so an import of another `@verisci/*` package fails to typecheck.
 
 ## API

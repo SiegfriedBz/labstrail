@@ -110,12 +110,14 @@ starts nothing. Its steps:
    is in VeriSci's field, from its title, abstract and opening (`checkField`, with core's
    `fieldCheckPrompt`; [ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)).
    A paper `outside` ends the run `refused: outside-field` before anything is stored, and the
-   run logs Gemini's reason with the CID. A failed check waits 30 s (`fieldRetryWait`,
-   `check-field-wait-<n>`) and asks once more (`check-field-<n>-again`); when that fails too,
-   the paper is published, its rating checking the field again, and the run logs
-   `field-unchecked` with the failure and its HTTP status. The verdict is asked once per run:
-   a later attempt reads the paper again but asks nothing, and a draft or a minted asset is
-   never checked. Gemini gets 60 s (`fieldTimeoutMs`). The check reads untrusted text: a paper
+   run logs Gemini's reason with the CID. A check that gets no answer (a rate limit, an outage,
+   an answer that does not parse) waits 30 s (`fieldRetryWait`, `check-field-wait-<n>`) and
+   asks once more (`check-field-<n>-again`); when that fails too, the paper is published, its
+   rating checking the field again, and the run logs `field-unchecked` with the failure and
+   its HTTP status. Gemini refusing the request (a bad key, a model it no longer serves) is a
+   setup error: the run fails (`setup`) with nothing stored. The verdict is asked once per
+   run, on the first attempt whose paper is read: a later attempt reads the paper again but
+   asks nothing, and a draft or a minted asset is never checked. Gemini gets 60 s (`fieldTimeoutMs`). The check reads untrusted text: a paper
    written to fool it is published, and its rating still checks the field.
 5. **store**, then **mint**: `startMint` listens 10 s, then the run polls the state every
    30 s with `step.sleep`. A mint not seen after 10 minutes is started again
@@ -130,9 +132,13 @@ Retries ([ADR 0009](../../docs/adr/0009-retries-are-spaced-with-step-sleep.md)):
   starts a new attempt from the read, which reads the paper again only when nothing is
   stored ([ADR 0010](../../docs/adr/0010-pdf-to-target-ka-pipeline.md)); a mint not seen
   after 10 minutes starts a new attempt at once. Up to 5 attempts.
+- **check-field:** one more ask after 30 s, not 2 minutes: free-tier Gemini calls that
+  failed within seconds answered 30 s later (`docs/domain.md` → Gemini), and a paper is
+  published anyway when the second ask fails, so a longer wait would only hold it back.
 - The run has 45 minutes in all, which can end it before its 5 attempts.
 - It fails at once when its settings are missing or invalid, when the node or GROBID refuses
-  our credential, or when the node does not serve the graph. A run that fails is recovered
+  our credential or Gemini the field check's request, or when the node does not serve the
+  graph. A run that fails is recovered
   by publishing the same PDF again.
 
 ## Rating a paper
@@ -245,8 +251,8 @@ cached PDF as the publish run does (GROBID's header and the start of the text, s
 needs `GROBID_URL`), asks `checkField`, and prints the expected and the found field with
 Gemini's reason. Each paper costs one Flash-Lite request, which has its own daily limit.
 
-Each paper costs one Gemini request, and the free tier allows 20 a day per Google project
-(`docs/domain.md` → Gemini): a full run uses 14 of them. To try a change within a day, run
+A scoring run costs one `gemini-3.8-flash` request per paper, and the free tier allows 20 of
+those a day per Google project (`docs/domain.md` → Gemini): a full run uses 14 of them. To try a change within a day, run
 only the papers it should fix (`score-papers <id> <id>`), then the whole set once more before
 keeping it. Google's terms forbid getting around the limit, so more keys or projects are not
 an option; a paid tier is.

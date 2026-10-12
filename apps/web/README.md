@@ -164,7 +164,7 @@ the EIP-712 domain and type to check the signature with.
 
 ## Design
 
-A lab instrument with a web3 edge, in Tailwind CSS v4 (`app/globals.css`):
+The "Clinical" look: a clinical record with an on-chain proof, in Tailwind CSS v4 (`app/globals.css`):
 
 - Two themes: light by default, dark once the visitor picks it with the sun and moon button
   in the header; the choice is kept in this browser (`localStorage`). `THEME_SCRIPT`
@@ -236,7 +236,7 @@ unless `APP_ENV` is `local`:
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis's REST address and token, for the limits: one database per environment, previews using staging's ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)). The token is secret |
 | `REOWN_PROJECT_ID` | The Reown project id for the wallet window, from one project shared by every environment, read on the server and handed to the page, so nothing is inlined at build time. Without it the pages say the wallet is not set up |
 
-The pages also need the workflows' settings (DKG, Pinata, chain, Inngest;
+The pages also need the workflows' settings (DKG, Pinata, chain, Gemini, Inngest;
 [`packages/workflows`](../../packages/workflows/README.md#environment)). With
 `APP_ENV=local`, `/api/inngest` and the upload page talk to the Inngest dev server.
 `instrumentation.ts` checks the workflows' and the web app's settings when a deployed server
