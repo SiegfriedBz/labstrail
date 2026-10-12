@@ -21,6 +21,19 @@ export const ratingControllerAbi = [
   },
   {
     "type": "function",
+    "name": "DEPLOYED_AT",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "MAX_SCORE",
     "inputs": [],
     "outputs": [
