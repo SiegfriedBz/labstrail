@@ -16,7 +16,7 @@ decisions were taken, so a later ADR can sit in an earlier group.
 
 | ADR | Decision |
 | --- | --- |
-| [0037. VeriSci rates life-science and health papers](0037-verisci-rates-life-science-and-health-papers.md) | Biology, medicine and health research; the scorer decides a paper's field, and a request to rate a paper outside it is cancelled |
+| [0037. VeriSci publishes and rates life-science and health papers](0037-verisci-rates-life-science-and-health-papers.md) | Biology, medicine and health research; publishing refuses a paper outside the field, and the scorer cancels a request to rate one |
 
 ## Tools
 
@@ -55,7 +55,7 @@ A PDF becomes a Target KA.
 
 | ADR | Decision |
 | --- | --- |
-| [0010. PDFs become Target KAs in a stepped pipeline](0010-pdf-to-target-ka-pipeline.md) | Signed upload, signed CID, then parse, store and mint as steps, metadata read by code; named from the CID, first submitter kept |
+| [0010. PDFs become Target KAs in a stepped pipeline](0010-pdf-to-target-ka-pipeline.md) | Signed upload, signed CID, then parse, check the field, store and mint as steps, metadata read by code; named from the CID, first submitter kept |
 
 ## What a rating is
 

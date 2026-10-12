@@ -23,6 +23,7 @@ Phase 1 scores a paper by machine. The first scorer judged the Target KA's tripl
 - Changing the model touches no other code.
 - The on-chain score always equals the score in the R-KA.
 - The same answers always give the same score, and each point can be traced to a quote in the paper. The score measures how completely a paper reports its work, not whether its findings are right.
+- VeriSci presents the score as reproducibility readiness: whether a paper gives what others need to check and reproduce its work, not whether it reproduces (phase 3, [0012](0012-three-phases-settled-by-the-oracle.md)) or is right. It cannot detect a fabricated paper that states every right thing.
 - This ADR guarantees the score's shape, not its quality. The paper's text is untrusted input to the model; a quote the model makes up earns nothing.
 - On the free tier, Google may use prompts and answers to improve its products; the scorer sends only a published paper, which is public already. The free tier's daily limit bounds how many papers are scored a day, at one request per rating.
 - A paper is read through the pinning gateway, so the gateway must be up to rate one.
@@ -33,3 +34,4 @@ Phase 1 scores a paper by machine. The first scorer judged the Target KA's tripl
 - 2026-10-07: corrected where a better scorer is recorded, to match the rule that a choice on a topic an ADR covers goes into that ADR.
 - 2026-10-11: the scorer is Gemini `gemini-3.8-flash` on the free tier, since VeriSci pays for every rating and Claude's API has no free tier (rating run plan, user's choice).
 - 2026-10-11: the scorer reads the paper's full text, answers its kind of study's checklist with quotes, and code computes the score; the output becomes `{ score, rationale, studyType, checks }`, since the record alone showed little of what a reader checks (scorer v2 plan, user's choice).
+- 2026-10-12: the score is presented as reproducibility readiness, and what it cannot detect is stated (scope and branding plan, user's choice).
