@@ -32,7 +32,7 @@ function contrast(a: string, b: string): number {
 const light = tokens(":root");
 const themes = {
   light,
-  // The dark block sets only what changes; `accent-deep` is shared.
+  // The dark block sets only the tokens that change; the others come from the light block.
   dark: { ...light, ...tokens(':root[data-theme="dark"]') },
 };
 
@@ -48,14 +48,14 @@ describe("globals.css's palette", () => {
     const on = (text: string, ground: string) =>
       contrast(String(theme[text]), String(theme[ground]));
 
-    for (const text of ["ink", "muted", "accent", "danger"])
+    // accent-2 is text too: the on-chain labels and the minted UAL.
+    for (const text of ["ink", "muted", "accent", "accent-2", "danger"])
       expect(on(text, "page"), `${text} on page`).toBeGreaterThanOrEqual(4.5);
     expect(on("accent-ink", "accent"), "accent-ink on accent").toBeGreaterThanOrEqual(4.5);
     expect(
       contrast("#ffffff", String(theme["accent-deep"])),
       "white on accent-deep",
     ).toBeGreaterThanOrEqual(4.5);
-    expect(on("accent-2", "page"), "accent-2 on page").toBeGreaterThanOrEqual(3);
   });
 
   it("keeps muted text and the accent readable on the dark theme's panels", () => {

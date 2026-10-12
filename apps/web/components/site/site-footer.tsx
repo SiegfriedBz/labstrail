@@ -58,7 +58,7 @@ export function SiteFooter({ ratingController }: { ratingController: string | un
     <footer className="mt-16 border-t border-line bg-surface">
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1fr_1.9fr] md:gap-14">
         <div className="grid content-start gap-4">
-          <Link href="/" aria-label="VeriSci home" className="w-fit">
+          <Link href="/" aria-label={`${SITE.name} home`} className="w-fit">
             <Logo />
           </Link>
           <p className="max-w-[40ch] text-sm leading-relaxed text-muted">{SITE.description}</p>

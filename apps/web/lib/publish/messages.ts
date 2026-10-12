@@ -72,7 +72,7 @@ export function refusalMessage(reason: RefusalReason): string {
     case "no-title":
       return "We couldn't find a title on the first page of this PDF. If its pages are pictures (a scan, or a PDF saved from a browser's viewer), we can't read them: use the publisher's original PDF.";
     case "unreadable":
-      return "We couldn't read the text of this PDF, so it couldn't be rated. Use the publisher's original PDF.";
+      return "We couldn't read the text of this PDF, so it wasn't published: a paper we can't read can't be rated. Use the publisher's original PDF.";
     case "no-text":
       return "We found no text in this PDF. If its pages are pictures (a scan, or a PDF saved from a browser's viewer), we can't read them: use the publisher's original PDF.";
     case "outside-field":
