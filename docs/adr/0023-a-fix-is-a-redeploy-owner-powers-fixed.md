@@ -11,7 +11,7 @@ Requests can still be pending on a contract when it is replaced, and no request 
 
 ## Decision
 
-- No upgrade proxy. A fix is a redeploy. The app reads a list of contract addresses per environment: the current one, which takes new requests, and past ones. Request ids hash the contract address, so ids from two deployments never collide ([0016](0016-asset-names-derive-from-request-id.md)).
+- No upgrade proxy. A fix is a redeploy. The app reads a list of contract addresses per environment: the current one, which takes new requests, and past ones. Request ids hash the contract address and its deploy time, so ids from two deployments never collide ([0016](0016-asset-names-derive-from-request-id.md)).
 - After a redeploy, the owner pauses the old contract, and the backend keeps settling the requests still pending on it until none are left. A past contract takes no new requests; its history stays readable. While a contract is paused, fulfil and cancel keep working.
 - The owner sets the oracle and the pending cap, pauses and unpauses new requests, and transfers ownership.
 - A transfer takes two steps: the owner names the new owner, who then accepts. Ownership never moves to the oracle ([0030](0030-owner-and-oracle-are-different-addresses.md)).
@@ -36,3 +36,4 @@ Requests can still be pending on a contract when it is replaced, and no request 
 - 2026-10-07: retitled to name everything it now covers (was "The contract is not upgradeable").
 - 2026-10-10: corrected: "the agents" is now "the workflows" and "the agents plan" "the rating plan", since the agents package was renamed `workflows`.
 - 2026-10-12: corrected: local runs read their contract on Anvil from local-only settings, not from the deployments file, as 0036 decided on 2026-10-11.
+- 2026-10-13: corrected: request ids also hash the contract's deploy time, which keeps apart two deployments at one address, as 0016 says.
