@@ -61,7 +61,8 @@ planning; cite them rather than re-arguing them.
 1. `/plan-feature <name>` writes `docs/plans/NNN-<name>.md` (gitignored local notes).
 2. `/implement <NNN>` branches from `origin/develop`, writes the tests first and shows them
    failing, then implements until green, committing in small steps.
-3. `/review-branch` runs CI's checks, tests and builds, then the read-only reviewer; it
+3. `/review-branch` runs CI's checks, tests and builds, refreshes the architecture views in
+   `.omm/` that the branch changed, then the read-only reviewer; it
    blocks on any failure, stale docs or ADR conflict, then drafts the PR.
 4. `/review-adrs`, on demand: checks every ADR against every other and reports conflicts
    for the user to decide (ADR 0025).

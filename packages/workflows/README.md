@@ -8,6 +8,8 @@ upload page makes to start and follow it, and the papers list's read; the rating
 scores a requested paper and has the oracle record it, and the oracle function. Locally a
 dev script starts the rating run; on staging, the Alchemy webhook will (next plan).
 
+Architecture views: [`.omm/overall-architecture/workflows/`](../../.omm/overall-architecture/workflows/), [`.omm/pipeline/`](../../.omm/pipeline/) (`omm view --port 4000` shows them; root README → Architecture).
+
 ## Depends on
 
 `@verisci/core`, `@verisci/env`, `@verisci/dkg`, `@verisci/contracts`; Inngest, viem

@@ -15,6 +15,8 @@ rating's content: a paper's text prepared for the scorer, each study type's chec
 scorer's prompt and the check of its answer, the score, the R-KA's triples, and the queries
 that find a target's PDF and read a rating back.
 
+Architecture views: [`.omm/overall-architecture/core/`](../../.omm/overall-architecture/core/) (`omm view --port 4000` shows them; root README → Architecture).
+
 ## Depends on
 
 The `multiformats` library, to parse CIDs, `@xmldom/xmldom`, to read TEI, Zod, to check the

@@ -7,6 +7,8 @@ follows it until its Target KA is minted and verifies its record; the list of pu
 papers; and `/api/inngest`, which serves the workflows' Inngest functions
 ([ADR 0003](../../docs/adr/0003-inngest-functions-live-in-workflows.md)).
 
+Architecture views: [`.omm/overall-architecture/web-app/`](../../.omm/overall-architecture/web-app/), [`.omm/route-page-map/`](../../.omm/route-page-map/), [`.omm/state-transitions/paper-page/`](../../.omm/state-transitions/paper-page/) (`omm view --port 4000` shows them; root README → Architecture).
+
 ## Depends on
 
 All five packages: `@verisci/env`, `@verisci/core`, `@verisci/dkg`,
