@@ -1,6 +1,6 @@
 created: 2026-10-12T05:42:03.463Z
-updated: 2026-10-12T05:42:38.219Z
-update_count: 3
+updated: 2026-10-12T06:11:30.794Z
+update_count: 4
 last_field: diagram
 kind: nested-class
 title: core
@@ -13,9 +13,10 @@ children:
 parentPath: []
 prev_diagram: >
   graph LR
-      publish["Publish\nsrc/publish/"] -->|"names the Target KA, links the PDF by CID"| assets["Assets\nsrc/assets/"]
-      papers["Papers\nsrc/papers/"] -->|"reads Target KAs back with"| publish
-      papers -->|"parses UALs and graph rows with"| assets
-      rating["Rating\nsrc/rating/"] -->|"names R-KAs, classifies targets with"| assets
-      rating -->|"reads the paper's record with"| papers
-      fixtures["Fixtures\nsrc/fixtures/"] -.->|"test data for"| rating
+      publish["Publish\nsrc/publish/"] -->|"chain id of the signed domain"| assets["Assets\nsrc/assets/"]
+      papers["Papers\nsrc/papers/"] -->|"Target KA predicates"| publish
+      papers -->|"UALs, CIDs, asset names, graph rows"| assets
+      rating["Rating\nsrc/rating/"] -->|"R-KA names, target UALs, CIDs"| assets
+      rating -->|"the paper's record"| papers
+      rating -->|"triple helpers"| publish
+      fixtures["Fixtures\nsrc/fixtures/"] -.->|"test data"| rating

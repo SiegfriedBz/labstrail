@@ -26,5 +26,5 @@ CLAUDE.local.md
 # Plans are local working notes
 docs/plans/
 
-# Editor setup added by oh-my-mermaid's `omm setup` (Cursor plugin), not project code
+# Cursor's copy of oh-my-mermaid's skills, added by `omm setup`: editor setup, kept on the machine that ran it
 .cursor-plugin/
