@@ -276,9 +276,14 @@ Observed on `lfoppiano/grobid:0.9.1-crf`, 2026-10-09, except where a fact cites 
   ([ADR 0010](adr/0010-pdf-to-target-ka-pipeline.md)).
 - **The header can give an accent apart from its letter** (2026-10-12): a cohort study's TEI
   listed "Montserrat Rodrı ´guez-Ayala" and "Bele ´n Moreno-Franco", the accent as a spacing
-  `´` (U+00B4) after a space, and the `i` as a dotless `ı` (U+0131), the base LaTeX draws an
-  accent on. `parseTeiHeader` joins such accents back (`packages/core` → Target KAs); papers
-  published before that fix keep the split names in their KAs.
+  `´` (U+00B4) after its letter, often after a space, and the `i` as a dotless `ı` (U+0131), the
+  base LaTeX draws an accent on. On the 14 reference PDFs, every split accent came after its
+  letter, and all were in authors' names. Once one opened the surname: "José Ramón Banegas"
+  came as forename `Jose` and surname `´ramo ´n Banegas` (with GROBID's lowercase `r`).
+  `parseTeiHeader` joins them back in names only (`packages/core` → Target KAs), since papers
+  also write `´` as an apostrophe or a prime in titles and abstracts ("Alzheimer´s", "3´ UTR",
+  "cytidine 5´-diphosphate"). Papers published before that fix keep the split names in their
+  KAs.
 - **`POST /api/processFulltextDocument` drops statements printed beside a paper's first page**
   (2026-10-11): on a PLOS ONE trial (e0269224, 12 pages, 11 s), the TEI held the body's
   sections as flat `div`s, each with its `head`, and the funding and data availability

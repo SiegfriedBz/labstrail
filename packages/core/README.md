@@ -120,13 +120,15 @@ A Target KA describes a paper and who submitted it
 
 - **Metadata** comes from GROBID's TEI header, read by `parseTeiHeader`: the main title,
   each author's forenames and surname in document order, the abstract's paragraphs and the
-  DOI, each with its whitespace collapsed and in Unicode NFC. An accent GROBID gives apart
-  from its letter (`Rodrı ´guez`, `Bele ´n`: a spacing `´`, `¨`, `¸`, `ˇ` and the like, often
-  after a dotless `ı`) is joined back to it (`Rodríguez`, `Belén`), when the two make one
-  Latin letter; an accent that opens a surname goes to the forename's last letter, since
-  GROBID gives an accent after its letter. ASCII `^`, `~` and the backtick are never read as
-  accents. A header with no
-  title is refused, and so is XML with any parse error (`not-tei`), without printing anything.
+  DOI, each with its whitespace collapsed. In authors' names (in Unicode NFC), an accent
+  GROBID gives apart from its letter (`Rodrı ´guez`, `Bele ´n`: a spacing `´`, `¨`, `¸`, `ˇ`
+  and the like, often after a dotless `ı`) is joined back to the letter before it
+  (`Rodríguez`, `Belén`), or to a dotless `ı` after it (`Garc ´ıa`), when the two make one Latin
+  letter; one opening a surname before a lowercase letter goes to the forename's last letter
+  when it can take it. An accent before a capital (`O´Brien`) or with no letter to take it
+  stays. The title and the abstract stay as GROBID gives them: papers also write `´` as an
+  apostrophe or a prime (`Alzheimer´s`, `3´ UTR`). A header with no title is refused, and so
+  is XML with any parse error (`not-tei`), without printing anything.
 - **Triples:** the subject is `urn:verisci:paper:<cid>`, typed `schema:ScholarlyArticle`,
   with `schema:name`, `schema:url` (`ipfs://<cid>`), `schema:abstract`, `schema:sameAs`
   (`https://doi.org/<doi>`), and one `schema:author` node per author,

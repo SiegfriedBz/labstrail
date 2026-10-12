@@ -21,9 +21,8 @@ const DOI_PREFIX = /^(?:https?:\/\/(?:dx\.)?doi\.org\/|doi:)/i;
 const DOI = /^10\.\d{4,9}\/[^\s<>"{}|\\^`]+$/;
 
 /**
- * Spacing accents a PDF's text layer can give apart from their letter ("Rodrı ´guez"), and the
- * combining mark each stands for. ASCII `^`, `~` and the backtick are left out: in papers they
- * are maths, URLs and code.
+ * Spacing accents a PDF's text layer can give apart from their letter in a name
+ * ("Rodrı ´guez"), and the combining mark each stands for.
  */
 const SPACING_ACCENTS: Readonly<Record<string, string>> = {
   "\u00b4": "\u0301",
@@ -41,11 +40,14 @@ const SPACING_ACCENTS: Readonly<Record<string, string>> = {
   "\u02dd": "\u030b",
   "\u02db": "\u0328",
 };
-/** One or more spacing accents opening a text. */
-const LEADING_ACCENTS = new RegExp(`^[${Object.keys(SPACING_ACCENTS).join("")}]+`, "u");
+/** A spacing accent opening a name part, before a lowercase letter ("´ramo ´n"). */
+const OPENING_ACCENT = new RegExp(`^[${Object.keys(SPACING_ACCENTS).join("")}](?=\\p{Ll})`, "u");
 /** The dotless letters a LaTeX accent is drawn on, and the letter they stand for. */
 const DOTLESS: Readonly<Record<string, string>> = { "\u0131": "i", "\u0237": "j" };
+/** The marks a dotless letter after them takes ("Garc ´ıa"); a breve stays with the letter before ("Yag˘ız"). */
+const ON_DOTLESS = new Set(["\u0301", "\u0300", "\u0308", "\u0302"]);
 const LETTER = /^\p{L}$/u;
+const UPPERCASE = /^\p{Lu}$/u;
 /** One letter of Latin-1 Supplement to Latin Extended-B, the range of European names. */
 const ACCENTED_LETTER = /^[\u00c0-\u024f]$/u;
 
@@ -56,9 +58,11 @@ export function isDoi(value: string): boolean {
 
 /**
  * Reads a paper's title, authors, abstract and DOI from GROBID's TEI header
- * (`processHeaderDocument`). Whitespace inside each field collapses to single spaces, and an
- * accent GROBID gives apart from its letter ("Rodrı ´guez", "Bele ´n") is joined back to it
- * ("Rodríguez", "Belén"), each field then in Unicode NFC.
+ * (`processHeaderDocument`). Whitespace inside each field collapses to single spaces. In
+ * authors' names, in Unicode NFC, an accent GROBID gives apart from its letter ("Rodrı ´guez",
+ * "Bele ´n") is joined back to it ("Rodríguez", "Belén"); the title and the abstract stay as
+ * GROBID gives them, since papers also write `´` as an apostrophe or a prime ("Alzheimer´s",
+ * "3´ UTR").
  *
  * Returns `not-tei` for input that is not a TEI document with a header, and `no-title` for
  * a header with no title. Returns a result for every input.
@@ -127,62 +131,55 @@ function text(element: Element | undefined): string {
 }
 
 /**
- * A person's name from its parts, in order. GROBID gives an accent after its letter, so one
- * that opens a part ("Jose", "´Ramo ´n Banegas") belongs to the letter ending the part before.
+ * A person's name from its parts, in order, with its split accents joined back. GROBID gives
+ * an accent after its letter, so one opening a part before a lowercase letter ("Jose",
+ * "´ramo ´n Banegas") belongs to the letter ending the part before, when that letter takes it.
  */
 function nameOf(parts: readonly Element[]): string {
-  const texts = parts.map((part) => part.textContent?.trim() ?? "");
+  const texts = parts.map((part) => collapse(part.textContent ?? "").normalize("NFC"));
   for (let index = 1; index < texts.length; index++) {
-    const leading = LEADING_ACCENTS.exec(texts[index] as string)?.[0];
-    if (leading === undefined) continue;
-    texts[index - 1] += leading;
-    texts[index] = (texts[index] as string).slice(leading.length);
+    const opening = OPENING_ACCENT.exec(texts[index] as string)?.[0];
+    const previous = texts[index - 1] as string;
+    if (opening === undefined || accented([...previous].at(-1), opening) === undefined) continue;
+    texts[index - 1] = previous + opening;
+    texts[index] = (texts[index] as string).slice(opening.length);
   }
-  return collapse(texts.join(" "));
+  return joinAccents(collapse(texts.join(" ")));
 }
 
 function collapse(value: string): string {
-  return joinAccents(value.replace(/\s+/g, " ").trim()).normalize("NFC");
+  return value.replace(/\s+/g, " ").trim();
 }
 
 /**
- * Joins each spacing accent to its letter, at most one space away: a dotless `ı` or `ȷ` on
- * either side first (the base a LaTeX accent is drawn on), else the letter before, else the
- * letter after; the first that composes into one Latin letter takes it, and an accent none
- * composes with stays. A joined accent's space to a letter before it goes (the text layer puts
- * one there), and so does its space to the letter after it when that letter takes it.
+ * Joins each spacing accent in a name to its letter: an acute, grave, diaeresis or circumflex
+ * before a dotless `ı` goes to the `ı` ("Garc ´ıa"); any other goes to the letter before it, at
+ * most one space away, when the two make one Latin letter, and that space goes. An accent before
+ * a capital is an apostrophe ("O´Brien"), and one with no letter to take it stays as it is: an
+ * accent never moves to a letter after it otherwise.
  */
-function joinAccents(value: string): string {
-  const chars = [...value];
+function joinAccents(name: string): string {
+  const chars = [...name];
   const out: string[] = [];
   for (let index = 0; index < chars.length; index++) {
     const char = chars[index] as string;
     const mark = SPACING_ACCENTS[char];
-    if (mark === undefined) {
+    const next = chars[index + 1];
+    const spaceBefore = out.at(-1) === " ";
+    const before = letterAt(out, out.length - (spaceBefore ? 2 : 1));
+    if (mark === undefined || (next !== undefined && UPPERCASE.test(next))) {
       out.push(char);
       continue;
     }
-    const spaceBefore = out.at(-1) === " ";
-    const spaceAfter = chars[index + 1] === " ";
-    const before = letterAt(out, out.length - (spaceBefore ? 2 : 1));
-    const afterAt = index + (spaceAfter ? 2 : 1);
-    const after = letterAt(chars, afterAt);
-    const byBefore = accented(before, mark);
-    const byAfter = accented(after, mark);
-    const joinsAfter =
-      byAfter !== undefined && (byBefore === undefined || (isDotless(after) && !isDotless(before)));
-    const joined = joinsAfter ? byAfter : byBefore;
+    const onDotless = next !== undefined && next in DOTLESS && ON_DOTLESS.has(mark);
+    const joined = onDotless ? accented(next, mark) : accented(before, mark);
     if (joined === undefined) {
       out.push(char);
       continue;
     }
     if (spaceBefore && before !== undefined) out.pop();
-    if (joinsAfter) {
-      chars[afterAt] = joined;
-      if (spaceAfter) index++;
-    } else {
-      out[out.length - 1] = joined;
-    }
+    if (onDotless) chars[index + 1] = joined;
+    else out[out.length - 1] = joined;
   }
   return out.join("");
 }
@@ -193,13 +190,10 @@ function letterAt(chars: readonly string[], index: number): string | undefined {
   return char !== undefined && LETTER.test(char) ? char : undefined;
 }
 
-function isDotless(letter: string | undefined): boolean {
-  return letter !== undefined && Object.hasOwn(DOTLESS, letter);
-}
-
-/** `letter` with the combining `mark`, when there is a letter and the two compose into one Latin letter. */
+/** `letter` with the spacing accent's or combining `mark`, when the two compose into one Latin letter. */
 function accented(letter: string | undefined, mark: string): string | undefined {
   if (letter === undefined) return undefined;
-  const composed = `${DOTLESS[letter] ?? letter}${mark}`.normalize("NFC");
+  const combining = SPACING_ACCENTS[mark] ?? mark;
+  const composed = `${DOTLESS[letter] ?? letter}${combining}`.normalize("NFC");
   return ACCENTED_LETTER.test(composed) ? composed : undefined;
 }

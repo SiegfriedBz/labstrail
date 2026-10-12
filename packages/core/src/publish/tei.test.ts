@@ -81,7 +81,13 @@ describe("parseTeiHeader", () => {
     });
   });
 
-  describe("accents GROBID splits from their letters", () => {
+  describe("accents GROBID splits from the letters of authors' names", () => {
+    const named = (forename: string, surname: string) =>
+      parseTeiHeader(
+        tei({
+          analytic: `<author><persName><forename>${forename}</forename><surname>${surname}</surname></persName></author>`,
+        }),
+      );
     const authors = (...names: string[]) =>
       parseTeiHeader(
         tei({
@@ -90,7 +96,6 @@ describe("parseTeiHeader", () => {
             .join(""),
         }),
       );
-    const titled = (title: string) => parseTeiHeader(tei({}).replace("A Title", title));
 
     it("joins a spacing acute after a dotless i, and drops the space before it", () => {
       expect(authors("Montserrat Rodrı ´guez-Ayala")).toMatchObject({
@@ -99,8 +104,8 @@ describe("parseTeiHeader", () => {
     });
 
     it("joins an accent to the letter before it, inside a word", () => {
-      expect(authors("Bele ´n Moreno-Franco")).toMatchObject({
-        metadata: { authors: ["Belén Moreno-Franco"] },
+      expect(authors("Bele ´n Moreno-Franco", "Je ´re ´mie")).toMatchObject({
+        metadata: { authors: ["Belén Moreno-Franco", "Jérémie"] },
       });
     });
 
@@ -110,7 +115,7 @@ describe("parseTeiHeader", () => {
       });
     });
 
-    it("gives the accent to a dotless i after it, on either side", () => {
+    it("gives an acute before a dotless i to the i", () => {
       expect(authors("Garc ´ıa")).toMatchObject({
         metadata: { authors: ["García"] },
       });
@@ -120,21 +125,9 @@ describe("parseTeiHeader", () => {
       ["a diaeresis", "Mu¨ller", "Müller"],
       ["a cedilla", "Franc¸ois", "François"],
       ["a caron", "Dvorˇák", "Dvořák"],
+      ["a breve before a Turkish dotless i", "Yag˘ız", "Yağız"],
     ])("joins %s", (_, split, whole) => {
       expect(authors(split)).toMatchObject({ metadata: { authors: [whole] } });
-    });
-
-    it("repairs the title and the abstract like the authors", () => {
-      const result = parseTeiHeader(
-        tei({ profile: "<abstract><p>A na¨ıve model.</p></abstract>" }).replace(
-          "A Title",
-          "Sjo ¨gren's syndrome",
-        ),
-      );
-
-      expect(result).toMatchObject({
-        metadata: { title: "Sjögren's syndrome", abstract: "A naïve model." },
-      });
     });
 
     it("composes a letter and a combining accent into one letter", () => {
@@ -144,38 +137,40 @@ describe("parseTeiHeader", () => {
       expect(result.ok && result.metadata.authors[0]).toHaveLength(4);
     });
 
-    it("gives an accent that opens a surname to the end of the forename", () => {
-      const result = parseTeiHeader(
-        tei({
-          analytic:
-            "<author><persName><forename>Jose</forename><surname>\u00b4Ramo \u00b4n Banegas</surname></persName></author>",
-        }),
-      );
+    it("gives an accent that opens a lowercase surname to the end of the forename", () => {
+      expect(named("Jose", "´ramo ´n Banegas")).toMatchObject({
+        metadata: { authors: ["José ramón Banegas"] },
+      });
+    });
 
-      expect(result).toMatchObject({ metadata: { authors: ["Jos\u00e9 Ram\u00f3n Banegas"] } });
+    it("keeps an accent that opens a capitalised surname where it is", () => {
+      expect(named("Juan", "´Alvarez")).toMatchObject({
+        metadata: { authors: ["Juan ´Alvarez"] },
+      });
     });
 
     it("keeps the space after an accent its letter before takes", () => {
-      expect(authors("Rene \u00b4 Descartes")).toMatchObject({
-        metadata: { authors: ["Ren\u00e9 Descartes"] },
+      expect(authors("Rene ´ Descartes")).toMatchObject({
+        metadata: { authors: ["René Descartes"] },
       });
     });
 
     it.each([
-      ["between two numbers", "Scores 1 \u00b4 2"],
-      ["alone", "\u00b4"],
-    ])("keeps an accent with no letter beside it, %s", (_, title) => {
-      expect(titled(title)).toMatchObject({ metadata: { title } });
+      ["an apostrophe before a capital", "O´Brien"],
+      ["a letter before that takes no such accent", "Nguyê ˜n"],
+      ["no letter before it", "Li 3´"],
+    ])("keeps an accent with %s", (_, name) => {
+      expect(authors(name)).toMatchObject({ metadata: { authors: [name] } });
     });
 
-    it("keeps an accent no Latin letter composes with", () => {
-      expect(titled("Let f´(x) be")).toMatchObject({ metadata: { title: "Let f´(x) be" } });
-    });
+    it("leaves the title and the abstract as GROBID gives them", () => {
+      const title = "Alzheimer´s disease and the 3´ UTR";
+      const abstract = "The ´normal´ group, in ˜30% of cases.";
+      const result = parseTeiHeader(
+        tei({ profile: `<abstract><p>${abstract}</p></abstract>` }).replace("A Title", title),
+      );
 
-    it("never reads ASCII ^ or ~ as an accent", () => {
-      expect(titled("x^2 for n ~10 a^b")).toMatchObject({
-        metadata: { title: "x^2 for n ~10 a^b" },
-      });
+      expect(result).toMatchObject({ metadata: { title, abstract } });
     });
 
     it("gives the same metadata for the same header", () => {
