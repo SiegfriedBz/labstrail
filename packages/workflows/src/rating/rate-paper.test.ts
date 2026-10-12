@@ -578,17 +578,33 @@ describe("runRating: retries", () => {
     expect(oracleCalls).toEqual([]);
   });
 
-  it("reads the PDF again when it does not read as one, then cancels invalid-target on the last attempt", async () => {
+  it("cancels invalid-target a PDF that reads badly three times, scoring nothing", async () => {
     const { run, deps, dkg, oracleCalls, log } = rate({
       papers: [{ ok: false, reason: "unreadable" }],
     });
 
     expect(await run).toEqual({ state: "cancelled", reason: "invalid-target" });
-    expect(deps.readPaper).toHaveBeenCalledTimes(RATING_SETTINGS.attempts);
-    expect(log).toContain(`sleep retry-${RATING_SETTINGS.attempts - 1} 2m`);
+    expect(deps.readPaper).toHaveBeenCalledTimes(RATING_SETTINGS.unreadableReads);
+    expect(log).toContain(`sleep retry-${RATING_SETTINGS.unreadableReads - 1} 2m`);
     expect(deps.score).not.toHaveBeenCalled();
     expect(dkg.storeAsset).not.toHaveBeenCalled();
     expect(oracleCalls).toEqual([cancel("invalid-target")]);
+  });
+
+  it("fails paper-unreadable, with no cancel, when the attempts run out before three bad reads", async () => {
+    const { run, deps, oracleCalls } = rate({
+      papers: [
+        { ok: false, reason: "unreachable" },
+        { ok: false, reason: "unreachable" },
+        { ok: false, reason: "unreachable" },
+        { ok: false, reason: "unreachable" },
+        { ok: false, reason: "unreadable" },
+      ],
+    });
+
+    await expect(run).rejects.toThrow(/^rating-failed:paper-unreadable: /);
+    expect(deps.readPaper).toHaveBeenCalledTimes(RATING_SETTINGS.attempts);
+    expect(oracleCalls).toEqual([]);
   });
 
   it("scores a PDF that reads on a later attempt after not reading as one", async () => {
