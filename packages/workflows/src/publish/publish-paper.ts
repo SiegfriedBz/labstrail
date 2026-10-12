@@ -160,7 +160,8 @@ type Attempt =
  * A failure worth a retry waits `retryWait` with `step.sleep` and starts again from the
  * read, for `attempts` attempts (ADR 0009); a mint not seen after `pollsPerMint` polls is
  * started again (ADR 0008). Throws `NonRetriableError` when the node or GROBID refuses our
- * credential, the node does not serve the graph, or the attempts run out.
+ * credential, Gemini refuses the field check's request, the node does not serve the graph, or
+ * the attempts run out.
  *
  * The deadline is checked against `receivedAt`, so retries during an outage never expire a
  * signature that was valid when it arrived. `receivedAt` is the event's `ts`, which its
