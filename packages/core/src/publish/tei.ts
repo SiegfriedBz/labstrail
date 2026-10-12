@@ -40,8 +40,14 @@ const SPACING_ACCENTS: Readonly<Record<string, string>> = {
   "\u02dd": "\u030b",
   "\u02db": "\u0328",
 };
-/** A spacing accent opening a name part, before a lowercase letter ("´ramo ´n"). */
-const OPENING_ACCENT = new RegExp(`^[${Object.keys(SPACING_ACCENTS).join("")}](?=\\p{Ll})`, "u");
+/**
+ * A spacing accent opening a name part, before a lowercase letter other than a dotless `ı`
+ * ("´ramo ´n"; "´ıa" is left to the `ı`, as a word can only start there when it was split).
+ */
+const OPENING_ACCENT = new RegExp(
+  `^[${Object.keys(SPACING_ACCENTS).join("")}](?!\\u0131)(?=\\p{Ll})`,
+  "u",
+);
 /** The dotless i a LaTeX accent is drawn on, and the letter it stands for. */
 const DOTLESS: Readonly<Record<string, string>> = { "\u0131": "i" };
 /** The marks a dotless `ı` after them takes ("Garc ´ıa"); a breve stays with the letter before ("Yag ˘ız"). */
@@ -133,16 +139,17 @@ function text(element: Element | undefined): string {
 /**
  * A person's name from its parts, in order, with its split accents joined back. GROBID gives
  * an accent after its letter, so one opening a part before a lowercase letter ("Jose",
- * "´ramo ´n Banegas") goes to the last letter of the part before, when that part is more than
- * an initial and its letter takes the accent; after an initial, the accent joins inside the
- * name ("A", "´lvarez" → "Álvarez").
+ * "´ramo ´n Banegas") goes to the last letter of the part before, when that part does not end
+ * in an initial and its letter takes the accent; after an initial, the accent joins inside the
+ * name ("Carlos A", "´lvarez" → "Carlos Álvarez").
  */
 function nameOf(parts: readonly Element[]): string {
   const texts = parts.map((part) => collapse(part.textContent ?? "").normalize("NFC"));
   for (let index = 1; index < texts.length; index++) {
     const opening = OPENING_ACCENT.exec(texts[index] as string)?.[0];
     const previous = [...(texts[index - 1] as string)];
-    if (opening === undefined || previous.length < 2) continue;
+    const lastWord = previous.slice(previous.lastIndexOf(" ") + 1);
+    if (opening === undefined || lastWord.length < 2) continue;
     const joined = accented(previous.at(-1), SPACING_ACCENTS[opening] as string);
     if (joined === undefined) continue;
     texts[index - 1] = [...previous.slice(0, -1), joined].join("");
@@ -158,8 +165,8 @@ function collapse(value: string): string {
 /**
  * Joins each spacing accent in a name to its letter, in the shapes GROBID gives: an acute,
  * grave, diaeresis or circumflex before a dotless `ı` goes to the `ı` ("Garc ´ıa"); any other
- * goes to the letter before it when a space or a dotless `ı` stands between them ("Bele ´n",
- * "Rodrı´guez"), and the space goes. It joins only when the two make one letter of Latin-1
+ * goes to the letter before it when a space separates them ("Bele ´n", and the space goes) or
+ * when that letter is a dotless `ı` ("Rodrı´guez"). It joins only when the two make one letter of Latin-1
  * Supplement to Latin Extended-B. Anything else stays as it is: an accent before a capital or
  * right after another letter is an apostrophe ("O´Brien", "N´diaye"), and an accent never
  * moves to a letter after it otherwise.

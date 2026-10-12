@@ -127,7 +127,8 @@ A Target KA describes a paper and who submitted it
   (`Garc ´ıa` → `García`). It joins only when the two make one letter of Latin-1 Supplement to
   Latin Extended-B (`é`, `ü`, `ç`, `ř`, `ő`), so a Vietnamese `ễ` stays split. An accent that
   opens a surname before a lowercase letter goes to the forename's last letter, unless the
-  forename is an initial or its letter cannot take it. An accent right after a letter or before
+  forename ends in an initial or its letter cannot take it; one before a dotless `ı` is left to
+  the `ı`. An accent right after a letter or before
   a capital is an apostrophe and stays (`N´diaye`, `O´Brien`). The title and the abstract stay
   as GROBID gives them: papers also write `´` as an apostrophe or a prime (`Alzheimer´s`,
   `3´ UTR`). A header with no title is refused, and so is XML with any parse error

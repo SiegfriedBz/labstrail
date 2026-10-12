@@ -149,6 +149,24 @@ describe("parseTeiHeader", () => {
       ).toMatchObject({ metadata: { authors: ["Maria \u00c1lvarez"] } });
     });
 
+    it("joins an accent after an initial ending a longer forename inside the surname", () => {
+      expect(named(["forename", "Carlos A"], ["surname", "\u00b4lvarez"])).toMatchObject({
+        metadata: { authors: ["Carlos \u00c1lvarez"] },
+      });
+    });
+
+    it("gives an accent that opens a surname before a dotless i to the i, in one word", () => {
+      expect(named(["forename", "Garc"], ["surname", "\u00b4\u0131a-Esquinas"])).toMatchObject({
+        metadata: { authors: ["Garc\u00eda-Esquinas"] },
+      });
+    });
+
+    it("keeps an accent that opens a surname when the forename's letter cannot take it", () => {
+      expect(named(["forename", "Ahmad"], ["surname", "\u00b4ali"])).toMatchObject({
+        metadata: { authors: ["Ahmad \u00b4ali"] },
+      });
+    });
+
     it("keeps an accent that opens a capitalised surname where it is", () => {
       expect(named(["forename", "Juan"], ["surname", "\u00b4Alvarez"])).toMatchObject({
         metadata: { authors: ["Juan \u00b4Alvarez"] },
@@ -166,6 +184,7 @@ describe("parseTeiHeader", () => {
       ["an apostrophe before a lowercase letter", "N\u00b4diaye Sa\u00b4id Dell\u00b4acqua"],
       ["a letter before that takes no such accent", "Nguy\u00ea \u02dcn"],
       ["no letter before it", "Li 3\u00b4"],
+      ["a space and no letter before it", "J. \u00b4a"],
       ["ASCII ^, ~ or a backtick", "A^b C~d E`f"],
     ])("keeps %s", (_, name) => {
       expect(authors(name)).toMatchObject({ metadata: { authors: [name] } });
