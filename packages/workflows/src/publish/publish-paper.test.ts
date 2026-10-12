@@ -409,6 +409,30 @@ describe("runPublish", () => {
     expect(deps.checkField).toHaveBeenCalledTimes(2);
   });
 
+  it("fails as setup at once when Gemini refuses the request, with nothing stored", async () => {
+    const { run, log, dkg } = await publish({
+      fields: [{ ok: false, reason: "refused", status: 400 }],
+    });
+
+    await expect(run).rejects.toThrow(NonRetriableError);
+    await expect(run).rejects.toThrow(/^publish-failed:setup: .*Gemini refused .*400/);
+    expect(log).toEqual(["verify", "read-1", "parse-paper-1", "check-field-1"]);
+    expect(dkg.storeAsset).not.toHaveBeenCalled();
+  });
+
+  it("fails as setup when Gemini refuses the second ask", async () => {
+    const { run, log, dkg } = await publish({
+      fields: [
+        { ok: false, reason: "unreachable" },
+        { ok: false, reason: "refused", status: 403 },
+      ],
+    });
+
+    await expect(run).rejects.toThrow(/^publish-failed:setup: .*Gemini refused .*403/);
+    expect(log).toContain("check-field-1-again");
+    expect(dkg.storeAsset).not.toHaveBeenCalled();
+  });
+
   it("publishes the paper and logs field-unchecked when the check fails twice", async () => {
     const { run, log, deps, logger } = await publish({
       fields: [

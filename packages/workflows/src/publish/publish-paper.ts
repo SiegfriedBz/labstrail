@@ -34,7 +34,12 @@ export const PUBLISH_SETTINGS = {
   fieldModel: "gemini-3.5-flash-lite",
   /** How long Gemini gets to check a paper's field, inside a step's 300 s on Vercel. */
   fieldTimeoutMs: 60_000,
-  /** The wait before the field check is asked once more. */
+  /**
+   * The wait before the field check is asked once more: shorter than `retryWait` (ADR 0009),
+   * since free-tier Gemini calls that failed within seconds answered when asked again 30 s later
+   * (`docs/domain.md` → Gemini), and a paper is published anyway when the second ask fails, so a
+   * longer wait would only hold it back.
+   */
   fieldRetryWait: "30s",
   /** The longest opening of a paper's text the field check reads, as the rating prepares it. */
   openingChars: 6_000,
@@ -147,8 +152,10 @@ type Attempt =
  * A new paper's field is checked once per run, after its first read (ADR 0037): a paper
  * outside the field ends the run `refused: outside-field` before anything is stored. A check
  * that fails waits `fieldRetryWait` and is asked once more; when that fails too, the paper is
- * published, its rating checking the field again, and the run logs `field-unchecked`. A draft
- * or a minted asset is never checked: its content is sealed.
+ * published, its rating checking the field again, and the run logs `field-unchecked`. Gemini
+ * refusing the request (a bad key, a model it no longer serves) is ours to fix, not a missing
+ * answer: it fails the run (`setup`) with nothing stored. A draft or a minted asset is never
+ * checked: its content is sealed.
  *
  * A failure worth a retry waits `retryWait` with `step.sleep` and starts again from the
  * read, for `attempts` attempts (ADR 0009); a mint not seen after `pollsPerMint` polls is
@@ -254,9 +261,10 @@ async function publishOnce(context: AttemptContext): Promise<Attempt> {
       if (!context.field.checked) {
         const { title, abstract } = paper.metadata;
         const input = { title, ...(abstract ? { abstract } : {}), opening: paper.opening };
-        const outside = await checkFieldOnce(context, input);
+        const verdict = await checkFieldOnce(context, input);
+        if (typeof verdict === "object") return verdict;
         context.field.checked = true;
-        if (outside)
+        if (verdict === "outside")
           return { kind: "done", outcome: { state: "refused", reason: "outside-field" } };
       }
       quads = targetKaQuads(paper.metadata, {
@@ -285,25 +293,35 @@ async function publishOnce(context: AttemptContext): Promise<Attempt> {
 }
 
 /**
- * Asks the field check, and once more after `fieldRetryWait` if it fails; true when the paper
- * is outside the field. Logs Gemini's reason for a paper outside, and `field-unchecked` when
- * both calls fail.
+ * Asks the field check, and once more after `fieldRetryWait` if it fails: `outside` for a paper
+ * outside the field, `publish` for one in it or when both asks fail, and a `fatal` attempt when
+ * Gemini refuses the request. Logs Gemini's reason for a paper outside, and `field-unchecked`
+ * when both asks fail.
  */
-async function checkFieldOnce(context: AttemptContext, paper: FieldCheckInput): Promise<boolean> {
+async function checkFieldOnce(
+  context: AttemptContext,
+  paper: FieldCheckInput,
+): Promise<"outside" | "publish" | Attempt> {
   const { attempt, submission, step, deps, logger } = context;
   let checked = await step.run(`check-field-${attempt}`, () => deps.checkField(paper));
-  if (!checked.ok) {
+  if (!checked.ok && checked.reason !== "refused") {
     await step.sleep(`check-field-wait-${attempt}`, PUBLISH_SETTINGS.fieldRetryWait);
     checked = await step.run(`check-field-${attempt}-again`, () => deps.checkField(paper));
   }
   if (!checked.ok) {
     const status = checked.status === undefined ? "" : ` (HTTP ${checked.status})`;
+    if (checked.reason === "refused") {
+      return {
+        kind: "fatal",
+        reason: `Gemini refused the field check${status}: check GEMINI_API_KEY and the model`,
+      };
+    }
     logger.warn(`field-unchecked: ${submission.cid}: ${checked.reason}${status}`);
-    return false;
+    return "publish";
   }
-  if (checked.field === "life-sciences") return false;
+  if (checked.field === "life-sciences") return "publish";
   logger.info(`outside-field: ${submission.cid}: ${checked.reason}`);
-  return true;
+  return "outside";
 }
 
 function minted(ual: string): Attempt {
