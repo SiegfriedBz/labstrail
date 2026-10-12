@@ -5,9 +5,10 @@ import { type PaperText, quoteFound, quoteTextOf } from "./paper-text.ts";
 /**
  * The version of the scorer, recorded in every R-KA with the model (ADR 0018): its prompt,
  * checklists, scoring, quote matching and text preparation, all covered by the version's
- * fingerprint test. Version 1 judged a paper's DKG record against eight signals.
+ * fingerprint test. Version 1 judged a paper's DKG record against eight signals; version 2
+ * read the full text against a checklist; version 3 lets a quote's ellipsis mark left-out text.
  */
-export const SCORER_PROMPT_VERSION = "2";
+export const SCORER_PROMPT_VERSION = "3";
 
 /** Whether a paper is in VeriSci's field (ADR 0037). */
 export const FIELDS = ["life-sciences", "outside"] as const;

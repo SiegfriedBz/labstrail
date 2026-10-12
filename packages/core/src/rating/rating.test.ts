@@ -150,7 +150,7 @@ describe("rKaQuads", () => {
       '"false"^^<http://www.w3.org/2001/XMLSchema#boolean>',
     );
     has(PHASE_IRI, "urn:verisci:model", '"gemini-3.8-flash"');
-    has(PHASE_IRI, "urn:verisci:promptVersion", '"2"');
+    has(PHASE_IRI, "urn:verisci:promptVersion", '"3"');
   });
 
   it("links one node per check, with its id, its answer and its quote when it has one", () => {

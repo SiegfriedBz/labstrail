@@ -47,8 +47,8 @@ function otherAnswer(
 }
 
 describe("SCORER_PROMPT_VERSION", () => {
-  it("is 2, the full-text checklist scorer", () => {
-    expect(SCORER_PROMPT_VERSION).toBe("2");
+  it("is 3, the full-text checklist scorer whose quotes may mark left-out text", () => {
+    expect(SCORER_PROMPT_VERSION).toBe("3");
   });
 });
 
@@ -468,6 +468,7 @@ const QUOTES = [
   "Patients were randomly assigned … with a computer-generated sequence.",
   "generated sequence. Data are available from the corresponding author on reasonable request.",
   "Line 3 of the results. Line 2 of the results.",
+  "Patients were randomly assigned [12] to citicoline … The outcome assessors were not blinded to allocation.",
 ];
 
 /**
@@ -477,7 +478,7 @@ const QUOTES = [
  * When this test fails, raise SCORER_PROMPT_VERSION and add the new version's fingerprint (an
  * unreleased version's may be updated).
  */
-const RELEASED: Readonly<Record<string, string>> = { "2": "72754c07" };
+const RELEASED: Readonly<Record<string, string>> = { "2": "72754c07", "3": "c75f09e6" };
 
 describe("SCORER_PROMPT_VERSION", () => {
   it("changes whenever the prompt, a checklist, the scoring, quote matching or the text changes", () => {
@@ -511,7 +512,7 @@ describe("SCORER_PROMPT_VERSION", () => {
     ];
     const prepared = texts.map((text) => (text.ok ? text.paper.text : text.reason));
 
-    expect(found).toEqual([1, 0, 1, 1, 0, 1, 0, 0, 0]);
+    expect(found).toEqual([1, 0, 1, 1, 0, 1, 0, 0, 0, 1]);
     expect(
       fingerprint([system, user, scores.join(","), found.join(""), ...prepared].join("\n")),
     ).toBe(RELEASED[SCORER_PROMPT_VERSION]);
