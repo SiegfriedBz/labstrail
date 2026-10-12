@@ -26,8 +26,9 @@ pending on it
 
 - **Request.** Anyone calls `requestPhase1(targetUal)` with a non-empty UAL and
   receives a `requestId`: the `keccak256` of the chain id, the contract
-  address, a nonce, the requester and the UAL's hash. Every request on every
-  deployment therefore has its own id
+  address, its deploy time (`DEPLOYED_AT`), a nonce, the requester and the
+  UAL's hash. Every request on every deployment therefore has its own id, even
+  on a contract redeployed at the same address on a restarted Anvil
   ([ADR 0016](../../docs/adr/0016-asset-names-derive-from-request-id.md)).
   Each requester may hold at most `maxPendingPerRequester` pending requests
   ([ADR 0015](../../docs/adr/0015-rating-requests-are-free-on-testnet.md)).
@@ -51,7 +52,8 @@ pending on it
   cancels
   ([ADR 0020](../../docs/adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
 - **Read.** `getRatingRequest(requestId)` returns the full `RatingRequest`
-  record, with status `None` for an unknown id. `pendingCount()` and
+  record, with status `None` for an unknown id. `DEPLOYED_AT()` returns the
+  deployment's block timestamp, hashed into every request id. `pendingCount()` and
   `pendingRequestIds(offset, limit)` list pending requests in chunks; their
   order changes as requests settle. `requestCountOf(targetUal)` and
   `requestIdsOf(targetUal, offset, limit)` list a target's requests, oldest
@@ -83,7 +85,7 @@ Failures revert with custom errors. Every state change emits an event:
 ```text
                  requestPhase1 (anyone)
                          │  checks: not paused, UAL not empty, under the cap
-                         │  id = hash(chain, contract, nonce, requester, UAL)
+                         │  id = hash(chain, contract, deploy time, nonce, requester, UAL)
                          ▼
    ┌──────────────── Pending ────────────────┐
    │   in _pendingRequestIds  (reconciler)   │
@@ -207,6 +209,8 @@ forge script script/DeployRatingController.s.sol --rpc-url http://127.0.0.1:8546
 ([`packages/workflows` → Running a rating locally](../workflows/README.md#running-a-rating-locally)).
 Anvil listens on 8546 because the DKG node's RPC proxy holds 8545, Anvil's default, and
 answers as Base Sepolia. Anvil forgets everything when it stops: deploy again after a restart.
+The new contract lands at the same address with a later deploy time, so its request ids never
+repeat those of the one before.
 
 ### How the scripts fit together
 
@@ -225,13 +229,27 @@ answers as Base Sepolia. Anvil forgets everything when it stops: deploy again af
 
 ### Redeploying
 
-After a redeploy, pause the previous contract. It stops accepting requests
-while the oracle settles those still pending
+A redeploy replaces an environment's contract; the previous one is paused once
+the new one is live, and settles the requests still pending on it
 ([ADR 0023](../../docs/adr/0023-a-fix-is-a-redeploy-owner-powers-fixed.md)).
 
-```bash
-cast send <previous address> "pause()" --rpc-url base_sepolia --account verisci-deployer
-```
+1. Deploy and record the new contract (Deploying an environment above).
+2. Merge the pull request, and let it reach the environment's deployment
+   (`develop` for staging, `main` for production). Until then, the deployed
+   app sends requests to the previous contract, its `current` one.
+3. Pause the previous contract, then read how many requests it still holds:
+
+   ```bash
+   cast send <previous address> "pause()" --rpc-url base_sepolia --account verisci-deployer
+   cast call <previous address> "pendingCount()(uint256)" --rpc-url base_sepolia
+   ```
+
+Paused before step 2, every request the app sends in between reverts with
+`EnforcedPause`. Left open until then, a request on the previous contract
+still settles: the rating runs read every contract of the environment,
+current and past. A previous contract that does harm, such as recording wrong
+scores or taking a wave of spam, is paused at once instead, and the gap
+accepted.
 
 ## TypeScript API
 

@@ -385,7 +385,10 @@ R-KAs still go to the staging graph.
    shows the request, its score and its R-KA once fulfilled.
 
 Restarting Anvil empties it: deploy again (the first deploy on a fresh chain gets the same
-address). Every request comes from a new requester, so request ids never repeat.
+address). Request ids still never repeat, since each one hashes the contract's deploy time
+([`packages/contracts` → RatingController](../contracts/README.md#ratingcontroller)). Every
+request comes from a new requester, so a stopped run never holds a slot of the per-requester
+cap.
 
 The script stands in for the Alchemy webhook, which comes with the next plan: it reads the
 `Phase1Requested` log from its own transaction's receipt and builds the event with

@@ -104,7 +104,8 @@ publishes the ratings of every contract of an environment to that environment's
 graph, so a redeployed contract keeps the graph of the one it replaces; the old
 contract is paused and drained ([ADR 0023](docs/adr/0023-a-fix-is-a-redeploy-owner-powers-fixed.md)).
 Each contract's R-KA names are its own, because the request id hashes the chain
-id and contract address ([ADR 0016](docs/adr/0016-asset-names-derive-from-request-id.md)).
+id, the contract's address and its deploy time
+([ADR 0016](docs/adr/0016-asset-names-derive-from-request-id.md)).
 
 The DKG node runs with GROBID and an RPC proxy, on its own server once a deployed
 environment calls it; until then on a developer's computer, started by hand
