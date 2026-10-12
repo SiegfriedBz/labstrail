@@ -12,7 +12,7 @@ Papers enter verisci as PDFs and must become Target KAs. Parsing and the DKG wri
 - The browser uploads the PDF straight to IPFS pinning with a short-lived signed URL from the server, so the file never passes through a Vercel function. The server checks the pinned file before starting the pipeline. A file that fails the check is unpinned only if it is not a PDF and no asset points at it: every environment shares one pinning account, and their size limits may differ ([0005](0005-staging-and-production-are-isolated.md)).
 - The submitter signs an EIP-712 statement of the PDF's CID with their wallet. The server verifies it before publishing, and the Target KA records the submitter's address and signature, so anyone can check who submitted it without trusting verisci. No contract call: a published paper can be rated without being registered on chain, and only papers verisci published are rated ([0011](0011-a-rating-is-a-separate-r-ka.md)).
 - Events and step outputs carry the PDF's CID, never its bytes.
-- The pipeline runs each stage as its own step: parse with GROBID, check the field, store, then mint ([0007](0007-all-writes-converge.md), [0008](0008-mints-are-async-polled-in-short-steps.md)). The metadata is read from GROBID's structured output by code, so the same PDF always gives the same KA. Before a new paper is stored, a small model checks it is in VeriSci's field ([0037](0037-verisci-rates-life-science-and-health-papers.md)): publishing's one model call, which decides only whether the paper is published.
+- The pipeline runs each stage as its own step: parse with GROBID, check the field, store, then mint ([0007](0007-all-writes-converge.md), [0008](0008-mints-are-async-polled-in-short-steps.md)). The metadata is read from GROBID's structured output by code, so the same PDF always gives the same KA. Before a new paper is stored, a small model checks it is in VeriSci's field ([0037](0037-verisci-rates-life-science-and-health-papers.md)): publishing's only use of a model, which decides only whether the paper is refused for its field.
 - The Target KA's name derives from the PDF's CID, so publishing the same PDF again converges on the same asset, and the publish function is a singleton on that name. A KA already stored or minted keeps its first submitter: a later submission of the same PDF records nothing.
 - The KA links the PDF by its content address (`ipfs://…`); a DOI is metadata only.
 
@@ -21,7 +21,7 @@ Papers enter verisci as PDFs and must become Target KAs. Parsing and the DKG wri
 - A retry starts again from what the node holds and redoes only what is not there yet ([0007](0007-all-writes-converge.md)): the paper is read and parsed again only when nothing was stored.
 - Nothing on chain tracks a publish, so a publish that fails after its retries is recovered by submitting the same PDF again.
 - Publishing needs a connected wallet and one signature, but no gas.
-- Publishing makes one free-tier Gemini request per new paper; what its answer decides is [0037](0037-verisci-rates-life-science-and-health-papers.md)'s.
+- Publishing makes one free-tier Gemini request per new paper, and a second when the first gets no answer; what the answer decides is [0037](0037-verisci-rates-life-science-and-health-papers.md)'s.
 - A signature proves an address, not a person. Every publish costs money (pinning, parsing, node funds), so issuing upload URLs is still rate-limited.
 - Pinata and GROBID (current choices, not part of the decision) must both be up to publish. A paper GROBID reads badly gets a poor KA; an LLM cleanup step can be added then. Pinata holds the only copy of each PDF until a second pin is added.
 
@@ -36,3 +36,4 @@ Papers enter verisci as PDFs and must become Target KAs. Parsing and the DKG wri
 - 2026-10-11: rating is open to papers verisci published, not to any KA (ADR 0011, rating run review).
 - 2026-10-12: before a new paper is stored, a small Gemini model checks its field (ADR 0037); the metadata is still read by code, so the same PDF still gives the same KA, and publishing now makes one free-tier model request per new paper (scope and branding plan, user's choice).
 - 2026-10-12: the field check's outcomes are left to ADR 0037, which states them all, rather than said here as "refused" (ADR sweep, user's choice).
+- 2026-10-12: publishing asks Gemini a second time when the first request gets no answer (ADR 0037), so a new paper uses one or two free-tier requests, not one (branch review, user's choice).
