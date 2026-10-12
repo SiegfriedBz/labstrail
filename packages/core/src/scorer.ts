@@ -3,8 +3,9 @@ import { CHECKS, type CheckId, checklistOf, STUDY_TYPES, type StudyType } from "
 import { type PaperText, quoteFound, quoteTextOf } from "./paper-text.ts";
 
 /**
- * The version of the scorer's prompt and checklists, recorded in every R-KA with the model
- * (ADR 0018). Version 1 judged a paper's DKG record against eight signals.
+ * The version of the scorer, recorded in every R-KA with the model (ADR 0018): its prompt,
+ * checklists, scoring, quote matching and text preparation, all covered by the version's
+ * fingerprint test. Version 1 judged a paper's DKG record against eight signals.
  */
 export const SCORER_PROMPT_VERSION = "2";
 

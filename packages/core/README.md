@@ -41,6 +41,7 @@ so an import of another `@verisci/*` package fails to typecheck.
 | `submissionTypedData(message)` | The EIP-712 typed data a submitter signs to publish a PDF, in the shape viem takes |
 | `canonicalContextGraph(id)` | A context graph id with its address in lowercase and its name unchanged: the one spelling a submission signs |
 | `SUBMISSION_DOMAIN`, `SubmissionMessage` | VeriSci's EIP-712 domain, and the signed `{ cid, contextGraph, deadline }` |
+| `MAX_PDF_BYTES` | The largest PDF verisci publishes and rates, 15 MB: read by the upload page, the publish run and the rating run |
 | `parseTeiHeader(xml)` | A paper's `PaperMetadata` (title, authors, abstract, DOI) from GROBID's TEI header, or `not-tei` or `no-title`; returns a result for every input |
 | `PaperMetadata`, `TeiResult` | The metadata read from a TEI header, and the result of `parseTeiHeader` |
 | `ORIGINTRAIL_CONTRACTS`, `OriginTrailContracts`, `knowledgeAssetToken(ual)` | OriginTrail's `DKGKnowledgeAssets` (the ERC-721 holding every asset's token) and `KnowledgeAssetsLifecycle` addresses by chain id, and the contract and token id behind a UAL: the id itself when the UAL names the contract, else the author's address above the asset number in the low 96 bits; `undefined` for a chain with no recorded contracts |
