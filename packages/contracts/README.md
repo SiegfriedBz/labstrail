@@ -35,8 +35,10 @@ pending on it
   ([ADR 0031](../../docs/adr/0031-uals-are-normalized-before-the-contract.md)),
   whose target is not a paper verisci published
   ([ADR 0011](../../docs/adr/0011-a-rating-is-a-separate-r-ka.md)), or whose paper
-  is outside the life sciences and health or its PDF holds no text, such as a scan
-  ([ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)).
+  is outside the life sciences and health
+  ([ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)), or
+  whose PDF cannot be read for its text, such as a scan
+  ([ADR 0011](../../docs/adr/0011-a-rating-is-a-separate-r-ka.md)).
 - **Fulfil.** The oracle calls `fulfilPhase1(requestId, score, rKaUal)` with a
   score from 0 to 100 and the R-KA's UAL. The record holds the phase-1 score;
   later phases get their own fields in later contract versions

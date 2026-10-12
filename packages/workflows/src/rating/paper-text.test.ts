@@ -36,9 +36,9 @@ function read(body: Uint8Array | string, status = 200, maxChars = 150_000) {
       new Response(typeof body === "string" ? body : (body as Uint8Array<ArrayBuffer>), { status }),
   );
   const options = {
-    gatewayUrl: "https://verisci.mypinata.cloud/",
+    gatewayUrl: "https://example.mypinata.cloud/",
     fetch,
-    maxBytes: 30 * 1024 * 1024,
+    maxBytes: 15 * 1024 * 1024,
     timeoutMs: 60_000,
     maxChars,
   };
@@ -51,7 +51,7 @@ describe("readPaperText", () => {
     const answer = await result;
 
     expect(fetch).toHaveBeenCalledWith(
-      `https://verisci.mypinata.cloud/ipfs/${CID}`,
+      `https://example.mypinata.cloud/ipfs/${CID}`,
       expect.anything(),
     );
     expect(answer.ok).toBe(true);
@@ -83,13 +83,13 @@ describe("readPaperText", () => {
     expect(await read(pdfOf([])).result).toEqual({ ok: false, reason: "no-text" });
   });
 
-  it("is unreadable for a file over maxBytes", async () => {
+  it("is too-large for a file over maxBytes", async () => {
     const fetch = vi.fn(async () => new Response(PAPER_PDF as Uint8Array<ArrayBuffer>));
     const options = { gatewayUrl: "https://g.example", fetch, maxBytes: 100, timeoutMs: 60_000 };
 
     expect(await readPaperText(CID, { ...options, maxChars: 150_000 })).toEqual({
       ok: false,
-      reason: "unreadable",
+      reason: "too-large",
     });
   });
 });

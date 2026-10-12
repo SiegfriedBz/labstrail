@@ -1,4 +1,8 @@
-/** The result of {@link fetchPdf}: `unreachable` is worth a retry, the others are not. */
+/**
+ * The result of {@link fetchPdf}: `unreachable` is worth a retry. The publish run refuses
+ * the others; a rating run reads a `not-a-pdf` file again, since the gateway may have given
+ * another file.
+ */
 export type FetchPdfResult =
   | { readonly ok: true; readonly bytes: Uint8Array }
   | { readonly ok: false; readonly reason: "not-a-pdf" | "too-large" | "unreachable" };

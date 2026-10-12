@@ -31,7 +31,8 @@ Inngest workflows that combine `core` logic with the `dkg` and `contracts` adapt
 - Adapters return typed results and never throw for an expected failure, as ADR 0021
   asks of server reads. A run throws `NonRetriableError` only when its settings or
   its invocation's data are invalid (`loadDeps`, `loadRatingDeps`, the oracle's `setup`),
-  when the node or GROBID refuses our credential or Gemini the request, when the node does
+  when the node or GROBID refuses our credential or Gemini the request, when Gemini gives
+  two answers the check refuses (`scorer-unusable`), when the node does
   not serve the graph, when a minted R-KA's score does not parse (`rating-unreadable`),
   when the oracle function fails or finds the request fulfilled with another R-KA
   (`oracle-failed`, `oracle-conflict`), and when its attempts or budget run out; its message starts `publish-failed:<reason>:` (`PublishFailure`, which the paper's

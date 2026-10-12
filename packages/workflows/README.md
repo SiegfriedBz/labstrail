@@ -156,9 +156,11 @@ is left ([ADR 0007](../../docs/adr/0007-all-writes-converge.md)):
      **find-target** found the paper in this graph, so the node is still loading it.
    - **read-paper** fetches the PDF through the gateway and extracts its text with unpdf
      (`packages/core` → Ratings → The paper's text), up to 150,000 characters. A PDF with no
-     text layer (a scan) cancels `invalid-target`. A file that is not a PDF, is over the size
-     limit or does not parse is retried, since the publish run read the same file: the
-     gateway or the reader is at fault.
+     text layer (a scan), or one over the size limit (published before the limit was
+     lowered from 30 to 15 MB), cancels `invalid-target`
+     ([ADR 0011](../../docs/adr/0011-a-rating-is-a-separate-r-ka.md)). A file that is not a
+     PDF or does not parse is read again on the next attempt, since the gateway may have given
+     another file; still unreadable on the last attempt, it cancels `invalid-target`.
    - **score-paper** asks Gemini, in one request, for the paper's field and study type and the
      answer to each of that type's checks, with quotes; `scoreChecks` checks the quotes and
      computes the score. A paper outside the life sciences and health cancels
@@ -178,10 +180,10 @@ cancelled meanwhile, is an orphan: the outcome names it, and the run logs it as 
 
 Retries ([ADR 0009](../../docs/adr/0009-retries-are-spaced-with-step-sleep.md)): a chain
 that does not answer is read again every 2 minutes, up to 5 times. A node that does not
-answer or gives no rows yet, a quorum failure, a gateway that does not give the PDF, a file
-that does not read as a PDF, or a Gemini call that is unreachable or rate-limited waits 2
+answer or gives no rows yet, a quorum failure, a gateway that does not give the PDF, or a
+Gemini call that is unreachable or rate-limited waits 2
 minutes and starts a new attempt from the R-KA's read, up to 5 attempts, then fails
-(`node-unreachable`, `paper-unreachable`, `paper-unreadable`, `scorer-unavailable`;
+(`node-unreachable`, `paper-unreachable`, `scorer-unavailable`;
 `mint-not-confirmed` when the mint is never seen). A Gemini answer the check refuses is asked
 for again once, then the run fails `scorer-unusable`: the same paper and prompt tend to give
 the same answer, and each answer uses one of the free tier's 20 requests a day. A node that does not answer is never

@@ -578,13 +578,39 @@ describe("runRating: retries", () => {
     expect(oracleCalls).toEqual([]);
   });
 
-  it("reads the PDF again when it does not read as one, then fails paper-unreadable, with no cancel", async () => {
-    const { run, deps, oracleCalls } = rate({ papers: [{ ok: false, reason: "unreadable" }] });
+  it("reads the PDF again when it does not read as one, then cancels invalid-target on the last attempt", async () => {
+    const { run, deps, dkg, oracleCalls, log } = rate({
+      papers: [{ ok: false, reason: "unreadable" }],
+    });
 
-    await expect(run).rejects.toThrow(/^rating-failed:paper-unreadable: /);
+    expect(await run).toEqual({ state: "cancelled", reason: "invalid-target" });
     expect(deps.readPaper).toHaveBeenCalledTimes(RATING_SETTINGS.attempts);
+    expect(log).toContain(`sleep retry-${RATING_SETTINGS.attempts - 1} 2m`);
     expect(deps.score).not.toHaveBeenCalled();
-    expect(oracleCalls).toEqual([]);
+    expect(dkg.storeAsset).not.toHaveBeenCalled();
+    expect(oracleCalls).toEqual([cancel("invalid-target")]);
+  });
+
+  it("scores a PDF that reads on a later attempt after not reading as one", async () => {
+    const { run, deps } = rate({
+      papers: [
+        { ok: false, reason: "unreadable" },
+        { ok: true, paper: PAPER },
+      ],
+    });
+
+    expect(await run).toMatchObject({ state: "fulfilled" });
+    expect(deps.readPaper).toHaveBeenCalledTimes(2);
+  });
+
+  it("cancels invalid-target at once a PDF over the size limit, reading it once", async () => {
+    const { run, deps, dkg, oracleCalls } = rate({ papers: [{ ok: false, reason: "too-large" }] });
+
+    expect(await run).toEqual({ state: "cancelled", reason: "invalid-target" });
+    expect(deps.readPaper).toHaveBeenCalledTimes(1);
+    expect(deps.score).not.toHaveBeenCalled();
+    expect(dkg.storeAsset).not.toHaveBeenCalled();
+    expect(oracleCalls).toEqual([cancel("invalid-target")]);
   });
 
   it("asks Gemini at most twice for an answer the check refuses, then fails scorer-unusable", async () => {

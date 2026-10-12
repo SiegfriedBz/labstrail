@@ -71,17 +71,15 @@ export const RATING_SETTINGS = {
 /**
  * Why a rating run stopped without an outcome, carried in its error as
  * `rating-failed:<reason>: <detail>` ({@link ratingFailureReason}). `setup` and
- * `rating-unreadable` are ours to fix; the others clear up with time, and the request stays
+ * `rating-unreadable` are ours to fix; the others may clear up with time, and the request stays
  * pending for the next run. `paper-unreachable` is the gateway not giving the paper's PDF;
- * `paper-unreadable` is a file that does not read as the PDF the publish run read (the gateway
- * giving another file, or the reader failing). `scorer-unusable` is Gemini answering twice with
- * an answer the check refuses.
+ * `scorer-unusable` is Gemini answering twice with an answer the check refuses, which the same
+ * paper tends to repeat.
  */
 export type RatingFailure =
   | "chain-unreachable"
   | "node-unreachable"
   | "paper-unreachable"
-  | "paper-unreadable"
   | "scorer-unavailable"
   | "scorer-unusable"
   | "mint-not-confirmed"
@@ -93,7 +91,6 @@ const RATING_FAILURES: readonly RatingFailure[] = [
   "chain-unreachable",
   "node-unreachable",
   "paper-unreachable",
-  "paper-unreadable",
   "scorer-unavailable",
   "scorer-unusable",
   "mint-not-confirmed",
@@ -165,6 +162,7 @@ type Attempt =
   | { readonly kind: "expire"; readonly orphan?: string }
   | { readonly kind: "retry"; readonly failure: RatingFailure; readonly reason: string }
   | { readonly kind: "invalid-target" }
+  | { readonly kind: "unreadable"; readonly reason: string }
   | { readonly kind: "mint-again" }
   | { readonly kind: "fatal"; readonly failure: RatingFailure; readonly reason: string };
 
@@ -196,8 +194,9 @@ export function ratingFailureReason(output: unknown): RatingFailure | undefined 
  *    PDF link (`find-pdf`), reads its text (`read-paper`), and has Gemini classify it and answer
  *    its study type's checks in one request (`score-paper`), each done once per run; a
  *    paper outside the field (ADR 0037), whose PDF link is not an IPFS CID, or whose PDF holds
- *    no text (a scan) is cancelled `invalid-target` before anything is stored, and a link or
- *    PDF that does not come or does not read is asked for again;
+ *    no text (a scan) or is over the size limit is cancelled `invalid-target` before anything
+ *    is stored (ADR 0011); a link or PDF that does not come is asked for again, and a file that
+ *    does not read as a PDF is too, until the last attempt cancels it `invalid-target`;
  * 4. the score is always read back from the minted R-KA, so the chain records the R-KA's;
  * 5. past `maxAgeMs`, only a minted R-KA is fulfilled (a stored one is polled, never minted);
  *    anything else is cancelled `expired`.
@@ -259,13 +258,14 @@ export async function runRating(
       const answer = await oracle("cancel", cancelOf(contract, requestId, "expired"));
       return outcomeOf(answer, result.orphan, logger);
     }
-    if (result.kind === "invalid-target") {
+    const lastAttempt = attempt === RATING_SETTINGS.attempts;
+    if (result.kind === "invalid-target" || (result.kind === "unreadable" && lastAttempt)) {
       const answer = await oracle("cancel", cancelOf(contract, requestId, "invalid-target"));
       return outcomeOf(answer, undefined, logger);
     }
     if (result.kind === "fatal") throw stop(result.failure, `${name.name}: ${result.reason}`);
     last = result;
-    if (result.kind === "retry" && attempt < RATING_SETTINGS.attempts) {
+    if ((result.kind === "retry" || result.kind === "unreadable") && !lastAttempt) {
       await step.sleep(`retry-${attempt}`, RATING_SETTINGS.retryWait);
     }
   }
@@ -408,13 +408,13 @@ async function score(
   if (!run.paper) {
     const { cid } = run;
     const read = await step.run(`read-paper-${attempt}`, () => deps.readPaper(cid));
-    if (!read.ok && read.reason === "no-text") return { kind: "invalid-target" };
+    if (!read.ok && (read.reason === "no-text" || read.reason === "too-large")) {
+      return { kind: "invalid-target" };
+    }
     if (!read.ok && read.reason === "unreachable") {
       return { kind: "retry", failure: "paper-unreachable", reason: `the PDF ${cid} did not come` };
     }
-    if (!read.ok) {
-      return { kind: "retry", failure: "paper-unreadable", reason: `${cid} did not read as a PDF` };
-    }
+    if (!read.ok) return { kind: "unreadable", reason: `${cid} did not read as a PDF` };
     run.paper = read.paper;
   }
   const { paper } = run;
