@@ -29,12 +29,17 @@ contract RatingControllerTest is Test {
 
     // --- helpers ---
 
-    function _expectedId(uint256 chainId, address deployedAt, uint256 nonce, address requester, string memory targetUal)
-        internal
-        pure
-        returns (bytes32)
-    {
-        return keccak256(abi.encode(chainId, deployedAt, nonce, requester, keccak256(bytes(targetUal))));
+    function _expectedId(
+        uint256 chainId,
+        address contractAddress,
+        uint256 deployedAt,
+        uint256 nonce,
+        address requester,
+        string memory targetUal
+    ) internal pure returns (bytes32) {
+        return keccak256(
+            abi.encode(chainId, contractAddress, deployedAt, nonce, requester, keccak256(bytes(targetUal)))
+        );
     }
 
     function _requestBy(address requester) internal returns (bytes32) {
@@ -107,7 +112,7 @@ contract RatingControllerTest is Test {
 
     function test_Request_EmitsPhase1Requested() public {
         vm.warp(1_700_000_000);
-        bytes32 expected = _expectedId(block.chainid, address(controller), 0, alice, TARGET);
+        bytes32 expected = _expectedId(block.chainid, address(controller), controller.DEPLOYED_AT(), 0, alice, TARGET);
         vm.expectEmit(address(controller));
         emit IRatingController.Phase1Requested(expected, alice, keccak256(bytes(TARGET)), TARGET, 1_700_000_000);
         _requestBy(alice);
@@ -120,15 +125,22 @@ contract RatingControllerTest is Test {
         assertEq(controller.requestCountOf(TARGET), 2);
     }
 
-    function testFuzz_Request_IdMatchesScheme(address requester, string calldata targetUal, uint64 chainId) public {
+    function testFuzz_Request_IdMatchesScheme(
+        address requester,
+        string calldata targetUal,
+        uint64 chainId,
+        uint64 deployedAt
+    ) public {
         vm.assume(bytes(targetUal).length > 0);
+        vm.warp(deployedAt);
+        (RatingController deployed,) = new DeployRatingController().run();
         vm.chainId(chainId);
-        uint256 nonce = controller.nonce();
+        uint256 nonce = deployed.nonce();
 
         vm.prank(requester);
-        bytes32 id = controller.requestPhase1(targetUal);
+        bytes32 id = deployed.requestPhase1(targetUal);
 
-        assertEq(id, _expectedId(chainId, address(controller), nonce, requester, targetUal));
+        assertEq(id, _expectedId(chainId, address(deployed), deployedAt, nonce, requester, targetUal));
     }
 
     function testFuzz_Request_IdsDifferAcrossChainIds(uint64 chainA, uint64 chainB) public {
@@ -157,6 +169,27 @@ contract RatingControllerTest is Test {
         bytes32 idA = RatingController(atA).requestPhase1(TARGET);
         vm.prank(alice);
         bytes32 idB = RatingController(atB).requestPhase1(TARGET);
+        assertNotEq(idA, idB);
+    }
+
+    /// A restarted Anvil brings back the chain id, the contract's address and its nonce; only
+    /// the deploy time differs.
+    function testFuzz_Request_IdsDifferAcrossRedeploysAtOneAddress(uint64 deployedAtA, uint64 deployedAtB) public {
+        vm.assume(deployedAtA != deployedAtB);
+        address redeployed = makeAddr("redeployed");
+        uint256 snapshot = vm.snapshotState();
+
+        vm.warp(deployedAtA);
+        deployCodeTo("RatingController.sol:RatingController", abi.encode(oracle, 3), redeployed);
+        vm.prank(alice);
+        bytes32 idA = RatingController(redeployed).requestPhase1(TARGET);
+
+        vm.revertToState(snapshot);
+        vm.warp(deployedAtB);
+        deployCodeTo("RatingController.sol:RatingController", abi.encode(oracle, 3), redeployed);
+        vm.prank(alice);
+        bytes32 idB = RatingController(redeployed).requestPhase1(TARGET);
+
         assertNotEq(idA, idB);
     }
 

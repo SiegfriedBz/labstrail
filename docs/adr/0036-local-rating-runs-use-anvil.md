@@ -17,5 +17,8 @@ A rating run stops unless the contract's oracle is its own key, and only `develo
 
 - No testnet funds and no faucet: Anvil's accounts are funded, and it mines each transaction at once.
 - Fee raises and Base's receipts are not exercised locally; `develop` is where they are first seen.
-- Anvil forgets its requests when it restarts, so a request id could repeat and name an R-KA already in the staging graph; requests made from a fresh account each time keep every id new ([0016](0016-asset-names-derive-from-request-id.md)).
 - R-KAs from local runs sit in the staging graph, recorded by no contract the staging UI reads ([0014](0014-contract-owns-scores-dkg-owns-content.md)).
+
+## History
+
+- 2026-10-12: request ids no longer repeat after an Anvil restart, since the contract hashes its deployment time into each id ([0016](0016-asset-names-derive-from-request-id.md)); requests no longer need a fresh account.

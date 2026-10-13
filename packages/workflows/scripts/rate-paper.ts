@@ -55,8 +55,8 @@ if (!raw && !normalized.ok) {
 }
 const target = raw || !normalized.ok ? input : normalized.ual;
 
-// A fresh requester per request, so request ids never repeat after Anvil restarts: a repeated
-// id would name an R-KA already minted in the staging graph.
+// A throwaway requester per run, so each run starts clear of the cap of pending requests per
+// requester, which a stopped local run would otherwise hold (ADR 0015).
 const requester = privateKeyToAccount(generatePrivateKey());
 await createTestClient({ chain: anvil, mode: "anvil", transport }).setBalance({
   address: requester.address,

@@ -9,7 +9,7 @@ A rating is requested on chain, then scored by our workflow, stored and minted b
 
 ## Decision
 
-- The v2 contract gives every rating request (phase 1) its own id: the hash of the chain id, the contract address, a counter, the requester and the target UAL. A retry is a new request. Whether a later phase's request gets its own id is left to the phase-2 plan.
+- The v2 contract gives every rating request (phase 1) its own id: the hash of the chain id, the contract address, the time the contract was deployed, a counter, the requester and the target UAL. A retry is a new request. Whether a later phase's request gets its own id is left to the phase-2 plan.
 - Because the id hashes the requester and target, a reorg that reorders requests can never pair one request's rating with another.
 - The rating's R-KA name derives from its phase-1 request id ([0011](0011-a-rating-is-a-separate-r-ka.md)). Target KAs are named from their PDF instead ([0010](0010-pdf-to-target-ka-pipeline.md)).
 - Nothing load-bearing lives in a browser: client storage may cache, never decide.
@@ -18,4 +18,8 @@ A rating is requested on chain, then scored by our workflow, stored and minted b
 
 - Given a rating's phase-1 request id, any process can compute the R-KA's name and read the state on chain and on the daemon, so recovery needs no browser ([0020](0020-stuck-requests-recovered-only-oracle-cancels.md)).
 - A retried store or mint targets the same name instead of creating a duplicate.
-- Two deployments never produce the same id ([0005](0005-staging-and-production-are-isolated.md)), and several ratings per paper are possible ([0013](0013-several-ratings-per-paper.md)).
+- Two deployments never produce the same id, even two at one address on a restarted Anvil ([0005](0005-staging-and-production-are-isolated.md), [0036](0036-local-rating-runs-use-anvil.md)), and several ratings per paper are possible ([0013](0013-several-ratings-per-paper.md)).
+
+## History
+
+- 2026-10-12: the id also hashes the contract's deployment time, so a contract redeployed at the same address on a restarted Anvil never repeats an id, which 0036 had to work around.
