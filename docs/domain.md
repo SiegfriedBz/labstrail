@@ -21,8 +21,23 @@ Observed on an OriginTrail V10 node (`10.0.16`, `nodeRole: edge`, testnet), Base
 
   A UAL parser accepts both and never assumes the middle segment is our node: a target
   published elsewhere ([ADR 0011](adr/0011-a-rating-is-a-separate-r-ka.md)) may use either.
+- **Canonical UAL spelling** (OriginTrail/dkg `packages/core/src/ka-ual-identity.ts`,
+  checked at `74a515e`, 2026-10-06): lowercase address and chain namespace, decimal numbers
+  with no leading zero; the chain part may be namespaced with several colons, and the chain
+  number goes up to uint256. Id `0` is a valid canonical id there. Our parser keeps these
+  rules but caps the chain number at `Number.MAX_SAFE_INTEGER`
+  ([ADR 0031](adr/0031-uals-are-normalized-before-the-contract.md)).
 - **Context graph ids** are the full `<agent address>/<name>`. A bare name refers to a
   different, local graph, so queries with it silently return nothing.
+- **Asset names are scoped per context graph and per writing agent** (OriginTrail/dkg,
+  checked at `74a515e`, 2026-10-07): a name is stored at
+  `did:dkg:context-graph:<graph id>/assertion/<agent address>/<name>`
+  (`packages/core/src/constants.ts`), so the same name in two graphs is two assets.
+- **Asset name rules** (`validateAssertionName`, same file and commit): 1 to 256
+  characters, no `/`, no whitespace and none of `<>"{}|^` `` ` `` `\`. A path segment
+  starting with `did:dkg:` or matching `0x<40 hex>:<number>` is read as a KA id
+  (`packages/cli/src/daemon/routes/knowledge-assets.ts`). Ours start with `verisci-`
+  (`packages/core/README.md` → Asset names).
 - **Store and mint are separate calls:** `POST /api/knowledge-assets`, then
   `…/{name}/vm/publish`. Asset states are missing, stored (`promoted`) and minted
   (`published`). A stored asset already has a `reservedUal`, so a UAL being present does
@@ -49,12 +64,30 @@ Observed on an OriginTrail V10 node (`10.0.16`, `nodeRole: edge`, testnet), Base
   `packages/evm-module/docs/greenfield-ka-ual.md`): the KA is minted to its author as an
   ERC-721 token, and each update adds a new immutable version under the same token. Only
   the owner (the token holder) can update it. Unverified: the daemon API call for an update
-  ([ADR 0012](adr/0012-ratings-evolve-in-three-phases.md)).
+  ([ADR 0012](adr/0012-three-phases-settled-by-the-oracle.md)).
 - **KA numbers are counted per author** and reserved at store time (the `reservedUal`).
   Both our graphs publish as one author, and a stored asset that is never minted keeps
   its number, so each environment sees gaps in its numbering. Expected, not a bug.
 - **Authority resolution needs the node's local JSON-RPC proxy:** public Base Sepolia
   endpoints are not reliable enough for it.
+
+## IPFS
+
+CID facts checked with `multiformats` 14.0.5, 2026-10-07; import defaults from the Kubo
+docs, current at 2026-10-07. The settings Pinata's signed-URL uploads use are still to be
+checked.
+
+- **One file has several CIDs, depending on the import settings:** CID version, raw
+  leaves or UnixFS leaves, and the chunker. Kubo's default gives a CIDv0 (`Qm…`, dag-pb);
+  with CIDv1 and raw leaves, a file that fits in one chunk gives a `bafkrei…` CID (raw
+  codec), and a larger file a `bafybei…` CID (dag-pb root). The uploader picks the
+  settings, so one PDF keeps one CID only while every upload goes through the same
+  uploader with the same settings ([ADR 0010](adr/0010-pdf-to-target-ka-pipeline.md)).
+- **One CID has several spellings:** CIDv0 (`Qm…`) and CIDv1 in base32 (`b…`), base58btc
+  (`z…`) or base36 (`k…`). `CID.parse` reads all four, and `.toV1().toString()` writes
+  base32. It refuses uppercase base32 (`B…`).
+- **A valid CID can name any hash and any size:** `CID.parse` checks the format only. An
+  identity-hash CID carries its data inline, so it can be hundreds of characters long.
 
 ## Chain
 
@@ -64,7 +97,7 @@ Observed on Base Sepolia (chain id 84532) with Alchemy.
   L1,** minutes later. Reorgs before that are rare but possible (Base docs), which is why
   request ids are bound to their content ([ADR 0016](adr/0016-asset-names-derive-from-request-id.md)).
 - **The free RPC tier caps `eth_getLogs` at 10 blocks,** so nothing may depend on scanning
-  history; read current contract state instead ([ADR 0020](adr/0020-a-cron-reconciler-recovers-stuck-requests.md)).
+  history; read current contract state instead ([ADR 0020](adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
 - **Alchemy delivers a log to every webhook rule matching its contract:** keep exactly one
   rule per contract, or one request reaches two oracles.
 - **Each Alchemy webhook signs with its own secret:** a route checking another
@@ -95,21 +128,21 @@ Observed on Vercel Hobby with Inngest Cloud, except where a fact cites the vendo
   from triggering, so staging stops after three quiet days on `develop` ([ADR 0005](adr/0005-staging-and-production-are-isolated.md)).
 - **Unverified: cron functions in a branch environment.** Inngest's docs do not say
   whether a branch environment runs scheduled functions; staging's reconciler relies on
-  it, so the agents plan checks it on `develop` ([ADR 0020](adr/0020-a-cron-reconciler-recovers-stuck-requests.md)).
+  it, so the agents plan checks it on `develop` ([ADR 0020](adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
 - **Only production and the stable `develop` deployment receive webhooks:** feature
   previews have no stable URL to register.
 - **Inngest concurrency limits count running steps, not runs:** a run that is sleeping or
   waiting holds no slot, so a concurrency key cannot keep two functions (or two runs) off
-  the same request ([ADR 0020](adr/0020-a-cron-reconciler-recovers-stuck-requests.md)).
+  the same request ([ADR 0020](adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
 - **Inngest `singleton` (mode `skip`) locks a whole run, sleeps included:** while a run for
-  a key is active, new runs for that key are skipped (Inngest docs) ([ADR 0020](adr/0020-a-cron-reconciler-recovers-stuck-requests.md)).
+  a key is active, new runs for that key are skipped (Inngest docs) ([ADR 0020](adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
 - **Inngest deduplicates event ids for 24 hours only:** an event re-sent later with the
   same id starts a new run ([ADR 0017](adr/0017-chain-events-are-ingested-at-least-once.md)).
 - **Inngest caps sizes:** an event payload at 256 KB, a step's output at 4 MB, a run's
   state at 32 MB and a function at 1,000 steps (Inngest docs, to verify on our plan).
   Payloads carry ids, never file bytes ([ADR 0010](adr/0010-pdf-to-target-ka-pipeline.md)).
 - **Vercel Hobby runs cron jobs at most once a day,** at an imprecise time within the
-  hour (Vercel docs), so schedules run as Inngest crons ([ADR 0020](adr/0020-a-cron-reconciler-recovers-stuck-requests.md)).
+  hour (Vercel docs), so schedules run as Inngest crons ([ADR 0020](adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
 - **Inngest's free plan allows 50,000 executions a month and 5 concurrent steps**
   (Inngest pricing): every step, poll and cron tick counts against the first, so poll
   and cron intervals and the rating throttle are set against it ([ADR 0008](adr/0008-mints-are-async-polled-in-short-steps.md),
