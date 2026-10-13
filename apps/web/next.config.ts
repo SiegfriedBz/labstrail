@@ -14,13 +14,28 @@ loadEnvConfig(
   true,
 );
 
+/**
+ * Coinbase's SDK, reached through wagmi's connectors, imports the optional `@x402/*` payment
+ * packages lazily; Turbopack still resolves them at build, so they point at an empty module.
+ */
+const OPTIONAL_PEERS = [
+  "@x402/core/client",
+  "@x402/evm",
+  "@x402/evm/exact/client",
+  "@x402/evm/upto/client",
+  "@x402/svm/exact/client",
+];
+
 const nextConfig: NextConfig = {
+  turbopack: {
+    resolveAlias: Object.fromEntries(OPTIONAL_PEERS.map((name) => [name, "./lib/empty-module.ts"])),
+  },
   transpilePackages: [
-    "@verisci/agents",
     "@verisci/contracts",
     "@verisci/core",
     "@verisci/dkg",
     "@verisci/env",
+    "@verisci/workflows",
   ],
 };
 

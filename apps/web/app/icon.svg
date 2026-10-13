@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <title>VeriSci</title>
+  <!-- VeriSci's mark, as components/site/logo.tsx draws it, in fixed colours (emerald and cyan on a near-black tile) that read on light and dark browser tabs. -->
+  <defs>
+    <linearGradient id="g" x1="6" y1="24" x2="26" y2="8" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#43d095"/>
+      <stop offset="1" stop-color="#49bdd4"/>
+    </linearGradient>
+  </defs>
+  <rect x="0.75" y="0.75" width="30.5" height="30.5" rx="9" fill="#0a0c0d" stroke="#43d095" stroke-opacity="0.35" stroke-width="1.5"/>
+  <path d="M8.5 15.5 14 21.5 23.5 9.5" fill="none" stroke="url(#g)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="8.5" cy="15.5" r="2.4" fill="#43d095"/>
+  <circle cx="14" cy="21.5" r="3" fill="url(#g)"/>
+  <circle cx="23.5" cy="9.5" r="2.4" fill="#49bdd4"/>
+  <circle cx="23.5" cy="9.5" r="4.6" fill="none" stroke="#49bdd4" stroke-opacity="0.35"/>
+</svg>

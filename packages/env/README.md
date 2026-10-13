@@ -5,11 +5,19 @@ declares the variables it reads as Zod schemas; a missing or invalid variable fa
 on first import with one `EnvError` that names every bad variable and never shows
 its value.
 
-Built on [`@t3-oss/env-core`](https://env.t3.gg) and [Zod](https://zod.dev).
+Workflows (`@verisci/workflows`) and the web app's own settings (`apps/web/lib/web-env.ts`)
+are the exception, since `next build` imports them with only `APP_ENV` set: a deployed
+server checks them when it starts (`apps/web/instrumentation.ts`) and refuses to start on a
+bad one; locally (`APP_ENV=local`) a workflow checks its settings on its first run and stops
+at once, and the web app on the request that reads them
+([ADR 0004](../../docs/adr/0004-env-variables-per-workspace-one-root-file.md)).
+
+Status: `defineEnv`, the shared `NODE_ENV`/`APP_ENV` schema and `EnvError`, used by every
+workspace's env module.
 
 ## Depends on
 
-No other workspace.
+[`@t3-oss/env-core`](https://env.t3.gg) and [Zod](https://zod.dev); no other workspace.
 
 ## Shared variables
 
@@ -34,23 +42,31 @@ declares its own variables and why `APP_ENV` is required in production builds is
 
 ## Declaring a workspace's variables
 
-Each workspace keeps its schema in its own `src/env.ts` and extends `sharedEnv`.
-A workspace declares only what it reads, so no workspace requires (or sees) a
-secret it does not use.
+Each workspace declares its variables in its env module (`src/env.ts` in a package,
+`lib/web-env.ts` in `apps/web`; it may import the schema from a file next to it) and extends
+the shared env. A workspace declares only what it reads, so no workspace requires (or sees)
+a secret it does not use. A dev script (`scripts/*.ts`) declares the variables it reads with
+`defineEnv`, in the script itself, so it requires only those: the workflows' `publish-pdf`
+reads the Pinata key and the context graph, not the rest of the workflows' settings.
 
 ```ts
-// packages/dkg/src/env.ts
+// packages/<workspace>/src/env.ts
 import { defineEnv, sharedEnv } from "@verisci/env";
 import { z } from "zod";
 
 export const env = defineEnv({
   extends: [sharedEnv],
-  server: { DKG_URL: z.url() },
+  server: { SOME_URL: z.url() },
 });
 
-env.DKG_URL; // string
+env.SOME_URL; // string
 env.APP_ENV; // "local" | "staging" | "production"
 ```
+
+When tests must check the rules with their own values, put them in a function that takes
+a `runtimeEnv` and extends `createSharedEnv(runtimeEnv)`, and have `src/env.ts` call it
+once: `packages/dkg` does this (`createDkgEnv` in `src/dkg-env.ts`), since `src/env.ts`
+validates `process.env` as soon as it is imported.
 
 Envs in `extends` keep the values they were built with; they are not re-read from
 the given `runtimeEnv`. `sharedEnv` is always built from `process.env`, so a test
@@ -65,14 +81,20 @@ env file, so they are listed in the Foundry section of `.env.example` without a
 as `DEPLOY_ENV` are passed on the command line
 ([ADR 0004](../../docs/adr/0004-env-variables-per-workspace-one-root-file.md)).
 
+Programs that run on the DKG node server (`infra/*`, such as the RPC proxy) read their
+own settings from an env file on that server, since it runs them with plain Node and no
+install. Each lists its variables in its README
+([ADR 0004](../../docs/adr/0004-env-variables-per-workspace-one-root-file.md)).
+
 ## API
 
 | Export | What it does |
 | --- | --- |
 | `defineEnv({ server, extends?, runtimeEnv? })` | Validates `runtimeEnv` (default `process.env`, never mutated) and returns a typed, read-only object; throws `EnvError` |
-| `EnvError` | `message` lists each variable and the schema's message; `issues` is `{ variable, message }[]`. Never contains a value |
+| `DefineEnvOptions`, `RuntimeEnv` | `defineEnv`'s options, and the variables it reads (`process.env` or a plain object) |
+| `EnvError`, `EnvIssue` | `message` lists each variable and the schema's message; `issues` is `EnvIssue[]` (`{ variable, message }`). Never contains a value |
 | `sharedSchema(runtimeEnv?)` | The Zod schemas for `NODE_ENV` and `APP_ENV`; `APP_ENV` is required when `runtimeEnv.NODE_ENV` is `production` |
-| `sharedEnv` | The shared variables, validated from `process.env` |
+| `sharedEnv`, `SharedEnv` | The shared variables, validated from `process.env`, and their type |
 | `createSharedEnv(runtimeEnv?)` | Builds the shared env from a given object, for tests and scripts |
 
 In tests, pass `runtimeEnv` explicitly rather than setting `process.env`.
@@ -85,8 +107,8 @@ included, with no defaults applied and without `extends` merged in.
 
 Nothing in the repo needs it today. It is only for a step that imports env-declaring
 modules without running code that reads the values. Never use it for `next build`,
-which prerenders pages with the values (the home page would show `undefined`), and
-never in a running app.
+where code that reads a setting at build time would get `undefined`, and never in a
+running app.
 
 ## Scripts
 

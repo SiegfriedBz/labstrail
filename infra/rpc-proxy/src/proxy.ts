@@ -1,0 +1,517 @@
+import type { DailyBudget } from "./budget.ts";
+
+/** What one upstream answered: a result, or an error (its own, or the transport's). */
+export type UpstreamReply =
+  | { readonly result: unknown }
+  | {
+      readonly error: {
+        readonly code?: number;
+        readonly message: string;
+        /** Revert data, kept: the daemon decodes contract errors from it. */
+        readonly data?: unknown;
+      };
+    };
+
+/** Sends one JSON-RPC body to one upstream URL. Never throws: a failure is an `error` reply. */
+export type Post = (url: string, body: object, timeoutMs: number) => Promise<UpstreamReply>;
+
+/** A JSON-RPC 2.0 response, as the DKG daemon expects it. */
+export interface JsonRpcResponse {
+  readonly jsonrpc: "2.0";
+  readonly id: unknown;
+  readonly result?: unknown;
+  readonly error?: { readonly code: number; readonly message: string; readonly data?: unknown };
+}
+
+/** What {@link createProxy} needs; the network and the clock are injected. */
+export interface ProxyOptions {
+  /** Alchemy's URL, key included: asked last, within `budget`. */
+  readonly alchemyUrl: string;
+  /** Free public endpoints, asked before Alchemy, the one with more free slots first. */
+  readonly publicUrls: readonly string[];
+  readonly budget: DailyBudget;
+  readonly post: Post;
+  readonly now: () => number;
+  readonly sleep: (ms: number) => Promise<void>;
+  /** Most `eth_getLogs` windows kept in memory. */
+  readonly logCacheMax?: number;
+}
+
+/** The proxy: answers JSON-RPC requests and reports its counters. */
+export interface Proxy {
+  handle(request: unknown): Promise<JsonRpcResponse>;
+  /** Answers a raw HTTP body: one request or a batch. */
+  handleBody(text: string): Promise<JsonRpcResponse | JsonRpcResponse[]>;
+  /** One line of counters, for the log every 30 s. */
+  statusLine(): string;
+}
+
+type Lane = "fast" | "bulk";
+
+/**
+ * Log ranges per request: publicnode accepts 2,000 blocks, sepolia.base.org 200 (checked
+ * 2026-10-09), Alchemy's free tier 10.
+ */
+const PUBLIC_SPAN = 2_000;
+const ALCHEMY_SPAN = 10;
+/** Below this, a window the public endpoints refuse goes to Alchemy in slices. */
+const MIN_PUBLIC_SPAN = 125;
+/** Logs this many blocks below the head no longer change, so they are cached. */
+const FINALITY_BLOCKS = 64;
+const READ_TTL_MS = 3_000;
+const COOLDOWN_MS = 1_500;
+const DEFAULT_LOG_CACHE_MAX = 20_000;
+const READ_CACHE_MAX = 10_000;
+const SLICE_WORKERS = 4;
+const ALL_FAILED = "all endpoints failed";
+/** Characters of an upstream's last error shown in the status line. */
+const LAST_ERROR_CHARS = 80;
+/** Largest forward jump of the head accepted at once: about 5.5 hours of 2 s blocks. */
+const MAX_HEAD_STEP = 10_000;
+/** Read calls answered from memory for {@link READ_TTL_MS}; `eth_chainId` is kept for good. */
+const SHORT_LIVED_READS = new Set(["eth_call", "eth_getBlockByNumber", "eth_blockNumber"]);
+
+/**
+ * The daemon's head probe times out after about 4 s, so fast calls get their own slots,
+ * separate from the log backfill's.
+ */
+const LANES: Record<Lane, { rounds: number; timeoutMs: number; slots: number }> = {
+  fast: { rounds: 3, timeoutMs: 6_000, slots: 6 },
+  bulk: { rounds: 4, timeoutMs: 30_000, slots: 4 },
+};
+
+interface LogFilter {
+  readonly fromBlock?: unknown;
+  readonly toBlock?: unknown;
+  readonly blockHash?: unknown;
+  readonly [key: string]: unknown;
+}
+
+/**
+ * A JSON-RPC proxy for the DKG daemon, which takes a single `rpcUrl`. It asks free public
+ * endpoints first and Alchemy last, within a daily budget; splits `eth_getLogs` ranges into
+ * windows the endpoints accept; and answers repeated reads from memory.
+ */
+export function createProxy(options: ProxyOptions): Proxy {
+  const { alchemyUrl, publicUrls, budget, post, now, sleep } = options;
+  const logCacheMax = options.logCacheMax ?? DEFAULT_LOG_CACHE_MAX;
+  const allUrls = [...publicUrls, alchemyUrl];
+
+  const cooldownUntil = new Map<string, number>();
+  const slots = new Map<string, { active: number; waiters: (() => void)[] }>();
+  const upstreamStats = new Map(allUrls.map((url) => [url, { calls: 0, failures: 0, last: "" }]));
+  const logCache = new Map<string, unknown[]>();
+  const logsInFlight = new Map<string, Promise<unknown[]>>();
+  const readCache = new Map<string, { reply: UpstreamReply; until: number }>();
+  const readsInFlight = new Map<string, Promise<UpstreamReply>>();
+  /** Largest log range each endpoint said it accepts ("limited to a 200 range"). */
+  const spanLimit = new Map<string, number>();
+  /** First block each endpoint said it keeps ("earliest available 46500000"). */
+  const historyFrom = new Map<string, number>();
+  /** Counts what the endpoints taught, so a refused window is planned again only after news. */
+  let lessons = 0;
+  let highestHead = 0;
+  let served = 0;
+  let failed = 0;
+
+  async function withSlot<T>(url: string, lane: Lane, fn: () => Promise<T>): Promise<T> {
+    const key = `${url}|${lane}`;
+    let slot = slots.get(key);
+    if (!slot) {
+      slot = { active: 0, waiters: [] };
+      slots.set(key, slot);
+    }
+    const s = slot;
+    // A freed slot passes straight to the next waiter, so a lane never runs over its limit.
+    if (s.active >= LANES[lane].slots) await new Promise<void>((r) => s.waiters.push(r));
+    else s.active++;
+    try {
+      return await fn();
+    } finally {
+      const next = s.waiters.shift();
+      if (next) next();
+      else s.active--;
+    }
+  }
+
+  async function call(url: string, body: object, lane: Lane): Promise<UpstreamReply> {
+    const raw = await withSlot(url, lane, () => post(url, body, LANES[lane].timeoutMs));
+    // Alchemy's URL holds its key: an error that echoes it shows "(alchemy)" instead.
+    const reply: UpstreamReply =
+      "error" in raw
+        ? {
+            error: {
+              ...raw.error,
+              message: masked(raw.error.message),
+              ...(typeof raw.error.data === "string" ? { data: masked(raw.error.data) } : {}),
+            },
+          }
+        : raw;
+    const stats = upstreamStats.get(url);
+    if (stats) {
+      stats.calls++;
+      if ("error" in reply) {
+        stats.failures++;
+        stats.last = reply.error.message;
+      }
+    }
+    if ("error" in reply) learn(url, reply.error.message);
+    return reply;
+  }
+
+  /** Alchemy's URL holds its key: text that echoes it shows "(alchemy)" instead. */
+  function masked(text: string): string {
+    return text.split(alchemyUrl).join("(alchemy)");
+  }
+
+  /**
+   * Remembers an endpoint's range cap or pruned history from its error message. A cap only
+   * shrinks and a history start only rises, so planning a window always ends.
+   */
+  function learn(url: string, message: string) {
+    const cap = /limited to an? (\d+)(?: block)? range/i.exec(message)?.[1];
+    if (cap !== undefined && Number(cap) >= 1 && Number(cap) < (spanLimit.get(url) ?? Infinity)) {
+      spanLimit.set(url, Number(cap));
+      lessons++;
+    }
+    const from = /earliest available (\d+)/i.exec(message)?.[1];
+    if (from !== undefined && Number(from) > (historyFrom.get(url) ?? 0)) {
+      historyFrom.set(url, Number(from));
+      lessons++;
+    }
+  }
+
+  /** Public endpoints with free slots come first, Alchemy last. */
+  function byLoad(urls: readonly string[], lane: Lane): string[] {
+    const load = (url: string) =>
+      url === alchemyUrl
+        ? Infinity
+        : (slots.get(`${url}|${lane}`)?.active ?? 0) / LANES[lane].slots;
+    return [...urls].sort((a, b) => load(a) - load(b));
+  }
+
+  /**
+   * Tries each endpoint, retrying transient failures; Alchemy only within budget. With
+   * `askEvery`, an endpoint's own error (a refused log range) moves on to the next endpoint,
+   * and is answered only if none succeeds in that round.
+   */
+  async function resolve(
+    body: object,
+    lane: Lane,
+    urls: readonly string[] = allUrls,
+    askEvery = false,
+  ): Promise<UpstreamReply> {
+    const { rounds } = LANES[lane];
+    let last = "no endpoint attempted";
+    for (let round = 0; round < rounds; round++) {
+      let refusal: UpstreamReply | undefined;
+      const respectCooldown = round < rounds - 1;
+      let attempted = false;
+      for (const url of byLoad(urls, lane)) {
+        if (respectCooldown && (cooldownUntil.get(url) ?? 0) > now()) continue;
+        if (url === alchemyUrl && !budget.tryUse()) {
+          last = "Alchemy budget used up";
+          continue;
+        }
+        attempted = true;
+        const reply = await call(url, body, lane);
+        if ("result" in reply) return reply;
+        if (!isTransient(reply.error.message)) {
+          if (!askEvery) return reply;
+          refusal ??= reply;
+          continue;
+        }
+        last = reply.error.message;
+        if (isThrottle(last)) cooldownUntil.set(url, now() + COOLDOWN_MS);
+      }
+      if (refusal) return refusal;
+      const onlyAlchemyLeft = urls.every((u) => u === alchemyUrl);
+      if (onlyAlchemyLeft && !budget.available()) break;
+      if (round < rounds - 1) await sleep(attempted ? 150 * 2 ** round : 500);
+    }
+    return { error: { code: -32000, message: `${ALL_FAILED}: ${last.slice(0, 120)}` } };
+  }
+
+  /** Reads answered from memory; only successful answers are kept. */
+  async function cachedRead(method: string, params: unknown, body: object) {
+    const forGood = method === "eth_chainId";
+    if (!forGood && !SHORT_LIVED_READS.has(method)) return resolve(body, "fast");
+    const key = `${method}|${JSON.stringify(params ?? [])}`;
+    const hit = readCache.get(key);
+    if (hit && hit.until > now()) return hit.reply;
+    // Identical reads arriving together share one upstream call.
+    const pending = readsInFlight.get(key);
+    if (pending !== undefined) return pending;
+    const work = resolve(body, "fast");
+    readsInFlight.set(key, work);
+    try {
+      const reply = await work;
+      if ("result" in reply) {
+        remember(readCache, key, { reply, until: forGood ? Infinity : now() + READ_TTL_MS });
+        if (readCache.size > READ_CACHE_MAX) dropExpired();
+      }
+      return reply;
+    } finally {
+      readsInFlight.delete(key);
+    }
+  }
+
+  function dropExpired() {
+    for (const [key, entry] of readCache) if (entry.until <= now()) readCache.delete(key);
+    while (readCache.size > READ_CACHE_MAX) readCache.delete(readCache.keys().next().value ?? "");
+  }
+
+  async function headBlock(): Promise<number> {
+    const body = { jsonrpc: "2.0", id: 1, method: "eth_blockNumber", params: [] };
+    const reply = await cachedRead("eth_blockNumber", [], body);
+    const head = "result" in reply ? fromHex(reply.result) : Number.NaN;
+    if (!Number.isFinite(head) || head <= 0) throw new Error("chain head unavailable");
+    // The head moves forward only, and by a plausible step: an endpoint a few blocks
+    // behind, or one wrong answer far ahead, leaves it where it is.
+    if (highestHead === 0 || (head > highestHead && head - highestHead <= MAX_HEAD_STEP)) {
+      highestHead = head;
+    }
+    return highestHead;
+  }
+
+  function logsBody(filter: LogFilter, lo: number, hi: number) {
+    return {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "eth_getLogs",
+      params: [{ ...filter, fromBlock: toHex(lo), toBlock: toHex(hi) }],
+    };
+  }
+
+  async function alchemySlices(filter: LogFilter, lo: number, hi: number): Promise<unknown[]> {
+    const slices: [number, number][] = [];
+    for (let a = lo; a <= hi; a += ALCHEMY_SPAN)
+      slices.push([a, Math.min(a + ALCHEMY_SPAN - 1, hi)]);
+    const out: unknown[][] = new Array(slices.length);
+    let cursor = 0;
+    let stopped = false;
+    async function worker() {
+      while (!stopped && cursor < slices.length) {
+        const index = cursor++;
+        const [a, b] = slices[index] ?? [lo, hi];
+        const reply = await resolve(logsBody(filter, a, b), "bulk", [alchemyUrl]);
+        if (!("result" in reply) || !Array.isArray(reply.result)) {
+          const why = "error" in reply ? reply.error.message : "not a list";
+          stopped = true;
+          throw new Error(`logs ${a}-${b}: ${why}`);
+        }
+        out[index] = reply.result;
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(SLICE_WORKERS, slices.length) }, worker));
+    return out.flat();
+  }
+
+  /**
+   * One window, on the public endpoints that keep its history and accept its size. When
+   * none accepts the size, or the ones that do are down, it is cut to the largest cap of the
+   * others. Only the part no public endpoint keeps goes to Alchemy slices. A refusal that
+   * teaches a cap or a pruned history plans the window again; any other refusal halves it,
+   * down to Alchemy slices. An outage of every endpoint that keeps the window's history fails
+   * the request, so the daemon retries later.
+   */
+  async function fetchWindow(filter: LogFilter, lo: number, hi: number): Promise<unknown[]> {
+    const span = hi - lo + 1;
+    const holding = publicUrls.filter((u) => (historyFrom.get(u) ?? 0) <= lo);
+    if (holding.length === 0) {
+      // Only the part no public endpoint keeps goes to Alchemy.
+      const kept = Math.min(...publicUrls.map((u) => historyFrom.get(u) ?? 0));
+      if (kept > hi) return alchemySlices(filter, lo, hi);
+      return [
+        ...(await alchemySlices(filter, lo, kept - 1)),
+        ...(await fetchWindow(filter, kept, hi)),
+      ];
+    }
+    const capOf = (urls: readonly string[]) =>
+      Math.max(1, ...urls.map((u) => spanLimit.get(u) ?? 0));
+    const fitting = holding.filter((u) => span <= (spanLimit.get(u) ?? Infinity));
+    if (fitting.length === 0) return cut(filter, lo, hi, capOf(holding));
+    const before = lessons;
+    const reply = await resolve(logsBody(filter, lo, hi), "bulk", fitting, true);
+    if ("result" in reply && Array.isArray(reply.result)) return reply.result;
+    if (lessons !== before) return fetchWindow(filter, lo, hi);
+    const message = "error" in reply ? reply.error.message : "not a list";
+    if (message.startsWith(ALL_FAILED)) {
+      // The endpoints that fit are down: one with a smaller cap may still serve smaller windows.
+      const smaller = holding.filter((u) => !fitting.includes(u));
+      if (smaller.length > 0) return cut(filter, lo, hi, capOf(smaller));
+      throw new Error(message);
+    }
+    if (span <= MIN_PUBLIC_SPAN) return alchemySlices(filter, lo, hi);
+    return cut(filter, lo, hi, Math.ceil(span / 2));
+  }
+
+  /** Fetches `lo`..`hi` as consecutive windows of `size` blocks, in order. */
+  async function cut(filter: LogFilter, lo: number, hi: number, size: number) {
+    const out: unknown[] = [];
+    for (let a = lo; a <= hi; a += size) {
+      out.push(...(await fetchWindow(filter, a, Math.min(a + size - 1, hi))));
+    }
+    return out;
+  }
+
+  async function windowLogs(filter: LogFilter, lo: number, hi: number, head: number) {
+    const key = JSON.stringify([filter.address, filter.topics, lo, hi]);
+    const final = hi < head - FINALITY_BLOCKS;
+    const hit = final ? logCache.get(key) : undefined;
+    if (hit) {
+      remember(logCache, key, hit);
+      return hit;
+    }
+    const pending = logsInFlight.get(key);
+    if (pending !== undefined) return pending;
+    const work = fetchWindow(filter, lo, hi);
+    logsInFlight.set(key, work);
+    try {
+      const logs = await work;
+      if (final) {
+        remember(logCache, key, logs);
+        if (logCache.size > logCacheMax) logCache.delete(logCache.keys().next().value ?? "");
+      }
+      return logs;
+    } finally {
+      logsInFlight.delete(key);
+    }
+  }
+
+  async function getLogs(params: unknown, body: object): Promise<UpstreamReply> {
+    const filter: LogFilter = (
+      Array.isArray(params) && isObject(params[0]) ? params[0] : {}
+    ) as LogFilter;
+    if (filter.blockHash !== undefined) return resolve(body, "bulk");
+    const head = await headBlock();
+    // A missing bound means "latest", as in JSON-RPC.
+    const from = toBlock(filter.fromBlock, head);
+    const to = Math.min(toBlock(filter.toBlock, head), head);
+    if (!Number.isFinite(from) || !Number.isFinite(to)) {
+      return { error: { code: -32602, message: "invalid block range" } };
+    }
+    if (to < from) return { result: [] };
+    const out: unknown[] = [];
+    for (let lo = from; lo <= to; lo += PUBLIC_SPAN) {
+      out.push(...(await windowLogs(filter, lo, Math.min(lo + PUBLIC_SPAN - 1, to), head)));
+    }
+    return { result: out };
+  }
+
+  async function handle(request: unknown): Promise<JsonRpcResponse> {
+    const id = isObject(request) && "id" in request ? request.id : null;
+    let response: JsonRpcResponse;
+    if (!isObject(request) || typeof request.method !== "string") {
+      response = { jsonrpc: "2.0", id, error: { code: -32600, message: "invalid request" } };
+    } else {
+      try {
+        const reply =
+          request.method === "eth_getLogs"
+            ? await getLogs(request.params, request)
+            : await cachedRead(request.method, request.params, request);
+        response = toResponse(id, reply);
+      } catch (e) {
+        response = { jsonrpc: "2.0", id, error: { code: -32000, message: errorMessage(e) } };
+      }
+    }
+    served++;
+    if (response.error) failed++;
+    return response;
+  }
+
+  return {
+    handle,
+    async handleBody(text) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        return { jsonrpc: "2.0", id: null, error: { code: -32700, message: "parse error" } };
+      }
+      if (!Array.isArray(parsed)) return handle(parsed);
+      if (parsed.length === 0) {
+        return { jsonrpc: "2.0", id: null, error: { code: -32600, message: "empty batch" } };
+      }
+      return Promise.all(parsed.map(handle));
+    },
+    statusLine() {
+      const parts = allUrls.map((url) => {
+        const s = upstreamStats.get(url) ?? { calls: 0, failures: 0, last: "" };
+        const name = url === alchemyUrl ? "alchemy" : new URL(url).host;
+        const extra = url === alchemyUrl ? ` budget=${budget.used()}/${budget.limit}` : "";
+        const why = s.last.replace(/\s+/g, " ");
+        const last = why ? ` last="${why.slice(0, LAST_ERROR_CHARS)}"` : "";
+        return `${name} calls=${s.calls} failures=${s.failures}${last}${extra}`;
+      });
+      return [`served=${served} failed=${failed}`, ...parts, `logCache=${logCache.size}`].join(
+        " | ",
+      );
+    },
+  };
+}
+
+/** Moves `key` to the newest end of an insertion-ordered map. */
+function remember<V>(map: Map<string, V>, key: string, value: V): void {
+  map.delete(key);
+  map.set(key, value);
+}
+
+function toResponse(id: unknown, reply: UpstreamReply): JsonRpcResponse {
+  if ("result" in reply) return { jsonrpc: "2.0", id, result: reply.result };
+  return {
+    jsonrpc: "2.0",
+    id,
+    error: {
+      code: reply.error.code ?? -32000,
+      message: reply.error.message,
+      ...(reply.error.data === undefined ? {} : { data: reply.error.data }),
+    },
+  };
+}
+
+/** A block tag or hex number as a block number; `NaN` for anything else. */
+function toBlock(tag: unknown, head: number): number {
+  if (tag === undefined || tag === null) return head;
+  if (tag === "latest" || tag === "pending" || tag === "safe" || tag === "finalized") return head;
+  if (tag === "earliest") return 0;
+  return fromHex(tag);
+}
+
+function fromHex(value: unknown): number {
+  return typeof value === "string" && /^0x[0-9a-fA-F]+$/.test(value)
+    ? Number.parseInt(value, 16)
+    : Number.NaN;
+}
+
+const toHex = (n: number) => `0x${n.toString(16)}`;
+
+/**
+ * Throttling, as opposed to a refused range ("block range limit exceeded", "too many
+ * results"), which is answered by smaller windows instead.
+ */
+function isThrottle(message: string): boolean {
+  const m = message.toLowerCase();
+  return ["429", "rate limit", "too many requests", "over capacity"].some((w) => m.includes(w));
+}
+
+/**
+ * Failures worth retrying elsewhere: throttling, the network, timeouts, any HTTP 5xx, and
+ * history this endpoint has pruned (another may keep it: publicnode keeps recent blocks only).
+ */
+function isTransient(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    isThrottle(message) ||
+    /\bhttp 5\d\d\b/.test(m) ||
+    ["fetch failed", "timeout", "aborted", "pruned"].some((w) => m.includes(w))
+  );
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function errorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}

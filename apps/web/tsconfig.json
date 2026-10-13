@@ -9,6 +9,15 @@
     "allowJs": true,
     "plugins": [{ "name": "next" }]
   },
-  "include": ["next-env.d.ts", "next.config.ts", "app", ".next/types/**/*.ts"],
+  "include": [
+    "next-env.d.ts",
+    "next.config.ts",
+    "instrumentation.ts",
+    "instrumentation.test.ts",
+    "app",
+    "lib",
+    "components",
+    ".next/types/**/*.ts"
+  ],
   "exclude": ["node_modules"]
 }
