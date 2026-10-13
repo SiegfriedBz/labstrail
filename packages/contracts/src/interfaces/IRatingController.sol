@@ -118,10 +118,12 @@ interface IRatingController {
     ///         oracle's key runs on a server and the owner's stays offline (ADR 0030).
     error SameOwnerAndOracle();
 
-    /// @notice Requests a phase-1 rating of `targetUal`. The id hashes the chain id, this contract's
-    ///         address, its deploy time, the nonce, the requester and the UAL's hash, so no two
-    ///         requests share one (ADR 0016).
-    /// @param targetUal The UAL of the Target KA to rate.
+    /// @notice Requests a phase-1 rating of `targetUal`. The contract stores and hashes the UAL
+    ///         exactly as given, so callers send its canonical spelling; the oracle cancels a
+    ///         request in any other spelling with `InvalidTarget` (ADR 0031).
+    ///         The id hashes the chain id, this contract's address, its deploy time, the nonce,
+    ///         the requester and the UAL's hash, so no two requests share one (ADR 0016).
+    /// @param targetUal The UAL of the Target KA to rate, in canonical spelling.
     /// @return requestId The new request id.
     function requestPhase1(string calldata targetUal) external returns (bytes32 requestId);
 
@@ -194,13 +196,13 @@ interface IRatingController {
     function pendingRequestIds(uint256 offset, uint256 limit) external view returns (bytes32[] memory ids);
 
     /// @notice Returns the number of requests made for a target.
-    /// @param targetUal The target UAL.
+    /// @param targetUal The target UAL, matched exactly as requested (ADR 0031).
     /// @return count The number of requests.
     function requestCountOf(string calldata targetUal) external view returns (uint256 count);
 
     /// @notice Returns up to `limit` of a target's request ids, oldest first, starting at index
     ///         `offset`.
-    /// @param targetUal The target UAL.
+    /// @param targetUal The target UAL, matched exactly as requested (ADR 0031).
     /// @param offset The index of the first id.
     /// @param limit The maximum number of ids.
     /// @return ids The target's request ids in that range.
