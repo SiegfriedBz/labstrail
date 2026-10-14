@@ -95,11 +95,23 @@ export function parsePaperRecord(
   };
 }
 
-/** The text of a quoted literal (`"a\"b"`, `"7"^^<…>`, `"x"@en`); a bare IRI unchanged. */
+/** What each one-letter escape in an N-Triples literal stands for. */
+const ESCAPES: Readonly<Record<string, string>> = { n: "\n", r: "\r", t: "\t", b: "\b", f: "\f" };
+
+/**
+ * The text of a quoted literal (`"a\"b"`, `"7"^^<…>`, `"x"@en`); a bare IRI unchanged. Decodes
+ * the N-Triples escapes the DKG writes: `\n`, `\r`, `\t`, `\b`, `\f`, `\uXXXX`, `\UXXXXXXXX`,
+ * and a backslash before any other character stands for that character.
+ */
 export function unquote(term: string): string {
   const match = /^"((?:[^"\\]|\\.)*)"(?:\^\^<[^>]*>|@[a-zA-Z-]+)?$/s.exec(term);
   if (!match) return term;
-  return (match[1] ?? "").replace(/\\(.)/gs, (_, char: string) =>
-    char === "n" ? "\n" : char === "r" ? "\r" : char === "t" ? "\t" : char,
+  return (match[1] ?? "").replace(
+    /\\(?:u([0-9a-fA-F]{4})|U([0-9a-fA-F]{8})|(.))/gs,
+    (_, short?: string, long?: string, char?: string) => {
+      const code = short ?? long;
+      if (code !== undefined) return String.fromCodePoint(Number.parseInt(code, 16));
+      return ESCAPES[char ?? ""] ?? char ?? "";
+    },
   );
 }

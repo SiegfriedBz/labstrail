@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type PaperSubmission, targetKaQuads } from "../publish/target-ka.ts";
-import { paperRecordQuery, parsePaperRecord, type QueryBinding } from "./paper-record.ts";
+import { paperRecordQuery, parsePaperRecord, type QueryBinding, unquote } from "./paper-record.ts";
 
 const CID = "bafybeias652m2pfpmuaeze4dxmtcjvfwvr7dsteumagdd2vwaqrbkjokxu";
 const SUBMISSION: PaperSubmission = {
@@ -105,5 +105,23 @@ describe("parsePaperRecord", () => {
     ],
   ])("reads %s as no record", (_, bindings) => {
     expect(parsePaperRecord(CID, bindings)).toBeUndefined();
+  });
+});
+
+describe("unquote", () => {
+  it("decodes the escapes the DKG writes for control characters", () => {
+    expect(unquote('"factor \\u000F which"')).toBe("factor \u000F which");
+    expect(unquote('"a\\bb"')).toBe("a\bb");
+    expect(unquote('"page\\fbreak"')).toBe("page\fbreak");
+  });
+
+  it("keeps decoding new lines, tabs, quotes and backslashes", () => {
+    expect(unquote('"one\\ntwo\\rthree\\tfour"')).toBe("one\ntwo\rthree\tfour");
+    expect(unquote('"say \\"hi\\" \\\\ done"')).toBe('say "hi" \\ done');
+  });
+
+  it("leaves a typed literal's value and a bare IRI as they are", () => {
+    expect(unquote('"7"^^<http://www.w3.org/2001/XMLSchema#integer>')).toBe("7");
+    expect(unquote("http://schema.org/Review")).toBe("http://schema.org/Review");
   });
 });
