@@ -1,9 +1,11 @@
 import { CheckCircle, Question, XCircle } from "@phosphor-icons/react/dist/ssr";
 import { createColumnHelper, tableFeatures } from "@tanstack/react-table";
-import type { PaperSummary, SignatureCheck } from "@verisci/workflows";
+import type { PaperRatingSummary, SignatureCheck } from "@verisci/workflows";
 import Link from "next/link";
 import { addressUrl } from "../../lib/papers/explorer.ts";
 import { authorsLine, formatPublished, signatureLabel } from "../../lib/papers/papers.ts";
+import type { PaperRow } from "../../lib/papers/ratings.ts";
+import { summaryLabel } from "../../lib/rating/messages.ts";
 import { shorten } from "../../lib/shorten.ts";
 
 /*
@@ -19,13 +21,17 @@ export const paperFeatures = tableFeatures({});
 /** The column every width shows; below `md`, its cell also carries the others. */
 export const PAPER_COLUMN = "title";
 
-const column = createColumnHelper<typeof paperFeatures, PaperSummary>();
+const column = createColumnHelper<typeof paperFeatures, PaperRow>();
 
-/** Paper (title and first authors), Published, Submitted by, Signature. */
+/** Paper (title and first authors), Score, Published, Submitted by, Signature. */
 export const paperColumns = column.columns([
   column.accessor(PAPER_COLUMN, {
     header: "Paper",
     cell: ({ row }) => <PaperCell paper={row.original} />,
+  }),
+  column.accessor("rating", {
+    header: "Score",
+    cell: ({ getValue }) => <Score rating={getValue()} />,
   }),
   column.accessor("publishedAt", {
     header: "Published",
@@ -48,7 +54,7 @@ const CHECK = {
 } as const;
 
 /** The paper's title, linked to its page, its first authors, and below `md` the other columns. */
-function PaperCell({ paper }: { paper: PaperSummary }) {
+function PaperCell({ paper }: { paper: PaperRow }) {
   return (
     <div className="grid min-w-0 gap-1.5">
       <Link
@@ -59,6 +65,7 @@ function PaperCell({ paper }: { paper: PaperSummary }) {
       </Link>
       <p className="text-pretty text-xs leading-relaxed text-muted">{authorsLine(paper)}</p>
       <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted md:hidden">
+        <Score rating={paper.rating} />
         <Published iso={paper.publishedAt} />
         <Submitter address={paper.submitter} />
         <Signature check={paper.signatureCheck} />
@@ -97,5 +104,22 @@ function Signature({ check }: { check: SignatureCheck }) {
       <Icon aria-hidden size={14} weight="bold" />
       {signatureLabel(check)}
     </span>
+  );
+}
+
+/**
+ * The paper's latest score, the contract's (ADR 0014), in the on-chain teal; its state in words
+ * when it has none.
+ */
+function Score({ rating }: { rating: PaperRatingSummary }) {
+  return rating.kind === "scored" ? (
+    <span
+      className="font-mono text-sm font-semibold text-accent-2"
+      title="Reproducibility readiness, out of 100"
+    >
+      {summaryLabel(rating)}
+    </span>
+  ) : (
+    <span className="text-muted">{summaryLabel(rating)}</span>
   );
 }

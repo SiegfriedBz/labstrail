@@ -14,6 +14,10 @@ vi.mock("@verisci/workflows", () => ({
   }),
 }));
 
+vi.mock("../rating/ratings-section.tsx", () => ({
+  RatingsSection: ({ ual }: { ual: string }) => <p>ratings of {ual}</p>,
+}));
+
 const { PaperLoader } = await import("./paper-loader.tsx");
 
 describe("PaperLoader", () => {
@@ -48,6 +52,7 @@ describe("PaperLoader", () => {
       "Screening VP1 of deformed wing virus",
     );
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(await screen.findByText(`ratings of ${UAL}`)).toBeTruthy();
   });
 
   it("asks about the run its event started", async () => {
@@ -60,5 +65,6 @@ describe("PaperLoader", () => {
 
     expect(readPaper).toHaveBeenCalledWith(CID, EVENT_ID);
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Saving the record");
+    expect(screen.queryByText(/ratings of/)).toBeNull();
   });
 });

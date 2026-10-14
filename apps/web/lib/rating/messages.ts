@@ -1,0 +1,46 @@
+import type { PaperRatingSummary } from "@verisci/workflows";
+
+/** Why a rating request did not go through, as the request flow names it. */
+export type RequestProblem = "too-many-pending" | "paused" | "unavailable";
+
+/** What a cancelled rating's page says, by the reason the oracle recorded. */
+export function cancelMessage(reason: "invalid-target" | "expired"): {
+  readonly title: string;
+  readonly body: string;
+} {
+  return reason === "invalid-target"
+    ? {
+        title: "This paper can't be rated",
+        body: "VeriSci rates life-science and health papers it published itself, and reads them from their PDF. This one is outside the life sciences and health, its PDF's text couldn't be read (a scan, or a file over the size limit), or its address isn't one of VeriSci's papers.",
+      }
+    : {
+        title: "The rating couldn't finish within a day",
+        body: "Something on our side kept the rating from finishing, such as the scoring model being unavailable all day. Nothing was recorded. You can ask for a new rating.",
+      };
+}
+
+/** What the paper page says when a rating request didn't go through. */
+export function requestMessage(problem: RequestProblem): string {
+  switch (problem) {
+    case "too-many-pending":
+      return "You already have 3 ratings waiting. Try again when one finishes.";
+    case "paused":
+      return "Ratings are paused for now.";
+    case "unavailable":
+      return "Your request didn't go through. Check your wallet and try again.";
+  }
+}
+
+/** A paper's rating in the papers list: its score, `Pending`, `Not rated`, or `Not checked` when the chain did not answer. */
+export function summaryLabel(summary: PaperRatingSummary): string {
+  switch (summary.kind) {
+    case "scored":
+      return String(summary.score);
+    case "pending":
+      return "Pending";
+    case "unrated":
+      return "Not rated";
+    case "unknown":
+      return "Not checked";
+  }
+}

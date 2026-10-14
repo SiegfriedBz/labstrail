@@ -1,9 +1,9 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
-import type { PaperSummary } from "@verisci/workflows";
 import { afterEach, describe, expect, it } from "vitest";
+import type { PaperRow } from "../../lib/papers/ratings.ts";
 import { PapersTable } from "./papers-table.tsx";
 
-const FIRST: PaperSummary = {
+const FIRST: PaperRow = {
   cid: "bafybeihwexgn2z6ffhokgkcu55hyrq6pc4v2pnkdvpj6nc63durj4q6b6m",
   ual: "did:dkg:base:84532/0xd701ed157232ad5e14bc4134a8d10d64d86f13b3/9",
   publishedAt: "2026-10-10T15:14:13.222Z",
@@ -12,14 +12,16 @@ const FIRST: PaperSummary = {
   authorCount: 10,
   submitter: "0x9a17ec95e96f8a7c40b7ac1411e8a844c7bf9111",
   signatureCheck: "valid",
+  rating: { kind: "scored", score: 67, requestId: `0x${"ab".repeat(32)}` },
 };
-const SECOND: PaperSummary = {
+const SECOND: PaperRow = {
   ...FIRST,
   cid: "bafybeihhkeyxcad3cuj42gvhpsh67tiagkwfxbjgjsx7m3tidbkknkifcy",
   title: "Cross-kingdom RNA interference",
   authors: [],
   authorCount: 0,
   signatureCheck: "unknown",
+  rating: { kind: "unrated" },
 };
 
 describe("PapersTable", () => {
@@ -42,6 +44,7 @@ describe("PapersTable", () => {
 
     expect(screen.getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual([
       "Paper",
+      "Score",
       "Published",
       "Submitted by",
       "Signature",
@@ -62,6 +65,25 @@ describe("PapersTable", () => {
     expect(within(first as HTMLElement).getAllByText("Valid").length).toBeGreaterThan(0);
     expect(within(second as HTMLElement).getByText("No authors listed")).toBeTruthy();
     expect(within(second as HTMLElement).getAllByText("Not checked").length).toBeGreaterThan(0);
+  });
+
+  it("shows each paper's latest score, or its rating's state in words", () => {
+    render(
+      <PapersTable
+        papers={[
+          FIRST,
+          SECOND,
+          { ...SECOND, cid: "bafy3", rating: { kind: "pending" } },
+          { ...SECOND, cid: "bafy4", rating: { kind: "unknown" }, signatureCheck: "valid" },
+        ]}
+      />,
+    );
+    const rows = screen.getAllByRole("row").slice(1) as HTMLElement[];
+
+    expect(within(rows[0] as HTMLElement).getAllByText("67").length).toBeGreaterThan(0);
+    expect(within(rows[1] as HTMLElement).getAllByText("Not rated").length).toBeGreaterThan(0);
+    expect(within(rows[2] as HTMLElement).getAllByText("Pending").length).toBeGreaterThan(0);
+    expect(within(rows[3] as HTMLElement).getAllByText("Not checked").length).toBeGreaterThan(0);
   });
 
   it("gives the publish date as a machine-readable time", () => {

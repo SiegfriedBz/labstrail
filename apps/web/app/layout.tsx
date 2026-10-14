@@ -27,7 +27,7 @@ export const metadata: Metadata = siteMetadata;
  */
 export default async function RootLayout({ children }: { children: ReactNode }) {
   await connection();
-  const { APP_ENV, REOWN_PROJECT_ID } = createWebEnv();
+  const { APP_ENV, REOWN_PROJECT_ID, LOCAL_CHAIN_RPC_URL } = createWebEnv();
   const ratingController = currentRatingController(APP_ENV);
   return (
     // THEME_SCRIPT sets data-theme before the first paint, so React finds another value there.
@@ -49,7 +49,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         >
           Skip to content
         </a>
-        <Providers projectId={REOWN_PROJECT_ID}>
+        <Providers
+          projectId={REOWN_PROJECT_ID}
+          localRpcUrl={APP_ENV === "local" ? LOCAL_CHAIN_RPC_URL : undefined}
+        >
           <header className="sticky top-0 z-20 border-b border-line bg-page/70 backdrop-blur-xl">
             <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
               <Link href="/" aria-label={`${SITE.name} home`}>

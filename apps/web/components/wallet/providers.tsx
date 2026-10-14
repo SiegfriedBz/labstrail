@@ -1,6 +1,6 @@
 "use client";
 
-import { baseSepolia } from "@reown/appkit/networks";
+import { type AppKitNetwork, baseSepolia, foundry } from "@reown/appkit/networks";
 import { createAppKit } from "@reown/appkit/react";
 import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -20,17 +20,30 @@ let adapter: WagmiAdapter | undefined;
 let appKit: ReturnType<typeof createAppKit> | undefined;
 
 /**
- * Builds the wagmi adapter and the AppKit window once per page load, on Base Sepolia
- * only: the Submission's EIP-712 domain names chain 84532, and wallets refuse typed data
- * for another chain than the active one (ADR 0034).
+ * The wallet's networks: Base Sepolia, where papers are signed (the Submission's EIP-712
+ * domain names chain 84532) and ratings requested (ADR 0034); locally also Anvil, on
+ * `localRpcUrl`, where ratings are requested (ADR 0036).
  */
-function walletAdapter(projectId: string): WagmiAdapter {
+export function walletNetworks(
+  localRpcUrl: string | undefined,
+): [AppKitNetwork, ...AppKitNetwork[]] {
+  if (!localRpcUrl) return [baseSepolia];
+  const anvil = { ...foundry, name: "Anvil", rpcUrls: { default: { http: [localRpcUrl] } } };
+  return [baseSepolia, anvil];
+}
+
+/**
+ * Builds the wagmi adapter and the AppKit window once per page load, on {@link walletNetworks}:
+ * wallets refuse typed data for another chain than the active one, so Base Sepolia comes first.
+ */
+function walletAdapter(projectId: string, localRpcUrl: string | undefined): WagmiAdapter {
   if (adapter) return adapter;
-  adapter = new WagmiAdapter({ projectId, networks: [baseSepolia], ssr: true });
+  const networks = walletNetworks(localRpcUrl);
+  adapter = new WagmiAdapter({ projectId, networks, ssr: true });
   appKit = createAppKit({
     adapters: [adapter],
     projectId,
-    networks: [baseSepolia],
+    networks,
     defaultNetwork: baseSepolia,
     metadata: {
       name: SITE.name,
@@ -61,15 +74,18 @@ function walletAdapter(projectId: string): WagmiAdapter {
  */
 export function Providers({
   projectId,
+  localRpcUrl,
   children,
 }: {
   projectId: string | undefined;
+  /** Anvil's URL, set only with `APP_ENV=local`, for requesting ratings there. */
+  localRpcUrl?: string | undefined;
   children: ReactNode;
 }) {
   const [queryClient] = useState(() => new QueryClient());
   if (!projectId) return <WalletReady value={false}>{children}</WalletReady>;
   return (
-    <WagmiProvider config={walletAdapter(projectId).wagmiConfig}>
+    <WagmiProvider config={walletAdapter(projectId, localRpcUrl).wagmiConfig}>
       <QueryClientProvider client={queryClient}>
         <WalletReady value={true}>
           <AppKitTheme />

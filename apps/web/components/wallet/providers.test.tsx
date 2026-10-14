@@ -5,7 +5,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const setThemeMode = vi.fn();
 const createAppKit = vi.fn((_options: { themeMode?: string }) => ({ setThemeMode }));
 vi.mock("@reown/appkit/react", () => ({ createAppKit }));
-vi.mock("@reown/appkit/networks", () => ({ baseSepolia: { id: 84532 } }));
+vi.mock("@reown/appkit/networks", () => ({
+  baseSepolia: { id: 84532 },
+  foundry: {
+    id: 31337,
+    name: "Foundry",
+    rpcUrls: { default: { http: ["http://127.0.0.1:8545"] } },
+  },
+}));
 vi.mock("@reown/appkit-adapter-wagmi", () => ({
   WagmiAdapter: class {
     wagmiConfig = {};
@@ -14,7 +21,7 @@ vi.mock("@reown/appkit-adapter-wagmi", () => ({
 vi.mock("wagmi", () => ({ WagmiProvider: ({ children }: { children: ReactNode }) => children }));
 
 document.documentElement.dataset.theme = "dark";
-const { Providers } = await import("./providers.tsx");
+const { Providers, walletNetworks } = await import("./providers.tsx");
 
 describe("Providers", () => {
   afterEach(cleanup);
@@ -43,5 +50,21 @@ describe("Providers", () => {
     );
 
     expect(screen.getByText("page")).toBeTruthy();
+  });
+});
+
+describe("walletNetworks", () => {
+  it("offers Base Sepolia only when deployed", () => {
+    expect(walletNetworks(undefined)).toEqual([{ id: 84532 }]);
+  });
+
+  it("adds Anvil on its local URL locally, for ratings", () => {
+    const [, anvil] = walletNetworks("http://127.0.0.1:8546");
+
+    expect(anvil).toMatchObject({
+      id: 31337,
+      name: "Anvil",
+      rpcUrls: { default: { http: ["http://127.0.0.1:8546"] } },
+    });
   });
 });
