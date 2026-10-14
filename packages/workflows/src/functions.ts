@@ -1,4 +1,3 @@
-import { ratingControllerDeployments } from "@verisci/contracts";
 import { createDkgClient } from "@verisci/dkg";
 import { type RuntimeEnv, sharedEnv } from "@verisci/env";
 import { createPublicClient, createWalletClient, type Hex, http } from "viem";
@@ -10,6 +9,7 @@ import { checkField } from "./publish/field-check.ts";
 import { createPublishPaper, PUBLISH_SETTINGS, type PublishDeps } from "./publish/publish-paper.ts";
 import { readPaper } from "./publish/read-paper.ts";
 import { verifySubmission } from "./publish/verify-submission.ts";
+import { environmentContracts } from "./rating/contracts.ts";
 import { createOracleTransaction, ORACLE_SETTINGS, type OracleChain } from "./rating/oracle.ts";
 import { createOracleChain } from "./rating/oracle-chain.ts";
 import { createRatePaper, RATING_SETTINGS, type RatingDeps } from "./rating/rate-paper.ts";
@@ -93,16 +93,9 @@ function getRatingChain(): RatingChain {
     // the reads the oracle makes (nonces, fees, receipts, contract calls) are the same.
     chain: createOracleChain({ client: client as never, wallet, account }),
     chainId: chain.id,
-    contracts: environmentContracts(env),
+    contracts: environmentContracts(env.APP_ENV, env.LOCAL_RATING_CONTRACT),
   };
   return ratingChain;
-}
-
-/** The contracts a rating run takes requests from, lowercase. */
-function environmentContracts(env: RatingEnv): string[] {
-  if (env.APP_ENV === "local") return [String(env.LOCAL_RATING_CONTRACT).toLowerCase()];
-  const { current, past } = ratingControllerDeployments(env.APP_ENV);
-  return [current, ...past].map((deployment) => deployment.address);
 }
 
 let ratingDeps: RatingDeps | undefined;

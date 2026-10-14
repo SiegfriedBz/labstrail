@@ -37,6 +37,7 @@ describe("workflows' layout", () => {
       "createWorkflowsEnv",
       "describeFailure",
       "functions",
+      "getRatingService",
       "getUploadService",
       "inngest",
       "oracleTransaction",
