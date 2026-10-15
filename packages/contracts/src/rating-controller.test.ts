@@ -1,4 +1,4 @@
-import { decodeFunctionData } from "viem";
+import { AbiDecodingZeroDataError, decodeFunctionData } from "viem";
 import { describe, expect, it, vi } from "vitest";
 import { ratingControllerAbi } from "./generated/rating-controller-abi.ts";
 import {
@@ -214,6 +214,17 @@ describe("readRequestIdsOf", () => {
   it("is unreachable when the RPC fails", async () => {
     const client = reader(async () => {
       throw new Error("timeout");
+    });
+
+    expect(await readRequestIdsOf(client, CONTRACT, TARGET)).toEqual({
+      ok: false,
+      reason: "unreachable",
+    });
+  });
+
+  it("is unreachable when the reply doesn't decode, as from an address with no contract", async () => {
+    const client = reader(async () => {
+      throw new AbiDecodingZeroDataError();
     });
 
     expect(await readRequestIdsOf(client, CONTRACT, TARGET)).toEqual({
