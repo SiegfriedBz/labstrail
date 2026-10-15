@@ -92,7 +92,7 @@ describe("PapersTable", () => {
     expect(screen.getAllByText("Not rated").length).toBeGreaterThan(0);
   });
 
-  it("shows each paper's latest score, or its rating's state in words", () => {
+  it("shows each paper's latest score with the phase it reached, or its rating's state in words", () => {
     render(
       <PapersTable
         papers={[
@@ -106,6 +106,8 @@ describe("PapersTable", () => {
     const rows = screen.getAllByRole("row").slice(1) as HTMLElement[];
 
     expect(within(rows[0] as HTMLElement).getAllByText("67").length).toBeGreaterThan(0);
+    expect(within(rows[0] as HTMLElement).getAllByText("phase 1").length).toBeGreaterThan(0);
+    expect(within(rows[1] as HTMLElement).queryByText("phase 1")).toBeNull();
     expect(within(rows[1] as HTMLElement).getAllByText("Not rated").length).toBeGreaterThan(0);
     expect(within(rows[2] as HTMLElement).getAllByText("Pending").length).toBeGreaterThan(0);
     expect(within(rows[3] as HTMLElement).getAllByText("Not checked").length).toBeGreaterThan(0);

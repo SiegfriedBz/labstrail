@@ -108,19 +108,22 @@ function Signature({ check }: { check: SignatureCheck }) {
 }
 
 /**
- * The paper's latest score, the contract's (ADR 0014), in the on-chain teal; its state in words
- * when it has none, and for an unrated paper a Rate link to its page's rating section, where a
- * contract takes ratings.
+ * The paper's latest score, the contract's (ADR 0014), in the on-chain teal, with the phase it
+ * reached (ADR 0012): phase 1, the only one that runs. Its state in words when it has none, and
+ * for an unrated paper a Rate link to its page's rating section, where a contract takes ratings.
  */
 function Score({ paper }: { paper: PaperRow }) {
   const { rating, cid } = paper;
   if (rating.kind === "scored") {
     return (
       <span
-        className="font-mono text-sm font-semibold text-accent-2"
+        className="inline-flex items-baseline gap-1.5 whitespace-nowrap"
         title="Reproducibility readiness, out of 100"
       >
-        {summaryLabel(rating)}
+        <span className="font-mono text-sm font-semibold text-accent-2">
+          {summaryLabel(rating)}
+        </span>
+        <span className="text-xs text-muted">phase 1</span>
       </span>
     );
   }
