@@ -137,7 +137,7 @@ describe("RatingProgress", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     show({ ok: true, rating: { ...RATING, status: "pending" }, stage: "scoring" });
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Scoring the paper");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Reading the paper");
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5000);
@@ -154,6 +154,49 @@ describe("RatingProgress", () => {
       await vi.advanceTimersByTimeAsync(20_000);
     });
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows a pending rating's steps, done ones first, each with what it does", () => {
+    show({ ok: true, rating: { ...RATING, status: "pending" }, stage: "minting" });
+
+    const steps = within(screen.getByRole("list", { name: "Rating steps" })).getAllByRole(
+      "listitem",
+    );
+    expect(steps.map((step) => step.querySelector("p")?.textContent)).toEqual([
+      "Scored",
+      "Saved off-chain",
+      "Minted on-chain (in progress)",
+      "Recorded on-chain",
+    ]);
+    expect(screen.getAllByText(/OriginTrail's Knowledge Asset contracts/)).toHaveLength(2);
+    expect(screen.getByText(/VeriSci's RatingController contract/)).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Minting the rating");
+  });
+
+  it("says a paper outside the field stops at the first step", () => {
+    show({ ok: true, rating: { ...RATING, status: "pending" }, stage: "scoring" });
+
+    expect(
+      screen.getByText(/outside the life sciences and health, the rating is cancelled/),
+    ).toBeTruthy();
+  });
+
+  it("says when a pending rating was requested, and that it is taking long past 15 min", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(RATING.requestedAt * 1000 + 25 * 60_000);
+    show({ ok: true, rating: { ...RATING, status: "pending" }, stage: "scoring" });
+
+    expect(screen.getByText("Requested 25 min ago")).toBeTruthy();
+    expect(screen.getByText(/taking longer than usual/)).toBeTruthy();
+  });
+
+  it("says nothing about a slow rating in its first minutes", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(RATING.requestedAt * 1000 + 2 * 60_000);
+    show({ ok: true, rating: { ...RATING, status: "pending" }, stage: "scoring" });
+
+    expect(screen.getByText("Requested 2 min ago")).toBeTruthy();
+    expect(screen.queryByText(/taking longer than usual/)).toBeNull();
   });
 
   it("asks nothing for a rating that is already final", async () => {

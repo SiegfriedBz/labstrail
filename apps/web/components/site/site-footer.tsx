@@ -14,8 +14,6 @@ interface ContractRow {
   owner: "OriginTrail" | "VeriSci";
   role: string;
   address: string;
-  /** Deployed, but nothing calls it yet. */
-  soon?: boolean;
 }
 
 /**
@@ -49,7 +47,6 @@ export function SiteFooter({ ratingController }: { ratingController: string | un
             owner: "VeriSci" as const,
             role: "Records each rating phase's score",
             address: ratingController,
-            soon: true,
           },
         ]
       : []),
@@ -92,11 +89,6 @@ export function SiteFooter({ ratingController }: { ratingController: string | un
                     >
                       {row.owner}
                     </span>
-                    {row.soon && (
-                      <span className="rounded-md bg-surface-strong px-1.5 py-0.5 font-mono text-[11px] text-muted">
-                        soon
-                      </span>
-                    )}
                   </span>
                   <span className="text-sm text-muted">{row.role}</span>
                 </span>

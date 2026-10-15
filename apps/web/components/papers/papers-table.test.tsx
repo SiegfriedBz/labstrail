@@ -67,6 +67,23 @@ describe("PapersTable", () => {
     expect(within(second as HTMLElement).getAllByText("Not checked").length).toBeGreaterThan(0);
   });
 
+  it("links an unrated paper's Score to its page's rating section, and no other", () => {
+    render(
+      <PapersTable
+        papers={[FIRST, SECOND, { ...SECOND, cid: "bafy5", rating: { kind: "cannot-rate" } }]}
+      />,
+    );
+    const [first, second, third] = screen.getAllByRole("row").slice(1) as HTMLElement[];
+
+    expect(
+      within(second as HTMLElement)
+        .getAllByRole("link", { name: "Rate" })
+        .map((link) => link.getAttribute("href")),
+    ).toContain(`/papers/${SECOND.cid}#rating`);
+    expect(within(first as HTMLElement).queryByRole("link", { name: "Rate" })).toBeNull();
+    expect(within(third as HTMLElement).queryByRole("link", { name: "Rate" })).toBeNull();
+  });
+
   it("shows each paper's latest score, or its rating's state in words", () => {
     render(
       <PapersTable

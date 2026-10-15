@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import type { RatingListResult } from "@verisci/workflows";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -10,7 +10,10 @@ const id = (n: number) => `0x${n.toString(16).padStart(64, "0")}`;
 const listRatings = vi.fn<(ual: string) => Promise<RatingListResult>>();
 let env: Record<string, string | undefined> = { APP_ENV: "staging" };
 
-vi.mock("@verisci/workflows", () => ({ getRatingService: () => ({ listRatings }) }));
+vi.mock("@verisci/workflows", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@verisci/workflows")>()),
+  getRatingService: () => ({ listRatings }),
+}));
 vi.mock("../../lib/web-env.ts", () => ({ createWebEnv: () => env }));
 vi.mock("./rate-button.tsx", () => ({
   RateButton: ({ config }: { config: unknown }) => (
@@ -38,7 +41,7 @@ describe("RatingsSection", () => {
     env = { APP_ENV: "staging" };
   });
 
-  it("leads with the latest score, as reproducibility readiness, and lists every rating", async () => {
+  it("leads with the latest score and lists every rating, newest first", async () => {
     listRatings.mockResolvedValue({
       ok: true,
       ratings: [
@@ -64,19 +67,25 @@ describe("RatingsSection", () => {
     await show();
 
     expect(listRatings).toHaveBeenCalledWith(UAL);
+    expect(screen.getByRole("heading", { name: "Ratings" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Reproducibility readiness" })).toBeTruthy();
     expect(screen.getByTestId("latest-score").textContent).toBe("67");
-    const rows = screen.getAllByRole("listitem");
-    expect(rows).toHaveLength(3);
-    expect(rows[0]?.textContent).toMatch(/Couldn't finish/);
-    expect(rows[1]?.textContent).toMatch(/67/);
-    expect(rows[2]?.textContent).toMatch(/In progress/);
+    expect(screen.getByRole("link", { name: "Read the checks" }).getAttribute("href")).toBe(
+      `/papers/${CID}/ratings/${id(2)}`,
+    );
+    const history = within(screen.getByRole("list", { name: "Rating history" }));
+    const rows = history.getAllByRole("listitem");
+    expect(rows.map((row) => row.textContent)).toEqual([
+      expect.stringMatching(/In progress/),
+      expect.stringMatching(/67/),
+      expect.stringMatching(/Couldn't finish/),
+    ]);
     expect(
-      screen.getAllByRole("link", { name: /Details/ }).map((link) => link.getAttribute("href")),
-    ).toEqual([1, 2, 3].map((n) => `/papers/${CID}/ratings/${id(n)}`));
+      history.getAllByRole("link", { name: /Details/ }).map((link) => link.getAttribute("href")),
+    ).toEqual([3, 2, 1].map((n) => `/papers/${CID}/ratings/${id(n)}`));
   });
 
-  it("says a paper with only a pending rating is being rated", async () => {
+  it("says a paper with only a pending rating is being rated, with a link to follow it", async () => {
     listRatings.mockResolvedValue({
       ok: true,
       ratings: [{ requestId: id(1), contract: CONTRACT, status: "pending", requestedAt: 1 }],
@@ -84,21 +93,69 @@ describe("RatingsSection", () => {
 
     await show();
 
-    expect(screen.getByText("Rating in progress")).toBeTruthy();
+    expect(screen.getByTestId("rating-state").textContent).toBe("Rating in progress");
+    expect(screen.getByRole("link", { name: "Follow it" }).getAttribute("href")).toBe(
+      `/papers/${CID}/ratings/${id(1)}`,
+    );
   });
 
-  it("says a paper never rated is not rated yet, with the button", async () => {
+  it("says a paper never rated is not rated yet, what a rating does, and shows the button", async () => {
     listRatings.mockResolvedValue({ ok: true, ratings: [] });
 
     await show();
 
-    expect(screen.getByText("Not rated yet")).toBeTruthy();
-    expect(screen.queryByRole("list")).toBeNull();
+    expect(screen.getByTestId("rating-state").textContent).toBe("Not rated yet");
+    expect(screen.getByText(/takes a few minutes/)).toBeTruthy();
+    expect(screen.queryByRole("list", { name: "Rating history" })).toBeNull();
     const button = screen.getByRole("button", { name: "Rate this paper" });
     expect(JSON.parse(button.dataset.config ?? "{}")).toMatchObject({
       chainId: 84_532,
       local: false,
     });
+  });
+
+  it("says a paper whose request was cancelled as invalid can't be rated, without the button", async () => {
+    listRatings.mockResolvedValue({
+      ok: true,
+      ratings: [
+        {
+          requestId: id(1),
+          contract: CONTRACT,
+          status: "cancelled",
+          cancelReason: "invalid-target",
+          requestedAt: 1,
+        },
+      ],
+    });
+
+    await show();
+
+    expect(screen.getByTestId("rating-state").textContent).toBe("Can't be rated");
+    expect(screen.queryByRole("button", { name: "Rate this paper" })).toBeNull();
+    expect(screen.getByText(/can't be asked for again/)).toBeTruthy();
+  });
+
+  it("shows the three phases, the first live and the others to come", async () => {
+    listRatings.mockResolvedValue({ ok: true, ratings: [] });
+
+    await show();
+
+    const phases = within(screen.getByRole("list", { name: "Rating phases" })).getAllByRole(
+      "listitem",
+    );
+    expect(phases.map((phase) => phase.textContent)).toEqual([
+      expect.stringMatching(/Reproducibility readiness.*live/),
+      expect.stringMatching(/Human review.*next/),
+      expect.stringMatching(/Wet-lab replication.*later/),
+    ]);
+  });
+
+  it("is the target of the papers list's Rate link", async () => {
+    listRatings.mockResolvedValue({ ok: true, ratings: [] });
+
+    await show();
+
+    expect(screen.getByRole("region", { name: "Ratings" }).id).toBe("rating");
   });
 
   it("says ratings can't be loaded when the chain doesn't answer, with a link to try again", async () => {

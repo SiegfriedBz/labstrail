@@ -8,7 +8,9 @@ describe("ProgressChain", () => {
   it("explains each step while a paper is being published", () => {
     render(<ProgressChain stage="minting" />);
 
-    expect(screen.getByText("The asset is minted on Base, with its merkle root")).toBeTruthy();
+    expect(
+      screen.getByText(/minted on Base by OriginTrail's Knowledge Asset contracts/),
+    ).toBeTruthy();
     expect(screen.getByText("(in progress)")).toBeTruthy();
   });
 
@@ -21,6 +23,6 @@ describe("ProgressChain", () => {
       "Minted on-chain",
       "Published",
     ]);
-    expect(screen.queryByText("The asset is minted on Base, with its merkle root")).toBeNull();
+    expect(screen.queryByText(/minted on Base by OriginTrail's/)).toBeNull();
   });
 });

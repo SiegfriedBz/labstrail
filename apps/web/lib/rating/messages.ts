@@ -31,13 +31,18 @@ export function requestMessage(problem: RequestProblem): string {
   }
 }
 
-/** A paper's rating in the papers list: its score, `Pending`, `Not rated`, or `Not checked` when the chain did not answer. */
+/**
+ * A paper's rating in the papers list: its score, `Pending`, `Can't be rated` (a request was
+ * cancelled `invalid-target`), `Not rated`, or `Not checked` when the chain did not answer.
+ */
 export function summaryLabel(summary: PaperRatingSummary): string {
   switch (summary.kind) {
     case "scored":
       return String(summary.score);
     case "pending":
       return "Pending";
+    case "cannot-rate":
+      return "Can't be rated";
     case "unrated":
       return "Not rated";
     case "unknown":

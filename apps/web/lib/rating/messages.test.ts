@@ -33,6 +33,7 @@ describe("summaryLabel", () => {
     [{ kind: "scored", score: 67, requestId: "0x1" }, "67"],
     [{ kind: "pending" }, "Pending"],
     [{ kind: "unrated" }, "Not rated"],
+    [{ kind: "cannot-rate" }, "Can't be rated"],
     [{ kind: "unknown" }, "Not checked"],
   ] as const)("labels %o as %s", (summary, label) => {
     expect(summaryLabel(summary)).toBe(label);

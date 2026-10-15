@@ -31,7 +31,7 @@ export const paperColumns = column.columns([
   }),
   column.accessor("rating", {
     header: "Score",
-    cell: ({ getValue }) => <Score rating={getValue()} />,
+    cell: ({ row }) => <Score rating={row.original.rating} cid={row.original.cid} />,
   }),
   column.accessor("publishedAt", {
     header: "Published",
@@ -65,7 +65,7 @@ function PaperCell({ paper }: { paper: PaperRow }) {
       </Link>
       <p className="text-pretty text-xs leading-relaxed text-muted">{authorsLine(paper)}</p>
       <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted md:hidden">
-        <Score rating={paper.rating} />
+        <Score rating={paper.rating} cid={paper.cid} />
         <Published iso={paper.publishedAt} />
         <Submitter address={paper.submitter} />
         <Signature check={paper.signatureCheck} />
@@ -109,17 +109,28 @@ function Signature({ check }: { check: SignatureCheck }) {
 
 /**
  * The paper's latest score, the contract's (ADR 0014), in the on-chain teal; its state in words
- * when it has none.
+ * when it has none, and for an unrated paper a Rate link to its page's rating section.
  */
-function Score({ rating }: { rating: PaperRatingSummary }) {
-  return rating.kind === "scored" ? (
-    <span
-      className="font-mono text-sm font-semibold text-accent-2"
-      title="Reproducibility readiness, out of 100"
-    >
-      {summaryLabel(rating)}
-    </span>
-  ) : (
-    <span className="text-muted">{summaryLabel(rating)}</span>
-  );
+function Score({ rating, cid }: { rating: PaperRatingSummary; cid: string }) {
+  if (rating.kind === "scored") {
+    return (
+      <span
+        className="font-mono text-sm font-semibold text-accent-2"
+        title="Reproducibility readiness, out of 100"
+      >
+        {summaryLabel(rating)}
+      </span>
+    );
+  }
+  if (rating.kind === "unrated") {
+    return (
+      <span className="inline-flex items-baseline gap-2 whitespace-nowrap">
+        <span className="text-muted">{summaryLabel(rating)}</span>
+        <Link href={`/papers/${cid}#rating`} className="link">
+          Rate
+        </Link>
+      </span>
+    );
+  }
+  return <span className="text-muted">{summaryLabel(rating)}</span>;
 }
