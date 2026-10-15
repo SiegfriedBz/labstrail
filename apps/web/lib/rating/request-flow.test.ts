@@ -31,7 +31,7 @@ function deps(over: Partial<RequestDeps> = {}): RequestDeps & {
     connect: vi.fn(),
     switchChain: vi.fn(async () => undefined),
     sendRequest: vi.fn(async () => TX),
-    waitForReceipt: async () => [requestLog(CONTRACT)],
+    waitForReceipt: async () => ({ reverted: false, logs: [requestLog(CONTRACT)] }),
     announce: vi.fn(async () => ({ ok: true as const, requestId: REQUEST_ID })),
     ...over,
   } as never;
@@ -117,8 +117,17 @@ describe("requestRating", () => {
     expect(flow.announce).not.toHaveBeenCalled();
   });
 
+  it("says the contract refused a request whose transaction reverted", async () => {
+    const flow = deps({ waitForReceipt: async () => ({ reverted: true, logs: [] }) });
+
+    expect(await requestRating(UAL, flow)).toEqual({ ok: false, problem: "refused" });
+    expect(flow.announce).not.toHaveBeenCalled();
+  });
+
   it("reads the request id only from this contract's log", async () => {
-    const flow = deps({ waitForReceipt: async () => [requestLog(OTHER)] });
+    const flow = deps({
+      waitForReceipt: async () => ({ reverted: false, logs: [requestLog(OTHER)] }),
+    });
 
     expect(await requestRating(UAL, flow)).toEqual({ ok: true, unconfirmed: TX });
   });

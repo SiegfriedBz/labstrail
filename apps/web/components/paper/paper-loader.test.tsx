@@ -14,6 +14,8 @@ vi.mock("@verisci/workflows", () => ({
   }),
 }));
 
+const router = { refresh: vi.fn() };
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("../rating/ratings-section.tsx", () => ({
   RatingsSection: ({ ual }: { ual: string }) => <p>ratings of {ual}</p>,
 }));

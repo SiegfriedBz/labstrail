@@ -25,6 +25,7 @@ describe("requestMessage", () => {
 
   it("words a failure it can't name", () => {
     expect(requestMessage("unavailable")).toMatch(/didn't go through/);
+    expect(requestMessage("refused")).toMatch(/contract refused/);
   });
 });
 

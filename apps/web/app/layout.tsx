@@ -1,4 +1,3 @@
-import { NoDeploymentError, ratingControllerDeployments } from "@verisci/contracts";
 import type { Metadata } from "next";
 import { Martian_Mono, Sora } from "next/font/google";
 import Link from "next/link";
@@ -10,6 +9,7 @@ import { SiteFooter } from "../components/site/site-footer.tsx";
 import { ThemeToggle } from "../components/site/theme-toggle.tsx";
 import { Providers } from "../components/wallet/providers.tsx";
 import { WalletButton } from "../components/wallet/wallet-button.tsx";
+import { ratingChainConfig } from "../lib/rating/chain.ts";
 import { SITE, siteMetadata } from "../lib/site.ts";
 import { THEME_SCRIPT } from "../lib/theme.ts";
 import { createWebEnv } from "../lib/web-env.ts";
@@ -27,8 +27,9 @@ export const metadata: Metadata = siteMetadata;
  */
 export default async function RootLayout({ children }: { children: ReactNode }) {
   await connection();
-  const { APP_ENV, REOWN_PROJECT_ID, LOCAL_CHAIN_RPC_URL } = createWebEnv();
-  const ratingController = currentRatingController(APP_ENV);
+  const env = createWebEnv();
+  const { APP_ENV, REOWN_PROJECT_ID, LOCAL_CHAIN_RPC_URL } = env;
+  const rating = ratingChainConfig(env);
   return (
     // THEME_SCRIPT sets data-theme before the first paint, so React finds another value there.
     <html
@@ -68,19 +69,11 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           <main id="main" className="relative mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-16">
             {children}
           </main>
-          <SiteFooter ratingController={ratingController} />
+          <SiteFooter
+            ratingController={rating && { address: rating.contract, local: rating.local }}
+          />
         </Providers>
       </body>
     </html>
   );
-}
-
-/** This environment's current RatingController address, or none while it has no deployment. */
-function currentRatingController(appEnv: "local" | "staging" | "production"): string | undefined {
-  try {
-    return ratingControllerDeployments(appEnv).current.address;
-  } catch (error) {
-    if (error instanceof NoDeploymentError) return undefined;
-    throw error;
-  }
 }

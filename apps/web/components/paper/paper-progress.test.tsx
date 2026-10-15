@@ -1,7 +1,13 @@
 import { act, cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PaperView } from "../../lib/publish/upload-actions.ts";
-import { PaperProgress } from "./paper-progress.tsx";
+
+const refresh = vi.fn();
+// One router for every render, as Next.js gives.
+const router = { refresh };
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
+
+const { PaperProgress } = await import("./paper-progress.tsx");
 
 const CID = "bafybeias652m2pfpmuaeze4dxmtcjvfwvr7dsteumagdd2vwaqrbkjokxu";
 const GRAPH = "0xd701ed157232ad5e14bc4134a8d10d64d86f13b3/verisci-staging";
@@ -78,6 +84,25 @@ describe("PaperProgress", () => {
 
     await advance(30_000);
     expect(urls).toHaveLength(2);
+  });
+
+  it("refreshes the server's part of the page once the paper is published, for its ratings", async () => {
+    serve([{ stage: "minting" }, PUBLISHED]);
+    refresh.mockClear();
+
+    render(
+      <PaperProgress
+        cid={CID}
+        contextGraph={GRAPH}
+        eventId={undefined}
+        initial={{ stage: "saving" }}
+      />,
+    );
+    await advance(5000);
+    expect(refresh).not.toHaveBeenCalled();
+    await advance(5000);
+
+    expect(refresh).toHaveBeenCalledTimes(1);
   });
 
   it("asks nothing when the server's view is already final", async () => {

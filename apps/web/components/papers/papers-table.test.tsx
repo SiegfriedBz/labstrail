@@ -13,6 +13,7 @@ const FIRST: PaperRow = {
   submitter: "0x9a17ec95e96f8a7c40b7ac1411e8a844c7bf9111",
   signatureCheck: "valid",
   rating: { kind: "scored", score: 67, requestId: `0x${"ab".repeat(32)}` },
+  canRate: true,
 };
 const SECOND: PaperRow = {
   ...FIRST,
@@ -82,6 +83,13 @@ describe("PapersTable", () => {
     ).toContain(`/papers/${SECOND.cid}#rating`);
     expect(within(first as HTMLElement).queryByRole("link", { name: "Rate" })).toBeNull();
     expect(within(third as HTMLElement).queryByRole("link", { name: "Rate" })).toBeNull();
+  });
+
+  it("leaves the Rate link out where no contract takes ratings", () => {
+    render(<PapersTable papers={[{ ...SECOND, canRate: false }]} />);
+
+    expect(screen.queryByRole("link", { name: "Rate" })).toBeNull();
+    expect(screen.getAllByText("Not rated").length).toBeGreaterThan(0);
   });
 
   it("shows each paper's latest score, or its rating's state in words", () => {

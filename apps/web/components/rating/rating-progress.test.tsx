@@ -199,6 +199,22 @@ describe("RatingProgress", () => {
     expect(screen.queryByText(/taking longer than usual/)).toBeNull();
   });
 
+  it("says why the paper's title and checks are missing when the node didn't answer", () => {
+    render(
+      <RatingProgress
+        cid={CID}
+        title="bafybe…6b6m"
+        requestId={REQUEST_ID}
+        initial={{ ok: true, rating: { ...RATING, status: "pending" }, stage: "scoring" }}
+        local={false}
+        nodeDown
+      />,
+    );
+
+    expect(screen.getByRole("status").textContent).toMatch(/node isn't answering/);
+    expect(screen.getByRole("status").textContent).toMatch(/score comes from the chain/);
+  });
+
   it("asks nothing for a rating that is already final", async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn();

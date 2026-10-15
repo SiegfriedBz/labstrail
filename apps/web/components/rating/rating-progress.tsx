@@ -15,6 +15,10 @@ const POLL_MS = 5000;
 /** How often the time since the request is redrawn. */
 const CLOCK_MS = 30_000;
 
+/** Why the page shows the paper's address, and perhaps no checks, when the node is down. */
+const NODE_DOWN_NOTE =
+  "VeriSci's node isn't answering right now, so the paper's title and the rating's checks can't be shown. The score comes from the chain, so it's accurate. Reload the page later to see everything.";
+
 /** What a rating running past `SLOW_AFTER_MS` adds to the panel. */
 const SLOW_NOTE =
   "This is taking longer than usual, most often because the scoring model is busy. VeriSci keeps trying. If the rating can't finish within a day, the request is cancelled and you can ask again.";
@@ -30,6 +34,7 @@ export function RatingProgress({
   requestId,
   initial,
   local,
+  nodeDown = false,
 }: {
   cid: string;
   /** The paper's title, for the breadcrumbs. */
@@ -38,6 +43,8 @@ export function RatingProgress({
   initial: RatingView;
   /** True on Anvil, which no block explorer shows. */
   local: boolean;
+  /** The DKG node did not answer the server's read: no title, and no checks to show. */
+  nodeDown?: boolean;
 }) {
   const [view, setView] = useState<RatingView>(initial);
   const stage = ratingStage(view);
@@ -100,6 +107,14 @@ export function RatingProgress({
           <p className="text-sm text-muted">{requestedAgo(view.rating.requestedAt, now)}</p>
         )}
       </div>
+      {nodeDown && (
+        <p
+          role="status"
+          className="max-w-[65ch] rounded-xl border border-line bg-surface-strong px-4 py-3 text-sm leading-relaxed text-muted"
+        >
+          {NODE_DOWN_NOTE}
+        </p>
+      )}
       <Body
         stage={stage}
         view={view}

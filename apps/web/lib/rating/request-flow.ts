@@ -25,8 +25,10 @@ export interface RequestDeps {
   switchChain(chainId: number): Promise<void>;
   /** Sends `requestPhase1(ual)` from the wallet and returns its hash; throws when refused or reverted. */
   sendRequest(ual: string): Promise<Hex>;
-  /** The mined transaction's logs, or `undefined` when no receipt came in time. */
-  waitForReceipt(hash: Hex): Promise<readonly ReceiptLog[] | undefined>;
+  /** The mined transaction's status and logs, or `undefined` when no receipt came in time. */
+  waitForReceipt(
+    hash: Hex,
+  ): Promise<{ readonly reverted: boolean; readonly logs: readonly ReceiptLog[] } | undefined>;
   /** Locally, has the server send the request's event (`announceLocalRating`). */
   announce(hash: Hex): Promise<AnnounceResult>;
 }
@@ -45,7 +47,8 @@ export type RequestResult =
  * Requests a phase-1 rating of `ual` from the visitor's wallet (ADRs 0015, 0031): connects the
  * wallet or switches its chain when needed, sends `requestPhase1` to the current contract, reads
  * the request id from the receipt's `Phase1Requested` log, then, locally only, has the server
- * announce it, since no Alchemy Notify webhook watches Anvil (ADR 0036).
+ * announce it, since no Alchemy Notify webhook watches Anvil (ADR 0036). A transaction mined
+ * but reverted (the cap filled or the contract paused after the wallet's check) is `refused`.
  */
 export async function requestRating(ual: string, deps: RequestDeps): Promise<RequestResult> {
   const account = deps.account();
@@ -60,8 +63,9 @@ export async function requestRating(ual: string, deps: RequestDeps): Promise<Req
   } catch (error) {
     return { ok: false, problem: problemOf(error) };
   }
-  const logs = await deps.waitForReceipt(hash).catch(() => undefined);
-  const requestId = logs && requestIdOf(logs, deps.contract);
+  const receipt = await deps.waitForReceipt(hash).catch(() => undefined);
+  if (receipt?.reverted) return { ok: false, problem: "refused" };
+  const requestId = receipt && requestIdOf(receipt.logs, deps.contract);
   if (!requestId) return { ok: true, unconfirmed: hash };
   if (!deps.local) return { ok: true, requestId };
   const announced = await deps.announce(hash).catch(() => ({ ok: false as const }));

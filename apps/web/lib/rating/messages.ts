@@ -1,7 +1,10 @@
 import type { PaperRatingSummary } from "@verisci/workflows";
 
-/** Why a rating request did not go through, as the request flow names it. */
-export type RequestProblem = "too-many-pending" | "paused" | "unavailable";
+/**
+ * Why a rating request did not go through, as the request flow names it: `refused` is a
+ * transaction the contract reverted once mined.
+ */
+export type RequestProblem = "too-many-pending" | "paused" | "refused" | "unavailable";
 
 /** What a cancelled rating's page says, by the reason the oracle recorded. */
 export function cancelMessage(reason: "invalid-target" | "expired"): {
@@ -26,6 +29,8 @@ export function requestMessage(problem: RequestProblem): string {
       return "You already have 3 ratings waiting. Try again when one finishes.";
     case "paused":
       return "Ratings are paused for now.";
+    case "refused":
+      return "The contract refused your request, so no rating was asked for: you may already have 3 ratings waiting, or ratings may be paused. The transaction's gas was still spent.";
     case "unavailable":
       return "Your request didn't go through. Check your wallet and try again.";
   }

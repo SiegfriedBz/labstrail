@@ -68,14 +68,14 @@ function RateFlow({ ual, cid, config }: { ual: string; cid: string; config: Rati
         setPhase("confirming");
         return hash;
       },
-      waitForReceipt: async (hash) =>
-        (
-          await waitForTransactionReceipt(wagmi, {
-            hash,
-            chainId: config.chainId,
-            timeout: RECEIPT_TIMEOUT_MS,
-          })
-        ).logs,
+      waitForReceipt: async (hash) => {
+        const receipt = await waitForTransactionReceipt(wagmi, {
+          hash,
+          chainId: config.chainId,
+          timeout: RECEIPT_TIMEOUT_MS,
+        });
+        return { reverted: receipt.status === "reverted", logs: receipt.logs };
+      },
       announce: (hash) => announceLocalRating(hash),
     });
     setPhase("idle");

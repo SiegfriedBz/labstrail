@@ -27,12 +27,14 @@ describe("withRatings", () => {
       { kind: "scored", score: 67, requestId: "0x1" },
       { kind: "pending" },
     ]);
+    expect(rows.every((row) => row.canRate)).toBe(true);
   });
 
-  it("calls every paper unrated where no contract takes ratings", async () => {
+  it("calls every paper unrated, and not rateable, where no contract takes ratings", async () => {
     const rows = await withRatings([paper(7)], undefined);
 
     expect(rows[0]?.rating).toEqual({ kind: "unrated" });
+    expect(rows[0]?.canRate).toBe(false);
   });
 
   it("calls every paper unknown when the read fails", async () => {

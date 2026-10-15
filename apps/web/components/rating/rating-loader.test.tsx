@@ -12,16 +12,18 @@ vi.mock("@verisci/workflows", () => ({
   getRatingService: () => ({ readRating }),
   getUploadService: () => ({ readPaper }),
 }));
-vi.mock("../../lib/web-env.ts", () => ({ createWebEnv: () => ({ APP_ENV: "staging" }) }));
+let env: Record<string, string | undefined> = { APP_ENV: "staging" };
+vi.mock("../../lib/web-env.ts", () => ({ createWebEnv: () => env }));
 vi.mock("next/navigation", () => ({
   notFound: () => {
     throw new Error("NEXT_NOT_FOUND");
   },
 }));
 vi.mock("./rating-progress.tsx", () => ({
-  RatingProgress: (props: { title: string; local: boolean }) => (
+  RatingProgress: (props: { title: string; local: boolean; nodeDown?: boolean }) => (
     <p>
-      progress of {props.title}, local {String(props.local)}
+      progress of {props.title}, local {String(props.local)}, node down{" "}
+      {String(props.nodeDown ?? false)}
     </p>
   ),
 }));
@@ -59,6 +61,7 @@ describe("RatingLoader", () => {
     cleanup();
     readRating.mockReset();
     readPaper.mockReset();
+    env = { APP_ENV: "staging" };
   });
 
   it("reads the rating and the paper's title for its page", async () => {
@@ -68,7 +71,9 @@ describe("RatingLoader", () => {
     render(await RatingLoader({ cid: CID, requestId: REQUEST_ID }));
 
     expect(readRating).toHaveBeenCalledWith(REQUEST_ID);
-    expect(screen.getByText("progress of RNAi therapies, local false")).toBeTruthy();
+    expect(
+      screen.getByText("progress of RNAi therapies, local false, node down false"),
+    ).toBeTruthy();
   });
 
   it("is not found when the rating is of another paper", async () => {
@@ -99,5 +104,26 @@ describe("RatingLoader", () => {
     render(await RatingLoader({ cid: CID, requestId: REQUEST_ID }));
 
     expect(screen.getByText(/progress of RNAi therapies/)).toBeTruthy();
+  });
+
+  it("still shows the rating, under the paper's short address, when the node doesn't answer", async () => {
+    readRating.mockResolvedValue(PENDING);
+    readPaper.mockResolvedValue({
+      asset: { ok: false, reason: "unreachable" },
+      run: undefined,
+    } as unknown as PaperStatus);
+
+    render(await RatingLoader({ cid: CID, requestId: REQUEST_ID }));
+
+    expect(screen.getByText(/progress of bafybe.*, node down true/)).toBeTruthy();
+  });
+
+  it("says ratings aren't set up, and reads nothing, where no contract takes them", async () => {
+    env = { APP_ENV: "local" };
+
+    render(await RatingLoader({ cid: CID, requestId: REQUEST_ID }));
+
+    expect(readRating).not.toHaveBeenCalled();
+    expect(screen.getByText(/aren't set up here/)).toBeTruthy();
   });
 });
