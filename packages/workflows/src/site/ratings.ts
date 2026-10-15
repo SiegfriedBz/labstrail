@@ -100,7 +100,9 @@ export interface RatingService {
   readRating(requestId: string): Promise<RatingView>;
   /**
    * Locally only, stands in for the Alchemy Notify webhook (ADR 0036): reads the transaction's
-   * receipt on Anvil and sends the event of the request it holds, once (ADR 0017).
+   * receipt on Anvil and sends the event of the request it holds, once (ADR 0017). Anvil or
+   * Inngest not answering is `unavailable`, logged as `rating-announce-unavailable: anvil: …`
+   * or `…: inngest: …`.
    */
   announceLocalRating(txHash: Hex): Promise<AnnounceResult>;
 }
@@ -191,7 +193,10 @@ export function createRatingService(io: RatingIo): RatingService {
     announceLocalRating: async (txHash) => {
       if (!io.local) return { ok: false, reason: "not-local" };
       const logs = await io.readReceiptLogs(txHash);
-      if (logs === "unreachable") return { ok: false, reason: "unavailable" };
+      if (logs === "unreachable") {
+        io.logger.warn(`rating-announce-unavailable: anvil: no receipt for ${txHash}`);
+        return { ok: false, reason: "unavailable" };
+      }
       const event = logs
         .filter((log) => io.contracts.includes(log.address.toLowerCase()))
         .map((log) => ratingRequestedEvent(log))

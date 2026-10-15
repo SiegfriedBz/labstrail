@@ -472,13 +472,18 @@ describe("announceLocalRating", () => {
     expect(fake.sent).toEqual([]);
   });
 
-  it("is unavailable when the receipt cannot be read", async () => {
+  it("is unavailable and logs one warning when Anvil's receipt cannot be read", async () => {
     const fake = io({ local: true, receipt: "unreachable" });
 
     expect(await createRatingService(fake).announceLocalRating(TX)).toEqual({
       ok: false,
       reason: "unavailable",
     });
+    expect(fake.warn).toHaveBeenCalledOnce();
+    expect(fake.warn).toHaveBeenCalledWith(
+      `rating-announce-unavailable: anvil: no receipt for ${TX}`,
+    );
+    expect(fake.sent).toEqual([]);
   });
 
   it("is unavailable and logs one warning when Inngest does not answer", async () => {
