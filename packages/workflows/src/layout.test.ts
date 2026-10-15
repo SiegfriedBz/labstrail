@@ -49,6 +49,7 @@ describe("workflows' layout", () => {
       "ratingSettingsRequired",
       "servedFunctions",
       "servesRating",
+      "summariseRatings",
       "workflowsName",
     ]);
   });
