@@ -1,6 +1,6 @@
 created: 2026-10-15T13:08:18.593Z
-updated: 2026-10-15T13:08:19.015Z
-update_count: 2
+updated: 2026-10-15T15:18:31.918Z
+update_count: 3
 last_field: diagram
 kind: nested-class
 title: rating-page
@@ -11,3 +11,10 @@ children:
   - scored
   - unavailable
 parentPath: []
+prev_diagram: >
+  graph LR
+      in-progress["In Progress\nscoring, saving, minting, recording"] -->|"the oracle fulfilled the request"| scored["Scored\nthe score and every check"]
+      in-progress -->|"the oracle cancelled it"| cancelled["Cancelled\ninvalid target, or past a day"]
+      in-progress -->|"the chain or the node did not answer"| unavailable["Unavailable\nasked again on the next poll"]
+      unavailable -->|"next poll answers"| in-progress
+      not-found["Not Found\nno contract holds it, or another paper's"]

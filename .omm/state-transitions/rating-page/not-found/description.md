@@ -1,1 +1,1 @@
-No contract of the environment holds the request id, or it rates another paper than the page's: the not-found page.
+No contract of the environment holds the request id, it rates another paper than the page's, or the page's paper isn't published: the not-found page. A rating the chain shows only on a later poll is checked then, and one of another paper reads "No rating here".

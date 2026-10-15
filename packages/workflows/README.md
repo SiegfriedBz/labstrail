@@ -379,7 +379,8 @@ not answer costs a page about 5 s ([ADR 0021](../../docs/adr/0021-server-reads-r
   transaction's receipt on Anvil itself, finds a `Phase1Requested` log of the Anvil contract,
   and sends its event with `ratingRequestedEvent`, so the id is the one the webhook would
   give. Deployed it answers `not-local`; a receipt with no such log gives `no-request`; Anvil or
-  Inngest not answering gives `unavailable` and logs `rating-announce-unavailable`.
+  Inngest not answering gives `unavailable` and logs `rating-announce-unavailable: anvil: …` or
+  `rating-announce-unavailable: inngest: …`.
 
 ## Running a publish locally
 
@@ -434,9 +435,10 @@ Or rate through the pages, after steps 1 to 4:
 
 Restarting Anvil empties it: deploy again (the first deploy on a fresh chain gets the same
 address). Request ids still never repeat, since each one hashes the contract's deploy time
-([`packages/contracts` → RatingController](../contracts/README.md#ratingcontroller)). Every
-request comes from a new requester, so each run starts clear of the per-requester cap, whatever
-earlier runs left pending.
+([`packages/contracts` → RatingController](../contracts/README.md#ratingcontroller)). Each
+`rate-paper` request comes from a new requester, so each run starts clear of the per-requester
+cap, whatever earlier runs left pending. Requests from your own wallet, through the pages, count
+against its cap of 3 while they are pending, announced or not; restarting Anvil clears them.
 
 The script, and the paper page through `announceLocalRating`, stand in for the Alchemy Notify
 webhook, which comes with the next plan: each reads the `Phase1Requested` log from the

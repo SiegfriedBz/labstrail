@@ -85,7 +85,9 @@ shaped like the table (`components/papers/papers-table-skeleton.tsx`).
   the node answers (`docs/domain.md` → Next.js).
 - The Score column shows each paper's latest phase-1 score, the contract's
   ([ADR 0014](../../docs/adr/0014-contract-owns-scores-dkg-owns-content.md)), in the on-chain
-  teal; otherwise its state in words, summed by `summariseRatings`, the rule the paper page
+  teal, followed by the phase it reached, "phase 1"
+  ([ADR 0012](../../docs/adr/0012-three-phases-settled-by-the-oracle.md)); otherwise its state
+  in words, summed by `summariseRatings`, the rule the paper page
   shares: "Pending", "Can't be rated" (a request was cancelled as invalid), "Not rated" with a
   Rate link to the paper's Ratings section where a contract takes ratings, or "Not checked"
   when the chain did not answer within 3 s, so a slow chain never holds the list
@@ -188,7 +190,9 @@ behind a skeleton with the real headings (`components/rating/ratings-section.tsx
   for the receipt, reads the request id from its `Phase1Requested` log and opens the rating's
   page. Locally, it first has the server announce the request (`announceLocalRating`), since no
   Alchemy Notify webhook watches Anvil
-  ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)). It says when the wallet
+  ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)); when that fails, it says the
+  request is on chain but its rating didn't start, and that the `pnpm dev` terminal says why
+  (`rating-announce-unavailable`), with a link to the request's page. It says when the wallet
   already has 3 ratings waiting
   ([ADR 0015](../../docs/adr/0015-rating-requests-are-free-on-testnet.md)), when ratings are
   paused, when the contract refused a mined request, and when no receipt came in time. A paper
@@ -234,8 +238,9 @@ stateDiagram-v2
 - Cancelled: why, in plain words (`lib/rating/messages.ts` → `cancelMessage`): the paper can't
   be rated (outside the field, a PDF whose text can't be read, or not one of VeriSci's
   papers), or the rating couldn't finish within a day.
-- A rating no contract holds, or one of another paper, is the not-found page. A chain that
-  does not answer is asked again. A DKG node that does not answer leaves the rating showing,
+- A rating no contract holds, one of another paper, or any under a paper that isn't
+  published, is the not-found page. A chain that does not answer is asked again, and a rating
+  it then shows of another paper reads "No rating here". A DKG node that does not answer leaves the rating showing,
   from the chain, under the paper's short address, with a note that the title and checks
   can't be shown ([ADR 0021](../../docs/adr/0021-server-reads-return-typed-results.md)).
   Where no contract takes ratings, the page says so.
@@ -339,7 +344,7 @@ unless `APP_ENV` is `local`:
 | --- | --- |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis's REST address and token, for the limits: one database per environment, previews using staging's ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)). The token is secret |
 | `REOWN_PROJECT_ID` | The Reown project id for the wallet window, from one project shared by every environment, read on the server and handed to the page, so nothing is inlined at build time. Without it the pages say the wallet is not set up |
-| `LOCAL_CHAIN_RPC_URL`, `LOCAL_RATING_CONTRACT` | Optional, read only when `APP_ENV=local`: Anvil's URL and the RatingController deployed there. With both, the pages read and request ratings on that contract and the wallet window offers Anvil; without them, the pages say ratings aren't set up ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)) |
+| `LOCAL_CHAIN_RPC_URL`, `LOCAL_RATING_CONTRACT` | Optional, read only when `APP_ENV=local`: Anvil's URL and the RatingController deployed there. With both, the pages read and request ratings on that contract and the wallet window offers Anvil; without either, the paper and rating pages say ratings aren't set up, the papers list shows no Rate link, and the wallet window offers only Base Sepolia ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)) |
 
 The pages also need the workflows' settings (DKG, Pinata, chain, Gemini, Inngest;
 [`packages/workflows`](../../packages/workflows/README.md#environment)). With
