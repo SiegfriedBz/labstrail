@@ -25,13 +25,15 @@ Inngest workflows that combine `core` logic with the `dkg` and `contracts` adapt
   on a function's first run. Never import `src/env.ts` from the main entry: `web` imports
   it, and `next build` must pass with only `APP_ENV` set.
 - **Layout:** `src/publish/` (the publish run and its adapters: GROBID, Pinata),
-  `src/rating/` (the rating run, the scorer, the oracle), `src/pdf/` (fetching a pinned PDF
+  `src/rating/` (the rating run, the scorer, the oracle, the rating event, and the
+  environment's contracts, which the site service shares), `src/pdf/` (fetching a pinned PDF
   and reading its text, which both runs use), `src/gemini/` (the Gemini call the scorer and
-  the publish run's field check share), `src/site/` (the service the web app calls:
-  upload URLs, submissions, a paper's status, the papers list). At the root only the entry
+  the publish run's field check share), `src/site/` (the services the web app calls: upload
+  URLs, submissions, a paper's status, the papers list, and its ratings). At the root only the entry
   (`index.ts`), the settings (`env.ts`, `*-env.ts`), the wiring (`functions.ts`) and the
   Inngest client. What both runs use goes in a shared folder such as `pdf/` or `gemini/`; a folder may
-  import from another (the site service checks submissions with `publish/`).
+  import from another (the site service checks submissions with `publish/`, and reads
+  ratings with `rating/`).
   `src/layout.test.ts` checks that each file sits in one of these folders (any `*-env.ts` at
   the root) and that the entry exports the same names.
 - Step ids are unique per run (`read-1`, `wait-1-3`, `poll-1-3`); every wait is a

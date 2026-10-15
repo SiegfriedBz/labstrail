@@ -2,7 +2,8 @@
 
 Solidity contracts built with Foundry, and the TypeScript bindings the other
 workspaces import: the typed ABI, the deployed addresses of each environment, reads of a
-rating request and of the contract's oracle, and the calldata of the oracle's calls.
+rating request, of a paper's request ids and of the contract's oracle, and the calldata of
+the oracle's calls.
 
 Status: `RatingController` v2 is implemented and tested. Deployed addresses are
 recorded in `deployments/base-sepolia.json`.
@@ -12,7 +13,7 @@ Architecture views: [`.omm/overall-architecture/contracts/`](../../.omm/overall-
 ## Depends on
 
 `@verisci/core`, `@verisci/env`, Zod (validates `deployments/base-sepolia.json`), and viem
-(reads a request and encodes the oracle's calls).
+(reads requests and encodes the oracle's calls).
 
 ## RatingController
 
@@ -257,13 +258,14 @@ accepted.
 | Export | What it does |
 | --- | --- |
 | `ratingControllerAbi` | The contract ABI, typed `as const` so viem infers every function, event and error |
-| `ratingControllerDeployments(appEnv)` | `{ chainId, current, past }` for `staging` or `production`; `local` resolves to staging ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)). `current` accepts new requests; `past` contracts are paused and drained ([ADR 0023](../../docs/adr/0023-a-fix-is-a-redeploy-owner-powers-fixed.md)) |
+| `ratingControllerDeployments(appEnv)` | `{ chainId, current, past }` for `staging` or `production`; `local` resolves to staging ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)); locally the rating functions and the pages use the Anvil contract their settings name instead ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)). `current` accepts new requests; `past` contracts are paused and drained ([ADR 0023](../../docs/adr/0023-a-fix-is-a-redeploy-owner-powers-fixed.md)) |
 | `NoDeploymentError` | Thrown by `ratingControllerDeployments` for an environment with no current deployment |
 | `Deployment`, `DeployEnv`, `RatingControllerDeployments` | The corresponding types |
 | `readRatingRequest(client, contract, requestId)` | The request's `RatingRequestState` (status `none`, `pending`, `fulfilled` or `cancelled`, cancel reason, lowercase requester, `requestedAt` in seconds, score, target and R-KA UALs), or `unreachable` when the RPC fails or the reply does not decode |
+| `readRequestIdsOf(client, contract, targetUal)` | Every request id the contract holds for a target UAL, oldest first, read in pages of 50 (`requestCountOf`, then `requestIdsOf`), or `unreachable` when the RPC fails or a reply does not decode; the pages list a paper's ratings with it |
 | `readOracleAgent(client, contract)` | The contract's oracle address in lowercase, or `unreachable` |
 | `fulfilCalldata(requestId, score, rKaUal)`, `cancelCalldata(requestId, reason)` | The calldata of `fulfilPhase1` and of `cancelRequest` (`expired` or `invalid-target`), which the oracle signs and sends |
-| `ContractReader`, `RequestStatus`, `CancelReason`, `ReadRequestResult`, `ReadOracleResult` | What the reads take from a viem public client, and their types |
+| `ContractReader`, `RequestStatus`, `CancelReason`, `ReadRequestResult`, `ReadRequestIdsResult`, `ReadOracleResult` | What the reads take from a viem public client, and their types |
 | `contractsName` | The package name, imported by the web app's package test |
 
 Each `Deployment` records the contract `address`, the deployment `txHash` and

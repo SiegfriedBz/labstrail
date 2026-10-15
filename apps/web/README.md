@@ -4,10 +4,12 @@ The Next.js 16 app (App Router).
 
 Status: the home page; the upload pages, where a visitor connects a wallet, publishes a PDF,
 follows it until its Target KA is minted and verifies its record; the list of published
-papers; and `/api/inngest`, which serves the workflows' Inngest functions
+papers, with each paper's score; ratings, where a published paper's page lists its ratings
+and requests one from the wallet, and each rating's page follows it to its score and shows
+every check behind it; and `/api/inngest`, which serves the workflows' Inngest functions
 ([ADR 0003](../../docs/adr/0003-inngest-functions-live-in-workflows.md)).
 
-Architecture views: [`.omm/overall-architecture/web-app/`](../../.omm/overall-architecture/web-app/), [`.omm/route-page-map/`](../../.omm/route-page-map/), [`.omm/state-transitions/paper-page/`](../../.omm/state-transitions/paper-page/) (`pnpm exec omm view --port 4000` shows them; root README → Architecture).
+Architecture views: [`.omm/overall-architecture/web-app/`](../../.omm/overall-architecture/web-app/), [`.omm/route-page-map/`](../../.omm/route-page-map/), [`.omm/state-transitions/paper-page/`](../../.omm/state-transitions/paper-page/), [`.omm/state-transitions/rating-page/`](../../.omm/state-transitions/rating-page/) (`pnpm exec omm view --port 4000` shows them; root README → Architecture).
 
 ## Depends on
 
@@ -25,15 +27,19 @@ points the optional `@x402/*` packages, reached through wagmi's connectors, at
 
 | Path | What it is |
 | --- | --- |
-| `/` | Home: what VeriSci does, the latest papers (the five newest, streamed in with a skeleton, linking to `/papers`), the DKG's two layers (the record off-chain, its ERC-721 token and merkle root on-chain, the UAL linking them), how publishing works and the rating flow to come, and an example paper asset |
+| `/` | Home: what VeriSci does, with a demo that publishes a paper and then rates it, the latest papers (the five newest, streamed in with a skeleton, linking to `/papers`), the DKG's two layers (the record off-chain, its ERC-721 token and merkle root on-chain, the UAL linking them), how publishing and rating work (phase 1 live, human review and replication to come), and an example paper asset |
 | `/publish` | Connect a wallet, drop a PDF, sign once; what publishing means and the limits ([ADR 0010](../../docs/adr/0010-pdf-to-target-ka-pipeline.md), [ADR 0034](../../docs/adr/0034-users-connect-a-wallet-anyone-may-publish.md)) |
-| `/papers?page=<n>` | Every paper this environment published, newest mint first, 20 to a page (below) |
-| `/papers/<cid>?event=<id>` | Where a paper stands, then its record, abstract and how to verify it (below), under "Papers / <title>" breadcrumbs. `?already=1` says a re-submitted PDF was already published |
+| `/papers?page=<n>` | Every paper this environment published, newest mint first, 20 to a page, each with its score (below) |
+| `/papers/<cid>?event=<id>` | Where a paper stands, then its record, abstract and how to verify it, and its Ratings section (`#rating`) once published (below), under "Papers / <title>" breadcrumbs. `?already=1` says a re-submitted PDF was already published |
 | `/api/papers/<cid>?event=<id>` | The same as JSON (`PaperView`: the stage, and the record once published), never cached: a read, so a route rather than a server action |
+| `/papers/<cid>/ratings/<requestId>` | One rating: where it stands until it is scored, then its score and every check behind it, or why it was cancelled (below), under "Papers / <title> / Rating" breadcrumbs |
+| `/api/ratings/<requestId>` | The same as JSON (`RatingView`), never cached, for the rating page to poll; not-found for an id that is not `0x` + 64 hex digits, or where no contract takes ratings |
 | `/api/inngest` | Serves the Inngest functions: the publish function, plus the rating and oracle functions where the oracle key is set |
 | any other path | `app/not-found.tsx`; a page that fails to render shows `app/error.tsx` with a retry |
 
-The publish form calls two server actions (`app/actions.ts`): `requestUpload()` signs a
+`app/actions.ts` holds three server actions. Locally, `announceLocalRating(txHash)` has the
+server announce a rating request (The Ratings section, below). The publish form calls the
+other two: `requestUpload()` signs a
 Pinata upload URL within the connection's daily limit, and `submitPaper(input)` checks the
 signed submission and starts its publish run within the address's daily limit
 ([ADR 0035](../../docs/adr/0035-limits-are-the-apps-only-state.md)). The browser
@@ -77,6 +83,13 @@ shaped like the table (`components/papers/papers-table-skeleton.tsx`).
   `Number.MAX_SAFE_INTEGER`, answers 404 before anything streams. A page past the last shows
   the not-found page, as a 200 with `noindex`, since the response is already streaming when
   the node answers (`docs/domain.md` → Next.js).
+- The Score column shows each paper's latest phase-1 score, the contract's
+  ([ADR 0014](../../docs/adr/0014-contract-owns-scores-dkg-owns-content.md)), in the on-chain
+  teal; otherwise its state in words, summed by `summariseRatings`, the rule the paper page
+  shares: "Pending", "Can't be rated" (a request was cancelled as invalid), "Not rated" with a
+  Rate link to the paper's Ratings section where a contract takes ratings, or "Not checked"
+  when the chain did not answer within 3 s, so a slow chain never holds the list
+  (`lib/papers/ratings.ts` → `withRatings`).
 - A node that does not answer says the list can't be loaded, with a link to try again; an
   answer that can't be read (a refused query, or a page the total covers with no readable
   row) says so, without the link. On the home page, the latest papers block says it can't
@@ -153,20 +166,99 @@ is minted to, which is our node and the UAL's author; the asset's ERC-721 token 
 OriginTrail's `DKGKnowledgeAssets`, `lib/papers/explorer.ts` → `assetTokenUrl`; the UAL; and the
 PDF's CID, linked through Pinata's public gateway, `ipfsUrl`, since ipfs.io no longer
 serves files). Addresses and the token link to Basescan. "How to check this record" gives
-the EIP-712 domain and type to check the signature with.
+the EIP-712 domain and type to check the signature with. A page that follows a paper to
+Published asks the server to render it again (`router.refresh`), so the Ratings section
+appears without a reload.
+
+### The Ratings section
+
+Under a published paper, the server reads its ratings inside their own `Suspense` boundary,
+behind a skeleton with the real headings (`components/rating/ratings-section.tsx`, through
+`getRatingService().listRatings`,
+[`packages/workflows`](../../packages/workflows/README.md#the-pages-calls)):
+
+- Phase 1, reproducibility readiness, leads: the latest score recorded on chain with a link
+  to its checks; "Rating in progress" with a link to follow it; "Can't be rated" when a request
+  was cancelled as invalid; or "Not rated yet" with what a rating does. The words are the
+  papers list's (`summariseRatings`).
+- **Rate this paper** (`components/rating/rate-button.tsx`, the flow in
+  `lib/rating/request-flow.ts`): connects the wallet or switches it to the rating chain, sends
+  `requestPhase1(ual)` to the environment's current contract
+  ([ADR 0023](../../docs/adr/0023-a-fix-is-a-redeploy-owner-powers-fixed.md)), waits up to 90 s
+  for the receipt, reads the request id from its `Phase1Requested` log and opens the rating's
+  page. Locally, it first has the server announce the request (`announceLocalRating`), since no
+  Alchemy Notify webhook watches Anvil
+  ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)). It says when the wallet
+  already has 3 ratings waiting
+  ([ADR 0015](../../docs/adr/0015-rating-requests-are-free-on-testnet.md)), when ratings are
+  paused, when the contract refused a mined request, and when no receipt came in time. A paper
+  that can't be rated has no button.
+- The history lists every rating, newest first, each with its day, its outcome and a link to
+  its page; then the three phases: reproducibility readiness (live), human review (next) and
+  wet-lab replication (later)
+  ([ADR 0012](../../docs/adr/0012-three-phases-settled-by-the-oracle.md)).
+- A chain that does not answer says the ratings can't be loaded, with a link to try again;
+  where no contract takes ratings, the section says so and reads nothing.
+
+### The rating page
+
+`components/rating/rating-loader.tsx` reads the rating (`readRating`) and the paper's title on
+the server; `components/rating/rating-progress.tsx` then asks `/api/ratings/<id>` every 5 s
+until the rating is scored or cancelled (`lib/rating/stage.ts`):
+
+```mermaid
+stateDiagram-v2
+  [*] --> scoring: request on chain, no R-KA yet
+  scoring --> saving: R-KA saved on the node
+  saving --> minting: mint started
+  minting --> recording: R-KA minted, the oracle records the score
+  recording --> scored: fulfilled on chain
+  scoring --> cancelled: invalid target, or past a day
+  saving --> cancelled
+  minting --> cancelled
+  scored --> [*]
+  cancelled --> [*]
+```
+
+- While pending, the page shows the steps as the publish page's chain (Scored, Saved
+  off-chain, Minted on-chain, Recorded on-chain; `components/rating/rating-steps.ts`), what
+  happens during the current one, and when the rating was requested; past 15 minutes
+  (`lib/rating/elapsed.ts`), a note that it is taking longer than usual, most often because
+  the scoring model is busy.
+- Scored (`components/rating/rating-detail.tsx`): the contract's score, flagged when the R-KA
+  records another ([ADR 0014](../../docs/adr/0014-contract-owns-scores-dkg-owns-content.md));
+  the study type and the rationale; each check with its answer and quote, and for a check
+  that lost its point what the scorer claimed and why it didn't count (`lib/rating/checks.ts`);
+  whether the paper's text was shortened; the model and prompt version; and links to the R-KA
+  and the contract (unlinked on Anvil).
+- Cancelled: why, in plain words (`lib/rating/messages.ts` → `cancelMessage`): the paper can't
+  be rated (outside the field, a PDF whose text can't be read, or not one of VeriSci's
+  papers), or the rating couldn't finish within a day.
+- A rating no contract holds, or one of another paper, is the not-found page. A chain that
+  does not answer is asked again. A DKG node that does not answer leaves the rating showing,
+  from the chain, under the paper's short address, with a note that the title and checks
+  can't be shown ([ADR 0021](../../docs/adr/0021-server-reads-return-typed-results.md)).
+  Where no contract takes ratings, the page says so.
+
+To rate a paper locally through these pages, against a contract on Anvil, see
+[`packages/workflows` → Running a rating locally](../../packages/workflows/README.md#running-a-rating-locally).
 
 ## Code layout
 
 - `app/`: the pages, the route handlers and the server actions.
 - `lib/`: each flow's logic, pure or with its IO passed in, tested in unit tests, in the
   flow's folder: `publish` (the upload, the publish form's steps, a paper's progress, the
-  messages and the limits) and `papers` (the list and explorer links). Only helpers several
+  messages and the limits), `papers` (the list, its rating summaries and explorer links) and
+  `rating` (the request flow, the rating chain, a rating's stage, its checks, the time since
+  the request and the messages). Only helpers several
   areas share sit at its root: `web-env`, `server`, `site` (the name and description the
   metadata, the footer and the wallet window read), `theme`, `shorten`, `utils` and
   `empty-module`.
 - `components/`, grouped by area: `site` (the shell every page shares: logo, header links,
   theme button, footer, breadcrumbs), `wallet` (the wallet providers and button),
-  `home`, `papers` (the papers list), `paper` (one paper's page), `publish`, and `ui`
+  `home` (the hero's demo and the latest papers), `papers` (the papers list), `paper` (one
+  paper's page and its step chain, which the rating page and the demo reuse), `rating` (the
+  Ratings section, the Rate button and the rating page), `publish`, and `ui`
   (shadcn primitives, restyled with the app's tokens). Tests sit next to their component.
 
 ## Design
@@ -186,24 +278,29 @@ The "Clinical" look: a clinical record with an on-chain proof, in Tailwind CSS v
 - The "Clinical" look: a cool off-white page (deep blue-grey in dark), a soft wash across
   the top of each page (blue from the top left, teal from the top right), one soft glow
   behind the hero. Raised panels
-  with hairline borders hold figures, tools, tables and lists: the hero's publish flow, the
-  UAL figure, the example asset, the papers table and its messages, the paper page's verify
-  and publish panels, the publish form and the footer's contracts. Elsewhere, coloured
+  with hairline borders hold figures, tools, tables and lists: the hero's demo, the
+  UAL figure, the example asset, the papers table and its messages, the paper page's verify,
+  publish and Ratings panels, the rating page's panel, the publish form and the footer's
+  contracts. Elsewhere, coloured
   edges, timelines and hairline rules group the content, with one call to action per page.
 - Two signal colours with one meaning each: blue for the off-chain record, teal for the
   on-chain asset. They blend only on the logo, the main action, live lines, and the line
-  linking a save to its mint in the publish chain. Text links are ink with a blue underline
+  linking a save to its mint in the step chains (`StepChain`, which draws the line between
+  two on-chain steps teal). Text links are ink with a blue underline
   (`link`); addresses in the papers list and the footer's contract links are muted and
   turn teal on hover. The header's wallet button is neutral, so each page's own call to
   action leads.
 - Sora for text, Martian Mono for on-chain values (`next/font`), Phosphor icons. One radius
   scale: `rounded-2xl` panels, `rounded-xl` buttons and inputs, `rounded-lg` small
   controls, `rounded-md` flags.
-- The hero's panel plays the publish flow on a loop: the example paper's PDF goes in, the
-  steps run, and its UAL comes out once minted (`components/home/chain-demo.tsx`). The
-  example is a real staging record whose signature checks out, the same as the example
-  asset lower on the page. Beside "Publish a paper", a "Browse papers" link.
-- Motion: the hero's publish flow loops and the step being worked on breathes; the home
+- The hero's panel plays the example paper being published, its UAL coming out once minted,
+  then the same paper being rated, its score (67, its real staging rating) coming out once
+  recorded (`components/home/chain-demo.tsx`). Publish and Rate tabs pick one flow, which then
+  loops on its own; both flows share one grid cell, so the panel keeps one height and the
+  hero beside it never moves. The example is a real staging record whose signature checks
+  out, the same as the example asset lower on the page. Beside "Publish a paper", a "Browse
+  papers" link.
+- Motion: the hero's flows loop and the step being worked on breathes; the home
   sections after the hero rise in as they enter the screen (`reveal`, a CSS scroll-driven
   animation, where the browser supports one). All of it stops for visitors who ask for
   reduced motion.
@@ -224,8 +321,8 @@ The "Clinical" look: a clinical record with an on-chain proof, in Tailwind CSS v
   in a `Suspense` boundary; what is known already (labels, the CID) shows at once.
 - The footer (`components/site/site-footer.tsx`) lists the contracts on Base Sepolia, linked on
   Basescan: OriginTrail's `DKGKnowledgeAssets` and `KnowledgeAssetsLifecycle`
-  (`ORIGINTRAIL_CONTRACTS` from `@verisci/core`), and this environment's RatingController
-  from `@verisci/contracts` (`local` shows staging's).
+  (`ORIGINTRAIL_CONTRACTS` from `@verisci/core`), and the RatingController this
+  environment's pages use (`lib/rating/chain.ts`): locally the Anvil one, unlinked.
 
 ## Environment
 
@@ -235,13 +332,14 @@ would mix the two unpredictably when it reloads. Next.js only watches `apps/web`
 so restart `pnpm dev` after editing a root env file. Variables already set in the
 environment (CI, the host) take precedence.
 
-Its own settings are declared in `lib/web-env.ts` (`createWebEnv`), all three required
+Its own settings are declared in `lib/web-env.ts` (`createWebEnv`), the first three required
 unless `APP_ENV` is `local`:
 
 | Variable | Value |
 | --- | --- |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis's REST address and token, for the limits: one database per environment, previews using staging's ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)). The token is secret |
 | `REOWN_PROJECT_ID` | The Reown project id for the wallet window, from one project shared by every environment, read on the server and handed to the page, so nothing is inlined at build time. Without it the pages say the wallet is not set up |
+| `LOCAL_CHAIN_RPC_URL`, `LOCAL_RATING_CONTRACT` | Optional, read only when `APP_ENV=local`: Anvil's URL and the RatingController deployed there. With both, the pages read and request ratings on that contract and the wallet window offers Anvil; without them, the pages say ratings aren't set up ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)) |
 
 The pages also need the workflows' settings (DKG, Pinata, chain, Gemini, Inngest;
 [`packages/workflows`](../../packages/workflows/README.md#environment)). With

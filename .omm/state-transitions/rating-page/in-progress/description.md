@@ -1,0 +1,1 @@
+Pending on the contract: the page shows the step chain (Scored, Saved off-chain, Minted on-chain, Recorded on-chain) at the R-KA's state on the node, what happens during the current step, when the rating was requested and, past 15 minutes, that it is taking longer than usual.

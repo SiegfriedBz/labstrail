@@ -1,0 +1,13 @@
+created: 2026-10-15T13:08:18.593Z
+updated: 2026-10-15T13:08:19.015Z
+update_count: 2
+last_field: diagram
+kind: nested-class
+title: rating-page
+children:
+  - cancelled
+  - in-progress
+  - not-found
+  - scored
+  - unavailable
+parentPath: []

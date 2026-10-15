@@ -1,0 +1,1 @@
+Fulfilled on the contract: its score, flagged when the R-KA records another (ADR 0014), then the R-KA's record from the DKG node: the study type, the rationale, every check with its answer and quote, and what the scorer claimed for a check that lost its point; the page stops polling.

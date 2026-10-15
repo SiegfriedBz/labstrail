@@ -1,0 +1,1 @@
+The chain did not answer, or the node did not answer for a pending rating's stage: shown as such, and asked again on the next poll.

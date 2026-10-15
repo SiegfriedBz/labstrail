@@ -18,15 +18,16 @@ Next.js 16 App Router app. See `README.md` here for scripts and status.
   ([ADR 0003](../../docs/adr/0003-inngest-functions-live-in-workflows.md)).
 - Components are grouped by area: `components/site` (the shell every page shares: logo,
   header links, theme button, footer, breadcrumbs), `wallet` (providers and button),
-  `home`, `papers` (the list), `paper` (one paper's page), `publish`, and `ui` (shadcn
+  `home`, `papers` (the list), `paper` (one paper's page), `rating` (the Ratings section, the
+  Rate button and the rating page), `publish`, and `ui` (shadcn
   primitives, restyled with `globals.css`'s tokens). A component another area reuses stays
   in its own area; a test sits next to its component.
 - Playwright end-to-end tests come in a later plan; until then, cover logic in unit tests.
   Put a flow's logic in `lib/` with its IO passed in (`publishFile`, `paperProgress`,
   `requestUploadUrl`), and keep components and `app/actions.ts` thin.
-- `lib/` is grouped by flow like `components/`: `lib/publish/` and `lib/papers/`; only
-  helpers several areas share (`web-env`, `server`, `site`, `theme`, `shorten`, `utils`,
-  `empty-module`) sit at its root. `lib/layout.test.ts` fails on a `.ts` or `.tsx` file
+- `lib/` is grouped by flow like `components/`: `lib/publish/`, `lib/papers/` and
+  `lib/rating/`; only helpers several areas share (`web-env`, `server`, `site`, `theme`,
+  `shorten`, `utils`, `empty-module`) sit at its root. `lib/layout.test.ts` fails on a `.ts` or `.tsx` file
   anywhere else, so a new flow adds its folder there.
 - Styling is Tailwind v4 with the tokens and classes in `app/globals.css` (`glass`,
   `signal-gradient`, `link`, `text-muted`, `text-accent`…): light (the default) and dark
