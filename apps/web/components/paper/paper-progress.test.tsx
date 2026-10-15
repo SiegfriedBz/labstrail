@@ -105,6 +105,46 @@ describe("PaperProgress", () => {
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
+  it("refreshes once while a published paper's record can't be loaded yet, and keeps asking", async () => {
+    const waiting: PaperView = {
+      stage: "published",
+      ual: PUBLISHED.ual,
+      recordProblem: "unavailable",
+    };
+    const urls = serve([waiting, waiting, PUBLISHED]);
+    refresh.mockClear();
+
+    const props = { cid: CID, contextGraph: GRAPH, eventId: undefined };
+    const { rerender } = render(<PaperProgress {...props} initial={{ stage: "minting" }} />);
+    await advance(5000);
+    // The refreshed server render hands the component a new first view.
+    rerender(<PaperProgress {...props} initial={waiting} />);
+    await advance(5000);
+    await advance(5000);
+
+    expect(urls).toHaveLength(3);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
+      "Screening VP1 of deformed wing virus",
+    );
+  });
+
+  it("never refreshes when the server already rendered the paper published", async () => {
+    const waiting: PaperView = {
+      stage: "published",
+      ual: PUBLISHED.ual,
+      recordProblem: "unavailable",
+    };
+    serve([waiting, PUBLISHED]);
+    refresh.mockClear();
+
+    render(<PaperProgress cid={CID} contextGraph={GRAPH} eventId={undefined} initial={waiting} />);
+    await advance(5000);
+    await advance(5000);
+
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
   it("asks nothing when the server's view is already final", async () => {
     const urls = serve([{ stage: "reading" }]);
 
