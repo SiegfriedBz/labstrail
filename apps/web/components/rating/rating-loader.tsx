@@ -9,8 +9,9 @@ import { RatingProgress } from "./rating-progress.tsx";
 /**
  * Reads a rating and its paper's title on the server, inside the rating page's `Suspense`,
  * and hands them to `RatingProgress`, which follows the rating from there. A rating no
- * contract holds, or one of another paper, is the not-found page; a chain that did not answer
- * is followed until it does. When the DKG node does not answer, the rating still shows, from
+ * contract holds, one of another paper, or any under a paper not published, is the not-found
+ * page; a chain that did not answer is followed until it does, and `RatingProgress` checks the
+ * rating's paper then. When the DKG node does not answer, the rating still shows, from
  * the chain, under the paper's short address, and the page says why (ADR 0021). Where no
  * contract takes ratings, the page says so and reads nothing.
  */
@@ -30,12 +31,14 @@ export async function RatingLoader({ cid, requestId }: { cid: string; requestId:
   if (!view.ok && view.reason === "not-found") notFound();
   const nodeDown = paper.stage === "unavailable";
   const ual = paper.stage === "published" ? paper.ual : undefined;
+  if (!nodeDown && ual === undefined) notFound();
   if (!nodeDown && view.ok && view.rating.targetUal !== ual) notFound();
   const title = paper.stage === "published" && paper.record ? paper.record.title : shorten(cid);
   return (
     <RatingProgress
       cid={cid}
       title={title}
+      ual={ual}
       requestId={requestId.toLowerCase()}
       initial={view}
       local={config.local}

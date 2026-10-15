@@ -20,10 +20,10 @@ vi.mock("next/navigation", () => ({
   },
 }));
 vi.mock("./rating-progress.tsx", () => ({
-  RatingProgress: (props: { title: string; local: boolean; nodeDown?: boolean }) => (
+  RatingProgress: (props: { title: string; ual?: string; local: boolean; nodeDown?: boolean }) => (
     <p>
       progress of {props.title}, local {String(props.local)}, node down{" "}
-      {String(props.nodeDown ?? false)}
+      {String(props.nodeDown ?? false)}, paper {props.ual ?? "unknown"}
     </p>
   ),
 }));
@@ -72,7 +72,7 @@ describe("RatingLoader", () => {
 
     expect(readRating).toHaveBeenCalledWith(REQUEST_ID);
     expect(
-      screen.getByText("progress of RNAi therapies, local false, node down false"),
+      screen.getByText(`progress of RNAi therapies, local false, node down false, paper ${UAL}`),
     ).toBeTruthy();
   });
 
@@ -97,13 +97,27 @@ describe("RatingLoader", () => {
     );
   });
 
-  it("still follows a rating the chain didn't answer for", async () => {
+  it("still follows a rating the chain didn't answer for, with the paper's UAL to check it by", async () => {
     readRating.mockResolvedValue({ ok: false, reason: "unavailable" });
     readPaper.mockResolvedValue(PUBLISHED);
 
     render(await RatingLoader({ cid: CID, requestId: REQUEST_ID }));
 
-    expect(screen.getByText(/progress of RNAi therapies/)).toBeTruthy();
+    expect(
+      screen.getByText(`progress of RNAi therapies, local false, node down false, paper ${UAL}`),
+    ).toBeTruthy();
+  });
+
+  it("is not found when the node answers that the paper isn't published", async () => {
+    readRating.mockResolvedValue({ ok: false, reason: "unavailable" });
+    readPaper.mockResolvedValue({
+      asset: { ok: true, state: "missing" },
+      run: undefined,
+    } as unknown as PaperStatus);
+
+    await expect(RatingLoader({ cid: CID, requestId: REQUEST_ID })).rejects.toThrow(
+      "NEXT_NOT_FOUND",
+    );
   });
 
   it("still shows the rating, under the paper's short address, when the node doesn't answer", async () => {
@@ -115,7 +129,7 @@ describe("RatingLoader", () => {
 
     render(await RatingLoader({ cid: CID, requestId: REQUEST_ID }));
 
-    expect(screen.getByText(/progress of bafybe.*, node down true/)).toBeTruthy();
+    expect(screen.getByText(/progress of bafybe.*, node down true, paper unknown/)).toBeTruthy();
   });
 
   it("says ratings aren't set up, and reads nothing, where no contract takes them", async () => {

@@ -26,11 +26,13 @@ const SLOW_NOTE =
 /**
  * Follows a rating from its page, starting from the view the server read (`RatingLoader`):
  * unless that view is final, asks `/api/ratings/<id>` every 5 s until it is scored, cancelled
- * or gone, and keeps asking through a view that could not be read.
+ * or gone, and keeps asking through a view that could not be read. A rating read this way that
+ * rates another paper than `ual` is not found.
  */
 export function RatingProgress({
   cid,
   title,
+  ual,
   requestId,
   initial,
   local,
@@ -39,6 +41,8 @@ export function RatingProgress({
   cid: string;
   /** The paper's title, for the breadcrumbs. */
   title: string;
+  /** The paper's UAL, which the rating must target; unknown while the DKG node is down. */
+  ual?: string;
   requestId: string;
   initial: RatingView;
   /** True on Anvil, which no block explorer shows. */
@@ -70,6 +74,7 @@ export function RatingProgress({
         // Asked again on the next poll.
       }
       if (stopped) return;
+      next = ofPaper(next, ual);
       setView(next);
       if (!isFinalRating(ratingStage(next))) timer = setTimeout(() => void poll(), POLL_MS);
     };
@@ -78,7 +83,7 @@ export function RatingProgress({
       stopped = true;
       clearTimeout(timer);
     };
-  }, [requestId, initial]);
+  }, [requestId, initial, ual]);
 
   const pending = view.ok && view.rating.status === "pending";
   return (
@@ -123,6 +128,12 @@ export function RatingProgress({
       />
     </div>
   );
+}
+
+/** A rating of another paper than the page's is not found here; with `ual` unknown, any rating shows. */
+function ofPaper(view: RatingView, ual: string | undefined): RatingView {
+  if (ual === undefined || !view.ok || view.rating.targetUal === ual) return view;
+  return { ok: false, reason: "not-found" };
 }
 
 function pillOf(stage: RatingPageStage): string {
@@ -172,7 +183,7 @@ function Body({
     );
   }
   if (stage.stage === "not-found") {
-    return <p className="text-muted">No rating contract of this environment holds this request.</p>;
+    return <p className="text-muted">This paper has no rating with this request id.</p>;
   }
   const current = STEPS.findIndex((step) => step.stage === stage.stage);
   return (

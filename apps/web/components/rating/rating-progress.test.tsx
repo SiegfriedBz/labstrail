@@ -40,11 +40,12 @@ const SCORED: RatingView = {
   },
 };
 
-function show(initial: RatingView, local = false) {
+function show(initial: RatingView, local = false, ual: string | undefined = UAL) {
   render(
     <RatingProgress
       cid={CID}
       title="RNAi therapies"
+      ual={ual}
       requestId={REQUEST_ID}
       initial={initial}
       local={local}
@@ -154,6 +155,42 @@ describe("RatingProgress", () => {
       await vi.advanceTimersByTimeAsync(20_000);
     });
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows a rating of another paper, read once the chain answers, as not found, and stops asking", async () => {
+    vi.useFakeTimers();
+    const other = { ...RATING, targetUal: `${UAL}0`, status: "pending" };
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: true, rating: other, stage: "scoring" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    show({ ok: false, reason: "unavailable" });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("No rating here");
+    expect(screen.getByText("This paper has no rating with this request id.")).toBeTruthy();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20_000);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a rating it can't match to the paper, when the node didn't answer", () => {
+    show(
+      {
+        ok: true,
+        rating: { ...RATING, targetUal: `${UAL}0`, status: "pending" },
+        stage: "scoring",
+      },
+      false,
+      undefined,
+    );
+
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Reading the paper");
   });
 
   it("shows a pending rating's steps, done ones first, each with what it does", () => {
