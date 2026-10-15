@@ -125,8 +125,8 @@ function ResultNote({ result, cid }: { result: RequestResult; cid: string }) {
   }
   return (
     <p role="status" className="text-sm leading-relaxed text-muted">
-      Your request is on chain, but its rating didn't start: the local Inngest dev server didn't
-      answer.{" "}
+      Your request is on chain, but its rating didn't start: the server couldn't announce it, and
+      the <code className="font-mono text-xs text-ink">pnpm dev</code> terminal says why.{" "}
       <Link href={`/papers/${cid}/ratings/${result.requestId}`} className="link">
         Open the request
       </Link>
