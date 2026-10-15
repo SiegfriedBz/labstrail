@@ -67,6 +67,7 @@ export {
   type RatingStage,
   type RatingSummary,
   type RatingView,
+  summariseRatings,
 } from "./site/ratings.ts";
 export type { ReadRunResult, RunState } from "./site/runs.ts";
 export {

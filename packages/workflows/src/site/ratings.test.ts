@@ -4,7 +4,7 @@ import { rKaName, rKaQuads, SCORER_PROMPT_VERSION } from "@verisci/core";
 import type { AssetResult, QueryResult } from "@verisci/dkg";
 import { encodeAbiParameters, encodeEventTopics, type Hex, keccak256, toHex } from "viem";
 import { describe, expect, it, vi } from "vitest";
-import { createRatingService, type RatingIo } from "./ratings.ts";
+import { createRatingService, type RatingIo, summariseRatings } from "./ratings.ts";
 
 const GRAPH = "0xD701ed157232ad5E14BC4134a8D10D64D86f13B3/verisci-staging";
 const AGENT = "0xd701ed157232ad5e14bc4134a8d10d64d86f13b3";
@@ -171,8 +171,39 @@ describe("listRatings", () => {
   });
 });
 
+describe("summariseRatings", () => {
+  const rating = (status: "pending" | "fulfilled" | "cancelled", extra = {}) => ({
+    requestId: id(1),
+    contract: CURRENT,
+    requestedAt: 100,
+    status,
+    ...extra,
+  });
+
+  it("keeps a score over a later cancel, and a pending request over an invalid-target cancel", () => {
+    expect(
+      summariseRatings([
+        rating("fulfilled", { score: 50, rKaUal: R_KA }),
+        rating("cancelled", { cancelReason: "invalid-target" }),
+      ]),
+    ).toEqual({ kind: "scored", score: 50, requestId: id(1) });
+    expect(
+      summariseRatings([
+        rating("cancelled", { cancelReason: "invalid-target" }),
+        rating("pending"),
+      ]),
+    ).toEqual({ kind: "pending" });
+  });
+
+  it("says a paper only ever cancelled as expired is unrated", () => {
+    expect(summariseRatings([rating("cancelled", { cancelReason: "expired" })])).toEqual({
+      kind: "unrated",
+    });
+  });
+});
+
 describe("paperRatingSummaries", () => {
-  it("gives each paper its latest fulfilled score, else pending, else unrated", async () => {
+  it("gives each paper its latest fulfilled score, else pending, else cannot-rate, else unrated", async () => {
     const third = `did:dkg:base:84532/${AGENT}/9`;
     const service = createRatingService(
       io({
@@ -198,7 +229,7 @@ describe("paperRatingSummaries", () => {
     ).toEqual([
       { kind: "scored", score: 67, requestId: id(2) },
       { kind: "pending" },
-      { kind: "unrated" },
+      { kind: "cannot-rate" },
       { kind: "unrated" },
     ]);
   });

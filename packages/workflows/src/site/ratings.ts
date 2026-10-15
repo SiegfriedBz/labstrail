@@ -45,13 +45,15 @@ export type RatingListResult =
   | { readonly ok: false; readonly reason: "unavailable" };
 
 /**
- * A paper's rating, as the papers list shows it: the latest fulfilled score; `pending` when
- * none is fulfilled and one is pending; `unrated` otherwise; `unknown` when the chain did not
- * answer in 3 s.
+ * A paper's rating, as the papers list and the paper page show it ({@link summariseRatings}):
+ * the latest fulfilled score; `pending` when none is fulfilled and one is pending;
+ * `cannot-rate` when a request was cancelled `invalid-target`; `unrated` otherwise; `unknown`
+ * when the chain did not answer in 3 s.
  */
 export type PaperRatingSummary =
   | { readonly kind: "scored"; readonly score: number; readonly requestId: string }
   | { readonly kind: "pending" }
+  | { readonly kind: "cannot-rate" }
   | { readonly kind: "unrated" }
   | { readonly kind: "unknown" };
 
@@ -151,7 +153,7 @@ export function createRatingService(io: RatingIo): RatingService {
       Promise.all(
         targetUals.map(async (ual): Promise<PaperRatingSummary> => {
           const list = await within(SUMMARY_TIMEOUT_MS, listRatings(ual));
-          return list === "late" || !list.ok ? { kind: "unknown" } : summarise(list.ratings);
+          return list === "late" || !list.ok ? { kind: "unknown" } : summariseRatings(list.ratings);
         }),
       ),
 
@@ -248,12 +250,18 @@ function summaryOf(
   return { ...base, status: "pending" };
 }
 
-/** The papers list's view of a paper's ratings, oldest first. */
-function summarise(ratings: readonly RatingSummary[]): PaperRatingSummary {
+/**
+ * A paper's ratings, oldest first, summed up as one {@link PaperRatingSummary}, any kind but
+ * `unknown`: the rule the papers list and the paper page share, so they agree.
+ */
+export function summariseRatings(
+  ratings: readonly RatingSummary[],
+): Exclude<PaperRatingSummary, { kind: "unknown" }> {
   const scored = ratings.filter((rating) => rating.status === "fulfilled").at(-1);
   if (scored) return { kind: "scored", score: scored.score ?? 0, requestId: scored.requestId };
-  return ratings.some((rating) => rating.status === "pending")
-    ? { kind: "pending" }
+  if (ratings.some((rating) => rating.status === "pending")) return { kind: "pending" };
+  return ratings.some((rating) => rating.cancelReason === "invalid-target")
+    ? { kind: "cannot-rate" }
     : { kind: "unrated" };
 }
 
