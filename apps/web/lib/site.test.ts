@@ -6,6 +6,7 @@ describe("SITE", () => {
     expect(SITE.name).toBe("VeriSci");
     expect(SITE.description).toMatch(/life-science and health papers/);
     expect(SITE.description).not.toMatch(/[—–]/);
+    expect(SITE.description).toMatch(/and rates whether/);
   });
 
   it("is the description of the page metadata, Open Graph and the Twitter card", () => {

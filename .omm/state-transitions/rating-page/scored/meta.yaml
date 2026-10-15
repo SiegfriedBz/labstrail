@@ -1,0 +1,9 @@
+created: 2026-10-15T13:08:19.830Z
+updated: 2026-10-15T13:08:19.830Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: scored
+children: []
+parentPath:
+  - rating-page

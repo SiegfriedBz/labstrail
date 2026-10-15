@@ -3,7 +3,8 @@
 import { ArrowSquareOut, Warning } from "@phosphor-icons/react";
 import { canonicalCid } from "@verisci/core";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { ipfsUrl } from "../../lib/papers/explorer.ts";
 import { failureMessage, refusalMessage } from "../../lib/publish/messages.ts";
 import { isFinal, type PaperStage } from "../../lib/publish/progress.ts";
@@ -47,7 +48,9 @@ const NOW: Partial<Record<PaperStage["stage"], string>> = {
  * Follows a paper from its page, starting from the view the server read (`PaperLoader`):
  * unless that view is final, asks `/api/papers/<cid>` every 5 s until a final stage, and
  * keeps asking through a stage that could not be read. Once published, shows the record,
- * its abstract, its steps as one row, and how to verify it. Shows and asks by the CID's
+ * its abstract, its steps as one row, and how to verify it; when the server rendered it
+ * unpublished, has it render the page once more (`router.refresh`), so the ratings section
+ * appears under it. Shows and asks by the CID's
  * canonical spelling, the one the signature covers, whatever spelling the address has.
  */
 export function PaperProgress({
@@ -68,6 +71,9 @@ export function PaperProgress({
 }) {
   const cid = canonicalCid(given) ?? given;
   const [view, setView] = useState<PaperView>(initial);
+  const router = useRouter();
+  // The server renders the ratings section only under a published paper: whether it has.
+  const rendered = useRef(initial.stage === "published");
 
   useEffect(() => {
     if (isFinal(initial)) return;
@@ -84,6 +90,10 @@ export function PaperProgress({
       }
       if (stopped) return;
       setView(next);
+      if (next.stage === "published" && !rendered.current) {
+        rendered.current = true;
+        router.refresh();
+      }
       if (!isFinal(next)) timer = setTimeout(() => void poll(), POLL_MS);
     };
     timer = setTimeout(() => void poll(), POLL_MS);
@@ -91,7 +101,7 @@ export function PaperProgress({
       stopped = true;
       clearTimeout(timer);
     };
-  }, [cid, eventId, initial]);
+  }, [cid, eventId, initial, router]);
 
   const record = view.stage === "published" ? view.record : undefined;
   const trail = (

@@ -14,16 +14,21 @@ interface ContractRow {
   owner: "OriginTrail" | "VeriSci";
   role: string;
   address: string;
-  /** Deployed, but nothing calls it yet. */
-  soon?: boolean;
+  /** On Anvil, which no block explorer shows: the address stays unlinked. */
+  local?: boolean;
 }
 
 /**
  * The site's footer: what VeriSci is and runs on, and the contracts behind every record, each
- * linked on Basescan: OriginTrail's, which hold and publish every asset, and our
- * RatingController for this environment, when it is deployed.
+ * linked on Basescan: OriginTrail's, which hold and publish every asset, and the
+ * RatingController this environment's pages use, when it has one; locally that is the Anvil
+ * one, shown unlinked.
  */
-export function SiteFooter({ ratingController }: { ratingController: string | undefined }) {
+export function SiteFooter({
+  ratingController,
+}: {
+  ratingController: { readonly address: string; readonly local: boolean } | undefined;
+}) {
   const origintrail = ORIGINTRAIL_CONTRACTS[CHAIN_ID];
   const rows: ContractRow[] = [
     ...(origintrail
@@ -47,9 +52,11 @@ export function SiteFooter({ ratingController }: { ratingController: string | un
           {
             name: "RatingController",
             owner: "VeriSci" as const,
-            role: "Records each rating phase's score",
-            address: ratingController,
-            soon: true,
+            role: ratingController.local
+              ? "Records each rating phase's score, on Anvil on this computer"
+              : "Records each rating phase's score",
+            address: ratingController.address,
+            local: ratingController.local,
           },
         ]
       : []),
@@ -92,23 +99,24 @@ export function SiteFooter({ ratingController }: { ratingController: string | un
                     >
                       {row.owner}
                     </span>
-                    {row.soon && (
-                      <span className="rounded-md bg-surface-strong px-1.5 py-0.5 font-mono text-[11px] text-muted">
-                        soon
-                      </span>
-                    )}
                   </span>
                   <span className="text-sm text-muted">{row.role}</span>
                 </span>
-                <a
-                  href={addressUrl(row.address)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex w-fit items-center gap-1.5 font-mono text-xs text-muted transition-colors hover:text-accent-2"
-                >
-                  {shorten(row.address, 8, 6)}
-                  <ArrowSquareOut size={12} />
-                </a>
+                {row.local ? (
+                  <span title={row.address} className="font-mono text-xs text-muted">
+                    {shorten(row.address, 8, 6)}
+                  </span>
+                ) : (
+                  <a
+                    href={addressUrl(row.address)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex w-fit items-center gap-1.5 font-mono text-xs text-muted transition-colors hover:text-accent-2"
+                  >
+                    {shorten(row.address, 8, 6)}
+                    <ArrowSquareOut size={12} />
+                  </a>
+                )}
               </li>
             ))}
           </ul>

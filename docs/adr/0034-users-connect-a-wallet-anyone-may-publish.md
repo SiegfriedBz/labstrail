@@ -9,7 +9,8 @@ The upload page needs to know who submits a paper. A submission is already autho
 
 ## Decision
 
-- Visitors connect a wallet through Reown AppKit with wagmi, on Base Sepolia only, the chain the Submission's EIP-712 domain names.
+- Visitors connect a wallet through Reown AppKit with wagmi, on Base Sepolia, the chain the Submission's EIP-712 domain names and the rating contracts' chain. Locally, the wallet also offers Anvil, for ratings only ([0036](0036-local-rating-runs-use-anvil.md)).
+- The wallet signs submissions and sends rating requests; a request is a transaction its sender pays the gas of.
 - Anyone with a wallet may publish: there is no allowlist and no sign-in session. The signature authorizes each submission.
 - A session (SIWE) is added only when a feature needs one.
 
@@ -18,3 +19,7 @@ The upload page needs to know who submits a paper. A submission is already autho
 - Browser, phone and email wallets all work, through one window.
 - Reown is a dependency: the page needs a Reown project id, from one project shared by every environment, and each deployed domain must be allowed in that project ([0005](0005-staging-and-production-are-isolated.md)).
 - With no account to check, cost is bounded by limits per connection and per signing address ([0035](0035-limits-are-the-apps-only-state.md)).
+
+## History
+
+- 2026-10-15: the wallet also sends rating requests, and offers Anvil locally ([0036](0036-local-rating-runs-use-anvil.md)) (rating UI, user's choice).

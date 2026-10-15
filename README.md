@@ -27,8 +27,10 @@ CI), and its ADRs and domain facts record what the prototype taught us. The firs
 user-facing feature is the upload page: connect a wallet, publish a PDF, follow it until it
 is minted, then verify its record (signature, token, UAL, CID) from the paper's page. Every
 published paper is listed at `/papers`, newest first, read a page at a time from the DKG.
-The rating run is built and runs locally against a contract on Anvil; what starts it on
-staging, and the rating pages, come next. The repo, its packages and the EIP-712 domain keep the lowercase name `verisci`.
+Ratings work end to end locally, against a contract on Anvil: a published paper's page
+requests one from the visitor's wallet, each rating has a page that follows it to its score
+and then shows every check and quote behind it, and the papers list shows each paper's
+score. What starts a rating on staging, and what restarts a stuck one, come next. The repo, its packages and the EIP-712 domain keep the lowercase name `verisci`.
 Everything runs on testnets.
 
 ## How it works
@@ -59,11 +61,18 @@ Built:
   [ADR 0014](docs/adr/0014-contract-owns-scores-dkg-owns-content.md),
   [ADR 0018](docs/adr/0018-phase-1-scorer-output-contract.md)). Locally, it runs
   against a contract on Anvil ([ADR 0036](docs/adr/0036-local-rating-runs-use-anvil.md)).
+- **Anyone with a wallet requests a rating from the paper's page**, paying only gas
+  ([ADR 0015](docs/adr/0015-rating-requests-are-free-on-testnet.md)). The rating's page
+  follows it to its score, then shows every check, answer and quote behind it; the paper's
+  page and the papers list show its latest score, the contract's
+  ([ADR 0014](docs/adr/0014-contract-owns-scores-dkg-owns-content.md)). Locally, the page
+  announces its own request, since no webhook watches Anvil
+  ([ADR 0017](docs/adr/0017-chain-events-are-ingested-at-least-once.md)).
 
-Next (the contracts and the rating run are built; nothing starts a run on staging yet):
+Next (requests and the rating run are built; nothing starts a run on staging yet):
 
-- **Anyone requests a rating on chain**, and an Alchemy webhook turns the request into a
-  rating run ([ADR 0017](docs/adr/0017-chain-events-are-ingested-at-least-once.md)).
+- **An Alchemy Notify webhook turns each request on chain into a rating run**
+  ([ADR 0017](docs/adr/0017-chain-events-are-ingested-at-least-once.md)).
 - **A cron job restarts stuck rating requests**, from the contract's own list of
   pending requests, and that request's run finishes or cancels it
   ([ADR 0020](docs/adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
@@ -116,9 +125,9 @@ which asks free public endpoints first and keeps Alchemy within a daily budget.
 also shows how the parts connect: on a server, Caddy is the only public entry.
 Each environment also has its own oracle wallet, Alchemy webhook, Inngest
 environment and Upstash store. Only `develop` holds staging's oracle key and runs
-its ratings; previews and local development share staging's contract and graph, and a
-developer running the rating functions locally uses a contract on a local Anvil chain and
-its oracle key ([ADR 0019](docs/adr/0019-oracle-transactions-are-serialized.md),
+its ratings; previews share staging's contract and graph, and local development shares
+staging's graph but rates, pages included, on a contract on a local Anvil chain with its
+oracle key ([ADR 0019](docs/adr/0019-oracle-transactions-are-serialized.md),
 [ADR 0036](docs/adr/0036-local-rating-runs-use-anvil.md)).
 
 ```mermaid
@@ -302,7 +311,7 @@ To publish a PDF locally (the RPC proxy, the DKG node, GROBID and the Inngest de
 follow [`packages/workflows` → Running a publish locally](packages/workflows/README.md#running-a-publish-locally),
 then open http://localhost:3000/publish (it needs the workflows' settings and
 `REOWN_PROJECT_ID`; see [`apps/web`](apps/web/README.md#environment)). To rate a paper
-locally, against a contract on Anvil, follow
+locally, from its page or from a script, against a contract on Anvil, follow
 [`packages/workflows` → Running a rating locally](packages/workflows/README.md#running-a-rating-locally).
 
 Environment variables are listed in [`.env.example`](.env.example): copy it to
@@ -310,7 +319,8 @@ Environment variables are listed in [`.env.example`](.env.example): copy it to
 `pnpm test` runs without it, and `pnpm build` needs only `APP_ENV` (`APP_ENV=local`).
 `pnpm dev` starts without it, but the home page's latest papers, the papers list, and the
 publish and paper pages need the DKG node and publish run settings, and the wallet window
-`REOWN_PROJECT_ID`. How workspaces declare
+`REOWN_PROJECT_ID`. The rating parts of the pages also read the chain: `CHAIN_RPC_URL`
+when deployed, or locally Anvil and the two `LOCAL_*` settings. How workspaces declare
 and validate them is in the [`@verisci/env` README](packages/env/README.md).
 
 ## Commands

@@ -1,7 +1,7 @@
 "use client";
 
 import { useTable } from "@tanstack/react-table";
-import type { PaperSummary } from "@verisci/workflows";
+import type { PaperRow } from "../../lib/papers/ratings.ts";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table.tsx";
 import { PAPER_COLUMN, paperColumns, paperFeatures } from "./papers-columns.tsx";
 
@@ -17,14 +17,14 @@ export function PapersTable({
   papers,
   label = "Published papers, newest first",
 }: {
-  papers: readonly PaperSummary[];
+  papers: readonly PaperRow[];
   /** What the table lists, for screen readers. */
   label?: string;
 }) {
   const table = useTable({
     features: paperFeatures,
     columns: paperColumns,
-    data: papers as PaperSummary[],
+    data: papers as PaperRow[],
     getRowId: (paper) => paper.cid,
   });
 

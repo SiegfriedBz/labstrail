@@ -58,6 +58,17 @@ export type {
   QueryProblem,
   SignatureCheck,
 } from "./site/papers.ts";
+export {
+  type AnnounceResult,
+  getRatingService,
+  type PaperRatingSummary,
+  type RatingListResult,
+  type RatingService,
+  type RatingStage,
+  type RatingSummary,
+  type RatingView,
+  summariseRatings,
+} from "./site/ratings.ts";
 export type { ReadRunResult, RunState } from "./site/runs.ts";
 export {
   getUploadService,

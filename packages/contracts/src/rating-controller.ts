@@ -31,10 +31,18 @@ export type ReadRequestResult =
   | { readonly ok: true; readonly request: RatingRequestState }
   | { readonly ok: false; readonly reason: "unreachable" };
 
+/** The result of {@link readRequestIdsOf}. */
+export type ReadRequestIdsResult =
+  | { readonly ok: true; readonly ids: readonly Hex[] }
+  | { readonly ok: false; readonly reason: "unreachable" };
+
 /** The result of {@link readOracleAgent}. */
 export type ReadOracleResult =
   | { readonly ok: true; readonly oracle: string }
   | { readonly ok: false; readonly reason: "unreachable" };
+
+/** How many request ids one `requestIdsOf` call asks for. */
+const ID_PAGE_SIZE = 50n;
 
 const STATUSES: readonly RequestStatus[] = ["none", "pending", "fulfilled", "cancelled"];
 const CANCEL_REASONS: readonly CancelReason[] = ["none", "expired", "invalid-target"];
@@ -70,6 +78,40 @@ export async function readRatingRequest(
         rKaUal: request.rKaUal,
       },
     };
+  } catch {
+    return { ok: false, reason: "unreachable" };
+  }
+}
+
+/**
+ * Reads every request id a RatingController holds for `targetUal`, oldest first (ADR 0022):
+ * `requestCountOf`, then `requestIdsOf` in pages of 50. The contract matches the UAL exactly
+ * as given (ADR 0031), so pass its canonical spelling. An RPC error or timeout is
+ * `unreachable`.
+ */
+export async function readRequestIdsOf(
+  client: ContractReader,
+  contract: Hex,
+  targetUal: string,
+): Promise<ReadRequestIdsResult> {
+  try {
+    const count = await client.readContract({
+      address: contract,
+      abi: ratingControllerAbi,
+      functionName: "requestCountOf",
+      args: [targetUal],
+    });
+    const ids: Hex[] = [];
+    for (let offset = 0n; offset < count; offset += ID_PAGE_SIZE) {
+      const page = await client.readContract({
+        address: contract,
+        abi: ratingControllerAbi,
+        functionName: "requestIdsOf",
+        args: [targetUal, offset, ID_PAGE_SIZE],
+      });
+      ids.push(...page);
+    }
+    return { ok: true, ids };
   } catch {
     return { ok: false, reason: "unreachable" };
   }

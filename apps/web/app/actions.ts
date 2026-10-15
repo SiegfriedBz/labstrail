@@ -1,6 +1,11 @@
 "use server";
 
-import { getUploadService, type SubmitResult } from "@verisci/workflows";
+import {
+  type AnnounceResult,
+  getRatingService,
+  getUploadService,
+  type SubmitResult,
+} from "@verisci/workflows";
 import { headers } from "next/headers";
 import {
   clientIp,
@@ -25,4 +30,13 @@ export async function submitPaper(input: unknown): Promise<SubmitResult> {
     service: getUploadService(),
     submissions: getLimits().submissions,
   });
+}
+
+/**
+ * Locally, starts the rating run of the request a transaction made on Anvil, in place of the
+ * Alchemy Notify webhook (ADR 0036); the service refuses it in any other environment.
+ */
+export async function announceLocalRating(txHash: string): Promise<AnnounceResult> {
+  if (!/^0x[0-9a-fA-F]{64}$/.test(txHash)) return { ok: false, reason: "no-request" };
+  return getRatingService().announceLocalRating(txHash as `0x${string}`);
 }

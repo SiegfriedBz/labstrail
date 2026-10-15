@@ -16,8 +16,10 @@ export {
   fulfilCalldata,
   type RatingRequestState,
   type ReadOracleResult,
+  type ReadRequestIdsResult,
   type ReadRequestResult,
   type RequestStatus,
   readOracleAgent,
   readRatingRequest,
+  readRequestIdsOf,
 } from "./rating-controller.ts";

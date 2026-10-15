@@ -1,4 +1,4 @@
-import { decodeFunctionData } from "viem";
+import { AbiDecodingZeroDataError, decodeFunctionData } from "viem";
 import { describe, expect, it, vi } from "vitest";
 import { ratingControllerAbi } from "./generated/rating-controller-abi.ts";
 import {
@@ -7,6 +7,7 @@ import {
   fulfilCalldata,
   readOracleAgent,
   readRatingRequest,
+  readRequestIdsOf,
 } from "./rating-controller.ts";
 
 const CONTRACT = "0x5fbdb2315678afecb367f032d93f642f64180aa3";
@@ -153,5 +154,82 @@ describe("calldata", () => {
     expect(
       decodeFunctionData({ abi: ratingControllerAbi, data: cancelCalldata(REQUEST_ID, reason) }),
     ).toEqual({ functionName: "cancelRequest", args: [REQUEST_ID, code] });
+  });
+});
+
+describe("readRequestIdsOf", () => {
+  const id = (n: number) => `0x${n.toString(16).padStart(64, "0")}` as const;
+
+  /** A contract holding `ids` for TARGET, answering `requestIdsOf` page by page. */
+  function contractWith(ids: readonly `0x${string}`[]) {
+    return reader(async () => undefined).readContract.mockImplementation(
+      async ({ functionName, args }: { functionName: string; args: readonly unknown[] }) => {
+        if (functionName === "requestCountOf") return BigInt(ids.length);
+        const [, offset, limit] = args as [string, bigint, bigint];
+        return ids.slice(Number(offset), Number(offset) + Number(limit));
+      },
+    );
+  }
+
+  it("returns a target's request ids oldest first", async () => {
+    const readContract = contractWith([id(1), id(2), id(3)]);
+
+    expect(await readRequestIdsOf({ readContract } as never, CONTRACT, TARGET)).toEqual({
+      ok: true,
+      ids: [id(1), id(2), id(3)],
+    });
+    expect(readContract).toHaveBeenCalledWith({
+      address: CONTRACT,
+      abi: ratingControllerAbi,
+      functionName: "requestCountOf",
+      args: [TARGET],
+    });
+  });
+
+  it("reads every page when a target has more than 50 requests", async () => {
+    const ids = Array.from({ length: 120 }, (_, n) => id(n + 1));
+    const readContract = contractWith(ids);
+
+    const result = await readRequestIdsOf({ readContract } as never, CONTRACT, TARGET);
+
+    expect(result).toEqual({ ok: true, ids });
+    const pages = readContract.mock.calls.filter(([call]) => call.functionName === "requestIdsOf");
+    expect(pages.map(([call]) => call.args)).toEqual([
+      [TARGET, 0n, 50n],
+      [TARGET, 50n, 50n],
+      [TARGET, 100n, 50n],
+    ]);
+  });
+
+  it("returns an empty list for a target with no request, with one read", async () => {
+    const readContract = contractWith([]);
+
+    expect(await readRequestIdsOf({ readContract } as never, CONTRACT, TARGET)).toEqual({
+      ok: true,
+      ids: [],
+    });
+    expect(readContract).toHaveBeenCalledTimes(1);
+  });
+
+  it("is unreachable when the RPC fails", async () => {
+    const client = reader(async () => {
+      throw new Error("timeout");
+    });
+
+    expect(await readRequestIdsOf(client, CONTRACT, TARGET)).toEqual({
+      ok: false,
+      reason: "unreachable",
+    });
+  });
+
+  it("is unreachable when the reply doesn't decode, as from an address with no contract", async () => {
+    const client = reader(async () => {
+      throw new AbiDecodingZeroDataError();
+    });
+
+    expect(await readRequestIdsOf(client, CONTRACT, TARGET)).toEqual({
+      ok: false,
+      reason: "unreachable",
+    });
   });
 });

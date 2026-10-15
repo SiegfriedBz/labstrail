@@ -68,8 +68,9 @@ export function parseDeployments(input: unknown): DeploymentsFile {
 }
 
 /**
- * An environment's deployments from a parsed file. `local` reads staging's, which is the
- * contract local development and previews use (ADR 0005).
+ * An environment's deployments from a parsed file. `local` reads staging's entry, since the
+ * file records no Anvil contract; locally, the rating functions and pages use the Anvil
+ * contract their settings name (ADR 0036).
  * @throws NoDeploymentError when that environment has no current deployment.
  */
 export function resolveDeployments(

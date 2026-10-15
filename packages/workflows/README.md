@@ -5,8 +5,10 @@ Inngest workflows that combine `core` logic with the `dkg` and `contracts` adapt
 
 Status: the publish run, which turns a pinned PDF into a minted Target KA, the calls the
 upload page makes to start and follow it, and the papers list's read; the rating run, which
-scores a requested paper and has the oracle record it, and the oracle function. Locally a
-dev script starts the rating run; on staging, the Alchemy webhook will (next plan).
+scores a requested paper and has the oracle record it, and the oracle function; and the
+rating pages' calls, which read a paper's ratings and one rating's progress. Locally the
+paper page, or a dev script, starts the rating run; on staging, the Alchemy Notify webhook
+will (next plan).
 
 Architecture views: [`.omm/overall-architecture/workflows/`](../../.omm/overall-architecture/workflows/), [`.omm/pipeline/`](../../.omm/pipeline/) (`pnpm exec omm view --port 4000` shows them; root README → Architecture).
 
@@ -31,7 +33,7 @@ server (`APP_ENV` other than `local`) checks them when it starts, through
 | --- | --- |
 | `GROBID_URL` | GROBID's base URL: `http://127.0.0.1:8070` locally ([`docs/node-host.md`](../../docs/node-host.md) → GROBID) |
 | `PINATA_GATEWAY_URL` | The Pinata account's dedicated gateway, `https://<name>.mypinata.cloud`, through which the publish and rating runs read PDFs; one account serves every environment ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)) |
-| `CHAIN_RPC_URL` | A Base Sepolia RPC URL, to check smart-contract wallets' signatures and, on staging and production, to read and write the rating contract |
+| `CHAIN_RPC_URL` | A Base Sepolia RPC URL, to check smart-contract wallets' signatures and, on staging and production, for the rating functions to read and write the rating contracts and the pages to read their ratings |
 | `PINATA_JWT` | A Pinata API key (JWT) allowed to upload, list and delete files; the `publish-pdf` dev script reads it too. Secret |
 | `GEMINI_API_KEY` | A Gemini API key from Google AI Studio, for the publish run's field check ([ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)) and the rating functions' scorer ([ADR 0018](../../docs/adr/0018-phase-1-scorer-output-contract.md)); the `score-papers` dev script reads it too. Every deployment checks it at start, previews included. Secret |
 | `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY` | Inngest's keys, required unless `APP_ENV` is `local`: the SDK reads them itself, and the signing key also reads runs for the upload page. Secret |
@@ -47,7 +49,7 @@ production, which refuses to start without the key, and on staging when the key 
 | Variable | Value |
 | --- | --- |
 | `ORACLE_PRIVATE_KEY` | The oracle's key, `0x` and 64 hex: on Vercel only `develop` (staging's, scoped to that branch) and production hold one; locally, Anvil's second default account's key. Secret |
-| `LOCAL_CHAIN_RPC_URL`, `LOCAL_RATING_CONTRACT` | Required only when `APP_ENV=local`: Anvil's URL (`http://127.0.0.1:8546`) and the RatingController deployed there ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)). Elsewhere the contracts come from the committed deployments file, current and past ([ADR 0028](../../docs/adr/0028-deployed-addresses-are-committed.md)) |
+| `LOCAL_CHAIN_RPC_URL`, `LOCAL_RATING_CONTRACT` | Required only when `APP_ENV=local`: Anvil's URL (`http://127.0.0.1:8546`) and the RatingController deployed there ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)). The pages' rating calls (`getRatingService`) and the `fund-local` script read them too. Elsewhere the contracts come from the committed deployments file, current and past ([ADR 0028](../../docs/adr/0028-deployed-addresses-are-committed.md)) |
 
 `DKG_CONTEXT_GRAPH` must spell its address in EIP-55 checksum case, as the node lists it
 (`@verisci/dkg`'s rule): a query with the address in another case reads another, empty
@@ -79,6 +81,9 @@ upload page reads runs there, with no keys.
 | `SubmitResult`, `SubmitRefusal`, `SubmitLimiter`, `LimitAnswer` | What `submitPaper` returns, why it refuses, the per-submitter limit the web app passes it, and the limit's answer (`unavailable` carries what the store threw) |
 | `UploadUrlResult`, `PinataUnavailable`, `ReadRunResult`, `RunState` | What `createUploadUrl` and the run read return; Pinata's `unavailable` carries what came back (`HTTP 503`, `unexpected answer`, or the error) |
 | `describeFailure(error)`, `PublishLogger` | A thrown value as one short log line, with its HTTP status and up to three causes (a refused connection names its address and port), and with URLs, bearer tokens, JWTs and long hex removed; the logger a run or a submission warns through |
+| `getRatingService()` | The rating pages' calls, built on first use from the settings: `listRatings(targetUal)`, `paperRatingSummaries(targetUals)`, `readRating(requestId)`, `announceLocalRating(txHash)` (below) |
+| `RatingService`, `RatingSummary`, `RatingListResult`, `RatingView`, `RatingStage`, `AnnounceResult` | Their type and answers: one request as its contract holds it; a paper's requests, oldest first, or `unavailable`; one rating, with its stage on the node while pending or its R-KA's record once fulfilled; the local announce's result |
+| `PaperRatingSummary`, `summariseRatings(ratings)` | A paper's rating as the pages show it (`scored` with the latest score, `pending`, `cannot-rate`, `unrated`, or `unknown` when the chain did not answer), and the one rule, shared by the papers list and the paper page, that sums a paper's requests into it |
 | `PaperListResult`, `PaperSummary`, `SignatureCheck`, `QueryProblem` | What `listPapers` returns: a page of papers with the total, or why not (`unavailable`, `unreadable`); one listed paper; a signature check (`valid`, `invalid`, `unknown`) |
 | `env` (from `@verisci/workflows/env`); `createWorkflowsEnv(runtimeEnv)`, `WorkflowsEnv` (from either entry) | The validated settings, the function that builds them from a given object, and their type |
 
@@ -346,6 +351,37 @@ papers list:
   that is not a positive integer, a page size over 50, or a page whose offset is not a safe
   integer throws a `RangeError`.
 
+`getRatingService()` serves the rating parts of the pages: the paper's page, each rating's
+page and its `/api/ratings/<id>` route, and the papers list's Score column. It reads the
+environment's contracts, current and past, on Base Sepolia, or locally only the Anvil one
+([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)), and needs no oracle key. Each
+chain call is tried once and gets 5 s, and the contracts are read at once, so a chain that does
+not answer costs a page about 5 s ([ADR 0021](../../docs/adr/0021-server-reads-return-typed-results.md)).
+
+- **`listRatings(targetUal)`** gives every request for the paper on those contracts, oldest
+  first (`readRequestIdsOf`, then each request), or `unavailable` when a contract does not
+  answer. The contract's score is the one given
+  ([ADR 0014](../../docs/adr/0014-contract-owns-scores-dkg-owns-content.md)).
+- **`paperRatingSummaries(targetUals)`** sums each paper's requests with `summariseRatings`,
+  for the papers list: the latest score, else `pending`, else `cannot-rate` when a request was
+  cancelled `invalid-target`, else `unrated`. A paper whose read takes more than 3 s is
+  `unknown`, so a slow chain never holds the list.
+- **`readRating(requestId)`** finds the request on the contracts, current first: `not-found`
+  when none holds it, `unavailable` when one did not answer and none holds it. A pending
+  request carries its stage, read from its R-KA's state on the node (`scoring` with no asset
+  yet, `saving` a draft, `minting` stored, `recording` minted, `unknown` when the node does
+  not answer). A fulfilled one carries its R-KA's record (study type, rationale, every check
+  with its answer and quote, and what the scorer claimed for a check that lost its point),
+  read back from the node, and `gap` when the R-KA's score differs from the contract's; or
+  `recordProblem`, as `readPaper` words it.
+- **`announceLocalRating(txHash)`**, locally only, stands in for the Alchemy Notify webhook
+  ([ADR 0017](../../docs/adr/0017-chain-events-are-ingested-at-least-once.md)): it reads the
+  transaction's receipt on Anvil itself, finds a `Phase1Requested` log of the Anvil contract,
+  and sends its event with `ratingRequestedEvent`, so the id is the one the webhook would
+  give. Deployed it answers `not-local`; a receipt with no such log gives `no-request`; Anvil or
+  Inngest not answering gives `unavailable` and logs `rating-announce-unavailable: anvil: …` or
+  `rating-announce-unavailable: inngest: …`.
+
 ## Running a publish locally
 
 1. Start the RPC proxy, the DKG node and GROBID ([`docs/node-host.md`](../../docs/node-host.md)).
@@ -384,15 +420,30 @@ R-KAs still go to the staging graph.
 6. `cast call <contract> "getRatingRequest(bytes32)" <request id> --rpc-url http://127.0.0.1:8546`
    shows the request, its score and its R-KA once fulfilled.
 
+Or rate through the pages, after steps 1 to 4:
+
+1. Set `REOWN_PROJECT_ID` for the wallet window
+   ([`apps/web`](../../apps/web/README.md#environment)), and add Anvil to your wallet as a
+   network (chain id 31337, RPC `http://127.0.0.1:8546`); the wallet window offers it only
+   with `APP_ENV=local`.
+2. `pnpm --filter @verisci/workflows fund-local <your address>` gives that address 1 ETH on
+   Anvil, for the request's gas.
+3. Open a published paper's page, click **Rate this paper** and confirm in the wallet. The page
+   waits for the receipt, then has the server announce the request (`announceLocalRating`),
+   and opens the rating's page, which follows it to its score. A Gemini outage shows as the
+   first step taking long: the run retries, then stops after its five attempts.
+
 Restarting Anvil empties it: deploy again (the first deploy on a fresh chain gets the same
 address). Request ids still never repeat, since each one hashes the contract's deploy time
-([`packages/contracts` → RatingController](../contracts/README.md#ratingcontroller)). Every
-request comes from a new requester, so each run starts clear of the per-requester cap, whatever
-earlier runs left pending.
+([`packages/contracts` → RatingController](../contracts/README.md#ratingcontroller)). Each
+`rate-paper` request comes from a new requester, so each run starts clear of the per-requester
+cap, whatever earlier runs left pending. Requests from your own wallet, through the pages, count
+against its cap of 3 while they are pending, announced or not; restarting Anvil clears them.
 
-The script stands in for the Alchemy webhook, which comes with the next plan: it reads the
-`Phase1Requested` log from its own transaction's receipt and builds the event with
-`ratingRequestedEvent`, the function the webhook route will call. From the event on, the run
+The script, and the paper page through `announceLocalRating`, stand in for the Alchemy Notify
+webhook, which comes with the next plan: each reads the `Phase1Requested` log from the
+request's receipt and builds the event with `ratingRequestedEvent`, the function the webhook
+route will call. From the event on, the run
 is the one staging runs: the contract and its oracle, the target read from the staging graph,
 Gemini's score, the R-KA minted on Base Sepolia, and the oracle's transaction and receipt.
 Alchemy's signed delivery, Inngest crons in a branch environment and Base's handling of a
@@ -406,6 +457,7 @@ stuck transaction are checked on `develop`; the unit tests cover every branch wi
 | `pnpm --filter @verisci/workflows test` | Runs its Vitest project (`vitest run`) with mocked adapters |
 | `pnpm --filter @verisci/workflows publish-pdf <file.pdf>` | Dev only: pins a PDF, signs it and sends `verisci/paper.submitted` to the local dev server |
 | `pnpm --filter @verisci/workflows rate-paper <target UAL> [--raw]` | Dev only, `APP_ENV=local`: requests a rating on the Anvil contract from a throwaway requester and sends `verisci/rating.requested` to the local dev server |
+| `pnpm --filter @verisci/workflows fund-local <address>` | Dev only, `APP_ENV=local`: gives the address 1 ETH on Anvil, so its wallet can request a rating from the paper page |
 | `pnpm --filter @verisci/workflows score-papers [--field] [id…]` | Dev only, `APP_ENV=local`: scores the reference papers with Gemini and compares each with what is expected, or with `--field` runs only the publish run's field check on them (Measuring the scorer above) |
 
 Ships TypeScript source (`src/index.ts`, `src/env.ts`), with no build step. The source is

@@ -88,8 +88,9 @@ const RECORD = [
 ] as const;
 
 /**
- * Home: what VeriSci does, the latest published papers, the way to publish, and the rating
- * flow to come. The latest papers stream in, so the hero never waits for the DKG node.
+ * Home: what VeriSci does, with a demo that publishes a paper and then rates it, the latest
+ * published papers, and how publishing and rating work. The latest papers stream in, so the
+ * hero never waits for the DKG node.
  */
 export default function Home() {
   return (
@@ -104,8 +105,8 @@ export default function Home() {
             <span className="text-accent">verify</span>
           </h1>
           <p className="max-w-[46ch] text-lg leading-relaxed text-muted">
-            For research in biology, medicine and health. Drop a PDF and sign with your wallet.
-            VeriSci records it on the knowledge graph, with you as its submitter.
+            For research in biology, medicine and health. Sign your PDF with your wallet to publish
+            it on the knowledge graph, then anyone can ask for its reproducibility rating.
           </p>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
             <Link
@@ -122,13 +123,9 @@ export default function Home() {
         </div>
         <div className="enter-late relative">
           <div aria-hidden className="signal-glow absolute -inset-x-4 -inset-y-10 sm:-inset-10" />
-          <figure className="glass relative grid gap-5 rounded-2xl p-6 sm:p-7">
-            <figcaption className="flex items-center justify-between gap-3 text-sm text-muted">
-              <span>Publish flow</span>
-              <span className="font-mono text-xs text-accent">live</span>
-            </figcaption>
+          <div className="glass relative rounded-2xl p-6 sm:p-7">
             <ChainDemo />
-          </figure>
+          </div>
         </div>
       </section>
 
@@ -240,8 +237,14 @@ export default function Home() {
           />
           <Track
             label="Rate"
-            badge="coming soon"
-            intro="Anyone will be able to ask for a rating of a published paper. The first score measures reproducibility readiness, not whether the work is right. Each phase records its own score on-chain, so earlier scores stay as they were."
+            badge={<span className="text-accent">phase 1 live</span>}
+            intro="Anyone with a wallet can ask for a rating of a published paper, from its page. The first score measures reproducibility readiness, not whether the work is right. Human review and replication come next, each with its own score on-chain, so earlier scores stay as they were."
+            action={
+              <Link href="/papers" className="link inline-flex w-fit items-center gap-1.5 text-sm">
+                Pick a paper to rate
+                <ArrowRight aria-hidden size={14} weight="bold" />
+              </Link>
+            }
             steps={RATE}
             muted
           />
@@ -277,8 +280,8 @@ export default function Home() {
             submitted it without trusting us.
           </p>
           <p className="max-w-[40ch] text-sm leading-relaxed text-muted">
-            A rating will be a separate asset, with its own UAL, whose statements point to this one.
-            The paper asset itself never changes.
+            A rating is a separate asset, with its own UAL, whose statements point to this one. The
+            paper asset itself never changes.
           </p>
         </div>
       </section>
@@ -294,12 +297,15 @@ function Track({
   label,
   badge,
   intro,
+  action,
   steps,
   muted = false,
 }: {
   label: string;
   badge: React.ReactNode;
   intro: string;
+  /** A link below the intro. */
+  action?: React.ReactNode;
   steps: typeof HOW | typeof RATE;
   muted?: boolean;
 }) {
@@ -313,6 +319,7 @@ function Track({
           </span>
         </h3>
         <p className="max-w-[52ch] text-sm leading-relaxed text-muted">{intro}</p>
+        {action}
       </div>
       <ol className="grid gap-7 md:grid-cols-3 md:gap-8">
         {steps.map(({ icon: Icon, title, body }, index) => (
