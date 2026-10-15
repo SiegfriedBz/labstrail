@@ -258,7 +258,7 @@ accepted.
 | Export | What it does |
 | --- | --- |
 | `ratingControllerAbi` | The contract ABI, typed `as const` so viem infers every function, event and error |
-| `ratingControllerDeployments(appEnv)` | `{ chainId, current, past }` for `staging` or `production`; `local` resolves to staging ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)); locally the rating functions and the pages use the Anvil contract their settings name instead ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)). `current` accepts new requests; `past` contracts are paused and drained ([ADR 0023](../../docs/adr/0023-a-fix-is-a-redeploy-owner-powers-fixed.md)) |
+| `ratingControllerDeployments(appEnv)` | `{ chainId, current, past }` for `staging` or `production`; `local` reads staging's entry, since the file records no Anvil contract. Locally, the rating functions and the pages use the Anvil contract their settings name ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)). `current` accepts new requests; `past` contracts are paused and drained ([ADR 0023](../../docs/adr/0023-a-fix-is-a-redeploy-owner-powers-fixed.md)) |
 | `NoDeploymentError` | Thrown by `ratingControllerDeployments` for an environment with no current deployment |
 | `Deployment`, `DeployEnv`, `RatingControllerDeployments` | The corresponding types |
 | `readRatingRequest(client, contract, requestId)` | The request's `RatingRequestState` (status `none`, `pending`, `fulfilled` or `cancelled`, cancel reason, lowercase requester, `requestedAt` in seconds, score, target and R-KA UALs), or `unreachable` when the RPC fails or the reply does not decode |

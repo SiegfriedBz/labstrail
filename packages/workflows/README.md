@@ -421,8 +421,10 @@ R-KAs still go to the staging graph.
 
 Or rate through the pages, after steps 1 to 4:
 
-1. Add Anvil to your wallet as a network (chain id 31337, RPC `http://127.0.0.1:8546`); the
-   wallet window offers it only with `APP_ENV=local`.
+1. Set `REOWN_PROJECT_ID` for the wallet window
+   ([`apps/web`](../../apps/web/README.md#environment)), and add Anvil to your wallet as a
+   network (chain id 31337, RPC `http://127.0.0.1:8546`); the wallet window offers it only
+   with `APP_ENV=local`.
 2. `pnpm --filter @verisci/workflows fund-local <your address>` gives that address 1 ETH on
    Anvil, for the request's gas.
 3. Open a published paper's page, click **Rate this paper** and confirm in the wallet. The page

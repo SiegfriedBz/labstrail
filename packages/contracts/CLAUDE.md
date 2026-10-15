@@ -38,6 +38,6 @@ layout, toolchain versions and commands.
   by target), 0023 (a fix is a redeploy; old contracts are paused and drained, with fulfil
   and cancel still working; the owner pauses and unpauses, and transfers ownership in two
   steps with no renounce), 0028 (deployed addresses are committed) and 0030 (owner and
-  oracle are different addresses). `HelperConfig` and `resolveDeployments` follow 0005
-  (staging, production and local); the local config deploys, on Anvil, the contract local
-  rating runs use (0036). See [`docs/adr/`](../../docs/adr/README.md).
+  oracle are different addresses). `HelperConfig` follows 0005 (staging, production and
+  local); its local config deploys, on Anvil, the contract local ratings use, pages included
+  (0036). `resolveDeployments` reads Base Sepolia's file, where `local` gets staging's entry. See [`docs/adr/`](../../docs/adr/README.md).
