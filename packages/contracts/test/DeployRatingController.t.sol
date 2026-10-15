@@ -31,6 +31,12 @@ contract DeployRatingControllerTest is Test {
         assertFalse(controller.paused());
     }
 
+    function testFuzz_Run_RecordsTheDeployTime(uint64 deployedAt) public {
+        vm.warp(deployedAt);
+        (RatingController controller,) = deployer.run();
+        assertEq(controller.DEPLOYED_AT(), deployedAt);
+    }
+
     function test_GetConfig_LocalUsesAnvilOracle() public view {
         HelperConfig.NetworkConfig memory config = helperConfig.getConfig();
         assertEq(config.oracleAgent, helperConfig.ANVIL_ORACLE());

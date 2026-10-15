@@ -1,0 +1,4 @@
+graph LR
+    helpers["Shared Helpers\nlib/web-env.ts, server.ts, site.ts, theme.ts, shorten.ts, utils.ts"] -->|"server.ts builds the upload limits from web-env and"| publish["Publish Flow\nlib/publish/"]
+    helpers -->|"web-env's local chain settings name the Anvil contract for"| rating["Rating Flow\nlib/rating/"]
+    papers["Papers\nlib/papers/"] -->|"asks which contract takes ratings with"| rating

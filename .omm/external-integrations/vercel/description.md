@@ -1,0 +1,1 @@
+Vercel Hobby hosts the web app and the Inngest functions it serves: develop deploys to staging, main to production, feature branches to previews. A function may run 300 s, which bounds each Inngest step; a deployed server checks its settings when it starts.

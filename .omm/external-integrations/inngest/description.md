@@ -1,0 +1,1 @@
+Inngest (INNGEST_EVENT_KEY and INNGEST_SIGNING_KEY when deployed; the dev server locally): receives the publish and rating events, invokes the functions served at /api/inngest step by step, and its REST API tells the paper's page how a publish run ended.

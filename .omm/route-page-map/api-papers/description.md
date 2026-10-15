@@ -1,0 +1,1 @@
+GET /api/papers/[cid] (app/api/papers/[cid]/route.ts): a paper's status for the page that follows a publish: the Target KA's state from the DKG node and, with ?event=, the publish run's state from Inngest, mapped to the page's stage.

@@ -15,8 +15,10 @@ interface IRatingController {
     }
 
     /// @notice Why a request was cancelled: `Expired` when it stayed pending past the maximum age
-    ///         (ADR 0020), `InvalidTarget` when its target UAL is not a Target KA that can be rated.
-    ///         `None` until then.
+    ///         (ADR 0020); `InvalidTarget` when its target cannot be rated: a UAL not in canonical
+    ///         form (ADR 0031), a KA verisci did not publish (ADR 0011), a paper outside the life
+    ///         sciences and health (ADR 0037), or a paper whose PDF cannot be read for its text,
+    ///         such as a scan or a file over the size limit (ADR 0011). `None` until then.
     enum CancelReason {
         None,
         Expired,
@@ -109,15 +111,19 @@ interface IRatingController {
     error InvalidCap();
 
     /// @notice `renounceOwnership` was called; ownership moves only by two-step transfer, so the
-    ///         contract always has an owner.
+    ///         contract always has an owner (ADR 0023).
     error RenounceOwnershipDisabled();
 
     /// @notice The owner and the oracle would be the same address. They are kept apart because the
     ///         oracle's key runs on a server and the owner's stays offline (ADR 0030).
     error SameOwnerAndOracle();
 
-    /// @notice Requests a phase-1 rating of `targetUal`.
-    /// @param targetUal The UAL of the Target KA to rate.
+    /// @notice Requests a phase-1 rating of `targetUal`. The contract stores and hashes the UAL
+    ///         exactly as given, so callers send its canonical spelling; the oracle cancels a
+    ///         request in any other spelling with `InvalidTarget` (ADR 0031).
+    ///         The id hashes the chain id, this contract's address, its deploy time, the nonce,
+    ///         the requester and the UAL's hash, so no two requests share one (ADR 0016).
+    /// @param targetUal The UAL of the Target KA to rate, in canonical spelling.
     /// @return requestId The new request id.
     function requestPhase1(string calldata targetUal) external returns (bytes32 requestId);
 
@@ -127,7 +133,7 @@ interface IRatingController {
     /// @param rKaUal The UAL of the rating's R-KA.
     function fulfilPhase1(bytes32 requestId, uint8 score, string calldata rKaUal) external;
 
-    /// @notice Cancels a pending request, with the reason it stopped (ADR 0024). Oracle only.
+    /// @notice Cancels a pending request, with the reason it stopped (ADR 0020). Oracle only.
     /// @param requestId The request to cancel.
     /// @param reason Why it is cancelled.
     function cancelRequest(bytes32 requestId, CancelReason reason) external;
@@ -141,7 +147,7 @@ interface IRatingController {
     function setMaxPendingPerRequester(uint8 max) external;
 
     /// @notice Stops new requests; fulfil and cancel keep working, so pending requests still
-    ///         settle (ADR 0027). Owner only.
+    ///         settle (ADR 0023). Owner only.
     function pause() external;
 
     /// @notice Lets new requests in again. Owner only.
@@ -150,6 +156,11 @@ interface IRatingController {
     /// @notice Highest phase-1 score.
     /// @return max The highest score, 100.
     function MAX_SCORE() external view returns (uint8 max);
+
+    /// @notice The block timestamp of this contract's deployment; hashed into each request id,
+    ///         so a contract redeployed at the same address never repeats an id (ADR 0016).
+    /// @return deployedAt The deployment's block timestamp, in seconds.
+    function DEPLOYED_AT() external view returns (uint256 deployedAt);
 
     /// @notice Number of requests made so far; hashed into each request id.
     /// @return count The number of requests made.
@@ -185,13 +196,13 @@ interface IRatingController {
     function pendingRequestIds(uint256 offset, uint256 limit) external view returns (bytes32[] memory ids);
 
     /// @notice Returns the number of requests made for a target.
-    /// @param targetUal The target UAL.
+    /// @param targetUal The target UAL, matched exactly as requested (ADR 0031).
     /// @return count The number of requests.
     function requestCountOf(string calldata targetUal) external view returns (uint256 count);
 
     /// @notice Returns up to `limit` of a target's request ids, oldest first, starting at index
     ///         `offset`.
-    /// @param targetUal The target UAL.
+    /// @param targetUal The target UAL, matched exactly as requested (ADR 0031).
     /// @param offset The index of the first id.
     /// @param limit The maximum number of ids.
     /// @return ids The target's request ids in that range.

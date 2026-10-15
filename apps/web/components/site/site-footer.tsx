@@ -1,8 +1,9 @@
 import { ArrowSquareOut } from "@phosphor-icons/react/dist/ssr";
 import { ORIGINTRAIL_CONTRACTS } from "@verisci/core";
 import Link from "next/link";
-import { addressUrl } from "../../lib/explorer.ts";
+import { addressUrl } from "../../lib/papers/explorer.ts";
 import { shorten } from "../../lib/shorten.ts";
+import { SITE } from "../../lib/site.ts";
 import { Logo } from "./logo.tsx";
 
 /** Base Sepolia, where every environment runs until mainnet (ADR 0015). */
@@ -13,16 +14,21 @@ interface ContractRow {
   owner: "OriginTrail" | "VeriSci";
   role: string;
   address: string;
-  /** Deployed, but nothing calls it yet. */
-  soon?: boolean;
+  /** On Anvil, which no block explorer shows: the address stays unlinked. */
+  local?: boolean;
 }
 
 /**
  * The site's footer: what VeriSci is and runs on, and the contracts behind every record, each
- * linked on Basescan: OriginTrail's, which hold and publish every asset, and our
- * RatingController for this environment, when it is deployed.
+ * linked on Basescan: OriginTrail's, which hold and publish every asset, and the
+ * RatingController this environment's pages use, when it has one; locally that is the Anvil
+ * one, shown unlinked.
  */
-export function SiteFooter({ ratingController }: { ratingController: string | undefined }) {
+export function SiteFooter({
+  ratingController,
+}: {
+  ratingController: { readonly address: string; readonly local: boolean } | undefined;
+}) {
   const origintrail = ORIGINTRAIL_CONTRACTS[CHAIN_ID];
   const rows: ContractRow[] = [
     ...(origintrail
@@ -46,9 +52,11 @@ export function SiteFooter({ ratingController }: { ratingController: string | un
           {
             name: "RatingController",
             owner: "VeriSci" as const,
-            role: "Records each rating phase's score",
-            address: ratingController,
-            soon: true,
+            role: ratingController.local
+              ? "Records each rating phase's score, on Anvil on this computer"
+              : "Records each rating phase's score",
+            address: ratingController.address,
+            local: ratingController.local,
           },
         ]
       : []),
@@ -57,12 +65,10 @@ export function SiteFooter({ ratingController }: { ratingController: string | un
     <footer className="mt-16 border-t border-line bg-surface">
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1fr_1.9fr] md:gap-14">
         <div className="grid content-start gap-4">
-          <Link href="/" aria-label="VeriSci home" className="w-fit">
+          <Link href="/" aria-label={`${SITE.name} home`} className="w-fit">
             <Logo />
           </Link>
-          <p className="max-w-[34ch] text-sm leading-relaxed text-muted">
-            Papers published as Knowledge Assets on the OriginTrail DKG, signed by their submitter.
-          </p>
+          <p className="max-w-[40ch] text-sm leading-relaxed text-muted">{SITE.description}</p>
           <p className="w-fit rounded-md border border-line px-2.5 py-1 font-mono text-xs text-muted">
             Base Sepolia testnet · chain {CHAIN_ID}
           </p>
@@ -93,23 +99,24 @@ export function SiteFooter({ ratingController }: { ratingController: string | un
                     >
                       {row.owner}
                     </span>
-                    {row.soon && (
-                      <span className="rounded-md bg-surface-strong px-1.5 py-0.5 font-mono text-[11px] text-muted">
-                        soon
-                      </span>
-                    )}
                   </span>
                   <span className="text-sm text-muted">{row.role}</span>
                 </span>
-                <a
-                  href={addressUrl(row.address)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex w-fit items-center gap-1.5 font-mono text-xs text-muted transition-colors hover:text-accent-2"
-                >
-                  {shorten(row.address, 8, 6)}
-                  <ArrowSquareOut size={12} />
-                </a>
+                {row.local ? (
+                  <span title={row.address} className="font-mono text-xs text-muted">
+                    {shorten(row.address, 8, 6)}
+                  </span>
+                ) : (
+                  <a
+                    href={addressUrl(row.address)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex w-fit items-center gap-1.5 font-mono text-xs text-muted transition-colors hover:text-accent-2"
+                  >
+                    {shorten(row.address, 8, 6)}
+                    <ArrowSquareOut size={12} />
+                  </a>
+                )}
               </li>
             ))}
           </ul>
@@ -117,7 +124,9 @@ export function SiteFooter({ ratingController }: { ratingController: string | un
       </div>
       <div className="border-t border-line">
         <div className="mx-auto flex max-w-6xl flex-wrap justify-between gap-x-6 gap-y-1 px-4 py-4 text-xs text-muted sm:px-6">
-          <p>© {new Date().getFullYear()} VeriSci</p>
+          <p>
+            © {new Date().getFullYear()} {SITE.name}
+          </p>
           <p>Built on the OriginTrail DKG, IPFS and Base.</p>
         </div>
       </div>

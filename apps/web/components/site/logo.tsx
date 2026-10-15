@@ -1,6 +1,7 @@
 /**
- * VeriSci's mark: a check drawn as three linked graph nodes, a verified record on the
- * knowledge graph. `app/icon.svg` is the same drawing, for the browser tab.
+ * VeriSci's mark: a heartbeat whose last beat is a check, health research verified, drawn from
+ * the off-chain record's blue into the on-chain proof's teal. `app/icon.svg` is the same
+ * drawing, for the browser tab.
  */
 export function LogoMark({ className = "size-8" }: { className?: string }) {
   return (
@@ -8,10 +9,10 @@ export function LogoMark({ className = "size-8" }: { className?: string }) {
       <defs>
         <linearGradient
           id="logo-signal"
-          x1="6"
-          y1="24"
-          x2="26"
-          y2="8"
+          x1="5"
+          y1="20"
+          x2="27"
+          y2="10"
           gradientUnits="userSpaceOnUse"
         >
           <stop offset="0" style={{ stopColor: "var(--accent)" }} />
@@ -29,24 +30,14 @@ export function LogoMark({ className = "size-8" }: { className?: string }) {
         strokeWidth="1.5"
       />
       <path
-        d="M8.5 15.5 14 21.5 23.5 9.5"
+        d="M5.6 17H9.8l2.2-6.3 2.7 11.1 2.3-4.9 3.2 3.5 5.8-8.6"
         fill="none"
         stroke="url(#logo-signal)"
-        strokeWidth="2.4"
+        strokeWidth="2.3"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <circle cx="8.5" cy="15.5" r="2.4" style={{ fill: "var(--accent)" }} />
-      <circle cx="14" cy="21.5" r="3" fill="url(#logo-signal)" />
-      <circle cx="23.5" cy="9.5" r="2.4" style={{ fill: "var(--accent-2)" }} />
-      <circle
-        cx="23.5"
-        cy="9.5"
-        r="4.6"
-        fill="none"
-        style={{ stroke: "var(--accent-2)" }}
-        strokeOpacity="0.35"
-      />
+      <circle cx="25.9" cy="11.8" r="2" style={{ fill: "var(--accent-2)" }} />
     </svg>
   );
 }

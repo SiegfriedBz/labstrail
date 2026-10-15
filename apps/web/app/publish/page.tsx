@@ -1,16 +1,22 @@
-import { Eye, Gauge, PenNib, Repeat } from "@phosphor-icons/react/dist/ssr";
+import { Eye, Gauge, Heartbeat, PenNib, Repeat } from "@phosphor-icons/react/dist/ssr";
 import { getUploadService, PUBLISH_SETTINGS, UPLOAD_SETTINGS } from "@verisci/workflows";
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import { PublishForm } from "../../components/publish/publish-form.tsx";
-import { UPLOAD_LIMITS } from "../../lib/limits.ts";
+import { UPLOAD_LIMITS } from "../../lib/publish/limits.ts";
 
 export const metadata: Metadata = {
   title: "Publish a paper · VeriSci",
-  description: "Drop a PDF and sign with your wallet to publish it as a verifiable record.",
+  description:
+    "Drop the PDF of a life-science or health paper and sign with your wallet to publish it as a verifiable record.",
 };
 
 const BEFORE = [
+  {
+    icon: Heartbeat,
+    title: "Life sciences and health only",
+    body: "Biology, medicine, neuroscience, pharmacology, public health and bioinformatics, and psychology when the study is about health. After you sign, an AI model reads the title, the abstract and the start of the text, and a paper our check places outside the field is refused before anything is recorded.",
+  },
   {
     icon: Eye,
     title: "Your PDF becomes public",
@@ -44,6 +50,7 @@ export default async function PublishPage() {
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Publish a paper</h1>
           <p className="max-w-[48ch] leading-relaxed text-muted">
             Your paper becomes a public record on the DKG, with your wallet as its submitter.
+            VeriSci takes papers in the life sciences and health only.
           </p>
         </div>
         <PublishForm

@@ -1,0 +1,1 @@
+The request is recorded with its target UAL and requester, under an id no other request has, on any deployment (ADR 0016), and listed under its target (ADR 0022). A rating run works on it; a run that fails leaves it pending for the next run, and past 24 hours a run cancels it expired unless its R-KA is minted.

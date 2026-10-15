@@ -1,15 +1,23 @@
-import { type PaperMetadata, type Triple, targetKaName, targetKaQuads } from "@verisci/core";
+import {
+  type FieldCheckInput,
+  MAX_PDF_BYTES,
+  type PaperMetadata,
+  type Triple,
+  targetKaName,
+  targetKaQuads,
+} from "@verisci/core";
 import type { DkgClient, DkgFailure } from "@verisci/dkg";
 import { type Inngest, NonRetriableError } from "inngest";
+import type { FieldCheckResult } from "./field-check.ts";
 import type { SubmissionRefusal, VerifiedSubmission, VerifyResult } from "./verify-submission.ts";
 
 /** The event that starts a publish: `{ cid, contextGraph, deadline, submitter, signature }`. */
 export const PAPER_SUBMITTED = "verisci/paper.submitted";
 
-/** The publish run's limits (ADR 0008, ADR 0009). */
+/** The publish run's limits and its field check's settings (ADR 0008, ADR 0009, ADR 0037). */
 export const PUBLISH_SETTINGS = {
   /** Largest PDF read from the gateway. */
-  maxPdfBytes: 30 * 1024 * 1024,
+  maxPdfBytes: MAX_PDF_BYTES,
   /** How long `startMint` listens for the node's answer. */
   listenMs: 10_000,
   pollInterval: "30s",
@@ -17,20 +25,51 @@ export const PUBLISH_SETTINGS = {
   pollsPerMint: 20,
   retryWait: "2m",
   attempts: 5,
-  /** A run's whole budget, enforced by Inngest. */
+  /**
+   * A run's whole budget, enforced by Inngest. The field check adds at most about 2.5 minutes
+   * once per run (two calls of `fieldTimeoutMs` and `fieldRetryWait`).
+   */
   finishTimeout: "45m",
+  /** The Gemini model that checks a new paper's field, on the free tier (ADR 0037). */
+  fieldModel: "gemini-3.5-flash-lite",
+  /** How long Gemini gets to check a paper's field, inside a step's 300 s on Vercel. */
+  fieldTimeoutMs: 60_000,
+  /**
+   * The wait before the field check is asked once more: shorter than `retryWait` (ADR 0009),
+   * since free-tier Gemini calls that failed within seconds answered when asked again 30 s later
+   * (`docs/domain.md` → Gemini), and a paper is published anyway when the second ask fails, so a
+   * longer wait would only hold it back.
+   */
+  fieldRetryWait: "30s",
+  /** The longest opening of a paper's text the field check reads, as the rating prepares it. */
+  openingChars: 6_000,
 } as const;
 
-/** Why a paper cannot be published; a retry would not change it. */
-export type PaperRefusal = "not-a-pdf" | "too-large" | "unparseable" | "no-title";
+/**
+ * Why a paper cannot be published; a retry would not change it. `unreadable` and `no-text` are
+ * PDFs the rating's reader cannot read; `outside-field`, a paper the field check placed
+ * outside VeriSci's field (ADR 0037).
+ */
+export type PaperRefusal =
+  | "not-a-pdf"
+  | "too-large"
+  | "unparseable"
+  | "no-title"
+  | "unreadable"
+  | "no-text"
+  | "outside-field";
 
 /**
- * The result of reading a paper: its metadata, or why not (`unreachable` is worth a retry;
- * `unauthorized`, GROBID refusing our credential, is a setup error).
+ * The result of reading a paper: its metadata and the opening of its text, or why not
+ * (`unreachable` is worth a retry; `unauthorized`, GROBID refusing our credential, is a setup
+ * error).
  */
 export type ReadPaperResult =
-  | { readonly ok: true; readonly metadata: PaperMetadata }
-  | { readonly ok: false; readonly reason: PaperRefusal | "unreachable" | "unauthorized" };
+  | { readonly ok: true; readonly metadata: PaperMetadata; readonly opening: string }
+  | {
+      readonly ok: false;
+      readonly reason: Exclude<PaperRefusal, "outside-field"> | "unreachable" | "unauthorized";
+    };
 
 /**
  * Why a publish run stopped without an outcome, carried in its error as
@@ -79,12 +118,26 @@ export interface PublishSteps {
   sleep(id: string, duration: string): Promise<void>;
 }
 
+/**
+ * Where a publish run logs the field check's verdicts (Inngest's logger), and where a
+ * submission or an upload URL names a service that gave no answer (the server's console).
+ */
+export interface PublishLogger {
+  info(message: string): void;
+  warn(message: string): void;
+}
+
 /** The adapters a publish run calls. */
 export interface PublishDeps {
   /** Checks the event data, its deadline against `receivedAt` (ms), when Inngest received it. */
   verifySubmission(data: unknown, receivedAt: number): Promise<VerifyResult>;
-  /** Fetches the PDF and parses its header, in one step so its bytes are never a step output. */
+  /**
+   * Fetches the PDF, parses its header and reads the opening of its text, in one step so its
+   * bytes are never a step output.
+   */
   readPaper(cid: string): Promise<ReadPaperResult>;
+  /** Asks Gemini whether a new paper is in VeriSci's field (ADR 0037). */
+  checkField(paper: FieldCheckInput): Promise<FieldCheckResult>;
   readonly dkg: Pick<DkgClient, "readAsset" | "storeAsset" | "startMint">;
 }
 
@@ -96,13 +149,22 @@ type Attempt =
 
 /**
  * Publishes a paper as a Target KA (ADR 0010): checks the submission, then reads the KA's
- * state and does only what is left (ADR 0007): read the paper, store, mint, poll. A KA
- * already stored or minted keeps its first submitter.
+ * state and does only what is left (ADR 0007): read the paper, check its field, store, mint,
+ * poll. A KA already stored or minted keeps its first submitter.
+ *
+ * A new paper's field is checked once per run, after its first read (ADR 0037): a paper
+ * outside the field ends the run `refused: outside-field` before anything is stored. A check
+ * that fails waits `fieldRetryWait` and is asked once more; when that fails too, the paper is
+ * published, its rating checking the field again, and the run logs `field-unchecked`. Gemini
+ * refusing the request (a bad key, a model it no longer serves) is ours to fix, not a missing
+ * answer: it fails the run (`setup`) with nothing stored. A draft or a minted asset is never
+ * checked: its content is sealed.
  *
  * A failure worth a retry waits `retryWait` with `step.sleep` and starts again from the
  * read, for `attempts` attempts (ADR 0009); a mint not seen after `pollsPerMint` polls is
  * started again (ADR 0008). Throws `NonRetriableError` when the node or GROBID refuses our
- * credential, the node does not serve the graph, or the attempts run out.
+ * credential, Gemini refuses the field check's request, the node does not serve the graph, or
+ * the attempts run out.
  *
  * The deadline is checked against `receivedAt`, so retries during an outage never expire a
  * signature that was valid when it arrived. `receivedAt` is the event's `ts`, which its
@@ -114,6 +176,7 @@ export async function runPublish(
   step: PublishSteps,
   deps: PublishDeps,
   receivedAt: number,
+  logger: PublishLogger,
 ): Promise<PublishOutcome> {
   const verified = await verify(data, step, deps, receivedAt);
   if (!verified.ok) return { state: "refused", reason: verified.reason };
@@ -123,8 +186,10 @@ export async function runPublish(
 
   let last = "";
   let lastFailure: PublishFailure = "node-unreachable";
+  const field: FieldState = { checked: false };
   for (let attempt = 1; attempt <= PUBLISH_SETTINGS.attempts; attempt++) {
-    const result = await publishOnce(attempt, name.name, submission, step, deps);
+    const context = { attempt, name: name.name, submission, step, deps, logger, field };
+    const result = await publishOnce(context);
     if (result.kind === "done") return result.outcome;
     if (result.kind === "fatal") throw stop("setup", `publish of ${name.name}: ${result.reason}`);
     last = result.kind === "retry" ? result.reason : "mint not seen";
@@ -162,13 +227,23 @@ async function verify(
   }
 }
 
-async function publishOnce(
-  attempt: number,
-  name: string,
-  submission: VerifiedSubmission,
-  step: PublishSteps,
-  deps: PublishDeps,
-): Promise<Attempt> {
+/** Whether the run has had the field check's verdict, or its fallback. */
+interface FieldState {
+  checked: boolean;
+}
+
+interface AttemptContext {
+  readonly attempt: number;
+  readonly name: string;
+  readonly submission: VerifiedSubmission;
+  readonly step: PublishSteps;
+  readonly deps: PublishDeps;
+  readonly logger: PublishLogger;
+  readonly field: FieldState;
+}
+
+async function publishOnce(context: AttemptContext): Promise<Attempt> {
+  const { attempt, name, submission, step, deps } = context;
   const read = await step.run(`read-${attempt}`, () => deps.dkg.readAsset(name));
   if (!read.ok) return failed(read);
   if (read.state === "minted") return minted(read.ual);
@@ -177,13 +252,24 @@ async function publishOnce(
     // A draft is sealed with its content: storing it only shares it, so its paper is not read again.
     let quads: Triple[] = [];
     if (read.state === "missing") {
-      const paper = await step.run(`read-paper-${attempt}`, () => deps.readPaper(submission.cid));
+      // `parse-paper` replaced `read-paper` when the result gained the text's opening, so a run
+      // already going never reads an old result as a new one.
+      const paper = await step.run(`parse-paper-${attempt}`, () => deps.readPaper(submission.cid));
       if (!paper.ok) {
         if (paper.reason === "unreachable")
           return { kind: "retry", reason: "paper unreachable", failure: "paper-unreachable" };
         if (paper.reason === "unauthorized")
           return { kind: "fatal", reason: "GROBID unauthorized" };
         return { kind: "done", outcome: { state: "refused", reason: paper.reason } };
+      }
+      if (!context.field.checked) {
+        const { title, abstract } = paper.metadata;
+        const input = { title, ...(abstract ? { abstract } : {}), opening: paper.opening };
+        const verdict = await checkFieldOnce(context, input);
+        if (typeof verdict === "object") return verdict;
+        context.field.checked = true;
+        if (verdict === "outside")
+          return { kind: "done", outcome: { state: "refused", reason: "outside-field" } };
       }
       quads = targetKaQuads(paper.metadata, {
         ...submission,
@@ -208,6 +294,38 @@ async function publishOnce(
     if (state.state === "minted") return minted(state.ual);
   }
   return { kind: "mint-again" };
+}
+
+/**
+ * Asks the field check, and once more after `fieldRetryWait` if it fails: `outside` for a paper
+ * outside the field, `publish` for one in it or when both asks fail, and a `fatal` attempt when
+ * Gemini refuses the request. Logs Gemini's reason for a paper outside, and `field-unchecked`
+ * when both asks fail.
+ */
+async function checkFieldOnce(
+  context: AttemptContext,
+  paper: FieldCheckInput,
+): Promise<"outside" | "publish" | Attempt> {
+  const { attempt, submission, step, deps, logger } = context;
+  let checked = await step.run(`check-field-${attempt}`, () => deps.checkField(paper));
+  if (!checked.ok && checked.reason !== "refused") {
+    await step.sleep(`check-field-wait-${attempt}`, PUBLISH_SETTINGS.fieldRetryWait);
+    checked = await step.run(`check-field-${attempt}-again`, () => deps.checkField(paper));
+  }
+  if (!checked.ok) {
+    const status = checked.status === undefined ? "" : ` (HTTP ${checked.status})`;
+    if (checked.reason === "refused") {
+      return {
+        kind: "fatal",
+        reason: `Gemini refused the field check${status}: check GEMINI_API_KEY and the model`,
+      };
+    }
+    logger.warn(`field-unchecked: ${submission.cid}: ${checked.reason}${status}`);
+    return "publish";
+  }
+  if (checked.field === "life-sciences") return "publish";
+  logger.info(`outside-field: ${submission.cid}: ${checked.reason}`);
+  return "outside";
 }
 
 function minted(ual: string): Attempt {
@@ -236,7 +354,7 @@ export function createPublishPaper(inngest: Inngest.Any, getDeps: () => PublishD
       singleton: { key: "event.data.cid", mode: "skip" },
       timeouts: { finish: PUBLISH_SETTINGS.finishTimeout },
     },
-    async ({ event, step }) =>
+    async ({ event, step, logger }) =>
       runPublish(
         event.data,
         {
@@ -245,6 +363,7 @@ export function createPublishPaper(inngest: Inngest.Any, getDeps: () => PublishD
         },
         loadDeps(getDeps),
         event.ts ?? Date.now(),
+        logger,
       ),
   );
 }

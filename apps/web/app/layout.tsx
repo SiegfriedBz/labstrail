@@ -1,4 +1,3 @@
-import { NoDeploymentError, ratingControllerDeployments } from "@verisci/contracts";
 import type { Metadata } from "next";
 import { Martian_Mono, Sora } from "next/font/google";
 import Link from "next/link";
@@ -10,6 +9,8 @@ import { SiteFooter } from "../components/site/site-footer.tsx";
 import { ThemeToggle } from "../components/site/theme-toggle.tsx";
 import { Providers } from "../components/wallet/providers.tsx";
 import { WalletButton } from "../components/wallet/wallet-button.tsx";
+import { ratingChainConfig } from "../lib/rating/chain.ts";
+import { SITE, siteMetadata } from "../lib/site.ts";
 import { THEME_SCRIPT } from "../lib/theme.ts";
 import { createWebEnv } from "../lib/web-env.ts";
 import "./globals.css";
@@ -17,15 +18,7 @@ import "./globals.css";
 const sans = Sora({ subsets: ["latin"], variable: "--font-sora" });
 const mono = Martian_Mono({ subsets: ["latin"], variable: "--font-martian" });
 
-const DESCRIPTION =
-  "Publish a paper as a Knowledge Asset on the OriginTrail DKG, signed by your wallet, so anyone can verify who submitted it.";
-
-export const metadata: Metadata = {
-  title: "VeriSci",
-  description: DESCRIPTION,
-  openGraph: { title: "VeriSci", description: DESCRIPTION, siteName: "VeriSci", type: "website" },
-  twitter: { card: "summary", title: "VeriSci", description: DESCRIPTION },
-};
+export const metadata: Metadata = siteMetadata;
 
 /**
  * The shell: header with the theme and wallet buttons, then the page. Rendered per request,
@@ -34,8 +27,9 @@ export const metadata: Metadata = {
  */
 export default async function RootLayout({ children }: { children: ReactNode }) {
   await connection();
-  const { APP_ENV, REOWN_PROJECT_ID } = createWebEnv();
-  const ratingController = currentRatingController(APP_ENV);
+  const env = createWebEnv();
+  const { REOWN_PROJECT_ID } = env;
+  const rating = ratingChainConfig(env);
   return (
     // THEME_SCRIPT sets data-theme before the first paint, so React finds another value there.
     <html
@@ -56,10 +50,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         >
           Skip to content
         </a>
-        <Providers projectId={REOWN_PROJECT_ID}>
+        <Providers projectId={REOWN_PROJECT_ID} localRpcUrl={rating?.rpcUrl}>
           <header className="sticky top-0 z-20 border-b border-line bg-page/70 backdrop-blur-xl">
             <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-              <Link href="/" aria-label="VeriSci home">
+              <Link href="/" aria-label={`${SITE.name} home`}>
                 <Logo />
               </Link>
               <nav className="flex items-center gap-2.5 sm:gap-5">
@@ -72,19 +66,11 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           <main id="main" className="relative mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-16">
             {children}
           </main>
-          <SiteFooter ratingController={ratingController} />
+          <SiteFooter
+            ratingController={rating && { address: rating.contract, local: rating.local }}
+          />
         </Providers>
       </body>
     </html>
   );
-}
-
-/** This environment's current RatingController address, or none while it has no deployment. */
-function currentRatingController(appEnv: "local" | "staging" | "production"): string | undefined {
-  try {
-    return ratingControllerDeployments(appEnv).current.address;
-  } catch (error) {
-    if (error instanceof NoDeploymentError) return undefined;
-    throw error;
-  }
 }

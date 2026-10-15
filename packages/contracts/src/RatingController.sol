@@ -16,6 +16,9 @@ contract RatingController is IRatingController, Ownable2Step, Pausable {
     uint8 public constant MAX_SCORE = 100;
 
     /// @inheritdoc IRatingController
+    uint256 public immutable DEPLOYED_AT;
+
+    /// @inheritdoc IRatingController
     uint256 public nonce;
 
     /// @inheritdoc IRatingController
@@ -39,6 +42,7 @@ contract RatingController is IRatingController, Ownable2Step, Pausable {
     /// @param oracleAgent_ The address allowed to fulfil and cancel requests.
     /// @param maxPendingPerRequester_ The initial per-requester pending cap (ADR 0015).
     constructor(address oracleAgent_, uint8 maxPendingPerRequester_) Ownable(msg.sender) {
+        DEPLOYED_AT = block.timestamp;
         _setOracleAgent(oracleAgent_);
         _setMaxPendingPerRequester(maxPendingPerRequester_);
     }
@@ -50,7 +54,7 @@ contract RatingController is IRatingController, Ownable2Step, Pausable {
         if (pending >= maxPendingPerRequester) revert TooManyPending(pending, maxPendingPerRequester);
 
         bytes32 targetUalHash = keccak256(bytes(targetUal));
-        requestId = keccak256(abi.encode(block.chainid, address(this), nonce++, msg.sender, targetUalHash));
+        requestId = keccak256(abi.encode(block.chainid, address(this), DEPLOYED_AT, nonce++, msg.sender, targetUalHash));
         // casting to 'uint64' is safe because timestamps stay below 2^64 for billions of years
         // forge-lint: disable-next-line(unsafe-typecast)
         uint64 requestedAt = uint64(block.timestamp);
@@ -155,8 +159,8 @@ contract RatingController is IRatingController, Ownable2Step, Pausable {
     }
 
     /// @notice Reverts with `RenounceOwnershipDisabled` for every caller. The contract always has an
-    ///         owner, who can replace the oracle in an emergency (ADR 0024); ownership moves by
-    ///         `transferOwnership` then `acceptOwnership`.
+    ///         owner, who can replace the oracle in an emergency (ADR 0020); ownership moves by
+    ///         `transferOwnership` then `acceptOwnership` (ADR 0023).
     function renounceOwnership() public pure override {
         revert RenounceOwnershipDisabled();
     }

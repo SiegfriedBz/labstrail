@@ -1,0 +1,1 @@
+The paper page and the papers list are rendered per request from the DKG node, so they are only as fast and available as the node. The rating parts of the pages also read the chain through Alchemy RPC on every view (each paper's requests on each of the environment's contracts); a server cache and multicall can cut those reads once traffic grows.

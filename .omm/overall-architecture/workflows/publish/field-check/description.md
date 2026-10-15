@@ -1,0 +1,1 @@
+field-check.ts: checkField sends core's fieldCheckPrompt for a new paper's title, abstract and opening to gemini-3.5-flash-lite (PUBLISH_SETTINGS.fieldModel) through the shared Gemini call (src/gemini/), with FIELD_OUTPUT_SCHEMA, and checks the answer with parseFieldAnswer: the field (life-sciences or outside), Gemini's reason and the model version, or a typed failure (ADR 0037).

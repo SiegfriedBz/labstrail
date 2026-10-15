@@ -10,7 +10,10 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "publish-pdf": "node --env-file-if-exists=../../.env.local scripts/publish-pdf.ts"
+    "publish-pdf": "node --env-file-if-exists=../../.env.local scripts/publish-pdf.ts",
+    "rate-paper": "node --env-file-if-exists=../../.env.local scripts/rate-paper.ts",
+    "score-papers": "node --env-file-if-exists=../../.env.local scripts/score-papers.ts",
+    "fund-local": "node --env-file-if-exists=../../.env.local scripts/fund-local.ts"
   },
   "dependencies": {
     "@verisci/contracts": "workspace:*",
@@ -18,6 +21,7 @@
     "@verisci/dkg": "workspace:*",
     "@verisci/env": "workspace:*",
     "inngest": "4.22.0",
+    "unpdf": "1.8.1",
     "viem": "2.57.4",
     "zod": "4.6.5"
   },

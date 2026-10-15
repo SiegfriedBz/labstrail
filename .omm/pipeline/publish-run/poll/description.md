@@ -1,0 +1,1 @@
+Steps wait-<n>-<k> and poll-<n>-<k>: sleeps 30 s with step.sleep and reads the asset's state, up to 20 times; a mint not seen after 10 minutes is started again. A node that does not answer waits 2 minutes and starts a new attempt, up to 5 (ADR 0009).

@@ -1,0 +1,1 @@
+/publish (app/publish/page.tsx, components/publish/publish-form.tsx): what publishing means and its limits, starting with the field (life sciences and health only, checked after signing, ADR 0037), then the form: connect a wallet, drop a PDF, sign once. On success it opens the paper's page with ?event=<id> to follow the run.

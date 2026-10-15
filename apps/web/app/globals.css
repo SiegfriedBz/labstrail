@@ -4,12 +4,12 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 /*
- * VeriSci's look: a lab instrument with a web3 edge, light by default, with a dark theme.
- * Neutral greys, two signal colours with one meaning each: emerald for the off-chain record
- * ("verified"), cyan for the on-chain asset. They blend only on the main action, live lines
- * and the link between them, and stay out of plain text and links, which are ink with an
- * emerald underline. Raised panels with hairline borders, a soft emerald and cyan wash at
- * the top of each page. One radius scale: rounded-2xl for panels, rounded-xl for buttons
+ * VeriSci's look, "Clinical": a clinical record with an on-chain proof, light by default, with
+ * a dark theme. Cool slate greys, two signal colours with one meaning each: blue for the
+ * off-chain record ("verified"), teal for the on-chain asset. They blend only on the main
+ * action, live lines and the link between them, and stay out of plain text and links, which
+ * are ink with a blue underline. Raised panels with hairline borders, a soft blue and teal
+ * wash at the top of each page. One radius scale: rounded-2xl for panels, rounded-xl for buttons
  * and inputs, rounded-lg for small inline controls.
  *
  * `<html data-theme>` picks the theme: `THEME_SCRIPT` (lib/theme.ts) sets it before the
@@ -18,58 +18,60 @@
  */
 :root {
   color-scheme: light;
-  --page: #f4f6f6;
+  --page: #f3f6fa;
   --surface: rgb(255 255 255 / 0.82);
-  --surface-strong: rgb(17 20 22 / 0.05);
-  --line: rgb(17 20 22 / 0.09);
-  --line-strong: rgb(17 20 22 / 0.16);
-  --ink: #111416;
-  --muted: #5a6361;
+  --surface-strong: rgb(15 23 34 / 0.05);
+  --line: rgb(15 23 34 / 0.09);
+  --line-strong: rgb(15 23 34 / 0.16);
+  --ink: #0f1722;
+  --muted: #536074;
   /* The accents are dark enough for AA text contrast on the page, so their fills take white
      text. */
-  --accent: #087a52;
-  --accent-2: #0a7489;
+  --accent: #1d5fc4;
+  --accent-2: #0b7a72;
   /* Text and icons on an accent fill. */
   --accent-ink: #ffffff;
-  --accent-soft: rgb(8 122 82 / 0.09);
-  --accent-glow: rgb(8 122 82 / 0.2);
-  /* A darker emerald for surfaces with white text, such as the wallet window's accent. */
-  --accent-deep: #0d7a55;
-  /* On-chain things (tokens, mints, contracts) take the cyan; off-chain records the emerald. */
-  --accent-2-soft: rgb(10 116 137 / 0.09);
+  --accent-soft: rgb(29 95 196 / 0.09);
+  --accent-glow: rgb(29 95 196 / 0.2);
+  /* A darker blue for surfaces with white text, such as the wallet window's accent. */
+  --accent-deep: #1b58b5;
+  /* On-chain things (tokens, mints, contracts) take the teal; off-chain records the blue. */
+  --accent-2-soft: rgb(11 122 114 / 0.09);
   --danger: #c4313d;
   --danger-soft: rgb(196 49 61 / 0.08);
   /* How strong the bench's wash is, a panel's edge light and shadow, and its fill without
      transparency. */
   --wash: 15%;
   --glass-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.9), 0 1px 2px rgb(17 20 22 / 0.05),
-    0 12px 32px -16px rgb(17 20 22 / 0.12);
+    inset 0 1px 0 rgb(255 255 255 / 0.9), 0 1px 2px rgb(15 23 34 / 0.05),
+    0 12px 32px -16px rgb(15 23 34 / 0.12);
   --glass-solid: #ffffff;
 }
 
-/* Dark: a dimmed graphite with solid raised panels one step lighter than the page, so
-   depth reads without glass; the accents lift to stay clear on it. */
+/* Dark: a deep blue-grey with solid raised panels one step lighter than the page, so depth
+   reads without glass; the accents lift to stay clear on it, and a brighter blue keeps white
+   text on the wallet window's accent. */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --page: #121517;
-  --surface: #181c1f;
+  --page: #0e131a;
+  --surface: #151b24;
   --surface-strong: rgb(255 255 255 / 0.06);
   --line: rgb(255 255 255 / 0.08);
   --line-strong: rgb(255 255 255 / 0.15);
-  --ink: #e8ecea;
-  --muted: #9aa4a1;
-  --accent: #4ccf9b;
-  --accent-2: #5cbfd6;
-  --accent-ink: #05140e;
-  --accent-soft: rgb(76 207 155 / 0.12);
-  --accent-glow: rgb(76 207 155 / 0.2);
-  --accent-2-soft: rgb(92 191 214 / 0.12);
+  --ink: #e5ebf3;
+  --muted: #97a3b6;
+  --accent: #7eaaff;
+  --accent-2: #4cd0c4;
+  --accent-ink: #06122a;
+  --accent-soft: rgb(126 170 255 / 0.12);
+  --accent-glow: rgb(126 170 255 / 0.2);
+  --accent-deep: #2a64c9;
+  --accent-2-soft: rgb(76 208 196 / 0.12);
   --danger: #f2939a;
   --danger-soft: rgb(242 147 154 / 0.12);
   --wash: 12%;
-  --glass-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 12px 32px -18px rgb(4 6 7 / 0.6);
-  --glass-solid: #181c1f;
+  --glass-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 12px 32px -18px rgb(3 6 12 / 0.6);
+  --glass-solid: #151b24;
 }
 
 @theme inline {
@@ -117,8 +119,8 @@ li {
   border-radius: 0.5rem;
 }
 
-/* The lab bench: a soft wash behind the top of each page, emerald from the top left and
-   cyan from the top right, each fading out on its own. */
+/* The bench: a soft wash behind the top of each page, blue from the top left and teal from
+   the top right, each fading out on its own. */
 .bench {
   background-image:
     radial-gradient(
@@ -144,7 +146,7 @@ li {
   filter: blur(32px);
 }
 
-/* Inline text links: ink, with an emerald underline that fills in on hover. In the
+/* Inline text links: ink, with a blue underline that fills in on hover. In the
    components layer, so a utility on the same element still wins. */
 @layer components {
   .link {
@@ -169,7 +171,7 @@ li {
   box-shadow: var(--glass-shadow);
 }
 
-/* The off-chain to on-chain link: emerald into cyan. */
+/* The off-chain to on-chain link: blue into teal. */
 .link-gradient {
   background-image: linear-gradient(to bottom, var(--accent), var(--accent-2));
 }

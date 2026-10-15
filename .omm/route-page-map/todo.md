@@ -1,0 +1,2 @@
+- The webhook route for rating requests (intake and recovery plan, ADR 0017).
+- Server-rendered metadata, a sitemap and an Open Graph image (SEO plan).

@@ -1,19 +1,31 @@
 import { Check, X } from "@phosphor-icons/react/dist/ssr";
-import type { PaperStage } from "../../lib/progress.ts";
+import type { PaperStage } from "../../lib/publish/progress.ts";
 
-/** Each step, and the layer it acts on: the record off-chain, or the asset on-chain. */
-const STEPS: readonly { label: string; layer?: "off-chain" | "on-chain"; detail: string }[] = [
+/** A step of a chain, and the layer it acts on: a record off-chain, or an asset on-chain. */
+export type ChainStep = {
+  readonly label: string;
+  readonly layer?: "off-chain" | "on-chain";
+  readonly detail: string;
+};
+
+/** A paper's publish steps. */
+const STEPS: readonly ChainStep[] = [
   { label: "Read", detail: "Title, authors and abstract taken from the PDF" },
-  { label: "Saved", layer: "off-chain", detail: "The record is written to the knowledge graph" },
+  {
+    label: "Saved",
+    layer: "off-chain",
+    detail: "The record is written to OriginTrail's knowledge graph",
+  },
   {
     label: "Minted",
     layer: "on-chain",
-    detail: "The asset is minted on Base, with its merkle root",
+    detail:
+      "The asset is minted on Base by OriginTrail's Knowledge Asset contracts, with its merkle root",
   },
   { label: "Published", detail: "Anyone can check who submitted it" },
 ];
 
-/** Classes per layer: emerald for the off-chain record, cyan for the on-chain asset. */
+/** Classes per layer: blue for the off-chain record, teal for the on-chain asset. */
 const TONE = {
   "off-chain": {
     text: "text-accent",
@@ -47,10 +59,9 @@ function position(stage: PaperStage["stage"]): { done: number; active: number | 
 }
 
 /**
- * A paper's publish steps as a vertical chain: done steps carry a check, the line into the
- * current step runs live and its node breathes, and a refused paper is marked at Read,
- * where every refusal happens. `compact` shows a published paper's steps as one row of done
- * steps, without their details, so the page leads with the paper.
+ * A paper's publish steps as a {@link StepChain}, a refused paper marked at Read, where every
+ * refusal happens. `compact` shows a published paper's steps as one row of done steps,
+ * without their details, so the page leads with the paper.
  */
 export function ProgressChain({
   stage,
@@ -60,28 +71,62 @@ export function ProgressChain({
   compact?: boolean;
 }) {
   if (compact) return <CompactChain />;
-  const { done, active } = position(stage);
   return (
-    <ol aria-label="Publish steps" className="relative grid gap-6">
-      {STEPS.map((step, index) => {
+    <StepChain
+      label="Publish steps"
+      steps={STEPS}
+      {...position(stage)}
+      stopAt={stage === "refused" ? 0 : undefined}
+    />
+  );
+}
+
+/**
+ * Steps as a vertical chain: the first `done` carry a check, the line into the `active` step
+ * runs live and its node breathes, and the step at `stopAt` is marked with a cross. A done
+ * line is blue, blue into teal from an off-chain step into an on-chain one, and teal between
+ * two on-chain steps.
+ */
+export function StepChain({
+  label,
+  steps,
+  done,
+  active,
+  stopAt,
+}: {
+  /** The list's accessible name. */
+  label: string;
+  steps: readonly ChainStep[];
+  done: number;
+  active: number | undefined;
+  stopAt?: number | undefined;
+}) {
+  return (
+    <ol aria-label={label} className="relative grid gap-6">
+      {steps.map((step, index) => {
         const isDone = index < done;
         const isActive = index === active;
-        const isStop = stage === "refused" && index === 0;
+        const isStop = index === stopAt;
         const lineLive = index + 1 === active;
         const tone = TONE[step.layer ?? "off-chain"];
-        const next = STEPS[index + 1];
-        /** The line from the off-chain save into the on-chain mint shows the link between them. */
+        const next = steps[index + 1];
+        /** The line from an off-chain save into an on-chain mint shows the link between them. */
         const linkLine = step.layer === "off-chain" && next?.layer === "on-chain";
+        const chainLine = step.layer === "on-chain" && next?.layer === "on-chain";
         return (
           <li key={step.label} className="relative grid grid-cols-[2rem_1fr] gap-4">
-            {index < STEPS.length - 1 && (
+            {next && (
               <span
                 aria-hidden
                 className={`absolute top-8 bottom-[-1.5rem] left-[15px] w-0.5 rounded-full ${
                   lineLive
                     ? "line-live"
                     : isDone
-                      ? (linkLine ? "link-gradient" : "bg-accent")
+                      ? linkLine
+                        ? "link-gradient"
+                        : chainLine
+                          ? "bg-accent-2"
+                          : "bg-accent"
                       : "bg-line-strong"
                 }`}
               />
@@ -125,8 +170,8 @@ export function ProgressChain({
 }
 
 /**
- * Every step done, as a four-column stepper: a check per step on one line (emerald, then
- * emerald into cyan from the save to the mint), each label under its check. Four columns
+ * Every step done, as a four-column stepper: a check per step on one line (blue, then blue
+ * into teal from the save to the mint), each label under its check. Four columns
  * fit a phone, so the row never wraps.
  */
 function CompactChain() {

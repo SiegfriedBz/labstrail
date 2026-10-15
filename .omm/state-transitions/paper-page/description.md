@@ -1,0 +1,1 @@
+What a paper's page shows while it follows a publish (apps/web/lib/publish/progress.ts, paperProgress, pure): it combines what the DKG node says about the Target KA with what Inngest says about the publish run, polled through /api/papers/[cid]. A minted asset is published whatever the run says, so a second submitter of the same PDF sees it at once.

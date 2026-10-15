@@ -1,0 +1,1 @@
+The rate-paper function (workflows/src/rating/rate-paper.ts), a singleton per request id: it checks the request, checks the target is a paper verisci published, then reads the R-KA's state and does only what is left. Each part of the score (the PDF link, the text, Gemini's answer) is asked for once per run and kept across attempts.

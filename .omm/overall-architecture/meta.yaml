@@ -1,0 +1,40 @@
+created: 2026-10-12T05:41:14.825Z
+updated: 2026-10-15T13:07:36.749Z
+update_count: 12
+last_field: todo
+git_commit: 94013bb
+git_branch: feat/029-rating-ui
+children:
+  - base-sepolia
+  - browser
+  - contracts
+  - core
+  - dkg-client
+  - dkg-node
+  - env
+  - inngest
+  - rpc-proxy
+  - web-app
+  - workflows
+prev_diagram: >
+  graph LR
+      browser["Browser\nresearcher's wallet"] -->|"pages, server actions"| web-app["Web App\napps/web/"]
+      inngest["Inngest\nevent and step engine"] -->|"invokes functions at /api/inngest"| web-app
+      web-app -->|"serves its functions, calls its site service"| workflows["Workflows\npackages/workflows/"]
+      web-app -->|"CIDs, UALs, typed data to sign"| core["Core\npackages/core/"]
+      web-app -->|"deployed addresses for the footer"| contracts["Contracts\npackages/contracts/"]
+      workflows -->|"pure rules: prompts, scores, triples, names"| core
+      workflows -->|"read, store, mint, query assets"| dkg-client["DKG Client\npackages/dkg/"]
+      workflows -->|"ABI and addresses for oracle transactions"| contracts
+      workflows -->|"sends events, runs steps"| inngest
+      dkg-client -->|"authenticated HTTP API"| dkg-node["DKG Node\nnode host"]
+      dkg-node -->|"Base JSON-RPC, within a budget"| rpc-proxy["RPC Proxy\ninfra/rpc-proxy/"]
+      rpc-proxy -->|"forwards calls"| base-sepolia["Base Sepolia\nchain"]
+      contracts -->|"RatingController deployed on"| base-sepolia
+      web-app -->|"validated settings"| env["Env\npackages/env/"]
+      workflows -->|"validated settings"| env
+      dkg-client -->|"validated settings"| env
+      classDef external fill:#585b70,stroke:#585b70,color:#cdd6f4
+      classDef entry fill:#89b4fa,stroke:#89b4fa,color:#1e1e2e
+      class inngest,dkg-node,base-sepolia,browser external
+      class web-app entry

@@ -9,3 +9,17 @@ export {
   type RatingControllerDeployments,
 } from "./deployments.ts";
 export { ratingControllerAbi } from "./generated/rating-controller-abi.ts";
+export {
+  type CancelReason,
+  type ContractReader,
+  cancelCalldata,
+  fulfilCalldata,
+  type RatingRequestState,
+  type ReadOracleResult,
+  type ReadRequestIdsResult,
+  type ReadRequestResult,
+  type RequestStatus,
+  readOracleAgent,
+  readRatingRequest,
+  readRequestIdsOf,
+} from "./rating-controller.ts";

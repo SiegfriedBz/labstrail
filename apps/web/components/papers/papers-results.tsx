@@ -1,13 +1,15 @@
 import { getUploadService } from "@verisci/workflows";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { PAPERS_PER_PAGE, pageHref, papersView } from "../../lib/papers.ts";
+import { PAPERS_PER_PAGE, pageHref, papersView } from "../../lib/papers/papers.ts";
+import { ratingSummaries, withRatings } from "../../lib/papers/ratings.ts";
 import { Pager } from "./pager.tsx";
 import { PapersTable } from "./papers-table.tsx";
 
 /**
  * One page of the papers list, read from the DKG when it renders, inside `/papers`'
- * `Suspense`: the count, the table and the page links, or why there is none. A page past
+ * `Suspense`: the count, the table with each paper's latest score from the chain, and the page
+ * links, or why there is none. A page past
  * the last shows the not-found page; by then the response is streaming, so its status is
  * 200 with `noindex` (a malformed `?page=` is refused with a 404 before that).
  */
@@ -18,7 +20,8 @@ export async function PapersResults({ page }: { page: number }) {
   );
 
   switch (view.kind) {
-    case "list":
+    case "list": {
+      const rows = await withRatings(view.papers, ratingSummaries());
       return (
         <div className="grid gap-6">
           <p className="text-sm text-muted">
@@ -27,11 +30,12 @@ export async function PapersResults({ page }: { page: number }) {
               : papersCount(view.total)}
           </p>
           <div className="glass rounded-2xl px-2 sm:px-4">
-            <PapersTable papers={view.papers} />
+            <PapersTable papers={rows} />
           </div>
           <Pager page={page} lastPage={view.lastPage} />
         </div>
       );
+    }
     case "empty":
       return (
         <p className="glass rounded-2xl p-5 leading-relaxed text-muted">

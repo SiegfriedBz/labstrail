@@ -1,0 +1,9 @@
+graph LR
+    submit-paper["Submit Paper\nsubmit-paper.ts"] -->|"checks the signed CID with"| verify-submission["Verify Submission\nverify-submission.ts"]
+    submit-paper -->|"finds the pinned file with"| pinata["Pinata Adapter\npinata.ts"]
+    publish-paper["Publish Run\npublish-paper.ts"] -->|"checks the event again with"| verify-submission
+    publish-paper -->|"reads title, authors, abstract and the text's opening with"| read-paper["Read Paper\nread-paper.ts, grobid.ts"]
+    publish-paper -->|"asks whether the paper is in the field with"| field-check["Field Check\nfield-check.ts"]
+    submit-paper -->|"turns a service's error into a log line with"| failure["Failure Lines\nfailure.ts"]
+    pinata -->|"describes what was thrown with"| failure
+    verify-submission -->|"describes the chain's error with"| failure

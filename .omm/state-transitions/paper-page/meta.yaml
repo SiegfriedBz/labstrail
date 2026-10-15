@@ -1,0 +1,14 @@
+created: 2026-10-12T05:49:02.118Z
+updated: 2026-10-12T05:49:02.286Z
+update_count: 2
+last_field: description
+kind: nested-class
+title: paper-page
+children:
+  - failed
+  - in-progress
+  - not-found
+  - published
+  - refused
+  - unavailable
+parentPath: []

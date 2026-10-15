@@ -1,0 +1,1 @@
+The run refused the paper for a reason retrying cannot change (not a PDF, too large, unreadable first page, no title, a PDF the rating's reader cannot read or with no text, a paper outside the life sciences and health, an expired or bad signature); messages.ts says which in plain words, and for a paper outside the field names the field and says it was not published.

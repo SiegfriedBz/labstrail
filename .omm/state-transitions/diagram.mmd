@@ -1,0 +1,5 @@
+graph LR
+    asset-state["Asset State\nDKG node: Target KA, R-KA"] -->|"minted Target KA can be rated"| rating-request["Rating Request\nRatingController"]
+    asset-state -->|"read with the run's state"| paper-page["Paper Page Stage\napps/web/lib/publish/progress.ts"]
+    rating-request -->|"fulfilled once its R-KA is minted"| asset-state
+    rating-request -->|"read with its R-KA's state"| rating-page["Rating Page Stage\napps/web/lib/rating/stage.ts"]

@@ -1,7 +1,13 @@
 import { act, cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { PaperView } from "../../lib/upload-actions.ts";
-import { PaperProgress } from "./paper-progress.tsx";
+import type { PaperView } from "../../lib/publish/upload-actions.ts";
+
+const refresh = vi.fn();
+// One router for every render, as Next.js gives.
+const router = { refresh };
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
+
+const { PaperProgress } = await import("./paper-progress.tsx");
 
 const CID = "bafybeias652m2pfpmuaeze4dxmtcjvfwvr7dsteumagdd2vwaqrbkjokxu";
 const GRAPH = "0xd701ed157232ad5e14bc4134a8d10d64d86f13b3/verisci-staging";
@@ -78,6 +84,65 @@ describe("PaperProgress", () => {
 
     await advance(30_000);
     expect(urls).toHaveLength(2);
+  });
+
+  it("refreshes the server's part of the page once the paper is published, for its ratings", async () => {
+    serve([{ stage: "minting" }, PUBLISHED]);
+    refresh.mockClear();
+
+    render(
+      <PaperProgress
+        cid={CID}
+        contextGraph={GRAPH}
+        eventId={undefined}
+        initial={{ stage: "saving" }}
+      />,
+    );
+    await advance(5000);
+    expect(refresh).not.toHaveBeenCalled();
+    await advance(5000);
+
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshes once while a published paper's record can't be loaded yet, and keeps asking", async () => {
+    const waiting: PaperView = {
+      stage: "published",
+      ual: PUBLISHED.ual,
+      recordProblem: "unavailable",
+    };
+    const urls = serve([waiting, waiting, PUBLISHED]);
+    refresh.mockClear();
+
+    const props = { cid: CID, contextGraph: GRAPH, eventId: undefined };
+    const { rerender } = render(<PaperProgress {...props} initial={{ stage: "minting" }} />);
+    await advance(5000);
+    // The refreshed server render hands the component a new first view.
+    rerender(<PaperProgress {...props} initial={waiting} />);
+    await advance(5000);
+    await advance(5000);
+
+    expect(urls).toHaveLength(3);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
+      "Screening VP1 of deformed wing virus",
+    );
+  });
+
+  it("never refreshes when the server already rendered the paper published", async () => {
+    const waiting: PaperView = {
+      stage: "published",
+      ual: PUBLISHED.ual,
+      recordProblem: "unavailable",
+    };
+    serve([waiting, PUBLISHED]);
+    refresh.mockClear();
+
+    render(<PaperProgress cid={CID} contextGraph={GRAPH} eventId={undefined} initial={waiting} />);
+    await advance(5000);
+    await advance(5000);
+
+    expect(refresh).not.toHaveBeenCalled();
   });
 
   it("asks nothing when the server's view is already final", async () => {

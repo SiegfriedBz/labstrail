@@ -1,0 +1,4 @@
+graph LR
+    deploy-scripts["Deploy Scripts\nscript/, tools/"] -->|"deploy and record"| rating-controller["RatingController\nsrc/RatingController.sol"]
+    rating-controller -->|"ABI generated into"| ts-bindings["TS Bindings\nsrc/index.ts, deployments.ts, generated/"]
+    deploy-scripts -->|"commit addresses to deployments/, read by"| ts-bindings

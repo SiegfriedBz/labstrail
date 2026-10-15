@@ -1,0 +1,11 @@
+created: 2026-10-12T05:42:03.116Z
+updated: 2026-10-15T13:07:37.590Z
+update_count: 3
+last_field: description
+kind: nested-class
+title: web-app
+children:
+  - app
+  - components
+  - lib
+parentPath: []

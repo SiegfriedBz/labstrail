@@ -1,0 +1,4 @@
+- Every write converges: read the state first, treat "already done" as success (ADR 0007).
+- Each Inngest step stays within Vercel Hobby's 300 s; mints are started then polled in short steps (ADR 0008); retries wait with step.sleep (ADR 0009).
+- Staging and production use separate contracts, graphs, Inngest environments and stores; they share one DKG node, so a -prod guard protects production (ADR 0005).
+- The MVP pays for nothing: free tiers only (Gemini, Inngest, Vercel Hobby, Upstash, testnets).

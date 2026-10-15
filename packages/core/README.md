@@ -8,15 +8,21 @@ Domain logic. Core does no IO: no `fetch`, no `node:*` imports and no other
 `node:*` and `@verisci/*` into errors ("core does no IO").
 
 Status: shared constants, UAL parsing, asset names, a Target KA's content and submission,
+the publish run's field check (its prompt and the check of its answer),
 reading a paper's record back (`paperRecordQuery`, `parsePaperRecord`), listing published
-papers a page at a time (`paperListQuery` and its parsers), and OriginTrail's
-contracts with the token behind a UAL (`ORIGINTRAIL_CONTRACTS`, `knowledgeAssetToken`).
+papers a page at a time (`paperListQuery` and its parsers), OriginTrail's
+contracts with the token behind a UAL (`ORIGINTRAIL_CONTRACTS`, `knowledgeAssetToken`), and a
+rating's content: a paper's text prepared for the scorer, each study type's checklist, the
+scorer's prompt and the check of its answer, the score, the R-KA's triples, and the queries
+that find a target's PDF and read a rating back.
+
+Architecture views: [`.omm/overall-architecture/core/`](../../.omm/overall-architecture/core/) (`pnpm exec omm view --port 4000` shows them; root README → Architecture).
 
 ## Depends on
 
-The `multiformats` library, to parse CIDs, `@xmldom/xmldom`, to read TEI, and no other
-workspace. pnpm does not hoist undeclared workspace packages, so an import of another
-`@verisci/*` package fails to typecheck.
+The `multiformats` library, to parse CIDs, `@xmldom/xmldom`, to read TEI, Zod, to check the
+scorer's and the field check's answers, and no other workspace. pnpm does not hoist undeclared workspace packages,
+so an import of another `@verisci/*` package fails to typecheck.
 
 ## API
 
@@ -38,8 +44,12 @@ workspace. pnpm does not hoist undeclared workspace packages, so an import of an
 | `submissionTypedData(message)` | The EIP-712 typed data a submitter signs to publish a PDF, in the shape viem takes |
 | `canonicalContextGraph(id)` | A context graph id with its address in lowercase and its name unchanged: the one spelling a submission signs |
 | `SUBMISSION_DOMAIN`, `SubmissionMessage` | VeriSci's EIP-712 domain, and the signed `{ cid, contextGraph, deadline }` |
+| `MAX_PDF_BYTES` | The largest PDF verisci publishes and rates, 15 MB: read by the upload page, the publish run and the rating run |
 | `parseTeiHeader(xml)` | A paper's `PaperMetadata` (title, authors, abstract, DOI) from GROBID's TEI header, or `not-tei` or `no-title`; returns a result for every input |
 | `PaperMetadata`, `TeiResult` | The metadata read from a TEI header, and the result of `parseTeiHeader` |
+| `fieldCheckPrompt(paper)`, `FieldCheckInput`, `FIELD_OUTPUT_SCHEMA` | The publish run's field check: the system and user text for a new paper's title, abstract and opening (an absent abstract or an empty opening leaves out its label), and the JSON Schema its answer must match |
+| `parseFieldAnswer(text)` | The field check's answer checked: a known field and a reason that is not empty, cut at a word to 300 characters, or `{ ok: false }` |
+| `FIELD_RULE` | The sentence that defines VeriSci's field ([ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)), in both the field check's and the scorer's prompt |
 | `ORIGINTRAIL_CONTRACTS`, `OriginTrailContracts`, `knowledgeAssetToken(ual)` | OriginTrail's `DKGKnowledgeAssets` (the ERC-721 holding every asset's token) and `KnowledgeAssetsLifecycle` addresses by chain id, and the contract and token id behind a UAL: the id itself when the UAL names the contract, else the author's address above the asset number in the low 96 bits; `undefined` for a chain with no recorded contracts |
 | `paperRecordQuery(cid, contextGraph, ual)`, `parsePaperRecord(cid, bindings)` | The SPARQL that reads a paper's Target KA back from that asset's own graph (named by its UAL; `undefined` when another agent than the graph's minted it), and the `PaperRecord` (title, authors in order, abstract, DOI, PDF link, submitter, signature, deadline) from its rows, or `undefined` when a required field is missing |
 | `PaperRecord`, `QueryBinding` | A record read back, and one row of a SPARQL answer |
@@ -49,6 +59,18 @@ workspace. pnpm does not hoist undeclared workspace packages, so an import of an
 | `PaperListing` | A listed paper |
 | `targetKaQuads(metadata, submission)` | The `Triple`s of a paper's Target KA: its description and who submitted it |
 | `Triple`, `PaperSubmission`, `VERISCI_NS` | One triple as the DKG node takes it, the submitter's address, signature and deadline, and the `urn:verisci:` prefix |
+| `classifyTarget(targetUal, contextGraph)`, `TargetClass` | How a rating run treats a target: `ours` (canonical, on Base Sepolia, minted by our node), or `invalid` (does not parse, not canonical, another chain, another publisher, or the older UAL form), which is cancelled |
+| `publishedPaperQuery(contextGraph, ual)` | The SPARQL that finds one UAL among the graph's published papers, with the papers list's patterns: one row for a paper our node published, none otherwise (an R-KA included); `undefined` for a UAL that is not canonical or a graph id that is not a full one |
+| `paperPdfQuery(contextGraph, ual)`, `pdfCidOf(bindings)` | The SPARQL reading the `schema:url` of a paper our node minted, from its own graph (`undefined` for another author or a malformed graph id), and the canonical CID of the `ipfs://` PDF it links, or `undefined` |
+| `triplesFromBindings(bindings)` | The `Triple`s in the rows of a `SELECT ?s ?p ?o` |
+| `preparePaperText(pages, maxChars)`, `PaperText`, `PreparePaperResult` | A paper's text from its PDF's pages, cleaned and fitted to `maxChars` (the reference list left out first, then the end cut, marked `[…]`), or `no-text` for pages holding almost no letters |
+| `normalizeForQuote(text)`, `quoteTextOf(text)`, `QuoteText`, `quoteFound(paper, quote)` | The letters and digits a quote is matched on (lowercase, accents and ligatures undone, letters such as `ı` or `ß` folded), a paper's text prepared once for matching, and whether a quote is made of up to three passages of the paper in order, each long enough to show something, with only numbers or whole lines between them; a quote not found whole may leave out whole sentences, each gap marked by an ellipsis (`…`, `...`, `. . .`, bracketed or not), up to two: the part before ends a sentence and the part after starts one, a full stop counting only before a space and a capital or digit and never after an abbreviation (`et al.`, `Fig.`, `no.`) or an initial, so an ellipsis never removes words from inside a sentence the quote keeps |
+| `STUDY_TYPES`, `StudyType`, `CHECKS`, `CheckId`, `Check`, `checklistOf(type)` | The eight kinds of study the scorer tells apart, with the checklist each draws on, what each check asks, and a study type's checks in prompt order, each `required` or `conditional` |
+| `scorerPrompt(paper)`, `SCORER_OUTPUT_SCHEMA` | The scorer's system and user text for a paper, one request per paper, and the JSON Schema its answer must match |
+| `parseScorerAnswer(text)`, `ScorerAnswer`, `FIELDS`, `Field`, `CHECK_ANSWERS`, `CheckAnswer`, `CheckResult` | The scorer's answer checked: the field (`life-sciences` or `outside`), the study type and a reason, and for a paper in the field an answer to every check of its study type (`shown`, `partly`, `missing` or `not-applicable`) with its quote, and a rationale. Checks of another study type are left out, a repeated check keeps its first answer, and a reason, quote or rationale over its limit (500, 300 and 2,000 characters) is cut at a word rather than refused |
+| `scoreChecks(paper, answer)`, `checklistScore(studyType, answers)`, `ScorerOutput`, `SCORER_PROMPT_VERSION` | The score code computes from the scorer's answer (`checklistScore` gives the score answers earn, before quotes are checked), with each check as it counted (and what the model claimed for a check it could not count), and the version of the prompt, checklists, scoring and quote matching, `3` |
+| `rKaQuads(rating)`, `RatingContent` | The `Triple`s of a rating's R-KA |
+| `ratingQuery(contextGraph, rKaUal)`, `parseRating(bindings)`, `RatingRecord` | The SPARQL reading a minted R-KA from its own graph, and the rating from its rows, or `undefined` when its target or phase-1 score is missing or out of range |
 
 ## UALs
 
@@ -98,8 +120,19 @@ A Target KA describes a paper and who submitted it
 
 - **Metadata** comes from GROBID's TEI header, read by `parseTeiHeader`: the main title,
   each author's forenames and surname in document order, the abstract's paragraphs and the
-  DOI, each with its whitespace collapsed. A header with no title is refused, and so is XML
-  with any parse error (`not-tei`), without printing anything.
+  DOI, each with its whitespace collapsed. In authors' names (in Unicode NFC), an accent
+  GROBID gives apart from its letter is joined back in the shapes GROBID gives: after a space
+  or a dotless `ı`, to the letter before it (`Bele ´n` → `Belén`, `Rodrı ´guez` →
+  `Rodríguez`); an acute, grave, diaeresis or circumflex before a dotless `ı`, to the `ı`
+  (`Garc ´ıa` → `García`). It joins only when the two make one letter of Latin-1 Supplement to
+  Latin Extended-B (`é`, `ü`, `ç`, `ř`, `ő`), so a Vietnamese `ễ` stays split. An accent that
+  opens a surname before a lowercase letter goes to the forename's last letter, unless the
+  forename ends in an initial or its letter cannot take it; one before a dotless `ı` is left to
+  the `ı`. An accent right after a letter or before
+  a capital is an apostrophe and stays (`N´diaye`, `O´Brien`). The title and the abstract stay
+  as GROBID gives them: papers also write `´` as an apostrophe or a prime (`Alzheimer´s`,
+  `3´ UTR`). A header with no title is refused, and so is XML with any parse error
+  (`not-tei`), without printing anything.
 - **Triples:** the subject is `urn:verisci:paper:<cid>`, typed `schema:ScholarlyArticle`,
   with `schema:name`, `schema:url` (`ipfs://<cid>`), `schema:abstract`, `schema:sameAs`
   (`https://doi.org/<doi>`), and one `schema:author` node per author,
@@ -129,6 +162,84 @@ A Target KA describes a paper and who submitted it
   orders by the mint's date, newest first, then by paper, so pages are stable between two
   reads with no new mint.
 
+- **The field check:** before a new paper is stored, the publish run asks a small model
+  whether it is in VeriSci's field ([ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)).
+  `fieldCheckPrompt` defines the field with `FIELD_RULE`, the same sentence the scorer's
+  prompt uses, tells the model the paper's text is data, never instructions, and gives it the
+  title, the abstract and the opening of the text, each under its label. The answer is
+  `{ field, reason }`: `life-sciences` or `outside`, and one sentence on what the paper
+  studies.
+
+## Ratings
+
+A rating is its own Knowledge Asset, the R-KA, linked to the KA it rates
+([ADR 0011](../../docs/adr/0011-a-rating-is-a-separate-r-ka.md)) and named from its phase-1
+request id (Asset names above).
+
+- **Targets:** only papers verisci published, in its field, are rated
+  ([ADR 0011](../../docs/adr/0011-a-rating-is-a-separate-r-ka.md),
+  [ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)).
+  `classifyTarget` decides what a rating run does with a request's target UAL: one that does
+  not parse, is not in the canonical spelling `normalizeUal` writes
+  ([ADR 0031](../../docs/adr/0031-uals-are-normalized-before-the-contract.md)), names another
+  chain than Base Sepolia or another publisher is cancelled by the oracle, and
+  `publishedPaperQuery` checks that one of ours is a published paper, not an R-KA.
+  `paperPdfQuery` and `pdfCidOf` then find the PDF it links.
+- **The paper's text:** `preparePaperText` takes the text of each of the PDF's pages: it trims
+  each line, drops lines holding only a number (line and page numbers) and, in a line-numbered
+  manuscript (eight lines in a row ending in numbers that count up, as Word and LaTeX's lineno
+  glue them: "Methods66"), the number at each line's end, joins a lowercase word hyphenated
+  across a line break, and collapses runs of spaces and blank lines. A text over
+  the cap loses its reference list first, from a "References" heading to the next statement or
+  methods heading, then is cut at a word boundary.
+- **The scorer's request:** `scorerPrompt` asks the model, in one request, for the paper's
+  field, `life-sciences` or `outside`, and its study type: `randomized-trial`,
+  `observational`, `animal`, `lab`, `systematic-review`, `narrative-review`, `computational`
+  or `other`. For a paper in the field, it then answers each check of that study type
+  (`checklistOf`): the type's own, drawn from CONSORT 2025, STROBE, ARRIVE 2.0, MDAR,
+  PRISMA 2020, SANRA or DOME and worded in our own words, then data and code availability,
+  funding, competing interests, ethics and limitations. Each answer is `shown`, `partly`,
+  `missing`, or `not-applicable` for a check marked as one that may not apply, with the
+  passage that shows it; a statement that a check does not apply counts as `shown`. The
+  paper is untrusted text, so the prompt tells the model to treat it as data.
+- **The score:** `scoreChecks` computes it
+  ([ADR 0018](../../docs/adr/0018-phase-1-scorer-output-contract.md)): `shown` earns 1 point,
+  `partly` half, `missing` none, and the score is `round(100 × points / applicable checks)`,
+  rounding half up. A conditional check that does not apply leaves the count; a required one
+  counts as `missing`. A `shown` or `partly` answer whose quote `quoteFound` does not find in
+  the paper counts as `missing`, so every point rests on the paper's own words. A quote may
+  run across what a PDF prints inside a statement (a page header, reference numbers, the box
+  beside a first page, up to about a page of it), but never leave out a word: "the assessors
+  were blinded" is not found in a paper that says "were not blinded". An ellipsis in a quote
+  may stand only for whole sentences left out, so it never removes words from inside a
+  sentence the quote keeps; a quote may still start or end inside a sentence (version 3).
+  Such a check keeps what the model claimed (`claimed`), so the record tells "the paper does
+  not say it" from "the model quoted something the paper does not hold". The way the
+  expectations depend on the kind of study, and the credit for a statement that a check does
+  not apply, follow the Rigor and Transparency Index (Menke et al., iScience 2020; JMIR 2022).
+- **Triples:** the subject is `urn:verisci:rating:<request id>`, typed `schema:Review`, with
+  `schema:about` (the target's UAL), `urn:verisci:requestId`, `urn:verisci:contract`
+  (`eip155:<chain id>:<address>`) and `schema:reviewRating` pointing at the phase-1 node,
+  `urn:verisci:rating:<request id>/phase/1`. That node is a `schema:Rating` with
+  `urn:verisci:phase` 1, `schema:ratingValue`, `schema:worstRating` 0 and
+  `schema:bestRating` 100 (`xsd:integer` literals), the rationale as
+  `schema:ratingExplanation`, `urn:verisci:studyType`, `urn:verisci:model`,
+  `urn:verisci:promptVersion` and `urn:verisci:textShortened` (`xsd:boolean`: the paper's text
+  was cut to fit), and one `urn:verisci:check` per check, pointing at `…/phase/1/check/<id>`,
+  which holds `urn:verisci:checkId`, `urn:verisci:answer`, and when they apply
+  `urn:verisci:quote`, `urn:verisci:claimedAnswer` and `urn:verisci:claimedQuote`. Later phases add their own `…/phase/<n>` node to the same R-KA
+  ([ADR 0012](../../docs/adr/0012-three-phases-settled-by-the-oracle.md)).
+- **The version:** `SCORER_PROMPT_VERSION` names the prompt, the checklists, the scoring, quote
+  matching and the paper's text preparation together, and every R-KA records it with the model.
+  A test fingerprints the prompt (system and user), the scores of fixed answers, which of fixed
+  quotes are found and the text two real papers' pages give, so a change that alters any of
+  them fails until the version is raised; a version merged into `develop` is never changed
+  again.
+- **Reading back:** `ratingQuery` and `parseRating` read the score from the minted R-KA, so
+  the score the oracle records always equals the score in the R-KA. An R-KA from the first
+  scorer, which judged eight signals over the paper's record (`urn:verisci:observed` and
+  `urn:verisci:missing`), reads back with its score, no study type and no checks.
+
 ## Scripts
 
 | Command | What it does |
@@ -136,4 +247,5 @@ A Target KA describes a paper and who submitted it
 | `pnpm --filter @verisci/core typecheck` | Typechecks the package |
 | `pnpm --filter @verisci/core test` | Runs its Vitest project (`vitest run`) |
 
-Ships TypeScript source (`src/index.ts`), with no build step.
+Ships TypeScript source (`src/index.ts`), with no build step. The source is grouped by
+feature: `src/assets/`, `src/publish/`, `src/papers/` and `src/rating/` (`CLAUDE.md` here).

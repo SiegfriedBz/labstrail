@@ -1,0 +1,1 @@
+GET /api/ratings/[requestId] (app/api/ratings/[requestId]/route.ts): one rating as JSON (RatingView) for the rating page to poll, never cached: the request from the contract, its stage from its R-KA on the DKG node while pending, and the R-KA's record once fulfilled. Not-found for an id that is not 0x and 64 hex digits, or where no contract takes ratings.

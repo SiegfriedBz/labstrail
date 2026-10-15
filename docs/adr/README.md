@@ -8,9 +8,15 @@ An ADR states the decision and its reason. The mechanics (timeouts, fee bumps, r
 lists in chunks, exact checks) belong in the plan that builds them, where code and tests
 confirm them.
 
-Groups follow reading order: tools, environments, how writes behave, then the publish
-flow before the rating flow that builds on it. Numbers follow the order decisions were
-taken, so a later ADR can sit in an earlier group.
+Groups follow reading order: what VeriSci covers, tools, environments, how writes behave,
+then the publish flow before the rating flow that builds on it. Numbers follow the order
+decisions were taken, so a later ADR can sit in an earlier group.
+
+## Scope
+
+| ADR | Decision |
+| --- | --- |
+| [0037. VeriSci publishes and rates life-science and health papers](0037-verisci-rates-life-science-and-health-papers.md) | Biology, medicine and health research; publishing refuses a paper outside the field, and a request to rate one is cancelled |
 
 ## Tools
 
@@ -31,6 +37,7 @@ taken, so a later ADR can sit in an earlier group.
 | [0023. A fix is a redeploy, and the owner's powers are fixed](0023-a-fix-is-a-redeploy-owner-powers-fixed.md) | A fix is a redeploy; old contracts are paused and drained; the owner sets the oracle and cap, pauses and unpauses, and transfers ownership in two steps, never to the oracle, with no renounce |
 | [0028. Deployed addresses are committed](0028-deployed-addresses-are-committed.md) | Staging's and production's contract addresses live in a committed file, changed by a reviewed PR |
 | [0030. The owner and the oracle are different addresses](0030-owner-and-oracle-are-different-addresses.md) | The owner's key stays offline; the oracle's key is on the deployment; the contract keeps them apart |
+| [0036. Local rating runs use an Anvil chain](0036-local-rating-runs-use-anvil.md) | A developer runs ratings, functions and pages, against a contract on a local Anvil chain, named by local-only settings; locally the page announces its own request; staging's and production's addresses stay committed |
 
 ## Writing to the DKG
 
@@ -48,14 +55,14 @@ A PDF becomes a Target KA.
 
 | ADR | Decision |
 | --- | --- |
-| [0010. PDFs become Target KAs in a stepped pipeline](0010-pdf-to-target-ka-pipeline.md) | Signed upload, signed CID, then parse, store and mint as steps, metadata read by code; named from the CID, first submitter kept |
+| [0010. PDFs become Target KAs in a stepped pipeline](0010-pdf-to-target-ka-pipeline.md) | Signed upload, signed CID, then parse, check the field, store and mint as steps, metadata read by code; named from the CID, first submitter kept |
 
 ## What a rating is
 
 | ADR | Decision |
 | --- | --- |
-| [0011. A rating is a separate R-KA, linked by schema:about](0011-a-rating-is-a-separate-r-ka.md) | Each rating is its own R-KA pointing at the paper; the paper is never modified |
-| [0012. Ratings evolve in three phases, each settled by the oracle](0012-three-phases-settled-by-the-oracle.md) | Machine score, human review, wet-lab; the oracle records every phase's score |
+| [0011. A rating is a separate R-KA, linked by schema:about](0011-a-rating-is-a-separate-r-ka.md) | Each rating is its own R-KA pointing at the paper; the paper is never modified; only papers verisci published, in its field, are rated |
+| [0012. Ratings evolve in three phases, each settled by the oracle](0012-three-phases-settled-by-the-oracle.md) | Machine score, human review by reviewers drawn with Chainlink VRF, wet-lab; the oracle records every phase's score |
 | [0013. A paper can have several ratings](0013-several-ratings-per-paper.md) | A rating is identified by its request id and its R-KA's UAL |
 | [0014. The contract owns scores, the DKG owns content](0014-contract-owns-scores-dkg-owns-content.md) | The UI shows the contract's score and flags a gap with the DKG |
 | [0022. The contract indexes request ids by target](0022-contract-indexes-request-ids-by-target.md) | The contract lists each paper's request ids, oldest first, read by view calls |
@@ -69,9 +76,9 @@ In the order a request lives: requested, named, ingested, scored, fulfilled, and
 | --- | --- |
 | [0015. Rating requests are free on testnet](0015-rating-requests-are-free-on-testnet.md) | Requesters pay only gas; a cap and a throttle bound spend until mainnet |
 | [0016. Asset names derive from the on-chain request id](0016-asset-names-derive-from-request-id.md) | Each phase-1 request has an on-chain id; any process computes the rating's name and its recovery from it alone |
-| [0017. Chain events are ingested at least once](0017-chain-events-are-ingested-at-least-once.md) | Signed webhooks, one event per request id, acked only after hand-off; the reconciler heals what is missed |
-| [0018. The phase-1 scorer has a fixed output contract](0018-phase-1-scorer-output-contract.md) | The scorer returns `{ score, rationale, observed, missing }`, computed once and read back |
-| [0019. Oracle transactions are serialized](0019-oracle-transactions-are-serialized.md) | One function sends every oracle transaction, one at a time; only `main` and `develop` hold the oracle keys |
+| [0017. Chain events are ingested at least once](0017-chain-events-are-ingested-at-least-once.md) | Signed webhooks, one event per request id, acked only after hand-off; the reconciler heals what is missed; locally the page announces its own request |
+| [0018. The phase-1 scorer has a fixed output contract](0018-phase-1-scorer-output-contract.md) | The scorer reads the paper's text and answers its study type's checks with quotes; code computes the score; it returns `{ score, rationale, studyType, checks }`, computed once and read back; Gemini, on its free tier |
+| [0019. Oracle transactions are serialized](0019-oracle-transactions-are-serialized.md) | One function sends every oracle transaction the backend sends, one at a time, checking receipts in later steps; only `main` and `develop` hold the oracle keys |
 | [0020. Stuck requests are recovered, and only the oracle cancels](0020-stuck-requests-recovered-only-oracle-cancels.md) | One run per request finishes what is left; a cron restarts stuck ones; only the oracle cancels |
 
 ## App
@@ -79,7 +86,7 @@ In the order a request lives: requested, named, ingested, scored, fulfilled, and
 | ADR | Decision |
 | --- | --- |
 | [0021. Server reads and actions return typed results](0021-server-reads-return-typed-results.md) | Expected failures come back as typed results that the caller handles |
-| [0034. Users connect a wallet, and anyone may publish](0034-users-connect-a-wallet-anyone-may-publish.md) | Reown AppKit with wagmi on Base Sepolia; the signature authorizes each submission; no allowlist, no session |
+| [0034. Users connect a wallet, and anyone may publish](0034-users-connect-a-wallet-anyone-may-publish.md) | Reown AppKit with wagmi on Base Sepolia (Anvil too, locally); the wallet signs submissions and sends rating requests; no allowlist, no session |
 | [0035. Limits are the app's only state](0035-limits-are-the-apps-only-state.md) | The chain and the DKG hold the truth, IPFS the PDF files; today Upstash Redis counts upload URLs per connection and submissions per address |
 
 ## Folded ADRs
@@ -97,15 +104,14 @@ Each was folded into the ADR that covers its topic. Their numbers stay retired, 
 
 ## Open questions
 
-Not decided yet. Each becomes an ADR in the plan that first needs the answer; the leaning is a starting point, not a decision.
+Not decided yet. The plan that first needs an answer records it, in a new ADR or in the ADR whose topic it belongs to, and removes the row in the same commit; the leaning is a starting point, not a decision.
 
 | Question | Leaning | Decided in |
 | --- | --- | --- |
-| Where do alerts go? | One chat-bot channel behind a single `notify()`, fed by a scheduled check (wallet balances, orphans, age of the oldest pending request) and an uptime check on the node's `/api/status`. | rating plan |
+| Where do alerts go? | One chat-bot channel behind a single `notify()`, fed by a scheduled check (wallet balances, orphans, age of the oldest pending request) and an uptime check on the node's `/api/status`. | intake and recovery plan |
 | Who may request phases 2 and 3? | Anyone, not only the phase-1 requester. Whoever requests, our node writes the R-KA update, since it owns the R-KA ([0012](0012-three-phases-settled-by-the-oracle.md)). Also open: whether a later phase's request gets its own id or reuses the rating's. | phase-2 plan |
 | Where does phases 2 and 3's human input wait before the oracle scores it? | None yet: on the DKG, as a draft the node holds, or in a store of the app's own, which would amend [0035](0035-limits-are-the-apps-only-state.md) ([0012](0012-three-phases-settled-by-the-oracle.md)). | phase-2 plan |
-| How does a local test run target a developer's own contract? | One local-only address variable for that contract, read by the workflows when `APP_ENV=local`; staging's and production's addresses stay in the committed file ([0028](0028-deployed-addresses-are-committed.md), [0019](0019-oracle-transactions-are-serialized.md)). | rating plan |
-| How does a rating run find the context graph of a target VeriSci did not publish? | The rating request names it next to the target's UAL, since a UAL alone does not name its graph ([0011](0011-a-rating-is-a-separate-r-ka.md)); check first whether a later DKG release resolves a UAL to its graph. | rating plan |
+| How are phase-2 reviewers drawn with Chainlink VRF? | None yet: the draw's contract, its VRF subscription and who funds it. It may touch [0023](0023-a-fix-is-a-redeploy-owner-powers-fixed.md) (the owner's powers), [0015](0015-rating-requests-are-free-on-testnet.md) (who pays) and [0019](0019-oracle-transactions-are-serialized.md) (oracle transactions) ([0012](0012-three-phases-settled-by-the-oracle.md)). | phase-2 plan |
 | Who holds the DKG node's credential? | Caddy keeps the daemon's admin token on the host and checks one credential per environment, so each can be revoked alone. The `-prod` guard stays ([0005](0005-staging-and-production-are-isolated.md)). | node server plan |
 
 ## Adding an ADR
@@ -121,6 +127,7 @@ An ADR states what is decided today, so each topic reads in one file.
 
 - **A new topic gets a new ADR.**
 - **A new choice on a topic an ADR already covers, a change to part of its decision, or a correction** goes into that ADR: rewrite it so it reads as the current decision, and add a dated line under `## History` at its end (`- 2026-10-07: what changed, and why`). A correction that keeps the decision, such as a forgotten word or an incomplete list, says "corrected". A choice that touches two ADRs' topics updates both, each with its History line.
+- **A change that answers an open question** removes that row in the same commit.
 - **A whole decision replaced** gets a new ADR: the old one's status becomes `Superseded by NNNN`, and the new one's header gets `- Supersedes: NNNN`.
 - **Folding:** when one ADR's topic is part of another's, its text moves into that ADR, with a History line, its file is deleted, and its number is listed under Folded ADRs. Each number names one ADR for good.
 - Every change is the user's call and goes through a reviewed PR; amending an ADR, in [0025](0025-reviews-gate-on-adrs-and-lint.md)'s sense, means this in-place change. Git keeps the full text of each version.

@@ -4,7 +4,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { PapersResults } from "../../components/papers/papers-results.tsx";
 import { PapersTableSkeleton } from "../../components/papers/papers-table-skeleton.tsx";
-import { PAPERS_PER_PAGE, parsePageParam } from "../../lib/papers.ts";
+import { PAPERS_PER_PAGE, parsePageParam } from "../../lib/papers/papers.ts";
 
 type SearchParams = Promise<{ page?: string | string[] }>;
 
@@ -37,8 +37,8 @@ export default async function PapersPage({ searchParams }: { searchParams: Searc
       <header className="grid gap-3">
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Published papers</h1>
         <p className="max-w-[65ch] leading-relaxed text-muted">
-          Each paper here is a Knowledge Asset on the DKG, minted on Base Sepolia. Open one to read
-          its record and check who submitted it.
+          Life-science and health papers, each a Knowledge Asset on the DKG, minted on Base Sepolia.
+          Open one to read its record and check who submitted it.
         </p>
       </header>
       <Suspense

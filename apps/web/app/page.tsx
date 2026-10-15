@@ -14,7 +14,7 @@ import { Suspense } from "react";
 import { ChainDemo } from "../components/home/chain-demo.tsx";
 import { LatestPapers } from "../components/home/latest-papers.tsx";
 import { PapersTableSkeleton } from "../components/papers/papers-table-skeleton.tsx";
-import { LATEST_PAPERS } from "../lib/papers.ts";
+import { LATEST_PAPERS } from "../lib/papers/papers.ts";
 
 const HOW = [
   {
@@ -25,7 +25,7 @@ const HOW = [
   {
     icon: FilePdf,
     title: "Drop your PDF",
-    body: "It's stored on IPFS, and we read its title, authors and abstract.",
+    body: "It's stored on IPFS. We read its title, authors and abstract, and check it's a life-science or health paper.",
   },
   {
     icon: PenNib,
@@ -37,13 +37,13 @@ const HOW = [
 const RATE = [
   {
     icon: Robot,
-    title: "Machine score",
-    body: "An AI model scores the paper's record (title, authors, abstract) from 0 to 100. The score goes on-chain, its reasons into the rating's asset.",
+    title: "Reproducibility readiness",
+    body: "An AI model reads the whole paper and checks, against the checklist for its kind of study, whether it gives what others need to check and reproduce the work. The score, from 0 to 100, goes on-chain, the answers and quotes into the rating's asset. It doesn't say whether the results hold, and it can't catch a made-up paper that states every right thing.",
   },
   {
     icon: UsersThree,
     title: "Human review",
-    body: "Reviewers read the paper and score it. Their score is recorded next to the machine score, which stays as it was.",
+    body: "Reviewers, drawn at random with Chainlink VRF so anyone can check the draw was fair, read the paper and score it. Their score is recorded next to the first one, which stays as it was.",
   },
   {
     icon: Flask,
@@ -88,8 +88,9 @@ const RECORD = [
 ] as const;
 
 /**
- * Home: what VeriSci does, the latest published papers, the way to publish, and the rating
- * flow to come. The latest papers stream in, so the hero never waits for the DKG node.
+ * Home: what VeriSci does, with a demo that publishes a paper and then rates it, the latest
+ * published papers, and how publishing and rating work. The latest papers stream in, so the
+ * hero never waits for the DKG node.
  */
 export default function Home() {
   return (
@@ -100,11 +101,12 @@ export default function Home() {
       <section className="grid items-center gap-10 md:min-h-[calc(100dvh-8rem)] md:grid-cols-[1.3fr_1fr] md:content-center md:gap-14">
         <div className="enter grid min-h-[calc(100dvh-6.5rem)] content-center gap-7 sm:min-h-[calc(100dvh-8rem)] md:min-h-0">
           <h1 className="text-4xl font-semibold leading-[1.08] tracking-tight md:text-[2.75rem] lg:text-5xl">
-            Publish your paper as a record anyone can <span className="text-accent">verify</span>
+            Publish your life-science paper as a record anyone can{" "}
+            <span className="text-accent">verify</span>
           </h1>
           <p className="max-w-[46ch] text-lg leading-relaxed text-muted">
-            Drop a PDF and sign with your wallet. VeriSci records it on the knowledge graph, with
-            you as its submitter.
+            For research in biology, medicine and health. Sign your PDF with your wallet to publish
+            it on the knowledge graph, then anyone can ask for its reproducibility rating.
           </p>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
             <Link
@@ -121,13 +123,9 @@ export default function Home() {
         </div>
         <div className="enter-late relative">
           <div aria-hidden className="signal-glow absolute -inset-x-4 -inset-y-10 sm:-inset-10" />
-          <figure className="glass relative grid gap-5 rounded-2xl p-6 sm:p-7">
-            <figcaption className="flex items-center justify-between gap-3 text-sm text-muted">
-              <span>Publish flow</span>
-              <span className="font-mono text-xs text-accent">live</span>
-            </figcaption>
+          <div className="glass relative rounded-2xl p-6 sm:p-7">
             <ChainDemo />
-          </figure>
+          </div>
         </div>
       </section>
 
@@ -239,8 +237,14 @@ export default function Home() {
           />
           <Track
             label="Rate"
-            badge="coming soon"
-            intro="Anyone will be able to ask for a rating of a published paper. Each phase records its own score on-chain, so earlier scores stay as they were."
+            badge={<span className="text-accent">phase 1 live</span>}
+            intro="Anyone with a wallet can ask for a rating of a published paper, from its page. The first score measures reproducibility readiness, not whether the work is right. Human review and replication come next, each with its own score on-chain, so earlier scores stay as they were."
+            action={
+              <Link href="/papers" className="link inline-flex w-fit items-center gap-1.5 text-sm">
+                Pick a paper to rate
+                <ArrowRight aria-hidden size={14} weight="bold" />
+              </Link>
+            }
             steps={RATE}
             muted
           />
@@ -276,8 +280,8 @@ export default function Home() {
             submitted it without trusting us.
           </p>
           <p className="max-w-[40ch] text-sm leading-relaxed text-muted">
-            A rating will be a separate asset, with its own UAL, whose statements point to this one.
-            The paper asset itself never changes.
+            A rating is a separate asset, with its own UAL, whose statements point to this one. The
+            paper asset itself never changes.
           </p>
         </div>
       </section>
@@ -293,12 +297,15 @@ function Track({
   label,
   badge,
   intro,
+  action,
   steps,
   muted = false,
 }: {
   label: string;
   badge: React.ReactNode;
   intro: string;
+  /** A link below the intro. */
+  action?: React.ReactNode;
   steps: typeof HOW | typeof RATE;
   muted?: boolean;
 }) {
@@ -312,6 +319,7 @@ function Track({
           </span>
         </h3>
         <p className="max-w-[52ch] text-sm leading-relaxed text-muted">{intro}</p>
+        {action}
       </div>
       <ol className="grid gap-7 md:grid-cols-3 md:gap-8">
         {steps.map(({ icon: Icon, title, body }, index) => (

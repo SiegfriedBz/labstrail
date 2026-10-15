@@ -40,6 +40,27 @@ describe("createWebEnv", () => {
     expect(createWebEnv({ APP_ENV: "local" }).UPSTASH_REDIS_REST_URL).toBeUndefined();
   });
 
+  it("reads the local chain's URL and contract locally, for the rating pages", () => {
+    const env = createWebEnv({
+      APP_ENV: "local",
+      LOCAL_CHAIN_RPC_URL: "http://127.0.0.1:8546",
+      LOCAL_RATING_CONTRACT: "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    });
+
+    expect(env.LOCAL_CHAIN_RPC_URL).toBe("http://127.0.0.1:8546");
+    expect(env.LOCAL_RATING_CONTRACT).toBe("0x5FbDB2315678afecb367f032d93F642f64180aa3");
+  });
+
+  it("refuses a local chain setting that is not a URL or an address", () => {
+    expect(
+      issues({ APP_ENV: "local", LOCAL_CHAIN_RPC_URL: "anvil", LOCAL_RATING_CONTRACT: "0x12" }),
+    ).toEqual(["LOCAL_CHAIN_RPC_URL", "LOCAL_RATING_CONTRACT"]);
+  });
+
+  it("ignores the local chain settings outside local", () => {
+    expect(issues({ ...settings, LOCAL_CHAIN_RPC_URL: "anvil" })).toEqual([]);
+  });
+
   it("throws EnvError", () => {
     expect(() => createWebEnv({ APP_ENV: "staging" })).toThrow(EnvError);
   });

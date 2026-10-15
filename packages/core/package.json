@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@xmldom/xmldom": "0.9.12",
-    "multiformats": "14.0.5"
+    "multiformats": "14.0.5",
+    "zod": "4.6.5"
   }
 }

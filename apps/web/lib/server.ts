@@ -1,4 +1,4 @@
-import { createLimits } from "./limits.ts";
+import { createLimits } from "./publish/limits.ts";
 import { createWebEnv } from "./web-env.ts";
 
 let limits: ReturnType<typeof createLimits> | undefined;

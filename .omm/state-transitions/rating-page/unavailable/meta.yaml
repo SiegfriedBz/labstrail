@@ -1,0 +1,9 @@
+created: 2026-10-15T13:08:20.684Z
+updated: 2026-10-15T13:08:20.684Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: unavailable
+children: []
+parentPath:
+  - rating-page

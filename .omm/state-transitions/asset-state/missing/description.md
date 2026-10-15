@@ -1,0 +1,1 @@
+No asset under this name in this graph: the publish run reads the paper, the rating run scores it. The node answers 404 both for this and for a graph it does not serve, so the client tells them apart before saying missing.

@@ -1,0 +1,1 @@
+verify-submission.ts: checks a submission's EIP-712 signature over { cid, contextGraph, deadline } against the submitter's address (with viem, so smart-contract wallets work), the deadline against when the event arrived, and the context graph against this environment's. Also used to check a published paper's signature for the papers list.

@@ -1,0 +1,1 @@
+Step read-rka-<n>: reads the R-KA named from the request id (verisci-rka-<request id>, ADR 0016). Minted: its score is read back; stored or draft: it is minted; missing: the paper is scored. Past 24 hours, only a minted R-KA is fulfilled and anything else is cancelled expired.

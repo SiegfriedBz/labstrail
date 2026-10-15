@@ -1,0 +1,2 @@
+- On staging nothing turns a rating request into a run yet: locally the paper's page or the rate-paper dev script sends the event; the webhook and the reconciler that restarts stuck runs are the next plan's (ADRs 0017, 0020). Until then, a run that gives up after its attempts leaves its request pending.
+- The scorer reads at most 150,000 characters of a paper; a longer one is cut, which can cost it points (the R-KA records textShortened).

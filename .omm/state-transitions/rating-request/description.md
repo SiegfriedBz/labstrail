@@ -1,0 +1,1 @@
+A phase-1 rating request on the RatingController (packages/contracts/src/RatingController.sol): pending from requestPhase1 until the oracle fulfils it with a score and the R-KA's UAL, or cancels it. Both are final, and only the oracle can do either (ADRs 0012, 0020). A requester may hold a capped number of pending requests.

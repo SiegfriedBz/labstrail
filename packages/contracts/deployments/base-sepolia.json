@@ -2,26 +2,64 @@
   "chainId": 84532,
   "staging": {
     "current": {
-      "address": "0xc5b1458b0e6f9a87bf7ae5d1d04f847b85287ae4",
-      "txHash": "0x5f9f440753b4bb6d9fe97b36ed95f841f9158cbd1ac2a5a0f0d95a1bfe2ce877",
-      "blockNumber": 47731987,
+      "address": "0xa5be5ee8e4b6825c4425cc208f0df09fb8147a90",
+      "txHash": "0xfc03ed99db85fe6a26e5eb9f3c4568e8a5cbab4f79510c15719c22392b19d091",
+      "blockNumber": 48074487,
       "owner": "0xa0f8e83c0829117838e805e40f49029a21a5a0e3",
       "oracleAgent": "0xe7899a249c8c21f334bda14d1d861116aa048f68",
       "maxPendingPerRequester": 3,
-      "commit": "3c627c7"
+      "commit": "7a0fa85"
     },
-    "past": []
+    "past": [
+      {
+        "address": "0xe91617faa0f2c39e62d3a887c1f4933595efc9dc",
+        "txHash": "0xc4943a8d8756c2a626cf04e29ba16b589c98a6ef26ea0f554981b0e08606d57b",
+        "blockNumber": 48038989,
+        "owner": "0xa0f8e83c0829117838e805e40f49029a21a5a0e3",
+        "oracleAgent": "0xe7899a249c8c21f334bda14d1d861116aa048f68",
+        "maxPendingPerRequester": 3,
+        "commit": "b3cc21f"
+      },
+      {
+        "address": "0xc5b1458b0e6f9a87bf7ae5d1d04f847b85287ae4",
+        "txHash": "0x5f9f440753b4bb6d9fe97b36ed95f841f9158cbd1ac2a5a0f0d95a1bfe2ce877",
+        "blockNumber": 47731987,
+        "owner": "0xa0f8e83c0829117838e805e40f49029a21a5a0e3",
+        "oracleAgent": "0xe7899a249c8c21f334bda14d1d861116aa048f68",
+        "maxPendingPerRequester": 3,
+        "commit": "3c627c7"
+      }
+    ]
   },
   "production": {
     "current": {
-      "address": "0xae82e52df0c8f2f9d41e7e17fdd60cbdbd299923",
-      "txHash": "0x5ee29503a6934b59a824a9645d3fde8e4a71c5e1ff0388917b08353f13ae4cd7",
-      "blockNumber": 47751934,
+      "address": "0xdd5ce116b3e1ffca5342b31ea81b638811dba15b",
+      "txHash": "0x577f5cbb1a739ba613c1afa18f53c12c05ffac3bf1a78333a5bfd7a5a8873c62",
+      "blockNumber": 48074505,
       "owner": "0xa0f8e83c0829117838e805e40f49029a21a5a0e3",
       "oracleAgent": "0xff1400d130a9da1b6b3929f43fa58417d64b54c2",
       "maxPendingPerRequester": 3,
-      "commit": "898f18a"
+      "commit": "7a0fa85"
     },
-    "past": []
+    "past": [
+      {
+        "address": "0xdb02cccf7407d06813236d5b7d3cca511c895f7e",
+        "txHash": "0x648d1ebf2e920141d6bbcdf00a4af6f757da35a909940afdafc4d3a7f9185291",
+        "blockNumber": 48039007,
+        "owner": "0xa0f8e83c0829117838e805e40f49029a21a5a0e3",
+        "oracleAgent": "0xff1400d130a9da1b6b3929f43fa58417d64b54c2",
+        "maxPendingPerRequester": 3,
+        "commit": "b3cc21f"
+      },
+      {
+        "address": "0xae82e52df0c8f2f9d41e7e17fdd60cbdbd299923",
+        "txHash": "0x5ee29503a6934b59a824a9645d3fde8e4a71c5e1ff0388917b08353f13ae4cd7",
+        "blockNumber": 47751934,
+        "owner": "0xa0f8e83c0829117838e805e40f49029a21a5a0e3",
+        "oracleAgent": "0xff1400d130a9da1b6b3929f43fa58417d64b54c2",
+        "maxPendingPerRequester": 3,
+        "commit": "898f18a"
+      }
+    ]
   }
 }

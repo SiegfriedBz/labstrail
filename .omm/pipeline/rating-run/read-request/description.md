@@ -1,0 +1,1 @@
+Step read-request: reads the request from the contract named in the event, which must be one of this environment's contracts, current or past. A request not pending, or a contract whose oracle is not this deployment's key, ends the run skipped before anything is spent.

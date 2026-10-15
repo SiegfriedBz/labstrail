@@ -21,8 +21,9 @@ edge`, testnet), Base Sepolia.
   - `did:dkg:base:{chainId}/{DKGKnowledgeAssets address}/{kaId}`: the older form, for ids
     with no author bits. OriginTrail's docs still show only this one.
 
-  A UAL parser accepts both and never assumes the middle segment is our node: a target
-  published elsewhere ([ADR 0011](adr/0011-a-rating-is-a-separate-r-ka.md)) may use either.
+  A UAL parser accepts both and never assumes the middle segment is our node: a rating
+  request may name either, and the rating run rates only our node's papers
+  ([ADR 0011](adr/0011-a-rating-is-a-separate-r-ka.md)).
 - **Canonical UAL spelling** (OriginTrail/dkg `packages/core/src/ka-ual-identity.ts`,
   checked at `74a515e`, 2026-10-06): lowercase address and chain namespace, decimal numbers
   with no leading zero; the chain part may be namespaced with several colons, and the chain
@@ -70,6 +71,10 @@ edge`, testnet), Base Sepolia.
   read in the daemon's `dkg-query/dist/dkg-query-engine.js`, 2026-10-10): the graph's data
   graph and its per-asset verifiable-memory graphs (`…/_verifiable_memory/<author>/<n>`).
   Shared memory is read only with `includeSharedMemory: true`.
+- **A query naming an asset graph that does not exist is refused, not empty** (10.0.22, local
+  node, 2026-10-11): `GRAPH <…/_verifiable_memory/<agent>/999>` answers 400 "Scoped query
+  violation: GRAPH <…> is outside the allowed graph set". To ask whether an asset exists,
+  query `_meta` instead (`publishedPaperQuery`), which answers 200 with no rows.
 - **A graph's `_meta` graph indexes its assets** (10.0.22, 2026-10-10), and a query scoped to
   the graph can read it as `GRAPH <did:dkg:context-graph:<graph id>/_meta>`. With `dkg:` for
   `http://dkg.io/ontology/`:
@@ -269,6 +274,88 @@ Observed on `lfoppiano/grobid:0.9.1-crf`, 2026-10-09, except where a fact cites 
   listed "Google Brain" and "Google Research" among the ten authors, and found no DOI
   (the arXiv PDF prints none). A Target KA carries what GROBID read
   ([ADR 0010](adr/0010-pdf-to-target-ka-pipeline.md)).
+- **The header can give an accent apart from its letter** (2026-10-12): a cohort study's TEI
+  listed "Montserrat Rodrı ´guez-Ayala" and "Bele ´n Moreno-Franco", the accent as a spacing
+  `´` (U+00B4) after its letter, often after a space, and the `i` as a dotless `ı` (U+0131), the
+  base LaTeX draws an accent on. On the 14 reference PDFs, every split accent came after its
+  letter, and all were in authors' names. Once one opened the surname: "José Ramón Banegas"
+  came as forename `Jose` and surname `´ramo ´n Banegas` (with GROBID's lowercase `r`).
+  `parseTeiHeader` joins them back in names only (`packages/core` → Target KAs), since papers
+  also write `´` as an apostrophe or a prime in titles and abstracts ("Alzheimer´s", "3´ UTR",
+  "cytidine 5´-diphosphate"). Papers published before that fix keep the split names in their
+  KAs.
+- **`POST /api/processFulltextDocument` drops statements printed beside a paper's first page**
+  (2026-10-11): on a PLOS ONE trial (e0269224, 12 pages, 11 s), the TEI held the body's
+  sections as flat `div`s, each with its `head`, and the funding and data availability
+  statements as `div type="funding"` and `div type="availability"` under `back`, but no
+  trace of its "Competing interests" line. The scorer reads a PDF's text with unpdf instead
+  (below).
+
+## PDF text
+
+Observed with unpdf 1.8.1 (a build of pdf.js with no worker), 2026-10-11.
+
+- **It reads a paper's text, page by page, in well under a second:** a 12-page PLOS ONE PDF
+  gave about 34,000 characters in 0.4 s, every statement beside the first page included.
+- **It writes some accents apart from their letters,** as the PDF draws them: `Sante´`,
+  `Franc¸ois`, `Je´re´mie`. A quote in which the model writes `Santé` matches only once
+  accents are dropped (`packages/core` → Ratings).
+- **It gives the page's text in the order the PDF draws it:** on PLOS pages the first page's
+  sidebar (citation, editor, data availability, funding, competing interests) comes in
+  pieces between the abstract's lines, so one statement can be split by text from another
+  column. A line break inside a word keeps its hyphen (`Institu-` / `tional`).
+- **Some PDFs make it print a font warning** (`Warning: TT: undefined function: 5`) on the
+  console; the text is still read.
+
+## Gemini
+
+From the Gemini API's pricing and models pages (2026-10-11), and the rating run's first live
+score the same day (plan 021).
+
+- **The free tier includes `gemini-3.8-flash`,** a stable model, Google's newest Flash; Gemini
+  3.1 Pro is not on the free tier. On the free tier, Google may use prompts and answers to
+  improve its products ([ADR 0018](adr/0018-phase-1-scorer-output-contract.md)).
+- **Rate limits are not published:** each account sees its own in Google AI Studio
+  (`aistudio.google.com/rate-limit`). A 429 means one was hit.
+- **The free tier allows 20 `gemini-3.8-flash` requests a day per project** (2026-10-11): the
+  21st answered 429 `RESOURCE_EXHAUSTED`, with a `QuotaFailure` naming
+  `GenerateRequestsPerDayPerProjectPerModel-FreeTier`, `quotaValue: "20"`, and a
+  `RetryInfo` delay running to midnight Pacific time. Any 429 body says which quota was hit.
+- **The quota belongs to the Google Cloud project, not the key:** every key of a project shares
+  it. Google's API terms forbid getting around a documented limit ("You agree to, and will not
+  attempt to circumvent, such limitations", `developers.google.com/terms`, read 2026-10-11),
+  so more keys or projects are not a way to more free requests; Google's consent or a paid
+  tier is.
+- **The paid tier** (pricing page, read 2026-10-11): `gemini-3.8-flash` costs $0.75 per
+  million input tokens and $3.75 per million output tokens, thinking tokens included, through
+  2026-12-31, and twice that from 2027-01-01. Prompts and answers on the paid tier are not
+  used to improve Google's products.
+- **`POST https://generativelanguage.googleapis.com/v1beta/models/<model>:generateContent`,**
+  key in the `x-goog-api-key` header, with `generationConfig.responseMimeType:
+  "application/json"` and `responseJsonSchema` (a JSON Schema: `integer` with `minimum` and
+  `maximum`, `enum`, `required` all held): `gemini-3.8-flash` answered one JSON object
+  matching it, in `candidates[0].content.parts[].text` with `finishReason: "STOP"`, and gave
+  `modelVersion: "gemini-3.8-flash"`. A whole rating run took about 25 s on Anvil, the mint on
+  Base Sepolia included.
+- The docs also show a newer `/v1beta/interactions` endpoint with a `response_format` field;
+  `generateContent` is not marked deprecated.
+- **`gemini-3.8-flash` thinks before it answers by default,** which sets its pace (scorer v2,
+  2026-10-11): a one-line prompt took 6 to 7 s; classifying a paper from its first 8,000
+  characters about 20 s; answering a trial's 15 checks over its 62,000 characters about
+  100 s. Its answers carry a `thoughtSignature` beside the text, and some gave no
+  `modelVersion`. On the free tier, some calls failed within seconds and succeeded when
+  tried again 30 s later.
+- **The publish run's field check uses `gemini-3.5-flash-lite`,** free of charge on the
+  pricing page (2026-10-11). Each model has its own daily quota (the 429 above names it
+  `…PerModel-FreeTier`), so the field check leaves the scorer's 20 requests a day alone. On
+  2026-10-12 it classified all 14 reference papers right from their title, abstract and first
+  6,000 characters (`score-papers --field`), with the same request shape as the scorer.
+- **A model Google is short of capacity for answers 503** (2026-10-12, `gemini-3.8-flash`): two
+  papers got 503 on three tries 30 s apart, while Flash-Lite answered at the same time.
+- **`gemini-3.8-flash` shortens some quotes with "…" or "..." although the prompt forbids it**
+  (2026-10-12: 3 quotes across the 11 reference papers scored, each skipping text between two
+  real passages), which is why quote matching accepts an ellipsis that stands for whole
+  sentences.
 
 ## Chain
 
@@ -287,6 +374,14 @@ Observed on Base Sepolia (chain id 84532) with Alchemy.
 - **Base has no public mempool:** the RPC forwards transactions to the sequencer, so
   whether Alchemy's pending nonce (`eth_getTransactionCount(…, "pending")`) shows a
   transaction not yet included is to verify ([ADR 0019](adr/0019-oracle-transactions-are-serialized.md)).
+- **Anvil, for local rating runs** (Foundry 1.8.4, 2026-10-11,
+  [ADR 0036](adr/0036-local-rating-runs-use-anvil.md)): its default port 8545 is the one the
+  DKG node's RPC proxy holds, and a call to `127.0.0.1:8545` then answers as Base Sepolia
+  (chain id 84532), so Anvil runs on 8546. `forge script … --broadcast --unlocked --sender
+  <Anvil's first account>` deploys with no key passed, since Anvil signs for its built-in
+  accounts; the first deploy on a fresh chain lands at
+  `0x5FbDB2315678afecb367f032d93F642f64180aa3`. The base fee starts at 1 gwei; viem's
+  `setBalance` (test client, mode `anvil`) funds any address.
 - **Replacing a pending transaction needs both `maxFeePerGas` and `maxPriorityFeePerGas`
   raised by at least 10%** (geth's default price bump; to verify on Base), or it is
   rejected as underpriced ([ADR 0019](adr/0019-oracle-transactions-are-serialized.md)).
@@ -332,6 +427,9 @@ Observed on Vercel Hobby with Inngest Cloud, except where a fact cites the vendo
   `GET /v1/events/{id}/runs` answers an empty list (2026-10-10): an id that a user can repeat
   (the same PDF published again by the same wallet) must carry something new per attempt,
   as the submission's deadline does.
+- **A function created with no triggers can only be invoked** with `step.invoke` (Inngest
+  4.22.0; its `opts.triggers` reads `[]`). The dev server ran the oracle function that way.
+  Step outputs are serialized as JSON, and `JSON.stringify` throws on a `bigint`.
 - **Inngest caps sizes:** an event payload at 256 KB, a step's output at 4 MB, a run's
   state at 32 MB and a function at 1,000 steps (Inngest docs, to verify on our plan).
   Payloads carry ids, never file bytes ([ADR 0010](adr/0010-pdf-to-target-ka-pipeline.md)).

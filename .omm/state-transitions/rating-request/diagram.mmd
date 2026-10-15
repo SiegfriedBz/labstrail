@@ -1,0 +1,3 @@
+graph LR
+    pending["Pending\nrequestPhase1(targetUal)"] -->|"oracle fulfilPhase1(score, rKaUal)"| fulfilled["Fulfilled\nscore and R-KA on chain"]
+    pending -->|"oracle cancelRequest(InvalidTarget or Expired)"| cancelled["Cancelled\nwith its reason"]

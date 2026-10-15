@@ -1,0 +1,22 @@
+graph LR
+    browser["Browser\nresearcher's wallet"] -->|"pages, server actions"| web-app["Web App\napps/web/"]
+    browser -->|"requestPhase1 from the wallet"| base-sepolia["Base Sepolia\nchain"]
+    inngest["Inngest\nevent and step engine"] -->|"invokes functions at /api/inngest"| web-app
+    web-app -->|"serves its functions, calls its site services"| workflows["Workflows\npackages/workflows/"]
+    web-app -->|"CIDs, UALs, typed data to sign"| core["Core\npackages/core/"]
+    web-app -->|"ABI and deployed addresses, for requests and the footer"| contracts["Contracts\npackages/contracts/"]
+    workflows -->|"pure rules: prompts, scores, triples, names"| core
+    workflows -->|"read, store, mint, query assets"| dkg-client["DKG Client\npackages/dkg/"]
+    workflows -->|"ABI, addresses and reads, for the oracle and the pages"| contracts
+    workflows -->|"sends events, runs steps"| inngest
+    dkg-client -->|"authenticated HTTP API"| dkg-node["DKG Node\nnode host"]
+    dkg-node -->|"Base JSON-RPC, within a budget"| rpc-proxy["RPC Proxy\ninfra/rpc-proxy/"]
+    rpc-proxy -->|"forwards calls"| base-sepolia
+    contracts -->|"RatingController deployed on"| base-sepolia
+    web-app -->|"validated settings"| env["Env\npackages/env/"]
+    workflows -->|"validated settings"| env
+    dkg-client -->|"validated settings"| env
+    classDef external fill:#585b70,stroke:#585b70,color:#cdd6f4
+    classDef entry fill:#89b4fa,stroke:#89b4fa,color:#1e1e2e
+    class inngest,dkg-node,base-sepolia,browser external
+    class web-app entry

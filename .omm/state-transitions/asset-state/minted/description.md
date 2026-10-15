@@ -1,0 +1,1 @@
+Published on chain under its UAL: our node holds the ERC-721 token, and the merkle root of its statements is anchored on Base Sepolia, so anyone can check the content still matches. A run that finds it minted goes straight to its outcome.

@@ -6,8 +6,8 @@ import { type DragEvent, useId, useState } from "react";
 import { BaseError, UserRejectedRequestError } from "viem";
 import { useAccount, useSignTypedData, useSwitchChain } from "wagmi";
 import { requestUpload, submitPaper } from "../../app/actions.ts";
-import { type PublishProblem, publishProblemMessage } from "../../lib/messages.ts";
-import { type Phase, publishFile, uploadToSignedUrl } from "../../lib/publish-flow.ts";
+import { type PublishProblem, publishProblemMessage } from "../../lib/publish/messages.ts";
+import { type Phase, publishFile, uploadToSignedUrl } from "../../lib/publish/publish-flow.ts";
 import { useWalletReady } from "../wallet/providers.tsx";
 
 const BASE_SEPOLIA = 84532;
@@ -148,7 +148,9 @@ function PublishFlow({ contextGraph, maxBytes, signatureLifetimeS }: PublishSett
               <UploadSimple size={28} />
             </span>
             <p className="font-medium">Drop your paper here, or tap to choose a PDF</p>
-            <p className="font-mono text-xs text-muted">application/pdf · max 30 MB</p>
+            <p className="font-mono text-xs text-muted">
+              application/pdf · max {maxBytes / 1024 / 1024} MB
+            </p>
           </div>
         )}
         <input

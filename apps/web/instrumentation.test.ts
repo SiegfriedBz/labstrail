@@ -1,12 +1,12 @@
 // @vitest-environment node
 import { EnvError, type RuntimeEnv } from "@verisci/env";
-import { createWorkflowsEnv } from "@verisci/workflows";
+import { checkRatingSettings, createWorkflowsEnv } from "@verisci/workflows";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { checkServerSettings as check, register } from "./instrumentation.ts";
 import { createWebEnv } from "./lib/web-env.ts";
 
 const checkServerSettings = (runtimeEnv: RuntimeEnv) =>
-  check(runtimeEnv, [createWorkflowsEnv, createWebEnv]);
+  check(runtimeEnv, [createWorkflowsEnv, createWebEnv, checkRatingSettings]);
 
 const settings = {
   DKG_URL: "http://127.0.0.1:9200",
@@ -16,6 +16,7 @@ const settings = {
   PINATA_GATEWAY_URL: "https://example.mypinata.cloud",
   CHAIN_RPC_URL: "https://sepolia.base.org",
   PINATA_JWT: "secret-pinata-jwt",
+  GEMINI_API_KEY: "secret-gemini",
   INNGEST_EVENT_KEY: "secret-event-key",
   INNGEST_SIGNING_KEY: "signkey-test-0123",
   UPSTASH_REDIS_REST_URL: "https://example.upstash.io",
@@ -34,6 +35,13 @@ describe("checkServerSettings", () => {
 
     expect(start).toThrow(EnvError);
     expect(start).toThrow(/GROBID_URL/);
+  });
+
+  it("refuses to start a deployed server without the Gemini key, a preview included", () => {
+    const start = () =>
+      checkServerSettings({ APP_ENV: "staging", ...settings, GEMINI_API_KEY: undefined });
+
+    expect(start).toThrow(/GEMINI_API_KEY/);
   });
 
   it("refuses to start a deployed server without the web app's settings", () => {
@@ -55,6 +63,37 @@ describe("checkServerSettings", () => {
 
   it("starts a deployed server whose settings are valid", () => {
     expect(() => checkServerSettings({ APP_ENV: "staging", ...settings })).not.toThrow();
+  });
+});
+
+describe("checkRatingSettings", () => {
+  const rating = { ORACLE_PRIVATE_KEY: `0x${"59c6".repeat(16)}` };
+  const production = {
+    APP_ENV: "production",
+    ...settings,
+    DKG_CONTEXT_GRAPH: `${settings.DKG_CONTEXT_GRAPH.split("/")[0]}/verisci-prod`,
+  };
+
+  it("refuses to start production without the oracle key (ADR 0019)", () => {
+    const start = () => checkServerSettings(production);
+
+    expect(start).toThrow(EnvError);
+    expect(start).toThrow(/ORACLE_PRIVATE_KEY/);
+  });
+
+  it("starts production with its rating settings", () => {
+    expect(() => checkServerSettings({ ...production, ...rating })).not.toThrow();
+  });
+
+  it("checks staging's rating settings only when it holds the oracle key", () => {
+    expect(() => checkServerSettings({ APP_ENV: "staging", ...settings })).not.toThrow();
+    expect(() =>
+      checkServerSettings({
+        APP_ENV: "staging",
+        ...settings,
+        ORACLE_PRIVATE_KEY: "0x12",
+      }),
+    ).toThrow(/ORACLE_PRIVATE_KEY/);
   });
 });
 

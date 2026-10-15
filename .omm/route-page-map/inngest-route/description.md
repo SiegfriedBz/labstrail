@@ -1,0 +1,1 @@
+GET, POST and PUT /api/inngest (app/api/inngest/route.ts): serves the workflows' functions to Inngest with its serve handler, up to 300 s per call; the functions themselves live in packages/workflows (ADR 0003).

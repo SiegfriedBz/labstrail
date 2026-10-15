@@ -19,7 +19,10 @@ Check, against the diff (`git diff <base>...HEAD`) and the files around it:
 
 **Docs** (each one blocks the PR)
 
-Docs go stale outside the diff, so do not stop at the changed lines:
+Docs go stale outside the diff, so do not stop at the changed lines. The architecture views
+in `.omm/` (each element's `description.md`, `diagram.mmd` and other fields) count as docs:
+grep them too, and report an element that names a path, step or behaviour the diff changed
+and still describes the old one, or a new folder or flow with no element:
 1. List what the diff changes that docs can mention: exports, commands and scripts,
    env variables, file paths, config, and behaviour (what fails, what a page shows).
    Grep each one across every `README.md`, `CLAUDE.md`, `CONTRIBUTING.md`,
@@ -48,6 +51,7 @@ ADRs are the source of truth, and only the user decides between them. Check only
 Then report:
 - Code in the diff that contradicts an accepted ADR: the ADR, its sentence, and the file:line.
 - An ADR the diff adds or changes that contradicts an ADR it cites or that cites it: both ADRs and both sentences.
+- An ADR the diff adds or changes that narrows, or makes an exception to, a rule of an ADR it cites, while that ADR gets no new `## History` line saying so (`docs/adr/README.md` → Changing an ADR: a choice that touches two ADRs' topics updates both): both ADRs and both sentences. Read each cited ADR's rules as absolute ("never", "every", "only") and ask whether the new text allows a case they rule out.
 - A one-way link: `Superseded by` without the matching `Supersedes` (or the reverse).
 - A link or citation (`ADR NNNN`, `[NNNN](…)`) to a folded ADR, anywhere in the diff, outside the places `docs/adr/README.md` → "Changing an ADR" allows (History lines, the Folded ADRs table, contract NatSpec until its next redeploy); or a deleted ADR missing from Folded ADRs.
 - A new ADR without an index row, a row in the wrong group, or a row whose title, link or status disagrees with the file.

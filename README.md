@@ -2,18 +2,23 @@
 
 [![CI](https://github.com/SiegfriedBz/verisci/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/SiegfriedBz/verisci/actions/workflows/ci.yml)
 
-VeriSci gives scientific papers an open quality rating that anyone can request,
-read and verify.
+VeriSci publishes life-science and health papers and gives them an open quality rating
+that anyone can request, read and verify
+([ADR 0037](docs/adr/0037-verisci-rates-life-science-and-health-papers.md)).
 
 ## Why
 
 How much to trust a paper is usually inferred from where it was published, and
-the reviews behind that judgement are rarely public. VeriSci attaches the
-rating to the paper itself, in the open: each rating is a public record on the
-OriginTrail Decentralized Knowledge Graph (DKG), and its score is written on
-chain, so neither can be quietly changed. A rating starts as a rough machine
-score and is meant to grow stronger through human review and, later, wet-lab
-replication ([ADR 0012](docs/adr/0012-three-phases-settled-by-the-oracle.md)).
+the reviews behind that judgement are rarely public. Yet many published results
+cannot be repeated: in a 2016 Nature survey of more than 1,500 researchers, more
+than 70% had tried and failed to reproduce another scientist's experiments
+(Baker, *Nature* 533, 452–454). VeriSci attaches the rating to the paper itself,
+in the open: each rating is a public record on the OriginTrail Decentralized
+Knowledge Graph (DKG), and its score is written on chain, so neither can be
+quietly changed. A rating starts as a machine score of how completely the paper
+reports what others need to reproduce its work, and is meant to grow stronger
+through human review and, later, wet-lab replication
+([ADR 0012](docs/adr/0012-three-phases-settled-by-the-oracle.md)).
 
 Status: early. VeriSci is a rebuild of an earlier prototype,
 `desci-rating-dapp`, which ran both flows (publish a paper, rate it) end to end on
@@ -22,7 +27,10 @@ CI), and its ADRs and domain facts record what the prototype taught us. The firs
 user-facing feature is the upload page: connect a wallet, publish a PDF, follow it until it
 is minted, then verify its record (signature, token, UAL, CID) from the paper's page. Every
 published paper is listed at `/papers`, newest first, read a page at a time from the DKG.
-Rating comes next. The repo, its packages and the EIP-712 domain keep the lowercase name `verisci`.
+Ratings work end to end locally, against a contract on Anvil: a published paper's page
+requests one from the visitor's wallet, each rating has a page that follows it to its score
+and then shows every check and quote behind it, and the papers list shows each paper's
+score. What starts a rating on staging, and what restarts a stuck one, come next. The repo, its packages and the EIP-712 domain keep the lowercase name `verisci`.
 Everything runs on testnets.
 
 ## How it works
@@ -30,10 +38,13 @@ Everything runs on testnets.
 Built:
 
 - **A paper becomes a Target KA.** Its submitter signs it with their wallet; the
-  PDF is parsed, its metadata read, and it is published to the DKG as a
-  Knowledge Asset that records who submitted it
-  ([ADR 0010](docs/adr/0010-pdf-to-target-ka-pipeline.md)). A publish that fails
-  after its retries is recovered by publishing the same PDF again.
+  PDF is parsed, its metadata read, a small Gemini model checks it is a life-science or
+  health paper, and it is published to the DKG as a Knowledge Asset that records who
+  submitted it ([ADR 0010](docs/adr/0010-pdf-to-target-ka-pipeline.md),
+  [ADR 0037](docs/adr/0037-verisci-rates-life-science-and-health-papers.md)). A paper
+  the check places outside the field is refused before anything is stored; when Gemini
+  cannot answer, the paper is published and its rating checks the field. A publish that
+  fails after its retries is recovered by publishing the same PDF again.
 - **Every write is safe to retry.** Each step checks what is already done
   before acting, so a retry never duplicates anything
   ([ADR 0007](docs/adr/0007-all-writes-converge.md)).
@@ -41,13 +52,27 @@ Built:
   oracle wallets and limit stores (production's graph and store come with its first app
   deployment); the DKG node, the Reown project and the pinning account are shared
   ([ADR 0005](docs/adr/0005-staging-and-production-are-isolated.md)).
+- **A requested paper is rated.** A rating run reads the paper's text, has an LLM answer
+  the reporting checklist of its kind of study (a trial, an animal study, a review…) with
+  quotes, and computes the score from those answers, once: it measures whether the paper
+  gives what others need to check and reproduce its work, not whether the work is right; our DKG node publishes the
+  rating as its own Rating KA (R-KA), and the oracle records the score on the contract
+  ([ADR 0011](docs/adr/0011-a-rating-is-a-separate-r-ka.md),
+  [ADR 0014](docs/adr/0014-contract-owns-scores-dkg-owns-content.md),
+  [ADR 0018](docs/adr/0018-phase-1-scorer-output-contract.md)). Locally, it runs
+  against a contract on Anvil ([ADR 0036](docs/adr/0036-local-rating-runs-use-anvil.md)).
+- **Anyone with a wallet requests a rating from the paper's page**, paying only gas
+  ([ADR 0015](docs/adr/0015-rating-requests-are-free-on-testnet.md)). The rating's page
+  follows it to its score, then shows every check, answer and quote behind it; the paper's
+  page and the papers list show its latest score, the contract's
+  ([ADR 0014](docs/adr/0014-contract-owns-scores-dkg-owns-content.md)). Locally, the page
+  announces its own request, since no webhook watches Anvil
+  ([ADR 0017](docs/adr/0017-chain-events-are-ingested-at-least-once.md)).
 
-Next (the contracts are deployed; the rating runs are not built yet):
+Next (requests and the rating run are built; nothing starts a run on staging yet):
 
-- **Anyone requests a rating on chain.** VeriSci scores the paper, our DKG node
-  publishes the rating as its own Rating KA (R-KA), and the oracle records the
-  score on the contract ([ADR 0011](docs/adr/0011-a-rating-is-a-separate-r-ka.md),
-  [ADR 0014](docs/adr/0014-contract-owns-scores-dkg-owns-content.md)).
+- **An Alchemy Notify webhook turns each request on chain into a rating run**
+  ([ADR 0017](docs/adr/0017-chain-events-are-ingested-at-least-once.md)).
 - **A cron job restarts stuck rating requests**, from the contract's own list of
   pending requests, and that request's run finishes or cancels it
   ([ADR 0020](docs/adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
@@ -71,6 +96,14 @@ Terms:
 
 The diagrams below show the target design; the workspaces build it plan by plan.
 
+Architecture views (overall architecture, the publish and rating pipelines, external
+integrations, state machines, routes) are in [`.omm/`](.omm/), written with
+[oh-my-mermaid](https://github.com/oh-my-mermaid/oh-my-mermaid), a pinned dev dependency:
+each element describes a folder, a flow or a service, with a Mermaid diagram. Each branch
+refreshes the elements it changes (`/implement`), and `/review-branch` blocks a PR that
+leaves one stale; each workspace README links to its own. `pnpm exec omm view --port 4000`
+shows them in a browser.
+
 ### Environments and resources
 
 Each environment has its own context graph on the shared DKG node
@@ -80,7 +113,8 @@ publishes the ratings of every contract of an environment to that environment's
 graph, so a redeployed contract keeps the graph of the one it replaces; the old
 contract is paused and drained ([ADR 0023](docs/adr/0023-a-fix-is-a-redeploy-owner-powers-fixed.md)).
 Each contract's R-KA names are its own, because the request id hashes the chain
-id and contract address ([ADR 0016](docs/adr/0016-asset-names-derive-from-request-id.md)).
+id, the contract's address and its deploy time
+([ADR 0016](docs/adr/0016-asset-names-derive-from-request-id.md)).
 
 The DKG node runs with GROBID and an RPC proxy, on its own server once a deployed
 environment calls it; until then on a developer's computer, started by hand
@@ -91,9 +125,10 @@ which asks free public endpoints first and keeps Alchemy within a daily budget.
 also shows how the parts connect: on a server, Caddy is the only public entry.
 Each environment also has its own oracle wallet, Alchemy webhook, Inngest
 environment and Upstash store. Only `develop` holds staging's oracle key and runs
-its ratings; previews and local development share staging's contract and graph, and a
-developer running the rating functions locally uses their own contract and
-oracle key ([ADR 0019](docs/adr/0019-oracle-transactions-are-serialized.md)).
+its ratings; previews share staging's contract and graph, and local development shares
+staging's graph but rates, pages included, on a contract on a local Anvil chain with its
+oracle key ([ADR 0019](docs/adr/0019-oracle-transactions-are-serialized.md),
+[ADR 0036](docs/adr/0036-local-rating-runs-use-anvil.md)).
 
 ```mermaid
 flowchart TB
@@ -102,7 +137,7 @@ flowchart TB
     sa["App server<br/>upload page, Upstash limits"]
     sp["Publish runs<br/>Inngest environment"]
     sc["RatingController (staging)<br/>Base Sepolia<br/>+ past contracts, paused"]
-    sr["Rating runs (next)<br/>oracle wallet, Alchemy webhook,<br/>same Inngest environment"]
+    sr["Rating runs<br/>oracle wallet, Alchemy webhook (next),<br/>same Inngest environment"]
     sg["Staging graph<br/>on the shared DKG node host"]
     sa -->|"paper.submitted"| sp -->|"stores and mints Target KAs"| sg
     sc --> sr -->|"stores and mints R-KAs"| sg
@@ -112,7 +147,7 @@ flowchart TB
     pa["App server<br/>upload page, Upstash limits"]
     pp["Publish runs<br/>Inngest environment"]
     pc["RatingController (production)<br/>Base Sepolia<br/>+ past contracts, paused"]
-    pr["Rating runs (next)<br/>oracle wallet, Alchemy webhook,<br/>same Inngest environment"]
+    pr["Rating runs<br/>oracle wallet, Alchemy webhook (next),<br/>same Inngest environment"]
     pg["Production graph<br/>on the shared DKG node host"]
     pa -->|"paper.submitted"| pp -->|"stores and mints Target KAs"| pg
     pc --> pr -->|"stores and mints R-KAs"| pg
@@ -132,6 +167,7 @@ sequenceDiagram
   participant A as App server
   participant R as Publish run (Inngest)
   participant G as GROBID (node host)
+  participant M as Gemini Flash-Lite
   participant N as DKG node
   U->>A: ask for an upload URL
   A-->>U: short-lived signed upload URL
@@ -148,7 +184,8 @@ sequenceDiagram
     R->>N: read the Target KA's state (stop if already minted)
     R->>P: fetch the PDF by its CID
     R->>G: parse the PDF
-    R->>R: read metadata from the TEI (refuse with a reason if unreadable)
+    R->>R: read metadata from the TEI and the start of the text (refuse with a reason if unreadable)
+    R->>M: title, abstract and start of the text: in the field? (refuse if outside)
     R->>N: store with the submitter address and signature, then mint and poll
     N-->>R: Target KA UAL, ready to be rated
   end
@@ -179,25 +216,31 @@ sequenceDiagram
   W->>R: event keyed on requestId
   R->>C: read the request and the contract's oracle
   Note over R: Stop if settled, or if the oracle is not this deployment's key.
-  R->>R: R-KA name from requestId
-  R->>N: read R-KA state by name
-  alt invalid target, or past the maximum age without a minted R-KA
-    R->>O: cancel(requestId, reason)
-    O->>C: cancelRequest(requestId, reason)
-  else missing
-    R->>R: score the target
-    R->>N: store R-KA, then mint and poll until minted
-    R->>O: fulfil(requestId, score, rKaUal)
-    O->>C: fulfilPhase1(requestId, score, rKaUal)
-  else stored
-    R->>N: read the stored score back
-    R->>N: mint and poll until minted
-    R->>O: fulfil(requestId, score, rKaUal)
-    O->>C: fulfilPhase1(requestId, score, rKaUal)
-  else minted
-    R->>N: read the score back from the R-KA
-    R->>O: fulfil(requestId, score, rKaUal)
-    O->>C: fulfilPhase1(requestId, score, rKaUal)
+  R->>N: is the target one of our published papers?
+  alt not a paper verisci published (its UAL, then the node's answer)
+    R->>O: cancel(requestId, invalid target)
+    O->>C: cancelRequest(requestId, invalid target)
+  else otherwise
+    R->>R: R-KA name from requestId
+    R->>N: read R-KA state by name
+    alt past the maximum age, and no R-KA minted (a stored one is polled 10 minutes first)
+      R->>O: cancel(requestId, expired)
+      O->>C: cancelRequest(requestId, expired)
+    else otherwise
+      opt nothing stored
+        R->>N: find the PDF the target links
+        R->>R: read its text; one Gemini request gives its field, study type and checks, with quotes
+        Note over R,O: Outside the life sciences and health, or no readable text:<br/>cancel(requestId, invalid target), and stop.
+        R->>R: check the quotes against the paper, compute the score
+        R->>N: store the R-KA
+      end
+      opt not minted yet (a draft is shared first)
+        R->>N: mint and poll until minted
+      end
+      R->>N: read the score back from the minted R-KA
+      R->>O: fulfil(requestId, score, rKaUal)
+      O->>C: fulfilPhase1(requestId, score, rKaUal), then check the receipt
+    end
   end
   Note over C,O: The oracle function re-reads the request and sends nothing if it is already settled.
   Note over C,R: A cron reconciler pages through pendingRequestIds(offset, limit)<br/>on every contract of the environment, past ones included,<br/>and restarts the run of any stuck request.
@@ -212,10 +255,16 @@ that finds an R-KA stored by an earlier run mints it at once: a KA cannot be
 minted twice
 ([ADR 0008](docs/adr/0008-mints-are-async-polled-in-short-steps.md)). Every
 fulfil and cancel goes through the one serialized oracle function, which reads
-the request again and sends nothing if it is already settled
-([ADR 0019](docs/adr/0019-oracle-transactions-are-serialized.md)); a target UAL
-that is invalid or not in canonical form is cancelled
-([ADR 0031](docs/adr/0031-uals-are-normalized-before-the-contract.md)). The
+the request again and sends nothing if it is already settled, then checks the receipt in
+later steps and raises the fees of a transaction stuck unmined
+([ADR 0019](docs/adr/0019-oracle-transactions-are-serialized.md)). The score the oracle
+records is always the one read back from the minted R-KA
+([ADR 0018](docs/adr/0018-phase-1-scorer-output-contract.md)); a target that is
+not a paper verisci published is cancelled
+([ADR 0011](docs/adr/0011-a-rating-is-a-separate-r-ka.md)), as is a UAL not in
+canonical form ([ADR 0031](docs/adr/0031-uals-are-normalized-before-the-contract.md)) and a
+paper outside the life sciences and health
+([ADR 0037](docs/adr/0037-verisci-rates-life-science-and-health-papers.md)). The
 contract's calls and events are documented in the
 [`@verisci/contracts` README](packages/contracts/README.md).
 
@@ -261,14 +310,17 @@ pnpm dev         # starts apps/web on http://localhost:3000
 To publish a PDF locally (the RPC proxy, the DKG node, GROBID and the Inngest dev server),
 follow [`packages/workflows` → Running a publish locally](packages/workflows/README.md#running-a-publish-locally),
 then open http://localhost:3000/publish (it needs the workflows' settings and
-`REOWN_PROJECT_ID`; see [`apps/web`](apps/web/README.md#environment)).
+`REOWN_PROJECT_ID`; see [`apps/web`](apps/web/README.md#environment)). To rate a paper
+locally, from its page or from a script, against a contract on Anvil, follow
+[`packages/workflows` → Running a rating locally](packages/workflows/README.md#running-a-rating-locally).
 
 Environment variables are listed in [`.env.example`](.env.example): copy it to
 `.env.local` at the repo root (gitignored), where `apps/web` loads it from.
 `pnpm test` runs without it, and `pnpm build` needs only `APP_ENV` (`APP_ENV=local`).
 `pnpm dev` starts without it, but the home page's latest papers, the papers list, and the
 publish and paper pages need the DKG node and publish run settings, and the wallet window
-`REOWN_PROJECT_ID`. How workspaces declare
+`REOWN_PROJECT_ID`. The rating parts of the pages also read the chain: `CHAIN_RPC_URL`
+when deployed, or locally Anvil and the two `LOCAL_*` settings. How workspaces declare
 and validate them is in the [`@verisci/env` README](packages/env/README.md).
 
 ## Commands
@@ -312,7 +364,7 @@ rules. `.claude/` holds the shared settings, hooks, skills and the read-only rev
 | --- | --- |
 | `/plan-feature <name>` | Writes `docs/plans/NNN-<name>.md` from the plan template |
 | `/implement <NNN>` | Branches from `develop`, writes the tests first, then implements until green |
-| `/review-branch` | Runs CI's checks, tests and builds, then a read-only review; blocks on any failure, stale docs or ADR conflict, then drafts the PR |
+| `/review-branch` | Runs CI's checks, tests and builds, then a read-only review; blocks on any failure, stale docs (the architecture views included) or ADR conflict, then drafts the PR |
 | `/review-adrs` | On demand: checks every ADR against every other and reports conflicts for the maintainer to decide |
 
 Hooks format, lint and test each file Claude edits, block edits to generated files and

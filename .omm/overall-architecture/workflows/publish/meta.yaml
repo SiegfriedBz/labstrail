@@ -1,0 +1,23 @@
+created: 2026-10-12T05:43:45.081Z
+updated: 2026-10-12T17:57:43.511Z
+update_count: 7
+last_field: diagram
+kind: nested-class
+title: publish
+children:
+  - failure
+  - field-check
+  - pinata
+  - publish-paper
+  - read-paper
+  - submit-paper
+  - verify-submission
+parentPath:
+  - workflows
+prev_diagram: >
+  graph LR
+      submit-paper["Submit Paper\nsubmit-paper.ts, failure.ts"] -->|"checks the signed CID with"| verify-submission["Verify Submission\nverify-submission.ts"]
+      submit-paper -->|"finds the pinned file with"| pinata["Pinata Adapter\npinata.ts"]
+      publish-paper["Publish Run\npublish-paper.ts"] -->|"checks the event again with"| verify-submission
+      publish-paper -->|"reads title, authors, abstract and the text's opening with"| read-paper["Read Paper\nread-paper.ts, grobid.ts"]
+      publish-paper -->|"asks whether the paper is in the field with"| field-check["Field Check\nfield-check.ts"]
