@@ -37,7 +37,7 @@ decisions were taken, so a later ADR can sit in an earlier group.
 | [0023. A fix is a redeploy, and the owner's powers are fixed](0023-a-fix-is-a-redeploy-owner-powers-fixed.md) | A fix is a redeploy; old contracts are paused and drained; the owner sets the oracle and cap, pauses and unpauses, and transfers ownership in two steps, never to the oracle, with no renounce |
 | [0028. Deployed addresses are committed](0028-deployed-addresses-are-committed.md) | Staging's and production's contract addresses live in a committed file, changed by a reviewed PR |
 | [0030. The owner and the oracle are different addresses](0030-owner-and-oracle-are-different-addresses.md) | The owner's key stays offline; the oracle's key is on the deployment; the contract keeps them apart |
-| [0036. Local rating runs use an Anvil chain](0036-local-rating-runs-use-anvil.md) | A developer runs the rating functions against a contract on a local Anvil chain, named by local-only settings; staging's and production's addresses stay committed |
+| [0036. Local rating runs use an Anvil chain](0036-local-rating-runs-use-anvil.md) | A developer runs ratings, functions and pages, against a contract on a local Anvil chain, named by local-only settings; locally the page announces its own request; staging's and production's addresses stay committed |
 
 ## Writing to the DKG
 
@@ -76,7 +76,7 @@ In the order a request lives: requested, named, ingested, scored, fulfilled, and
 | --- | --- |
 | [0015. Rating requests are free on testnet](0015-rating-requests-are-free-on-testnet.md) | Requesters pay only gas; a cap and a throttle bound spend until mainnet |
 | [0016. Asset names derive from the on-chain request id](0016-asset-names-derive-from-request-id.md) | Each phase-1 request has an on-chain id; any process computes the rating's name and its recovery from it alone |
-| [0017. Chain events are ingested at least once](0017-chain-events-are-ingested-at-least-once.md) | Signed webhooks, one event per request id, acked only after hand-off; the reconciler heals what is missed |
+| [0017. Chain events are ingested at least once](0017-chain-events-are-ingested-at-least-once.md) | Signed webhooks, one event per request id, acked only after hand-off; the reconciler heals what is missed; locally the page announces its own request |
 | [0018. The phase-1 scorer has a fixed output contract](0018-phase-1-scorer-output-contract.md) | The scorer reads the paper's text and answers its study type's checks with quotes; code computes the score; it returns `{ score, rationale, studyType, checks }`, computed once and read back; Gemini, on its free tier |
 | [0019. Oracle transactions are serialized](0019-oracle-transactions-are-serialized.md) | One function sends every oracle transaction the backend sends, one at a time, checking receipts in later steps; only `main` and `develop` hold the oracle keys |
 | [0020. Stuck requests are recovered, and only the oracle cancels](0020-stuck-requests-recovered-only-oracle-cancels.md) | One run per request finishes what is left; a cron restarts stuck ones; only the oracle cancels |
@@ -86,7 +86,7 @@ In the order a request lives: requested, named, ingested, scored, fulfilled, and
 | ADR | Decision |
 | --- | --- |
 | [0021. Server reads and actions return typed results](0021-server-reads-return-typed-results.md) | Expected failures come back as typed results that the caller handles |
-| [0034. Users connect a wallet, and anyone may publish](0034-users-connect-a-wallet-anyone-may-publish.md) | Reown AppKit with wagmi on Base Sepolia; the signature authorizes each submission; no allowlist, no session |
+| [0034. Users connect a wallet, and anyone may publish](0034-users-connect-a-wallet-anyone-may-publish.md) | Reown AppKit with wagmi on Base Sepolia (Anvil too, locally); the wallet signs submissions and sends rating requests; no allowlist, no session |
 | [0035. Limits are the app's only state](0035-limits-are-the-apps-only-state.md) | The chain and the DKG hold the truth, IPFS the PDF files; today Upstash Redis counts upload URLs per connection and submissions per address |
 
 ## Folded ADRs
