@@ -115,6 +115,11 @@ describe("unquote", () => {
     expect(unquote('"page\\fbreak"')).toBe("page\fbreak");
   });
 
+  it("decodes a long escape, and keeps one past the last code point as written", () => {
+    expect(unquote('"rat \\U0001F400 cell"')).toBe("rat \u{1F400} cell");
+    expect(unquote('"bad \\U00110000 code"')).toBe("bad \\U00110000 code");
+  });
+
   it("keeps decoding new lines, tabs, quotes and backslashes", () => {
     expect(unquote('"one\\ntwo\\rthree\\tfour"')).toBe("one\ntwo\rthree\tfour");
     expect(unquote('"say \\"hi\\" \\\\ done"')).toBe('say "hi" \\ done');

@@ -98,20 +98,25 @@ export function parsePaperRecord(
 /** What each one-letter escape in an N-Triples literal stands for. */
 const ESCAPES: Readonly<Record<string, string>> = { n: "\n", r: "\r", t: "\t", b: "\b", f: "\f" };
 
+/** Unicode's last code point, U+10FFFF. */
+const LAST_CODE_POINT = 0x10ffff;
+
 /**
  * The text of a quoted literal (`"a\"b"`, `"7"^^<…>`, `"x"@en`); a bare IRI unchanged. Decodes
  * the N-Triples escapes the DKG writes: `\n`, `\r`, `\t`, `\b`, `\f`, `\uXXXX`, `\UXXXXXXXX`,
- * and a backslash before any other character stands for that character.
+ * and a backslash before any other character stands for that character. A `\U` past the last
+ * Unicode code point stays as written.
  */
 export function unquote(term: string): string {
   const match = /^"((?:[^"\\]|\\.)*)"(?:\^\^<[^>]*>|@[a-zA-Z-]+)?$/s.exec(term);
   if (!match) return term;
   return (match[1] ?? "").replace(
     /\\(?:u([0-9a-fA-F]{4})|U([0-9a-fA-F]{8})|(.))/gs,
-    (_, short?: string, long?: string, char?: string) => {
+    (written: string, short?: string, long?: string, char?: string) => {
       const code = short ?? long;
-      if (code !== undefined) return String.fromCodePoint(Number.parseInt(code, 16));
-      return ESCAPES[char ?? ""] ?? char ?? "";
+      if (code === undefined) return ESCAPES[char ?? ""] ?? char ?? "";
+      const point = Number.parseInt(code, 16);
+      return point <= LAST_CODE_POINT ? String.fromCodePoint(point) : written;
     },
   );
 }
