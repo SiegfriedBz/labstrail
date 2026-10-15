@@ -277,6 +277,29 @@ describe("readRating", () => {
     expect(await service.readRating(id(1))).toEqual({ ok: false, reason: "unavailable" });
   });
 
+  it("asks every contract at once, so a slow one costs one wait, not one per contract", async () => {
+    const asked: string[] = [];
+    let answer: (() => void) | undefined;
+    const answered = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    const service = createRatingService(
+      io({
+        readRequest: async (contract) => {
+          asked.push(contract);
+          await answered;
+          return { ok: true, request: request({ status: "none", targetUal: "" }) };
+        },
+      }),
+    );
+
+    const view = service.readRating(id(1));
+    await Promise.resolve();
+    expect(asked).toEqual([CURRENT, PAST]);
+    answer?.();
+    expect(await view).toEqual({ ok: false, reason: "not-found" });
+  });
+
   it.each<[AssetResult, string]>([
     [{ ok: true, state: "missing" }, "scoring"],
     [{ ok: true, state: "draft" }, "saving"],

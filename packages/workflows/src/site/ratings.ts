@@ -19,8 +19,13 @@ import { queryProblem } from "./papers.ts";
 
 /** How long the chain gets for one paper's ratings in the papers list. */
 const SUMMARY_TIMEOUT_MS = 3_000;
-/** How long the DKG node and the chain each get to answer a page. */
+/** How long the DKG node gets for one read of a page. */
 const PAGE_TIMEOUT_MS = 15_000;
+/**
+ * How long the chain gets for one call of a page, tried once: a page reads the environment's
+ * contracts at once, so a chain that doesn't answer costs a page about this long.
+ */
+const CHAIN_TIMEOUT_MS = 5_000;
 
 /** One rating request of a paper, as its contract holds it. */
 export interface RatingSummary {
@@ -160,8 +165,12 @@ export function createRatingService(io: RatingIo): RatingService {
     readRating: async (requestId) => {
       const id = requestId.toLowerCase() as Hex;
       let unreachable = false;
-      for (const contract of io.contracts) {
-        const read = await io.readRequest(contract as Hex, id);
+      // Every contract at once, then in the environment's order, current first.
+      const reads = await Promise.all(
+        io.contracts.map((contract) => io.readRequest(contract as Hex, id)),
+      );
+      for (const [index, read] of reads.entries()) {
+        const contract = io.contracts[index] as string;
         if (!read.ok) {
           unreachable = true;
           continue;
@@ -293,8 +302,11 @@ export function getRatingService(): RatingService {
   const localChain = local
     ? defineEnv({ extends: [sharedEnv], server: localChainSchema, runtimeEnv: process.env })
     : undefined;
+  // One try per call, so a page waits at most `CHAIN_TIMEOUT_MS` per read: viem's default
+  // retries a timed-out call three times.
   const transport = http(localChain ? localChain.LOCAL_CHAIN_RPC_URL : env.CHAIN_RPC_URL, {
-    timeout: PAGE_TIMEOUT_MS,
+    timeout: CHAIN_TIMEOUT_MS,
+    retryCount: 0,
   });
   const client = createPublicClient({ chain: local ? anvil : baseSepolia, transport });
   const dkg = createDkgClient({
