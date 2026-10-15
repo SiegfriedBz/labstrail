@@ -19,9 +19,10 @@ A rating run stops unless the contract's oracle is its own key, and only `develo
 - No testnet funds and no faucet: Anvil's accounts are funded, and it mines each transaction at once.
 - Fee raises and Base's receipts are not exercised locally; `develop` is where they are first seen.
 - R-KAs from local runs sit in the staging graph, recorded by no contract the staging UI reads ([0014](0014-contract-owns-scores-dkg-owns-content.md)). Locally, the pages show only ratings made on Anvil: a paper rated on staging reads as unrated.
-- A local announce that never happens (the tab closed before the receipt) leaves the request pending; the developer asks for a new rating.
+- A local announce that never happens (the tab closed before the receipt) leaves the request pending until the reconciler finds it, as deployed ([0020](0020-stuck-requests-recovered-only-oracle-cancels.md)): the page only starts the run sooner.
 
 ## History
 
 - 2026-10-12: request ids no longer repeat after an Anvil restart, since the contract hashes its deployment time into each id ([0016](0016-asset-names-derive-from-request-id.md)); requests no longer need a fresh account.
 - 2026-10-15: the web app reads and requests ratings on the Anvil contract too, and locally the page announces its own request, since no webhook watches Anvil (rating UI, user's choice).
+- 2026-10-15: a request the page never announces waits for the reconciler, which runs wherever the oracle key is, a developer's computer included ([0020](0020-stuck-requests-recovered-only-oracle-cancels.md)); it no longer stays pending (rating UI review, user's choice).

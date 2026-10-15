@@ -11,7 +11,7 @@ Requests can stop halfway ([0007](0007-all-writes-converge.md)), or never start 
 
 ## Decision
 
-- One function processes a request, whoever starts it, the webhook or the reconciler. It is an Inngest singleton on the request id, so at most one run per request is active.
+- One function processes a request, whoever starts it: the webhook, the reconciler, or locally the page that sent it ([0036](0036-local-rating-runs-use-anvil.md)). It is an Inngest singleton on the request id, so at most one run per request is active.
 - Each run reads the request on chain and its R-KA on the daemon, then does what is left of score, store, mint and fulfil. A stored score is read back, never recomputed ([0018](0018-phase-1-scorer-output-contract.md)). Past a maximum age, it fulfils if the R-KA is minted, and otherwise cancels.
 - The v2 contract keeps an enumerable set of pending request ids with their request time, so recovery reads current state, never log history.
 - A reconciler, an Inngest cron, reads that set and starts the function for every request pending longer than a threshold. It never writes itself.
@@ -33,3 +33,4 @@ Requests can stop halfway ([0007](0007-all-writes-converge.md)), or never start 
 - 2026-10-07: ADR 0024 folded into this one, so recovery and cancelling read in one file.
 - 2026-10-07: retitled to name everything it now covers (was "A cron reconciler recovers stuck requests").
 - 2026-10-10: corrected: "the agents plan" is now "the rating plan", since the agents package was renamed `workflows`.
+- 2026-10-15: locally, the page that sent a request also starts its function; the reconciler still finds any request the page misses ([0036](0036-local-rating-runs-use-anvil.md)) (rating UI review, user's choice).
