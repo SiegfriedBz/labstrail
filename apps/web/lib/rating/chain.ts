@@ -11,7 +11,7 @@ export interface RatingChainConfig {
   readonly contract: string;
   /** True when `APP_ENV=local`: requests go to Anvil, and the page announces them itself. */
   readonly local: boolean;
-  /** Anvil's URL, for the wallet's local network; set only locally. */
+  /** Anvil's URL, the wallet's local network: set only locally, with the contract's address. */
   readonly rpcUrl?: string;
 }
 
