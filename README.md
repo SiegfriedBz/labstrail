@@ -229,7 +229,7 @@ sequenceDiagram
     else otherwise
       opt nothing stored
         R->>N: find the PDF the target links
-        R->>R: read its text; one Gemini request gives its field, study type and checks, with quotes
+        R->>R: read its text, then one Gemini request gives its field, study type and checks, with quotes
         Note over R,O: Outside the life sciences and health, or no readable text:<br/>cancel(requestId, invalid target), and stop.
         R->>R: check the quotes against the paper, compute the score
         R->>N: store the R-KA
