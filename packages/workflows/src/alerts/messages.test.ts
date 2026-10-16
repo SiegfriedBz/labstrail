@@ -33,6 +33,10 @@ describe("publishedText", () => {
   it("names it by its CID when the run didn't read the title, and leaves the link out without a site", () => {
     expect(publishedText({ cid: CID }, undefined)).toBe(`Published: ${CID}`);
   });
+
+  it("names it by its CID when its title is empty", () => {
+    expect(publishedText({ cid: CID, title: "" }, undefined)).toBe(`Published: ${CID}`);
+  });
 });
 
 describe("ratedText", () => {
@@ -61,5 +65,11 @@ describe("ratedText", () => {
         SITE,
       ),
     ).toBe(`Rating cancelled, can't be rated: ${TARGET}`);
+  });
+
+  it("names a paper whose title is empty by its UAL", () => {
+    expect(ratedText({ state: "fulfilled", score: 64 }, { ...paper, title: "" }, undefined)).toBe(
+      `Rated 64/100: ${TARGET}`,
+    );
   });
 });

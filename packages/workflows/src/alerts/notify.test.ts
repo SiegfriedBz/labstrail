@@ -78,4 +78,18 @@ describe("createNotify", () => {
       expect(JSON.stringify(logger.warn.mock.calls)).not.toContain(TOKEN);
     },
   );
+
+  it("replaces the token when the error names the URL it was sent to", async () => {
+    const { notify, logger } = setup({
+      fetch: vi.fn(async (url: string) => {
+        throw new Error(`request to ${url} failed`);
+      }),
+    });
+
+    await notify({ level: "alert", text: "x" });
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      "notify-unavailable: telegram: request to https://api.telegram.org/bot<token>/sendMessage failed",
+    );
+  });
 });

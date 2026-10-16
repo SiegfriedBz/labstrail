@@ -36,10 +36,26 @@ export function failureText(data: unknown): string | undefined {
 export function createFailureAlerts(inngest: Inngest.Any, alert: (text: string) => Promise<void>) {
   return inngest.createFunction(
     { id: "alert-on-failure", triggers: [{ event: FUNCTION_FAILED }] },
-    async ({ event, step }) => {
-      const text = failureText(event.data);
-      if (text) await step.run("alert", () => alert(text).then(() => null));
-      return { alerted: Boolean(text) };
-    },
+    async ({ event, step }) =>
+      alertOnFailure(event.data, { run: (id, fn) => step.run(id, fn) as never }, alert),
   );
+}
+
+/** The step tool a failure alert uses; tests pass a fake. */
+export interface FailureAlertSteps {
+  run<T>(id: string, fn: () => Promise<T>): Promise<T>;
+}
+
+/**
+ * Alerts on one `inngest/function.failed` event's `data`, from a step (`alert`), when
+ * {@link failureText} gives a text for it.
+ */
+export async function alertOnFailure(
+  data: unknown,
+  step: FailureAlertSteps,
+  alert: (text: string) => Promise<void>,
+): Promise<{ readonly alerted: boolean }> {
+  const text = failureText(data);
+  if (text) await step.run("alert", () => alert(text).then(() => null));
+  return { alerted: Boolean(text) };
 }

@@ -1,7 +1,15 @@
 import type { ReadRequestResult } from "@verisci/contracts";
+import { Inngest } from "inngest";
 import type { Hex } from "viem";
 import { describe, expect, it, vi } from "vitest";
-import { findStaleRequests, RECONCILER_SETTINGS, type ReconcilerDeps } from "./reconciler.ts";
+import {
+  createReconciler,
+  findStaleRequests,
+  RECONCILER_SETTINGS,
+  type ReconcilerDeps,
+  type ReconcilerSteps,
+  runReconciler,
+} from "./reconciler.ts";
 
 const HOUR = 3_600_000;
 const NOW = 1_791_900_000_000;
@@ -109,8 +117,8 @@ describe("findStaleRequests", () => {
     expect(warn).toHaveBeenCalledWith(`reconcile-unreachable: ${CURRENT}`);
   });
 
-  it("skips a request it can't read, or one settled since the page was read", async () => {
-    const { io } = deps(
+  it("skips a request it can't read, and logs how many, or one settled since the page was read", async () => {
+    const { io, warn } = deps(
       {
         [CURRENT]: [
           [id(1), 5 * HOUR],
@@ -137,5 +145,64 @@ describe("findStaleRequests", () => {
     );
 
     expect(await findStaleRequests(io, NOW)).toEqual([]);
+    expect(warn).toHaveBeenCalledWith(`reconcile-unreadable: ${CURRENT}: 1 of 2 requests`);
+  });
+});
+
+/** Steps that run at once and record every step id and the events sent. */
+function fakeSteps() {
+  const log: string[] = [];
+  const sent: unknown[] = [];
+  const step: ReconcilerSteps = {
+    async run(id, fn) {
+      log.push(id);
+      return fn();
+    },
+    async sendEvent(id, events) {
+      log.push(id);
+      sent.push(...events);
+    },
+  };
+  return { step, log, sent };
+}
+
+describe("runReconciler", () => {
+  it("sends every restart event from one step", async () => {
+    const { io } = deps({ [CURRENT]: [[id(1), 5 * HOUR]], [PAST]: [[id(2), 5 * HOUR]] });
+    const { step, log, sent } = fakeSteps();
+
+    expect(
+      await runReconciler(
+        step,
+        () => io,
+        () => NOW,
+      ),
+    ).toEqual({ restarted: 2 });
+    expect(log).toEqual(["find-stale", "restart"]);
+    expect(sent).toEqual(await findStaleRequests(io, NOW));
+  });
+
+  it("sends nothing when no request is stale", async () => {
+    const { io } = deps({ [CURRENT]: [[id(1), HOUR]] });
+    const { step, log } = fakeSteps();
+
+    expect(
+      await runReconciler(
+        step,
+        () => io,
+        () => NOW,
+      ),
+    ).toEqual({ restarted: 0 });
+    expect(log).toEqual(["find-stale"]);
+  });
+});
+
+describe("createReconciler", () => {
+  it("runs every 30 minutes, a singleton that skips a tick while the last one runs", () => {
+    const fn = createReconciler(new Inngest({ id: "verisci-test" }), () => deps({}).io);
+
+    expect(fn.opts.id).toBe("reconcile-ratings");
+    expect(fn.opts.triggers).toEqual([{ cron: "*/30 * * * *" }]);
+    expect(fn.opts.singleton).toEqual({ mode: "skip" });
   });
 });

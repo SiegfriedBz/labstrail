@@ -1,7 +1,7 @@
 import { readPendingCount, readPendingRequestIds } from "@verisci/contracts";
 import { ORIGINTRAIL_CONTRACTS } from "@verisci/core";
 import { createDkgClient } from "@verisci/dkg";
-import { type RuntimeEnv, sharedEnv } from "@verisci/env";
+import { defineEnv, type RuntimeEnv, sharedEnv } from "@verisci/env";
 import { createPublicClient, createWalletClient, erc20Abi, type Hex, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { anvil, baseSepolia } from "viem/chains";
@@ -22,7 +22,7 @@ import { createRatePaper, RATING_SETTINGS, type RatingDeps } from "./rating/rate
 import { createReconciler, type ReconcilerDeps } from "./rating/reconciler.ts";
 import { scorePaper } from "./rating/scorer.ts";
 import { createRatingEnv, type RatingEnv, servesRating } from "./rating-env.ts";
-import { createWorkflowsEnv } from "./workflows-env.ts";
+import { createWorkflowsEnv, telegramSchema } from "./workflows-env.ts";
 
 /** How long the gateway and GROBID each get, inside the 300 s a step may take on Vercel. */
 const IO_TIMEOUT_MS = 60_000;
@@ -32,10 +32,13 @@ const NOTIFY_TIMEOUT_MS = 10_000;
 
 let notify: Notify | undefined;
 
-/** The maintainer's Telegram chat (ADR 0038), built on first use; only logs without a bot. */
+/**
+ * The maintainer's Telegram chat (ADR 0038), built on first use from the Telegram settings
+ * alone, so an alert still goes out when another setting is bad; only logs without a bot.
+ */
 function getNotify(): Notify {
   if (notify) return notify;
-  const env = createWorkflowsEnv();
+  const env = defineEnv({ extends: [sharedEnv], server: telegramSchema, runtimeEnv: process.env });
   notify = createNotify({
     appEnv: env.APP_ENV,
     botToken: env.TELEGRAM_BOT_TOKEN,
@@ -240,6 +243,7 @@ function getHealthDeps(): HealthDeps {
             })
             .catch(() => undefined)
         : Promise.resolve(undefined),
+    logger: console,
   };
   return healthDeps;
 }

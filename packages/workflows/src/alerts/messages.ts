@@ -19,12 +19,15 @@ export function siteUrlOf(env: SiteEnv): string | undefined {
 const link = (siteUrl: string | undefined, path: string | undefined) =>
   siteUrl && path ? `\n${siteUrl}${path}` : "";
 
-/** The activity message for a paper this run minted: its title, or its CID, and its page. */
+/**
+ * The activity message for a paper this run minted: its title, or its CID when it has none,
+ * and its page.
+ */
 export function publishedText(
   paper: { readonly cid: string; readonly title?: string | undefined },
   siteUrl: string | undefined,
 ): string {
-  return `Published: ${paper.title ?? paper.cid}${link(siteUrl, `/papers/${paper.cid}`)}`;
+  return `Published: ${paper.title || paper.cid}${link(siteUrl, `/papers/${paper.cid}`)}`;
 }
 
 /** What a settled rating needs from its run to be named. */
@@ -38,7 +41,8 @@ export interface RatedPaper {
 
 /**
  * The activity message for a rating the oracle settled: the score out of 100, or why it was
- * cancelled, the paper by its title or UAL, and the rating's page when the paper was found.
+ * cancelled, the paper by its title (its UAL when it has none), and the rating's page when the
+ * paper was found.
  */
 export function ratedText(
   outcome:
@@ -47,7 +51,7 @@ export function ratedText(
   paper: RatedPaper,
   siteUrl: string | undefined,
 ): string {
-  const name = paper.title ?? paper.targetUal;
+  const name = paper.title || paper.targetUal;
   const page = paper.cid ? `/papers/${paper.cid}/ratings/${paper.requestId}` : undefined;
   const what =
     outcome.state === "fulfilled"

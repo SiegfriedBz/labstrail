@@ -1,11 +1,7 @@
-import type {
-  ReadPendingCountResult,
-  ReadRequestIdsResult,
-  ReadRequestResult,
-} from "@verisci/contracts";
 import type { Inngest } from "inngest";
 import type { Hex } from "viem";
 import { RATING_REQUESTED, type RatingRequested } from "./events.ts";
+import { type PendingReads, readPending } from "./pending.ts";
 
 /** The reconciler's settings (ADR 0020). */
 export const RECONCILER_SETTINGS = {
@@ -14,8 +10,9 @@ export const RECONCILER_SETTINGS = {
   intervalMs: 30 * 60_000,
   /**
    * A request pending longer than this is restarted. A run waits up to about 2 hours on a
-   * Gemini outage (`RATING_SETTINGS.retryWaits`); 4 hours restarts one that gave up without
-   * firing while it still runs, and leaves about 5 runs before the 24-hour maximum age.
+   * Gemini outage (`RATING_SETTINGS.retryWaits`) within its 300-minute budget; a restart that
+   * finds it still running is skipped, and the next window sends it again. 4 hours leaves
+   * about 5 windows before the 24-hour maximum age.
    */
   thresholdMs: 4 * 3_600_000,
   /** Pending ids read per contract per tick: one `pendingRequestIds` call. */
@@ -30,13 +27,16 @@ export interface RestartEvent {
 }
 
 /** The reads the reconciler makes; tests pass fakes. It never writes (ADR 0020). */
-export interface ReconcilerDeps {
+export interface ReconcilerDeps extends PendingReads {
   /** The environment's contracts, lowercase: current and past (ADR 0023), or Anvil's locally. */
   readonly contracts: readonly string[];
-  readPendingCount(contract: Hex): Promise<ReadPendingCountResult>;
-  readPendingIds(contract: Hex, offset: number, limit: number): Promise<ReadRequestIdsResult>;
-  readRequest(contract: Hex, requestId: Hex): Promise<ReadRequestResult>;
   readonly logger: { warn(message: string): void };
+}
+
+/** The step tools a reconciler tick uses; tests pass fakes. */
+export interface ReconcilerSteps {
+  run<T>(id: string, fn: () => Promise<T>): Promise<T>;
+  sendEvent(id: string, events: RestartEvent[]): Promise<unknown>;
 }
 
 /**
@@ -45,9 +45,11 @@ export interface ReconcilerDeps {
  * request without a stored cursor; of those, each still pending longer than `thresholdMs`. The
  * event id carries the 4-hour window, `rating:<requestId>:<window>`, so every tick of a window
  * sends the same id and Inngest starts at most one run per request per window, whatever the
- * throttle does with queued runs; the singleton keeps it off a run still going. A contract
- * that does not answer is logged `reconcile-unreachable` and left for the next tick; a request
- * that cannot be read, or settled since its page was read, is skipped.
+ * throttle does with queued runs; the singleton keeps it off a run still going, and the next
+ * window sends it again. A contract that does not answer is logged `reconcile-unreachable` and
+ * left for the next tick; requests are read 10 at a time (`readPending`), and those that do
+ * not answer are logged `reconcile-unreadable` with their number and skipped, as is one
+ * settled since its page was read.
  */
 export async function findStaleRequests(
   deps: ReconcilerDeps,
@@ -71,26 +73,40 @@ export async function findStaleRequests(
         deps.logger.warn(`reconcile-unreachable: ${contract}`);
         return [];
       }
-      const reads = await Promise.all(
-        ids.ids.map(async (requestId) => ({
-          requestId,
-          read: await deps.readRequest(address, requestId),
-        })),
+      const { pending, unreadable } = await readPending(deps, address, ids.ids);
+      if (unreadable > 0) {
+        deps.logger.warn(
+          `reconcile-unreadable: ${contract}: ${unreadable} of ${ids.ids.length} requests`,
+        );
+      }
+      return pending.flatMap(({ requestId, requestedAt }): RestartEvent[] =>
+        nowMs - requestedAt * 1000 > thresholdMs
+          ? [
+              {
+                name: RATING_REQUESTED,
+                id: `rating:${requestId}:${window}`,
+                data: { contract, requestId },
+              },
+            ]
+          : [],
       );
-      return reads.flatMap(({ requestId, read }): RestartEvent[] => {
-        if (!read.ok || read.request.status !== "pending") return [];
-        if (nowMs - read.request.requestedAt * 1000 <= thresholdMs) return [];
-        return [
-          {
-            name: RATING_REQUESTED,
-            id: `rating:${requestId}:${window}`,
-            data: { contract, requestId },
-          },
-        ];
-      });
     }),
   );
   return perContract.flat();
+}
+
+/**
+ * One reconciler tick: finds the stale requests in a step (`find-stale`), reading the time
+ * inside it, and sends their restart events from another (`restart`), only when there are some.
+ */
+export async function runReconciler(
+  step: ReconcilerSteps,
+  getDeps: () => ReconcilerDeps,
+  now: () => number,
+): Promise<{ readonly restarted: number }> {
+  const events = await step.run("find-stale", () => findStaleRequests(getDeps(), now()));
+  if (events.length > 0) await step.sendEvent("restart", events);
+  return { restarted: events.length };
 }
 
 /**
@@ -106,14 +122,18 @@ export function createReconciler(inngest: Inngest.Any, getDeps: () => Reconciler
       triggers: [{ cron: RECONCILER_SETTINGS.cron }],
       singleton: { mode: "skip" },
     },
-    async ({ step }) => {
-      const events = await step.run("find-stale", () => findStaleRequests(getDeps(), Date.now()));
-      if (events.length > 0)
-        await step.sendEvent(
-          "restart",
-          events.map((event) => ({ ...event })),
-        );
-      return { restarted: events.length };
-    },
+    async ({ step }) =>
+      runReconciler(
+        {
+          run: (id, fn) => step.run(id, fn) as never,
+          sendEvent: (id, events) =>
+            step.sendEvent(
+              id,
+              events.map((event) => ({ ...event })),
+            ),
+        },
+        getDeps,
+        () => Date.now(),
+      ),
   );
 }

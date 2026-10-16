@@ -1,6 +1,6 @@
 import { Inngest } from "inngest";
-import { describe, expect, it } from "vitest";
-import { createFailureAlerts, failureText } from "./on-failure.ts";
+import { describe, expect, it, vi } from "vitest";
+import { alertOnFailure, createFailureAlerts, failureText } from "./on-failure.ts";
 
 const failed = (functionId: string, message: string) => ({
   function_id: functionId,
@@ -38,6 +38,43 @@ describe("failureText", () => {
   it("is undefined for its own failures and for data that isn't a failure", () => {
     expect(failureText(failed("verisci-alert-on-failure", "x"))).toBeUndefined();
     expect(failureText({ nothing: true })).toBeUndefined();
+  });
+});
+
+describe("alertOnFailure", () => {
+  /** A step that runs at once and records its id, and an alert that records its text. */
+  function setup() {
+    const log: string[] = [];
+    const alert = vi.fn(async (_text: string) => {});
+    const step = {
+      async run<T>(id: string, fn: () => Promise<T>) {
+        log.push(id);
+        return fn();
+      },
+    };
+    return { log, alert, step };
+  }
+
+  it("sends one alert from a step of its own", async () => {
+    const { log, alert, step } = setup();
+
+    expect(
+      await alertOnFailure(failed("verisci-publish-paper", "publish-failed:setup: x"), step, alert),
+    ).toEqual({ alerted: true });
+    expect(log).toEqual(["alert"]);
+    expect(alert).toHaveBeenCalledExactlyOnceWith(
+      "verisci-publish-paper failed (run 01JRUN): publish-failed:setup: x",
+    );
+  });
+
+  it("sends nothing for its own failure, so a failing alert never alerts again", async () => {
+    const { log, alert, step } = setup();
+
+    expect(await alertOnFailure(failed("verisci-alert-on-failure", "x"), step, alert)).toEqual({
+      alerted: false,
+    });
+    expect(log).toEqual([]);
+    expect(alert).not.toHaveBeenCalled();
   });
 });
 

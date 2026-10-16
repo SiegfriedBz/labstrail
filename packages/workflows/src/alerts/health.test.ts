@@ -1,8 +1,14 @@
 import type { ReadRequestResult } from "@verisci/contracts";
 import { Inngest } from "inngest";
 import type { Hex } from "viem";
-import { describe, expect, it } from "vitest";
-import { createHealthCheck, HEALTH_SETTINGS, type HealthDeps, healthProblems } from "./health.ts";
+import { describe, expect, it, vi } from "vitest";
+import {
+  createHealthCheck,
+  HEALTH_SETTINGS,
+  type HealthDeps,
+  healthProblems,
+  runHealthCheck,
+} from "./health.ts";
 
 const HOUR = 3_600_000;
 const NOW = 1_791_900_000_000;
@@ -12,11 +18,14 @@ const PUBLISHER = "0xd701ed157232ad5e14bc4134a8d10d64d86f13b3";
 const CONTRACT = "0xa5be5ee8e4b6825c4425cc208f0df09fb8147a90";
 const id = (n: number) => `0x${n.toString(16).padStart(64, "0")}` as Hex;
 
-function deps(state: {
-  eth?: Record<string, bigint | undefined>;
-  trac?: Record<string, bigint | undefined>;
-  pending?: readonly (readonly [Hex, number])[];
-}): HealthDeps {
+function deps(
+  state: {
+    eth?: Record<string, bigint | undefined>;
+    trac?: Record<string, bigint | undefined>;
+    pending?: readonly (readonly [Hex, number])[];
+  },
+  overrides: Partial<HealthDeps> = {},
+): HealthDeps {
   const pending = state.pending ?? [];
   const eth: Record<string, bigint | undefined> = { [ORACLE]: ETH, [PUBLISHER]: ETH, ...state.eth };
   const trac: Record<string, bigint | undefined> = { [PUBLISHER]: 900n * ETH, ...state.trac };
@@ -45,6 +54,8 @@ function deps(state: {
         rKaUal: "",
       },
     }),
+    logger: { warn: vi.fn() },
+    ...overrides,
   };
 }
 
@@ -88,10 +99,118 @@ describe("healthProblems", () => {
   it("says nothing of a balance it couldn't read: the next hour reads it again", async () => {
     expect(await healthProblems(deps({ eth: { [ORACLE]: undefined } }), NOW)).toEqual([]);
   });
+
+  it("reads at most 3 pages a contract an hour, going on from the last hour's, and says how many it read", async () => {
+    const { pageSize, pagesPerHour } = HEALTH_SETTINGS;
+    const old = Array.from({ length: pageSize * 5 }, (_, n) => [id(n + 1), 7 * HOUR] as const);
+    const offsets: number[] = [];
+    const io = deps({ pending: old });
+    const counted: HealthDeps = {
+      ...io,
+      readPendingIds: (contract, offset, limit) => {
+        offsets.push(offset);
+        return io.readPendingIds(contract, offset, limit);
+      },
+    };
+
+    const problems = await healthProblems(counted, NOW);
+    await healthProblems(counted, NOW + HOUR);
+
+    expect(offsets).toHaveLength(2 * pagesPerHour);
+    expect(new Set(offsets)).toEqual(new Set([0, 1, 2, 3, 4].map((page) => page * pageSize)));
+    expect(problems).toEqual([
+      `300 rating requests pending over 6 h; the oldest, ${id((offsets[0] ?? 0) + 1)} on ${CONTRACT}, for 7 h (300 of the 500 pending read this hour)`,
+    ]);
+  });
+
+  it("logs a contract it couldn't reach, and how many requests didn't answer", async () => {
+    const reachable = deps({
+      pending: [
+        [id(1), 7 * HOUR],
+        [id(2), 7 * HOUR],
+      ],
+    });
+    const unreachable = deps(
+      {},
+      { readPendingCount: async () => ({ ok: false, reason: "unreachable" }) },
+    );
+    const partial = deps(
+      {},
+      {
+        readRequest: async (contract, requestId) =>
+          requestId === id(1)
+            ? { ok: false, reason: "unreachable" }
+            : reachable.readRequest(contract, requestId),
+        readPendingCount: reachable.readPendingCount,
+        readPendingIds: reachable.readPendingIds,
+      },
+    );
+
+    await healthProblems(unreachable, NOW);
+    const problems = await healthProblems(partial, NOW);
+
+    expect(unreachable.logger.warn).toHaveBeenCalledWith(`health-unreachable: ${CONTRACT}`);
+    expect(partial.logger.warn).toHaveBeenCalledWith(
+      `health-unreadable: ${CONTRACT}: 1 of 2 requests`,
+    );
+    expect(problems).toEqual([
+      `1 rating requests pending over 6 h; the oldest, ${id(2)} on ${CONTRACT}, for 7 h`,
+    ]);
+  });
+});
+
+/** A step that runs at once and records its id. */
+function fakeStep() {
+  const log: string[] = [];
+  return {
+    log,
+    step: {
+      async run<T>(stepId: string, fn: () => Promise<T>) {
+        log.push(stepId);
+        return fn();
+      },
+    },
+  };
+}
+
+describe("runHealthCheck", () => {
+  it("sends nothing when all is well", async () => {
+    const { step, log } = fakeStep();
+    const alert = vi.fn(async (_text: string) => {});
+
+    expect(
+      await runHealthCheck(
+        step,
+        () => deps({}),
+        alert,
+        () => NOW,
+      ),
+    ).toEqual({ problems: 0 });
+    expect(log).toEqual(["check"]);
+    expect(alert).not.toHaveBeenCalled();
+  });
+
+  it("sends one alert, from a step of its own, listing every problem", async () => {
+    const { step, log } = fakeStep();
+    const alert = vi.fn(async (_text: string) => {});
+    const low = HEALTH_SETTINGS.minEthWei - 1n;
+
+    await runHealthCheck(
+      step,
+      () => deps({ eth: { [ORACLE]: low }, pending: [[id(1), 7 * HOUR]] }),
+      alert,
+      () => NOW,
+    );
+
+    expect(log).toEqual(["check", "alert"]);
+    expect(alert).toHaveBeenCalledExactlyOnceWith(
+      `oracle ${ORACLE} holds 0.004999999999999999 ETH, under 0.005\n1 rating requests pending over 6 h; the oldest, ${id(1)} on ${CONTRACT}, for 7 h`,
+    );
+  });
 });
 
 describe("createHealthCheck", () => {
-  it("runs every hour", () => {
+  it("runs every hour, a singleton that skips an hour while the last check runs", () => {
     const fn = createHealthCheck(
       new Inngest({ id: "verisci-test" }),
       () => deps({}),
@@ -100,5 +219,6 @@ describe("createHealthCheck", () => {
 
     expect(fn.opts.id).toBe("check-health");
     expect(fn.opts.triggers).toEqual([{ cron: HEALTH_SETTINGS.cron }]);
+    expect(fn.opts.singleton).toEqual({ mode: "skip" });
   });
 });
