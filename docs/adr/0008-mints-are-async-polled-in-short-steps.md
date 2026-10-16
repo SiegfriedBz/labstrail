@@ -10,7 +10,7 @@ A DKG mint takes from about 5 seconds to over 300, and Vercel Hobby stops any fu
 ## Decision
 
 - A step starts the mint with the daemon's ordinary mint call and stops listening for its reply well before the function time limit. The workflow then polls the asset's state, waiting between polls with `step.sleep`, which costs no function time; no step waits for a mint to finish.
-- A run that finds an asset stored but not minted mints it at once, without waiting for a mint an earlier run may have started. A mint whose asset is still not minted after the maximum mint time is started again.
+- A run that finds an asset stored but not minted mints it at once, without waiting for a mint an earlier run may have started. A mint whose asset is still not minted after the maximum mint time is started again. Past a rating request's maximum age, a run starts no mint: it polls a stored R-KA for a mint an earlier run started, and the request is cancelled unless one lands ([0020](0020-stuck-requests-recovered-only-oracle-cancels.md)).
 
 ## Consequences
 
@@ -24,3 +24,4 @@ A DKG mint takes from about 5 seconds to over 300, and Vercel Hobby stops any fu
 
 - 2026-10-09: retitled (was "Mints are async, polled in short steps"). Mints start with the ordinary mint call and poll the asset's state instead of using the daemon's async route, and a run no longer waits for an earlier mint before minting. The DKG spike showed that the async route needs extra setup on the node, that a mint outlives its client, and that an asset cannot be minted twice ([domain](../domain.md)).
 - 2026-10-10: corrected: each workflow that mints sets its own poll interval and maximum mint time; the publish run has set its own, so they no longer wait for a later plan (ADR sweep).
+- 2026-10-16: past a rating request's maximum age, a run starts no mint and only polls for an earlier one, so the node never spends a publish fee on a request about to be cancelled ([0020](0020-stuck-requests-recovered-only-oracle-cancels.md)); the rating run has done so since it was built (ADR sweep in the intake and recovery review, user's choice).
