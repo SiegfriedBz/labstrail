@@ -76,6 +76,9 @@ export function workflowsSchema(appEnv: SharedEnv["APP_ENV"]) {
     ...telegramSchema,
     /** Set by Vercel: the branch, which names a staging deployment's Inngest environment. */
     VERCEL_GIT_COMMIT_REF: z.string().optional(),
+    /** Set by Vercel: production's domain and the branch's URL, for links in notifications. */
+    VERCEL_PROJECT_PRODUCTION_URL: z.string().optional(),
+    VERCEL_BRANCH_URL: z.string().optional(),
   };
 }
 

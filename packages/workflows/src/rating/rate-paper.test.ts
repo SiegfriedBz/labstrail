@@ -13,6 +13,7 @@ import type { AssetResult, DkgFailure, MintResult, QueryResult } from "@verisci/
 import { Inngest, NonRetriableError } from "inngest";
 import type { Hex } from "viem";
 import { describe, expect, it, vi } from "vitest";
+import type { Notice } from "../alerts/notify.ts";
 import type { ReadPaperTextResult } from "../pdf/paper-text.ts";
 import type { FieldCheckResult } from "../publish/field-check.ts";
 import { PUBLISH_SETTINGS } from "../publish/publish-paper.ts";
@@ -38,6 +39,7 @@ const R_KA = `did:dkg:base:84532/${AGENT}/12`;
 const REQUEST_ID = `0x${"ab".repeat(32)}` as Hex;
 const NAME = `verisci-rka-${REQUEST_ID}`;
 const NOW = 1_800_000_000_000;
+const SITE = "https://verisci.example";
 const YOUNG = NOW / 1000 - 60;
 const OLD = NOW / 1000 - 25 * 3600;
 const EVENT = { contract: CONTRACT, requestId: REQUEST_ID };
@@ -194,6 +196,8 @@ function rate(script: Script, data: unknown = EVENT) {
     readPaper: vi.fn(async () => next(papers)),
     score: vi.fn(async () => next(scores)),
     checkField: vi.fn(async () => next(fields)),
+    notify: vi.fn(async (_notice: Notice) => {}),
+    siteUrl: SITE,
   } satisfies RatingDeps;
   const { step, log, oracleCalls } = fakeSteps(script.oracleAnswer ?? settles);
   const logger = { error: vi.fn() };
@@ -285,7 +289,11 @@ describe("runRating: which requests it takes", () => {
     expect(deps.readPaper).not.toHaveBeenCalled();
     expect(dkg.readAsset).not.toHaveBeenCalled();
     expect(dkg.query).toHaveBeenCalledWith(publishedPaperQuery(GRAPH, TARGET));
-    expect(log).toEqual(["read-request", "find-target", "check-graph", "oracle cancel"]);
+    expect(log).toEqual(["read-request", "find-target", "check-graph", "oracle cancel", "notify"]);
+    expect(deps.notify).toHaveBeenCalledExactlyOnceWith({
+      level: "activity",
+      text: `Rating cancelled, can't be rated: ${TARGET}`,
+    });
   });
 
   it("never cancels on an empty answer from a node that no longer serves the graph", async () => {
@@ -360,7 +368,12 @@ describe("runRating: rating a paper", () => {
       "mint-1",
       "read-score-1",
       "oracle fulfil",
+      "notify",
     ]);
+    expect(deps.notify).toHaveBeenCalledExactlyOnceWith({
+      level: "activity",
+      text: `Rated 64/100: A trial\n${SITE}/papers/${CID}/ratings/${REQUEST_ID}`,
+    });
     expect(dkg.query).toHaveBeenCalledWith(paperPdfQuery(GRAPH, TARGET));
     expect(deps.readPaper).toHaveBeenCalledExactlyOnceWith(CID);
     expect(deps.checkField).toHaveBeenCalledExactlyOnceWith({
@@ -410,7 +423,7 @@ describe("runRating: rating a paper", () => {
     expect(deps.score).not.toHaveBeenCalled();
     expect(dkg.storeAsset).not.toHaveBeenCalled();
     expect(oracleCalls).toEqual([cancel("invalid-target")]);
-    expect(log.slice(-2)).toEqual(["check-field-1", "oracle cancel"]);
+    expect(log.slice(-3)).toEqual(["check-field-1", "oracle cancel", "notify"]);
   });
 
   it.each([
@@ -447,7 +460,7 @@ describe("runRating: rating a paper", () => {
     expect(await run).toEqual({ state: "cancelled", reason: "invalid-target" });
     expect(oracleCalls).toEqual([cancel("invalid-target")]);
     expect(dkg.storeAsset).not.toHaveBeenCalled();
-    expect(log.slice(-2)).toEqual(["score-paper-1", "oracle cancel"]);
+    expect(log.slice(-3)).toEqual(["score-paper-1", "oracle cancel", "notify"]);
   });
 
   it("cancels invalid-target a paper whose PDF holds no text, such as a scan, scoring nothing", async () => {
@@ -497,6 +510,7 @@ describe("runRating: rating a paper", () => {
       "read-rka-1",
       "read-score-1",
       "oracle fulfil",
+      "notify",
     ]);
     expect(deps.readPaper).not.toHaveBeenCalled();
     expect(oracleCalls).toEqual([fulfil(72)]);
@@ -520,6 +534,7 @@ describe("runRating: rating a paper", () => {
       "poll-1-2",
       "read-score-1",
       "oracle fulfil",
+      "notify",
     ]);
     expect(dkg.storeAsset).not.toHaveBeenCalled();
     expect(deps.readPaper).not.toHaveBeenCalled();
@@ -533,20 +548,21 @@ describe("runRating: rating a paper", () => {
     expect(deps.readPaper).not.toHaveBeenCalled();
   });
 
-  it("names the R-KA as an orphan when the request was cancelled meanwhile", async () => {
-    const { run, logger } = rate({
+  it("names the R-KA as an orphan when the request was cancelled meanwhile, and alerts on it", async () => {
+    const { run, logger, deps } = rate({
       oracleAnswer: () => ({ state: "cancelled", reason: "expired" }),
     });
 
     expect(await run).toEqual({ state: "cancelled", reason: "expired", orphan: R_KA });
     expect(logger.error).toHaveBeenCalledWith(expect.stringMatching(/^rating-orphan: /));
+    expect(deps.notify.mock.calls.map(([notice]) => notice.level)).toEqual(["alert", "activity"]);
+    expect(deps.notify.mock.calls[0]?.[0].text).toMatch(new RegExp(`^rating-orphan: ${R_KA}`));
   });
 
-  it("skips when the oracle finds the contract's oracle changed, or the request gone", async () => {
-    expect(await rate({ oracleAnswer: () => ({ state: "not-our-oracle" }) }).run).toEqual({
-      state: "skipped",
-      reason: "not-our-oracle",
-    });
+  it("skips, with no message, when the oracle finds the contract's oracle changed, or the request gone", async () => {
+    const changed = rate({ oracleAnswer: () => ({ state: "not-our-oracle" }) });
+    expect(await changed.run).toEqual({ state: "skipped", reason: "not-our-oracle" });
+    expect(changed.deps.notify).not.toHaveBeenCalled();
     expect(await rate({ oracleAnswer: () => ({ state: "unknown" }) }).run).toEqual({
       state: "skipped",
       reason: "not-pending",

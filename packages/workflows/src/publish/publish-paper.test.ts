@@ -2,6 +2,7 @@ import { type PaperMetadata, targetKaQuads } from "@verisci/core";
 import type { AssetResult, DkgClient, MintResult } from "@verisci/dkg";
 import { Inngest, NonRetriableError } from "inngest";
 import { describe, expect, it, vi } from "vitest";
+import type { Notice } from "../alerts/notify.ts";
 import type { FieldCheckResult } from "./field-check.ts";
 import {
   createPublishPaper,
@@ -26,6 +27,7 @@ const SUBMISSION = {
 };
 /** When Inngest received the event, in milliseconds. */
 const RECEIVED_AT = 1_800_000_000_000;
+const SITE = "https://verisci.example";
 const METADATA: PaperMetadata = {
   title: "A Title",
   authors: ["Ada Lovelace"],
@@ -97,6 +99,8 @@ function fakeDeps(script: Script) {
     readPaper: vi.fn(async () => next(papers)),
     checkField: vi.fn(async () => next(fields)),
     dkg: dkg as unknown as Pick<DkgClient, "readAsset" | "storeAsset" | "startMint">,
+    notify: vi.fn(async (_notice: Notice) => {}),
+    siteUrl: SITE,
   };
   return { deps, dkg };
 }
@@ -125,6 +129,7 @@ describe("runPublish", () => {
       "check-field-1",
       "store-1",
       "mint-1",
+      "notify",
     ]);
     expect(deps.readPaper).toHaveBeenCalledWith(CID);
     expect(dkg.storeAsset).toHaveBeenCalledWith(
@@ -132,22 +137,31 @@ describe("runPublish", () => {
       expect.arrayContaining([expect.objectContaining({ object: '"A Title"' })]),
     );
     expect(dkg.startMint).toHaveBeenCalledWith(NAME, { listenMs: PUBLISH_SETTINGS.listenMs });
+    expect(deps.notify).toHaveBeenCalledExactlyOnceWith({
+      level: "activity",
+      text: `Published: A Title\n${SITE}/papers/${CID}`,
+    });
   });
 
-  it("returns the UAL of a KA already minted, with no fetch, parse or store", async () => {
+  it("returns the UAL of a KA already minted, with no fetch, parse, store or message", async () => {
     const { run, log, deps, dkg } = await publish({ reads: [minted] });
 
     expect(await run).toEqual({ state: "minted", ual: UAL });
     expect(log).toEqual(["verify", "read-1"]);
     expect(deps.readPaper).not.toHaveBeenCalled();
     expect(dkg.storeAsset).not.toHaveBeenCalled();
+    expect(deps.notify).not.toHaveBeenCalled();
   });
 
-  it("mints a KA already stored without reading the paper or storing", async () => {
+  it("mints a KA already stored without reading the paper or storing, naming it by its CID", async () => {
     const { run, log, deps, dkg } = await publish({ reads: [stored] });
 
     expect(await run).toEqual({ state: "minted", ual: UAL });
-    expect(log).toEqual(["verify", "read-1", "mint-1"]);
+    expect(log).toEqual(["verify", "read-1", "mint-1", "notify"]);
+    expect(deps.notify).toHaveBeenCalledExactlyOnceWith({
+      level: "activity",
+      text: `Published: ${CID}\n${SITE}/papers/${CID}`,
+    });
     expect(deps.readPaper).not.toHaveBeenCalled();
     expect(dkg.storeAsset).not.toHaveBeenCalled();
   });
@@ -172,6 +186,7 @@ describe("runPublish", () => {
       "poll-1-2",
       "sleep wait-1-3 30s",
       "poll-1-3",
+      "notify",
     ]);
   });
 
@@ -209,7 +224,7 @@ describe("runPublish", () => {
     const { run, log, deps, dkg } = await publish({ reads: [{ ok: true, state: "draft" }] });
 
     expect(await run).toEqual({ state: "minted", ual: UAL });
-    expect(log).toEqual(["verify", "read-1", "store-1", "mint-1"]);
+    expect(log).toEqual(["verify", "read-1", "store-1", "mint-1", "notify"]);
     expect(deps.readPaper).not.toHaveBeenCalled();
     expect(dkg.storeAsset).toHaveBeenCalledWith(NAME, []);
   });

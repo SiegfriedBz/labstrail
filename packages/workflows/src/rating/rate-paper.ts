@@ -19,6 +19,8 @@ import type { DkgClient, DkgFailure } from "@verisci/dkg";
 import { type Inngest, type InngestFunction, NonRetriableError } from "inngest";
 import type { Hex } from "viem";
 import { z } from "zod";
+import { ratedText } from "../alerts/messages.ts";
+import type { Notify } from "../alerts/notify.ts";
 import type { GeminiFailureResult } from "../gemini/gemini.ts";
 import type { ReadPaperTextResult } from "../pdf/paper-text.ts";
 import type { FieldCheckResult } from "../publish/field-check.ts";
@@ -169,6 +171,10 @@ export interface RatingDeps {
   score(paper: PaperText): Promise<ScoreResult>;
   /** The publish run's Flash-Lite field check (`checkField`, ADR 0037), run before scoring. */
   checkField(paper: FieldCheckInput): Promise<FieldCheckResult>;
+  /** Tells the maintainer's Telegram chat (ADR 0038); never throws. */
+  notify: Notify;
+  /** The site's address, for the message's link to the rating's page (`siteUrlOf`). */
+  readonly siteUrl: string | undefined;
 }
 
 const eventSchema = z.object({
@@ -254,10 +260,29 @@ export async function runRating(
   if (read.oracle !== deps.oracle) return { state: "skipped", reason: "not-our-oracle" };
 
   const oracle = (id: string, input: OracleInput) => callOracle(id, input, step);
+  /** The outcome of the oracle's answer, announced once settled (ADR 0038). */
+  const settle = async (answer: OracleResult, orphan: string | undefined, run?: RunContext) => {
+    const outcome = outcomeOf(answer, orphan, logger);
+    if (outcome.state === "skipped") return outcome;
+    const paper = {
+      requestId,
+      targetUal: request.targetUal,
+      cid: run?.cid,
+      title: run?.head?.title,
+    };
+    await step.run("notify", async () => {
+      if (outcome.state === "cancelled" && outcome.orphan) {
+        await deps.notify({ level: "alert", text: orphanText(outcome.orphan, outcome.reason) });
+      }
+      await deps.notify({ level: "activity", text: ratedText(outcome, paper, deps.siteUrl) });
+      return null;
+    });
+    return outcome;
+  };
   const ours = classifyTarget(request.targetUal, deps.contextGraph) === "ours";
   if (!ours || !(await findTarget(request.targetUal, step, deps))) {
     const answer = await oracle("cancel", cancelOf(contract, requestId, "invalid-target"));
-    return outcomeOf(answer, undefined, logger);
+    return settle(answer, undefined);
   }
 
   const name = rKaName(requestId);
@@ -282,15 +307,15 @@ export async function runRating(
         requestId,
         action: { kind: "fulfil", score: result.score, rKaUal: result.rKaUal },
       });
-      return outcomeOf(answer, result.rKaUal, logger);
+      return settle(answer, result.rKaUal, run);
     }
     if (result.kind === "expire") {
       const answer = await oracle("cancel", cancelOf(contract, requestId, "expired"));
-      return outcomeOf(answer, result.orphan, logger);
+      return settle(answer, result.orphan, run);
     }
     if (result.kind === "invalid-target") {
       const answer = await oracle("cancel", cancelOf(contract, requestId, "invalid-target"));
-      return outcomeOf(answer, undefined, logger);
+      return settle(answer, undefined, run);
     }
     if (result.kind === "fatal") throw stop(result.failure, `${name.name}: ${result.reason}`);
     last = result;
@@ -581,6 +606,11 @@ async function callOracle(id: string, input: OracleInput, step: RatingSteps) {
   }
 }
 
+/** The `rating-orphan` line, logged and alerted on: an R-KA the contract will never record. */
+function orphanText(orphan: string, reason: "expired" | "invalid-target"): string {
+  return `rating-orphan: ${orphan} was minted for a request cancelled ${reason}`;
+}
+
 /** The run's outcome from the oracle's answer; `orphan` is an R-KA a cancel leaves unrecorded. */
 function outcomeOf(
   answer: OracleResult,
@@ -592,7 +622,7 @@ function outcomeOf(
       return { state: "fulfilled", score: answer.score, rKaUal: answer.rKaUal };
     case "cancelled":
       if (!orphan) return { state: "cancelled", reason: answer.reason };
-      logger.error(`rating-orphan: ${orphan} was minted for a request cancelled ${answer.reason}`);
+      logger.error(orphanText(orphan, answer.reason));
       return { state: "cancelled", reason: answer.reason, orphan };
     case "not-our-oracle":
       return { state: "skipped", reason: "not-our-oracle" };

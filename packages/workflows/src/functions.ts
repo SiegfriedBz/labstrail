@@ -4,6 +4,8 @@ import { type RuntimeEnv, sharedEnv } from "@verisci/env";
 import { createPublicClient, createWalletClient, type Hex, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { anvil, baseSepolia } from "viem/chains";
+import { siteUrlOf } from "./alerts/messages.ts";
+import { createNotify, type Notify } from "./alerts/notify.ts";
 import { inngest } from "./inngest.ts";
 import { readPaperText } from "./pdf/paper-text.ts";
 import { checkField } from "./publish/field-check.ts";
@@ -21,6 +23,26 @@ import { createWorkflowsEnv } from "./workflows-env.ts";
 
 /** How long the gateway and GROBID each get, inside the 300 s a step may take on Vercel. */
 const IO_TIMEOUT_MS = 60_000;
+
+/** How long Telegram gets to take a message. */
+const NOTIFY_TIMEOUT_MS = 10_000;
+
+let notify: Notify | undefined;
+
+/** The maintainer's Telegram chat (ADR 0038), built on first use; only logs without a bot. */
+function getNotify(): Notify {
+  if (notify) return notify;
+  const env = createWorkflowsEnv();
+  notify = createNotify({
+    appEnv: env.APP_ENV,
+    botToken: env.TELEGRAM_BOT_TOKEN,
+    chatId: env.TELEGRAM_CHAT_ID,
+    fetch: (url, init) => fetch(url, init),
+    timeoutMs: NOTIFY_TIMEOUT_MS,
+    logger: console,
+  });
+  return notify;
+}
 
 let publishDeps: PublishDeps | undefined;
 
@@ -57,6 +79,8 @@ function getPublishDeps(): PublishDeps {
       token: env.DKG_TOKEN,
       contextGraphId: env.DKG_CONTEXT_GRAPH,
     }),
+    notify: getNotify(),
+    siteUrl: siteUrlOf(env),
   };
   return publishDeps;
 }
@@ -148,6 +172,8 @@ function getRatingDeps(): RatingDeps {
         fetch: (input: string | URL | Request, init?: RequestInit) => fetch(input, init),
         timeoutMs: PUBLISH_SETTINGS.fieldTimeoutMs,
       }),
+    notify: getNotify(),
+    siteUrl: siteUrlOf(env),
   };
   return ratingDeps;
 }
@@ -156,7 +182,11 @@ function getRatingDeps(): RatingDeps {
 export const publishPaper = createPublishPaper(inngest, getPublishDeps);
 
 /** Sends the oracle's fulfil and cancel transactions, one at a time (ADR 0019). */
-export const oracleTransaction = createOracleTransaction(inngest, () => getRatingChain().chain);
+export const oracleTransaction = createOracleTransaction(
+  inngest,
+  () => getRatingChain().chain,
+  (text) => getNotify()({ level: "alert", text }),
+);
 
 /** Rates a requested paper and has the oracle record it (`verisci/rating.requested`). */
 export const ratePaper = createRatePaper(inngest, getRatingDeps, oracleTransaction, {
