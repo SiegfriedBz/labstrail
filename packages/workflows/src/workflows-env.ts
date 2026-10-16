@@ -29,22 +29,35 @@ export const telegramSchema = {
 };
 
 /**
- * What the Alchemy Notify webhook's intake reads (ADR 0017): the environment's signing key,
- * optional, since a deployment without it (a feature preview) answers the route with 404; and
- * locally the Anvil contract it reads instead (ADR 0036). The key is secret.
+ * The Alchemy Notify webhook's signing key (ADR 0017), optional: a deployment without it (a
+ * feature preview) answers the route with 404. Among the workflows' settings, so a deployed
+ * server checks it at start (ADR 0004). Secret.
  */
-export const webhookSchema = {
+export const webhookKeySchema = {
   ALCHEMY_WEBHOOK_SIGNING_KEY: z.string().min(1).optional(),
-  LOCAL_RATING_CONTRACT: z
-    .string()
-    .regex(/^0x[0-9a-fA-F]{40}$/, "must be a 0x address")
-    .optional(),
 };
+
+/**
+ * What the webhook's intake reads for `appEnv`: the signing key, and locally the Anvil contract
+ * it reads instead of the environment's (ADR 0036), which other environments never read.
+ */
+export function webhookSchema(appEnv: SharedEnv["APP_ENV"]) {
+  return {
+    ...webhookKeySchema,
+    LOCAL_RATING_CONTRACT:
+      appEnv === "local"
+        ? z
+            .string()
+            .regex(/^0x[0-9a-fA-F]{40}$/, "must be a 0x address")
+            .optional()
+        : z.string().optional(),
+  };
+}
 
 /**
  * Validates the workflows' settings from `runtimeEnv` (default `process.env`): GROBID, the
  * Pinata gateway and key, the Gemini key, a Base Sepolia RPC URL, the optional Telegram bot and chat,
- * and Inngest's event and signing keys
+ * the optional Alchemy Notify signing key, and Inngest's event and signing keys
  * outside `local` (the dev server needs none), plus the DKG node's (`dkgSchema`, in the
  * same pass, with the context graph's address in the node's checksum case) and the shared
  * ones. The Inngest SDK reads its keys itself; they are checked
@@ -74,6 +87,7 @@ export function workflowsSchema(appEnv: SharedEnv["APP_ENV"]) {
     INNGEST_EVENT_KEY: inngestKey,
     INNGEST_SIGNING_KEY: inngestKey,
     ...telegramSchema,
+    ...webhookKeySchema,
     /** Set by Vercel: the branch, which names a staging deployment's Inngest environment. */
     VERCEL_GIT_COMMIT_REF: z.string().optional(),
     /** Set by Vercel: production's domain and the branch's URL, for links in notifications. */

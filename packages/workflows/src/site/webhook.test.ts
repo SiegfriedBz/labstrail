@@ -1,8 +1,11 @@
 import { createHmac } from "node:crypto";
-import { ratingControllerAbi } from "@verisci/contracts";
+import { ratingControllerAbi, ratingControllerDeployments } from "@verisci/contracts";
 import { encodeAbiParameters, encodeEventTopics, type Hex, keccak256, toHex } from "viem";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createWebhookIntake, type WebhookIo } from "./webhook.ts";
+
+const inngestSend = vi.hoisted(() => vi.fn(async (_events: unknown) => ({ ids: [] })));
+vi.mock("../inngest.ts", () => ({ inngest: { send: inngestSend } }));
 
 const KEY = "whsec_test_signing_key";
 const CURRENT = "0xa5be5ee8e4b6825c4425cc208f0df09fb8147a90";
@@ -169,5 +172,68 @@ describe("createWebhookIntake", () => {
 
     expect(await intake.receive(raw, sign(raw))).toBe(404);
     expect(io.send).not.toHaveBeenCalled();
+  });
+
+  it("answers 400 and logs webhook-unreadable for a signed body that isn't JSON", async () => {
+    const { intake, warn } = setup();
+    const raw = "not json";
+
+    expect(await intake.receive(raw, sign(raw))).toBe(400);
+    expect(warn).toHaveBeenCalledWith("webhook-unreadable: not JSON");
+  });
+});
+
+describe("getWebhookIntake", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    inngestSend.mockClear();
+  });
+
+  /** The intake built from `env`, in a fresh module so its cached copy is rebuilt. */
+  async function intakeFor(env: Record<string, string | undefined>) {
+    for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value);
+    vi.resetModules();
+    const { getWebhookIntake } = await import("./webhook.ts");
+    return getWebhookIntake();
+  }
+
+  const sentContracts = () =>
+    inngestSend.mock.calls.flatMap(([events]) =>
+      (events as { data: { contract: string } }[]).map((event) => event.data.contract),
+    );
+
+  it("deployed, takes the environment's contracts and never reads LOCAL_RATING_CONTRACT", async () => {
+    const staging = ratingControllerDeployments("staging").current.address;
+    const intake = await intakeFor({
+      APP_ENV: "staging",
+      ALCHEMY_WEBHOOK_SIGNING_KEY: KEY,
+      LOCAL_RATING_CONTRACT: "left over from local",
+    });
+    const raw = body([requestLog(staging), requestLog(OTHER, `0x${"01".repeat(32)}`)]);
+
+    expect(await intake.receive(raw, sign(raw))).toBe(200);
+    expect(sentContracts()).toEqual([staging]);
+  });
+
+  it("locally, takes only the Anvil contract, so post-webhook can check the route", async () => {
+    const staging = ratingControllerDeployments("staging").current.address;
+    const intake = await intakeFor({
+      APP_ENV: "local",
+      ALCHEMY_WEBHOOK_SIGNING_KEY: KEY,
+      LOCAL_RATING_CONTRACT: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+    });
+    const anvil = "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512";
+    const raw = body([requestLog(anvil), requestLog(staging, `0x${"01".repeat(32)}`)]);
+
+    expect(await intake.receive(raw, sign(raw))).toBe(200);
+    expect(sentContracts()).toEqual([anvil]);
+  });
+
+  it("answers 404 where no signing key is set, as on a feature preview", async () => {
+    const intake = await intakeFor({ APP_ENV: "staging", ALCHEMY_WEBHOOK_SIGNING_KEY: undefined });
+    const raw = body([requestLog(CURRENT)]);
+
+    expect(await intake.receive(raw, sign(raw))).toBe(404);
+    expect(inngestSend).not.toHaveBeenCalled();
   });
 });

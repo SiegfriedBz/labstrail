@@ -60,13 +60,15 @@ const payloadSchema = z.object({
 });
 
 /**
- * Builds the webhook intake (ADR 0017): it checks the `X-Alchemy Notify-Signature` HMAC-SHA256 over the
+ * Builds the webhook intake (ADR 0017): it checks the `X-Alchemy-Signature` HMAC-SHA256 over the
  * raw body in constant time before parsing (401 when absent or wrong), reads the payload (400,
  * logged `webhook-unreadable`, when it is not one), and sends one `verisci/rating.requested`
  * event per `Phase1Requested` log of an environment contract, with the id `rating:<requestId>`
- * a repeated delivery shares. A log marked removed, of another contract or of another event
- * sends nothing. Inngest refusing the events answers 503 (logged `webhook-unavailable`), so
- * Alchemy Notify delivers again. Without a signing key it answers 404 and reads nothing.
+ * a repeated delivery shares. A log marked `removed`, of another contract or of another event
+ * sends nothing. After a reorg, Alchemy Notify delivers the new block, and a request the reorg
+ * dropped is stopped by the run's read of the request on chain. Inngest refusing the events
+ * answers 503 (logged `webhook-unavailable`), so Alchemy Notify delivers again. Without a
+ * signing key it answers 404 and reads nothing.
  */
 export function createWebhookIntake(io: WebhookIo): WebhookIntake {
   return {
@@ -122,10 +124,16 @@ let intake: WebhookIntake | undefined;
  * (`ALCHEMY_WEBHOOK_SIGNING_KEY`), the environment's contracts and the Inngest client. Deployed,
  * every contract of the environment; locally, where no webhook watches Anvil, the Anvil
  * contract (`LOCAL_RATING_CONTRACT`, ADR 0036), so `post-webhook` can check the route by hand.
+ * Only the local contract's setting is checked here; a deployed server checks the key at start
+ * with the workflows' settings (ADR 0004).
  */
 export function getWebhookIntake(): WebhookIntake {
   if (intake) return intake;
-  const env = defineEnv({ extends: [sharedEnv], server: webhookSchema, runtimeEnv: process.env });
+  const env = defineEnv({
+    extends: [sharedEnv],
+    server: webhookSchema(sharedEnv.APP_ENV),
+    runtimeEnv: process.env,
+  });
   const anvil = env.LOCAL_RATING_CONTRACT;
   intake = createWebhookIntake({
     signingKey: env.ALCHEMY_WEBHOOK_SIGNING_KEY,
