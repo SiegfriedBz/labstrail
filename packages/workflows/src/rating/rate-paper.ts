@@ -132,7 +132,8 @@ const RATING_FAILURES: readonly RatingFailure[] = [
  * `orphan` is an R-KA the contract will never record (ADR 0014): one minted for a request
  * cancelled meanwhile, or for one the oracle found gone (a reorg after the run's read, ADR
  * 0017). `rKaUal` is the R-KA a run minted or stored before finding the contract's oracle
- * changed: recorded only if a run under the new key fulfils it.
+ * changed: a later run records it once the deployment holds the contract's oracle key again,
+ * unless the request is cancelled by hand meanwhile.
  */
 export type RatingOutcome =
   | { readonly state: "fulfilled"; readonly score: number; readonly rKaUal: string }
@@ -627,16 +628,17 @@ async function callOracle(id: string, input: OracleInput, step: RatingSteps) {
 
 /** The `rating-orphan` line, logged and alerted on: an R-KA the contract will never record. */
 function orphanText(orphan: string, why: string): string {
-  return `rating-orphan: ${orphan} was minted for a request ${why}`;
+  return `rating-orphan: ${orphan} was written for a request ${why}`;
 }
 
 /**
- * The `rating-oracle-moved` line, logged and alerted on: an R-KA minted for a request whose
- * contract's oracle changed meanwhile, which a planned key rotation records on a later run and
- * the emergency path, a cancel by hand under the new key, never does (ADRs 0019, 0020).
+ * The `rating-oracle-moved` line, logged and alerted on: an R-KA minted or stored for a request
+ * whose contract's oracle changed meanwhile. A later run records it once the deployment holds
+ * the contract's oracle key again, the role pointed back (ADR 0020) or a rotated key deployed
+ * (ADR 0019); a cancel by hand under another key meanwhile leaves it unrecorded.
  */
 function movedText(rKaUal: string, requestId: string): string {
-  return `rating-oracle-moved: ${rKaUal} was minted for request ${requestId}, but the contract's oracle changed; it is recorded only if a run under the new key fulfils it`;
+  return `rating-oracle-moved: ${rKaUal} was written for request ${requestId}, but the contract's oracle is no longer this deployment's key; a later run records it once the deployment holds that key again, unless the request is cancelled by hand meanwhile`;
 }
 
 /** Why an outcome's R-KA is an orphan, for {@link orphanText}. */
@@ -647,8 +649,8 @@ function orphanWhy(outcome: RatingOutcome): string {
 /**
  * The run's outcome from the oracle's answer, given the R-KA it minted or left stored
  * (`orphan`): unrecorded when the oracle cancelled the request meanwhile or found it gone (a
- * reorg after the run's read); each such orphan is logged. When the contract's oracle changed,
- * the R-KA is kept as `rKaUal` and logged: recorded only if a run under the new key fulfils it.
+ * reorg after the run's read); each such orphan is logged here. When the contract's oracle
+ * changed, the R-KA is kept as `rKaUal`, which `settle` logs and alerts on.
  */
 function outcomeOf(
   answer: OracleResult,

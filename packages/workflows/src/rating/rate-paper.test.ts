@@ -597,14 +597,14 @@ describe("runRating: rating a paper", () => {
     expect(gone.log.slice(-1)).toEqual(["alert-orphan"]);
     expect(gone.deps.notify.mock.calls.map(([notice]) => notice.level)).toEqual(["alert"]);
     expect(gone.deps.notify.mock.calls[0]?.[0].text).toBe(
-      `rating-orphan: ${R_KA} was minted for a request no longer pending`,
+      `rating-orphan: ${R_KA} was written for a request no longer pending`,
     );
     expect(gone.logger.error).toHaveBeenCalledWith(expect.stringMatching(/^rating-orphan: /));
   });
 
   it("alerts that the minted R-KA may go unrecorded when the contract's oracle changed, without calling it an orphan", async () => {
     const changed = rate({ oracleAnswer: () => ({ state: "not-our-oracle" }) });
-    const text = `rating-oracle-moved: ${R_KA} was minted for request ${REQUEST_ID}, but the contract's oracle changed; it is recorded only if a run under the new key fulfils it`;
+    const text = `rating-oracle-moved: ${R_KA} was written for request ${REQUEST_ID}, but the contract's oracle is no longer this deployment's key; a later run records it once the deployment holds that key again, unless the request is cancelled by hand meanwhile`;
 
     expect(await changed.run).toEqual({
       state: "skipped",
