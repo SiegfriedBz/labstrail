@@ -25,7 +25,7 @@ Requests can stop halfway ([0007](0007-all-writes-converge.md)), or never start 
 - Correctness rests on the singleton, on convergent writes ([0007](0007-all-writes-converge.md)) and on the contract's own checks.
 - The function and the reconciler run only where the oracle key is ([0019](0019-oracle-transactions-are-serialized.md)). Staging's reconciler needs crons in a branch environment, which is unverified ([domain](../domain.md)).
 - While the owner has pointed the oracle role at another key, the backend's oracle transactions fail until it is pointed back.
-- The contracts plan builds the pending set and the cancel path; the rating plan sets the threshold, the cron interval and the maximum age.
+- The contracts plan builds the pending set and the cancel path; the rating plan sets the maximum age, and the intake and recovery plan the threshold and the cron interval.
 
 ## History
 
@@ -34,3 +34,4 @@ Requests can stop halfway ([0007](0007-all-writes-converge.md)), or never start 
 - 2026-10-07: retitled to name everything it now covers (was "A cron reconciler recovers stuck requests").
 - 2026-10-10: corrected: "the agents plan" is now "the rating plan", since the agents package was renamed `workflows`.
 - 2026-10-15: locally, the page that sent a request also starts its function; the reconciler still finds any request the page misses ([0036](0036-local-rating-runs-use-anvil.md)) (rating UI review, user's choice).
+- 2026-10-16: the intake and recovery plan sets the threshold and the cron interval, and builds the reconciler (intake and recovery).

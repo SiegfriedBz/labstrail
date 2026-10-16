@@ -17,7 +17,7 @@ Every rating costs an LLM call (on Gemini's free tier, capped per day, [0018](00
 
 - Fresh addresses get around the per-requester cap, so the throttle is the real bound on spend. Every request, spam included, takes at least one run and ends in one oracle transaction, so the throttle is sized against the Inngest execution cap, the oracle's gas and the LLM's free daily limit, which also caps how many papers are rated a day ([domain](../domain.md)).
 - A spam backlog can delay genuine requests past the maximum age, and they are cancelled ([0020](0020-stuck-requests-recovered-only-oracle-cancels.md)). Accepted on testnet.
-- The oracle wallet's and every node publisher wallet's balances are alerted on.
+- The oracle wallet's and every node publisher wallet's balances are alerted on ([0038](0038-alerts-go-to-one-telegram-chat.md)).
 - The contracts plan sets the cap; the rating plan sets the throttle.
 
 ## History
@@ -25,3 +25,4 @@ Every rating costs an LLM call (on Gemini's free tier, capped per day, [0018](00
 - 2026-10-09: corrected: the node pays publishes from several publisher wallets, not one; each is funded and alerted on (DKG spike, [domain](../domain.md)).
 - 2026-10-10: corrected: "the agents plan" is now "the rating plan", since the agents package was renamed `workflows`.
 - 2026-10-12: corrected: the LLM call runs on Gemini's free tier, capped per day (ADR 0018), not at a cost per call, and that daily cap bounds ratings too (ADR sweep, user's choice).
+- 2026-10-16: the balances are alerted on through the one alerts chat ([0038](0038-alerts-go-to-one-telegram-chat.md)) (intake and recovery).
