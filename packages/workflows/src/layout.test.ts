@@ -39,6 +39,7 @@ describe("workflows' layout", () => {
       "functions",
       "getRatingService",
       "getUploadService",
+      "getWebhookIntake",
       "inngest",
       "oracleTransaction",
       "publishFailureReason",

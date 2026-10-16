@@ -29,6 +29,19 @@ export const telegramSchema = {
 };
 
 /**
+ * What the Alchemy Notify webhook's intake reads (ADR 0017): the environment's signing key,
+ * optional, since a deployment without it (a feature preview) answers the route with 404; and
+ * locally the Anvil contract it reads instead (ADR 0036). The key is secret.
+ */
+export const webhookSchema = {
+  ALCHEMY_WEBHOOK_SIGNING_KEY: z.string().min(1).optional(),
+  LOCAL_RATING_CONTRACT: z
+    .string()
+    .regex(/^0x[0-9a-fA-F]{40}$/, "must be a 0x address")
+    .optional(),
+};
+
+/**
  * Validates the workflows' settings from `runtimeEnv` (default `process.env`): GROBID, the
  * Pinata gateway and key, the Gemini key, a Base Sepolia RPC URL, the optional Telegram bot and chat,
  * and Inngest's event and signing keys
