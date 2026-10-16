@@ -39,7 +39,8 @@ const env = defineEnv({
 const client = createPublicClient({ chain: anvil, transport: http(env.LOCAL_CHAIN_RPC_URL) });
 const receipt = await client.getTransactionReceipt({ hash: hash as Hex });
 
-// The fields the registered GraphQL query asks for (packages/workflows README).
+// The fields the registered GraphQL query asks for, for every log of the transaction, as the
+// query takes every event of the contract (packages/workflows README).
 const body = JSON.stringify({
   webhookId: "wh_local",
   id: `whevt_local_${Date.now()}`,
@@ -48,14 +49,10 @@ const body = JSON.stringify({
   event: {
     data: {
       block: {
-        hash: receipt.blockHash,
-        number: Number(receipt.blockNumber),
         logs: receipt.logs.map((log) => ({
           data: log.data,
           topics: log.topics,
-          index: log.logIndex,
           account: { address: log.address },
-          transaction: { hash: log.transactionHash },
         })),
       },
     },

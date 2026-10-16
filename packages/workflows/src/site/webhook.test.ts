@@ -27,9 +27,7 @@ function requestLog(address: string, requestId: Hex = REQUEST_ID) {
         targetUalHash: keccak256(toHex(TARGET)),
       },
     }),
-    index: 0,
     account: { address },
-    transaction: { hash: `0x${"cd".repeat(32)}` },
   };
 }
 
@@ -37,9 +35,7 @@ function requestLog(address: string, requestId: Hex = REQUEST_ID) {
 const pausedLog = {
   data: encodeAbiParameters([{ type: "address" }], [CURRENT]),
   topics: encodeEventTopics({ abi: ratingControllerAbi, eventName: "Paused" }),
-  index: 1,
   account: { address: CURRENT },
-  transaction: { hash: `0x${"ef".repeat(32)}` },
 };
 
 function body(logs: readonly unknown[]): string {
@@ -49,7 +45,7 @@ function body(logs: readonly unknown[]): string {
     createdAt: "2026-10-16T09:00:00.000Z",
     type: "GRAPHQL",
     event: {
-      data: { block: { hash: `0x${"12".repeat(32)}`, number: 123, logs } },
+      data: { block: { logs } },
       sequenceNumber: "1",
     },
   });
