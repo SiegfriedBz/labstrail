@@ -48,6 +48,7 @@ describe("workflows' layout", () => {
       "ratingFailureReason",
       "ratingRequestedEvent",
       "ratingSettingsRequired",
+      "reconcileRatings",
       "servedFunctions",
       "servesRating",
       "summariseRatings",

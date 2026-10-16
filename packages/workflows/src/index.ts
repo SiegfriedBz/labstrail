@@ -6,6 +6,7 @@ export {
   oracleTransaction,
   publishPaper,
   ratePaper,
+  reconcileRatings,
   servedFunctions,
 } from "./functions.ts";
 export { inngest } from "./inngest.ts";

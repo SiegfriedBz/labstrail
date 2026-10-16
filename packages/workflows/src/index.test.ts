@@ -29,10 +29,10 @@ describe("ratePaper", () => {
 });
 
 describe("servedFunctions", () => {
-  it("adds the rating and oracle functions only where the oracle key is set (ADR 0019)", () => {
+  it("adds the rating, oracle and reconciler functions only where the oracle key is set (ADR 0019)", () => {
     expect(
       servedFunctions({ ORACLE_PRIVATE_KEY: `0x${"59c6".repeat(16)}` }).map((fn) => fn.id()),
-    ).toEqual(["publish-paper", "rate-paper", "oracle-transaction"]);
+    ).toEqual(["publish-paper", "rate-paper", "oracle-transaction", "reconcile-ratings"]);
     expect(servedFunctions({}).map((fn) => fn.id())).toEqual(["publish-paper"]);
   });
 });

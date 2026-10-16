@@ -1,3 +1,4 @@
+import { readPendingCount, readPendingRequestIds } from "@verisci/contracts";
 import { createDkgClient } from "@verisci/dkg";
 import { type RuntimeEnv, sharedEnv } from "@verisci/env";
 import { createPublicClient, createWalletClient, type Hex, http } from "viem";
@@ -13,6 +14,7 @@ import { environmentContracts } from "./rating/contracts.ts";
 import { createOracleTransaction, ORACLE_SETTINGS, type OracleChain } from "./rating/oracle.ts";
 import { createOracleChain } from "./rating/oracle-chain.ts";
 import { createRatePaper, RATING_SETTINGS, type RatingDeps } from "./rating/rate-paper.ts";
+import { createReconciler, type ReconcilerDeps } from "./rating/reconciler.ts";
 import { scorePaper } from "./rating/scorer.ts";
 import { createRatingEnv, type RatingEnv, servesRating } from "./rating-env.ts";
 import { createWorkflowsEnv } from "./workflows-env.ts";
@@ -62,6 +64,8 @@ function getPublishDeps(): PublishDeps {
 interface RatingChain {
   readonly env: RatingEnv;
   readonly chain: OracleChain;
+  /** The reads the reconciler makes on the same chain. */
+  readonly pending: Pick<ReconcilerDeps, "readPendingCount" | "readPendingIds">;
   readonly chainId: number;
   /** The environment's contracts, lowercase. */
   readonly contracts: readonly string[];
@@ -92,6 +96,11 @@ function getRatingChain(): RatingChain {
     // Base's OP-stack formatters type its client apart from viem's default `PublicClient`;
     // the reads the oracle makes (nonces, fees, receipts, contract calls) are the same.
     chain: createOracleChain({ client: client as never, wallet, account }),
+    pending: {
+      readPendingCount: (contract) => readPendingCount(client as never, contract),
+      readPendingIds: (contract, offset, limit) =>
+        readPendingRequestIds(client as never, contract, offset, limit),
+    },
     chainId: chain.id,
     contracts: environmentContracts(env.APP_ENV, env.LOCAL_RATING_CONTRACT),
   };
@@ -148,11 +157,23 @@ export const ratePaper = createRatePaper(inngest, getRatingDeps, oracleTransacti
 });
 
 /**
- * The functions a deployment serves: the publish function, plus the rating and oracle
- * functions where the oracle key is set (ADR 0019). Reads the key's presence only.
+ * Restarts requests pending past the threshold, every 30 minutes (ADR 0020), on the rating
+ * chain's contracts: the environment's, or Anvil's locally (ADR 0036).
+ */
+export const reconcileRatings = createReconciler(inngest, () => {
+  const { chain, pending, contracts } = getRatingChain();
+  return { contracts, ...pending, readRequest: chain.readRequest, logger: console };
+});
+
+/**
+ * The functions a deployment serves: the publish function, plus the rating, oracle and
+ * reconciler functions where the oracle key is set (ADRs 0019, 0020). Reads the key's presence
+ * only.
  */
 export function servedFunctions(runtimeEnv: RuntimeEnv = process.env) {
-  return servesRating(runtimeEnv) ? [publishPaper, ratePaper, oracleTransaction] : [publishPaper];
+  return servesRating(runtimeEnv)
+    ? [publishPaper, ratePaper, oracleTransaction, reconcileRatings]
+    : [publishPaper];
 }
 
 /** Every Inngest function this deployment serves, for `web`'s `/api/inngest` route (ADR 0003). */
