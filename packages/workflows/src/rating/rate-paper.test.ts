@@ -590,21 +590,24 @@ describe("runRating: rating a paper", () => {
     expect(log.slice(-2)).toEqual(["alert-orphan", "notify"]);
   });
 
-  it("alerts on the minted R-KA as an orphan, with no activity message, when the oracle finds the contract's oracle changed, or the request gone", async () => {
-    const changed = rate({ oracleAnswer: () => ({ state: "not-our-oracle" }) });
-    expect(await changed.run).toEqual({ state: "skipped", reason: "not-our-oracle", orphan: R_KA });
-    expect(changed.log.slice(-1)).toEqual(["alert-orphan"]);
-    expect(changed.deps.notify.mock.calls.map(([notice]) => notice.level)).toEqual(["alert"]);
-    expect(changed.deps.notify.mock.calls[0]?.[0].text).toBe(
-      `rating-orphan: ${R_KA} was minted for a request whose contract's oracle changed`,
-    );
-    expect(changed.logger.error).toHaveBeenCalledWith(expect.stringMatching(/^rating-orphan: /));
-
+  it("alerts on the minted R-KA as an orphan, with no activity message, when the oracle finds the request gone", async () => {
     const gone = rate({ oracleAnswer: () => ({ state: "unknown" }) });
+
     expect(await gone.run).toEqual({ state: "skipped", reason: "not-pending", orphan: R_KA });
+    expect(gone.log.slice(-1)).toEqual(["alert-orphan"]);
+    expect(gone.deps.notify.mock.calls.map(([notice]) => notice.level)).toEqual(["alert"]);
     expect(gone.deps.notify.mock.calls[0]?.[0].text).toBe(
       `rating-orphan: ${R_KA} was minted for a request no longer pending`,
     );
+    expect(gone.logger.error).toHaveBeenCalledWith(expect.stringMatching(/^rating-orphan: /));
+  });
+
+  it("skips with no message when the contract's oracle changed: the request stays pending, and a restart under the right key records the R-KA", async () => {
+    const changed = rate({ oracleAnswer: () => ({ state: "not-our-oracle" }) });
+
+    expect(await changed.run).toEqual({ state: "skipped", reason: "not-our-oracle" });
+    expect(changed.deps.notify).not.toHaveBeenCalled();
+    expect(changed.logger.error).not.toHaveBeenCalled();
   });
 
   it("skips with no message when the oracle can't record a cancel that left no R-KA", async () => {

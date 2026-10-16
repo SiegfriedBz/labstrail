@@ -86,6 +86,24 @@ describe("alertOnFailure", () => {
     );
   });
 
+  it("alerts on a cancelled run whose event carries only the function and run ids, as the SDK types it", async () => {
+    const { alert, step } = setup();
+
+    expect(
+      await alertOnFailure(
+        {
+          name: "inngest/function.cancelled",
+          data: { function_id: "verisci-rate-paper", run_id: "01JRUN" },
+        },
+        step,
+        alert,
+      ),
+    ).toEqual({ alerted: true });
+    expect(alert).toHaveBeenCalledExactlyOnceWith(
+      "verisci-rate-paper cancelled (run 01JRUN): past its time budget, or by hand",
+    );
+  });
+
   it("alerts on a cancelled run too", async () => {
     const { alert, step } = setup();
 

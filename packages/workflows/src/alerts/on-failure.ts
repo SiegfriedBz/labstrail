@@ -13,10 +13,11 @@ export const FUNCTION_CANCELLED = "inngest/function.cancelled";
 /** The longest error text an alert carries. */
 const MAX_ERROR_CHARS = 300;
 
+/** What the alert reads of either event: a cancel's data may carry only the ids. */
 const failureSchema = z.object({
   function_id: z.string(),
   run_id: z.string(),
-  error: z.object({ message: z.string() }),
+  error: z.object({ message: z.string() }).optional(),
 });
 
 /**
@@ -36,7 +37,7 @@ export function failureText(
   if (ended === "cancelled") {
     return `${function_id} cancelled (run ${run_id}): past its time budget, or by hand`;
   }
-  const line = error.message.split("\n", 1)[0] ?? "";
+  const line = error?.message.split("\n", 1)[0] ?? "";
   const reason = line.length > MAX_ERROR_CHARS ? `${line.slice(0, MAX_ERROR_CHARS)}…` : line;
   return `${function_id} failed (run ${run_id}): ${reason}`;
 }

@@ -130,7 +130,8 @@ const RATING_FAILURES: readonly RatingFailure[] = [
 /**
  * How a rating run ends, unless it fails: the request fulfilled or cancelled, or skipped. An
  * `orphan` is an R-KA the contract will never record (ADR 0014): one minted for a request
- * cancelled meanwhile, or for one the oracle found gone or no longer its own.
+ * cancelled meanwhile, or for one the oracle found gone (a reorg after the run's read, ADR
+ * 0017).
  */
 export type RatingOutcome =
   | { readonly state: "fulfilled"; readonly score: number; readonly rKaUal: string }
@@ -621,17 +622,14 @@ function orphanText(orphan: string, why: string): string {
 
 /** Why an outcome's R-KA is an orphan, for {@link orphanText}. */
 function orphanWhy(outcome: RatingOutcome): string {
-  if (outcome.state === "cancelled") return `cancelled ${outcome.reason}`;
-  return outcome.state === "skipped" && outcome.reason === "not-our-oracle"
-    ? "whose contract's oracle changed"
-    : "no longer pending";
+  return outcome.state === "cancelled" ? `cancelled ${outcome.reason}` : "no longer pending";
 }
 
 /**
  * The run's outcome from the oracle's answer, given the R-KA it minted or left stored
- * (`orphan`): unrecorded when the oracle cancelled the request meanwhile, found it gone (a
- * reorg after the run's read), or found the contract's oracle changed; each such orphan is
- * logged.
+ * (`orphan`): unrecorded when the oracle cancelled the request meanwhile or found it gone (a
+ * reorg after the run's read); each such orphan is logged. When the contract's oracle changed,
+ * the request stays pending, and a restart under its key records the R-KA.
  */
 function outcomeOf(
   answer: OracleResult,
@@ -645,7 +643,8 @@ function outcomeOf(
       case "cancelled":
         return { state: "cancelled", reason: answer.reason, ...(orphan ? { orphan } : {}) };
       case "not-our-oracle":
-        return { state: "skipped", reason: "not-our-oracle", ...(orphan ? { orphan } : {}) };
+        // The request stays pending: a restart under the contract's oracle key records the R-KA.
+        return { state: "skipped", reason: "not-our-oracle" };
       case "unknown":
         return { state: "skipped", reason: "not-pending", ...(orphan ? { orphan } : {}) };
     }
