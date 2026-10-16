@@ -6,9 +6,10 @@ Inngest workflows that combine `core` logic with the `dkg` and `contracts` adapt
 Status: the publish run, which turns a pinned PDF into a minted Target KA, the calls the
 upload page makes to start and follow it, and the papers list's read; the rating run, which
 scores a requested paper and has the oracle record it, and the oracle function; and the
-rating pages' calls, which read a paper's ratings and one rating's progress. Locally the
-paper page, or a dev script, starts the rating run; on staging, the Alchemy Notify webhook
-will (next plan).
+rating pages' calls, which read a paper's ratings and one rating's progress. Deployed, the
+Alchemy Notify webhook starts the rating run and the reconciler restarts a request whose run
+stopped; locally, the paper page or a dev script starts it. Every publish, every settled
+rating and anything needing the maintainer goes to one Telegram chat.
 
 Architecture views: [`.omm/overall-architecture/workflows/`](../../.omm/overall-architecture/workflows/), [`.omm/pipeline/`](../../.omm/pipeline/) (`pnpm exec omm view --port 4000` shows them; root README → Architecture).
 
@@ -16,8 +17,8 @@ Architecture views: [`.omm/overall-architecture/workflows/`](../../.omm/overall-
 
 `@verisci/core`, `@verisci/env`, `@verisci/dkg`, `@verisci/contracts`; Inngest, viem
 (signature checks, the rating contract, the oracle's transactions), Zod and unpdf (a PDF's
-text, for the scorer and the field check). The scorer and the publish run's field check call
-the Gemini API over `fetch` (`src/gemini/`), with no SDK.
+text, for the scorer and the field check). The scorer and the field check, which both the
+publish and the rating runs make, call the Gemini API over `fetch` (`src/gemini/`), with no SDK.
 
 ## Environment
 
@@ -35,11 +36,14 @@ server (`APP_ENV` other than `local`) checks them when it starts, through
 | `PINATA_GATEWAY_URL` | The Pinata account's dedicated gateway, `https://<name>.mypinata.cloud`, through which the publish and rating runs read PDFs; one account serves every environment ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)) |
 | `CHAIN_RPC_URL` | A Base Sepolia RPC URL, to check smart-contract wallets' signatures and, on staging and production, for the rating functions to read and write the rating contracts and the pages to read their ratings |
 | `PINATA_JWT` | A Pinata API key (JWT) allowed to upload, list and delete files; the `publish-pdf` dev script reads it too. Secret |
-| `GEMINI_API_KEY` | A Gemini API key from Google AI Studio, for the publish run's field check ([ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)) and the rating functions' scorer ([ADR 0018](../../docs/adr/0018-phase-1-scorer-output-contract.md)); the `score-papers` dev script reads it too. Every deployment checks it at start, previews included. Secret |
+| `GEMINI_API_KEY` | A Gemini API key from Google AI Studio, for the field check both runs make ([ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)) and the rating functions' scorer ([ADR 0018](../../docs/adr/0018-phase-1-scorer-output-contract.md)); the `score-papers` dev script reads it too. Every deployment checks it at start, previews included. Secret |
 | `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY` | Inngest's keys, required unless `APP_ENV` is `local`: the SDK reads them itself, and the signing key also reads runs for the upload page. Secret |
 | `VERCEL_GIT_COMMIT_REF` | Set by Vercel: on staging, the branch, which names the Inngest branch environment runs are read from |
+| `VERCEL_PROJECT_PRODUCTION_URL`, `VERCEL_BRANCH_URL` | Set by Vercel: production's domain and the branch's URL, which notifications link to (`siteUrlOf`); locally, `http://localhost:3000` |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Optional: the bot's token (`<bot id>:<secret>`, from @BotFather) and the numeric id of the chat notifications go to, one for every environment ([ADR 0038](../../docs/adr/0038-alerts-go-to-one-telegram-chat.md)). Unset, as locally, notifications are only logged. On Vercel, set them on production and on `develop` only (scoped to that branch, like the oracle key), so a feature preview, whose messages would also read `staging`, only logs. The notifier reads only these and the shared settings, so an alert still goes out when another setting is bad. The token is secret |
+| `ALCHEMY_WEBHOOK_SIGNING_KEY` | Optional: the signing key of this environment's Alchemy Notify webhook (`webhookKeySchema`), read by `getWebhookIntake` and checked at start with the settings above; without it the webhook route answers 404, as on feature previews. Locally, any value lets `post-webhook` check the route. Secret |
 
-The rating functions read three more, declared in `src/rating-env.ts`
+The rating functions read four more, declared in `src/rating-env.ts`
 (`createRatingEnv`) and validated with the settings above in one pass, so one `EnvError`
 names every bad variable. A deployment serves the rating and oracle functions only when
 `ORACLE_PRIVATE_KEY` is set (`servesRating`); a deployed server checks these at start in
@@ -49,7 +53,8 @@ production, which refuses to start without the key, and on staging when the key 
 | Variable | Value |
 | --- | --- |
 | `ORACLE_PRIVATE_KEY` | The oracle's key, `0x` and 64 hex: on Vercel only `develop` (staging's, scoped to that branch) and production hold one; locally, Anvil's second default account's key. Secret |
-| `LOCAL_CHAIN_RPC_URL`, `LOCAL_RATING_CONTRACT` | Required only when `APP_ENV=local`: Anvil's URL (`http://127.0.0.1:8546`) and the RatingController deployed there ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)). The pages' rating calls (`getRatingService`) and the `fund-local` script read them too. Elsewhere the contracts come from the committed deployments file, current and past ([ADR 0028](../../docs/adr/0028-deployed-addresses-are-committed.md)) |
+| `PUBLISHER_ADDRESSES` | The DKG node's publisher wallets, comma-separated ([`docs/node-host.md`](../../docs/node-host.md) lists them), whose ETH and TRAC the health check watches. Required outside `local`, so a deployment that would watch none refuses to start ([ADR 0015](../../docs/adr/0015-rating-requests-are-free-on-testnet.md)); optional locally |
+| `LOCAL_CHAIN_RPC_URL`, `LOCAL_RATING_CONTRACT` | Required only when `APP_ENV=local`: Anvil's URL (`http://127.0.0.1:8546`) and the RatingController deployed there ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)). The pages' rating calls (`getRatingService`), the `rate-paper`, `fund-local` and `post-webhook` scripts read them too (`post-webhook` only the URL), and the webhook's intake reads the contract, locally only (`webhookSchema`). Elsewhere the contracts come from the committed deployments file, current and past ([ADR 0028](../../docs/adr/0028-deployed-addresses-are-committed.md)) |
 
 `DKG_CONTEXT_GRAPH` must spell its address in EIP-55 checksum case, as the node lists it
 (`@verisci/dkg`'s rule): a query with the address in another case reads another, empty
@@ -64,12 +69,13 @@ upload page reads runs there, with no keys.
 | --- | --- |
 | `workflowsName` | The package name, imported by the web app's package test |
 | `inngest` | VeriSci's Inngest client, in dev mode when `APP_ENV` is `local` |
-| `functions`, `servedFunctions(runtimeEnv)` | The Inngest functions this deployment serves, for `web`'s `/api/inngest` route: the publish function, plus the rating and oracle functions when `ORACLE_PRIVATE_KEY` is set |
+| `functions`, `servedFunctions(runtimeEnv)` | The Inngest functions this deployment serves, for `web`'s `/api/inngest` route: the publish function and the failure alerts, plus the rating, oracle, reconciler and health functions when `ORACLE_PRIVATE_KEY` is set |
+| `reconcileRatings`, `failureAlerts`, `healthCheck` | The `reconcile-ratings` cron, the `alert-on-failure` function and the `check-health` cron (below) |
 | `publishPaper` | The `publish-paper` function, run by `verisci/paper.submitted` |
 | `ratePaper`, `oracleTransaction` | The `rate-paper` function, run by `verisci/rating.requested`, and the `oracle-transaction` function it invokes (below) |
 | `RATING_REQUESTED`, `RatingRequested`, `ratingRequestedEvent(log)` | The rating event's name, `verisci/rating.requested`, its data `{ contract, requestId }`, and the event for a `Phase1Requested` log (id `rating:<request id>`), or `undefined` for any other log |
 | `RATING_SETTINGS`, `ORACLE_SETTINGS` | The rating run's and the oracle function's limits (below) |
-| `RatingOutcome`, `RatingFailure`, `ratingFailureReason(output)` | How a rating run ends (`fulfilled`, `cancelled` with an optional orphan R-KA, `skipped`), and why one stopped instead: each error it throws starts `rating-failed:<reason>:` |
+| `RatingOutcome`, `RatingFailure`, `ratingFailureReason(output)` | How a rating run ends (`fulfilled`, `cancelled` with an optional orphan R-KA, `skipped`, with an orphan R-KA when the oracle found the request gone, or the R-KA an oracle move may leave unrecorded), and why one stopped instead: each error it throws starts `rating-failed:<reason>:` |
 | `OracleAction`, `OracleInput`, `OracleResult`, `OracleFailure` | What the oracle function is asked, what it answers, and why it stops (`oracle-failed:<reason>:`) |
 | `createRatingEnv(runtimeEnv)`, `RatingEnv`, `checkRatingSettings(runtimeEnv)`, `ratingSettingsRequired(runtimeEnv)`, `servesRating(runtimeEnv)` | The rating settings and their type, the start check `apps/web/instrumentation.ts` runs, when it requires them, and whether a deployment serves the rating functions |
 | `PAPER_SUBMITTED` | The event's name, `verisci/paper.submitted` |
@@ -84,6 +90,7 @@ upload page reads runs there, with no keys.
 | `getRatingService()` | The rating pages' calls, built on first use from the settings: `listRatings(targetUal)`, `paperRatingSummaries(targetUals)`, `readRating(requestId)`, `announceLocalRating(txHash)` (below) |
 | `RatingService`, `RatingSummary`, `RatingListResult`, `RatingView`, `RatingStage`, `AnnounceResult` | Their type and answers: one request as its contract holds it; a paper's requests, oldest first, or `unavailable`; one rating, with its stage on the node while pending or its R-KA's record once fulfilled; the local announce's result |
 | `PaperRatingSummary`, `summariseRatings(ratings)` | A paper's rating as the pages show it (`scored` with the latest score, `pending`, `cannot-rate`, `unrated`, or `unknown` when the chain did not answer), and the one rule, shared by the papers list and the paper page, that sums a paper's requests into it |
+| `getWebhookIntake()`, `WebhookIntake`, `WebhookStatus` | The Alchemy Notify webhook's intake for `apps/web`'s route, built on first use: `receive(rawBody, signature)` answers the status to send back (below) |
 | `PaperListResult`, `PaperSummary`, `SignatureCheck`, `QueryProblem` | What `listPapers` returns: a page of papers with the total, or why not (`unavailable`, `unreadable`); one listed paper; a signature check (`valid`, `invalid`, `unknown`) |
 | `env` (from `@verisci/workflows/env`); `createWorkflowsEnv(runtimeEnv)`, `WorkflowsEnv` (from either entry) | The validated settings, the function that builds them from a given object, and their type |
 
@@ -128,6 +135,8 @@ starts nothing. Its steps:
 5. **store**, then **mint**: `startMint` listens 10 s, then the run polls the state every
    30 s with `step.sleep`. A mint not seen after 10 minutes is started again
    ([ADR 0008](../../docs/adr/0008-mints-are-async-polled-in-short-steps.md)).
+6. **notify**: a paper this run minted, not one an earlier run did, is announced once, by the
+   title it read, or its CID, with a link to its page (Notifications and alerts, below).
 
 Retries ([ADR 0009](../../docs/adr/0009-retries-are-spaced-with-step-sleep.md)):
 
@@ -152,7 +161,7 @@ Retries ([ADR 0009](../../docs/adr/0009-retries-are-spaced-with-step-sleep.md)):
 `verisci/rating.requested` carries `{ contract, requestId }`: a RatingController's lowercase
 address and a phase-1 request id. The `rate-paper` run is a singleton per request id in mode
 `skip` ([ADR 0020](../../docs/adr/0020-stuck-requests-recovered-only-oracle-cancels.md)),
-has 180 minutes, enough for every attempt and the oracle, and outside `APP_ENV=local` is
+has 300 minutes, enough for every attempt, their waits and the oracle, and outside `APP_ENV=local` is
 throttled to 3 starts an hour with a burst of 3, against Inngest's free plan
 ([ADR 0015](../../docs/adr/0015-rating-requests-are-free-on-testnet.md)). It does only what
 is left ([ADR 0007](../../docs/adr/0007-all-writes-converge.md)):
@@ -179,21 +188,32 @@ is left ([ADR 0007](../../docs/adr/0007-all-writes-converge.md)):
    ([ADR 0008](../../docs/adr/0008-mints-are-async-polled-in-short-steps.md)). A draft is
    shared, then minted. Missing is scored, then **store** writes the R-KA
    (`packages/core` → Ratings):
-   - **find-pdf** reads the `ipfs://` link to the paper's PDF from its own asset graph. A
-     link that is not an `ipfs://` CID cancels `invalid-target`. No link is retried:
-     **find-target** found the paper in this graph, so the node is still loading it.
+   - **find-pdf** reads the `ipfs://` link to the paper's PDF from its own asset graph, with
+     its title and abstract (`paperPdfQuery`, `paperHeadOf`). A link that is not an `ipfs://`
+     CID cancels `invalid-target`. No link is retried: **find-target** found the paper in this
+     graph, so the node is still loading it.
    - **read-paper** fetches the PDF through the gateway and extracts its text with unpdf
      (`packages/core` → Ratings → The paper's text), up to 150,000 characters. A PDF with no
      text layer (a scan), or one over the size limit (published before the limit was
      lowered from 30 to 15 MB), cancels `invalid-target`
-     ([ADR 0011](../../docs/adr/0011-a-rating-is-a-separate-r-ka.md)). A file that is not a
-     PDF or does not parse is read again on the next attempt, since the gateway may have given
-     another file; after 3 such reads it cancels `invalid-target`.
+     ([ADR 0011](../../docs/adr/0011-a-rating-is-a-separate-r-ka.md)). A gateway that does not
+     give the file the first time in a run is asked once more 15 s later
+     (`read-paper-<n>-wait`, then `read-paper-<n>-again`): it failed the first read of every run in local tests and gave
+     the next. A failed read names its cause (`HTTP <status>`, a timeout, the network error).
+     A file that is not a PDF or does not parse is read again on the next attempt, since the
+     gateway may have given another file; after 4 such reads, at least 22 minutes apart in
+     all, it cancels `invalid-target`.
+   - **check-field** asks `gemini-3.5-flash-lite` whether the paper is in the field, as the
+     publish run does (`checkField`, from its title, abstract and first 6,000 characters), once
+     a run: a paper `outside` cancels `invalid-target` before Flash is asked, even while Flash is
+     down; a check that does not answer leaves the field to the scorer
+     ([ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)).
    - **score-paper** asks Gemini, in one request, for the paper's field and study type and the
      answer to each of that type's checks, with quotes; `scoreChecks` checks the quotes and
      computes the score. A paper outside the life sciences and health cancels
-     `invalid-target`
-     ([ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)).
+     `invalid-target`, and so do two answers the check refuses: the same paper and prompt
+     tend to give the same answer, and each answer uses one of the free tier's 20 requests a
+     day, which a restart would spend again.
 
    Each of these is done once per run: a later attempt starts from the first one missing.
 4. **mint**, then **poll** every 30 s; a mint not seen after 10 minutes is started again.
@@ -204,25 +224,39 @@ is left ([ADR 0007](../../docs/adr/0007-all-writes-converge.md)):
 Past the maximum age (24 hours after the request's block), a minted R-KA is still fulfilled;
 a stored one is polled for 10 minutes without a new mint, and is fulfilled if it lands;
 anything else is cancelled `expired`. A stored R-KA left behind, or one minted for a request
-cancelled meanwhile, is an orphan: the outcome names it, and the run logs it as an error.
+cancelled meanwhile or gone when the oracle reads it (a reorg after the run's read), is an
+orphan: the outcome names it, and the run logs it and alerts on it from an **alert-orphan**
+step. When the contract's oracle changed mid-run, the run logs and alerts
+(**alert-oracle-moved**) what becomes of its R-KA. A minted one is recorded by a later run once the deployment holds the contract's oracle key again, the role pointed back
+([ADR 0020](../../docs/adr/0020-stuck-requests-recovered-only-oracle-cancels.md)) or a rotated
+key deployed ([ADR 0019](../../docs/adr/0019-oracle-transactions-are-serialized.md)), unless
+the request is cancelled by hand meanwhile. A stored one, past the maximum age, is recorded only
+if its mint landed; a later run otherwise cancels the request `expired`, leaving it unrecorded.
+Once the oracle settles the request, a **notify** step
+sends one activity message: the score or why it was cancelled, the paper (by its title, or its
+UAL when it has none), and the rating's page. A run that never read the paper, a restart that
+found the R-KA minted, looks it up first (**find-paper**); without the node's answer, the
+message names the paper by its UAL, with no link.
 
 Retries ([ADR 0009](../../docs/adr/0009-retries-are-spaced-with-step-sleep.md)): a chain
-that does not answer is read again every 2 minutes, up to 5 times. A node that does not
-answer or gives no rows yet, a quorum failure, a gateway that does not give the PDF, a file
-that does not read as a PDF (fewer than 3 times), or a Gemini call that is unreachable or
-rate-limited waits 2 minutes and starts a new attempt from the R-KA's read, up to 5 attempts,
-then fails (`node-unreachable`, `paper-unreachable`, `paper-unreadable`, `scorer-unavailable`;
-`mint-not-confirmed` when the mint is never seen). A Gemini answer the check refuses is asked
-for again once, then the run fails `scorer-unusable`: the same paper and prompt tend to give
-the same answer, and each answer uses one of the free tier's 20 requests a day. A node that does not answer is never
-taken for a missing paper. It fails at once (`setup`) on missing or invalid settings, a node that
+that does not answer is read again every 2 minutes, up to 5 times, and so is a node that does
+not answer whether it published the target (`lookupAttempts`, `lookupWait`). A node that does
+not answer or gives no rows yet, a quorum failure, a gateway that does not give the PDF, a
+file that does not read as a PDF (fewer than 4 times), or a Gemini call that is unreachable
+or rate-limited starts a new attempt from the R-KA's read after a growing wait: 2, 5, 15, 30,
+then 60 minutes (`retryWaits`), so 6 attempts ride out about 2 hours of a Gemini outage. Then
+the run fails (`node-unreachable`, `paper-unreachable`, `paper-unreadable`,
+`scorer-unavailable`; `mint-not-confirmed` when the mint is never seen). A Gemini answer the
+check refuses is asked for again once. A node that does not answer is never taken for a
+missing paper. It fails at once (`setup`) on missing or invalid settings, a node that
 refuses our key, Gemini refusing the request (the detail names its status), or a node that
 does not serve the graph, and
 (`rating-unreadable`) on a minted R-KA whose score does not parse. A failed run leaves the
-request pending; the reconciler of the next plan restarts it.
+request pending and alerts the maintainer; the reconciler restarts it (below).
 
-The scorer makes one request to `gemini-3.8-flash` per paper, since the free tier allows 20
-a day (`docs/domain.md` → Gemini): `scorePaper` sends `scorerPrompt`, temperature 0 and
+The scorer asks `gemini-3.8-flash` once per attempt until it gets an answer, at most 6 times
+a run, and each restart asks again, against the free tier's 20 a day (`docs/domain.md` →
+Gemini; [ADR 0018](../../docs/adr/0018-phase-1-scorer-output-contract.md)): `scorePaper` sends `scorerPrompt`, temperature 0 and
 `SCORER_OUTPUT_SCHEMA`, checks the answer with `parseScorerAnswer` (`askScorer`), then scores
 a paper in the field with `scoreChecks`. A 429 is `rate-limited`; any other 4xx is
 `refused`; a 5xx, a network error or no answer within 240 s is `unreachable`; each failure
@@ -291,8 +325,116 @@ minutes.
 
 Its answer is `fulfilled` (with the score and R-KA the chain holds), `cancelled` (with the
 chain's reason), `not-our-oracle`, or `unknown` (the contract no longer knows the request).
-Errors logged with a fixed tag (`oracle-at-fee-cap`, `oracle-conflict`, `oracle-no-funds`,
-`rating-orphan`) wait for alerts, which come with the next plan.
+An oracle without funds and a transaction at the fee cap are logged and alerted on once a
+run, each from a step of its own (`alert-no-funds`, `alert-fee-cap`), so a replay never sends
+it again; an `oracle-conflict` fails the run, which the failure alert reports.
+
+## The Alchemy Notify webhook
+
+Deployed, the rating run starts from the Alchemy Notify webhook
+([ADR 0017](../../docs/adr/0017-chain-events-are-ingested-at-least-once.md)): `apps/web`'s
+`POST /api/webhooks/alchemy` hands the raw body and its `X-Alchemy-Signature` to
+`getWebhookIntake().receive`, which:
+
+- answers 404 and reads nothing without `ALCHEMY_WEBHOOK_SIGNING_KEY`;
+- checks the signature, a hex HMAC-SHA256 of the raw body under the key, in constant time
+  before parsing, and answers 401 when it is missing or wrong;
+- answers 400, logged `webhook-unreadable: <field>`, for a body that is not a Custom Webhook
+  (GraphQL) delivery;
+- sends one `verisci/rating.requested` event per `Phase1Requested` log of an environment
+  contract, built with `ratingRequestedEvent` (id `rating:<request id>`, so a repeated delivery
+  makes no second run); a log marked `removed`, of another contract or of another event sends
+  nothing. After a reorg, Alchemy Notify delivers the new block; the run's read of the request
+  on chain stops one the reorg dropped before the run started, and the oracle function's read
+  one dropped later, whose R-KA minted meanwhile is an orphan, alerted on (`docs/domain.md` →
+  Chain, [ADR 0017](../../docs/adr/0017-chain-events-are-ingested-at-least-once.md));
+- answers 503, logged `webhook-unavailable: inngest: …`, when Inngest refuses the events, so
+  the Alchemy Notify webhook delivers again; otherwise 200.
+
+Each environment registers one Custom Webhook on Base Sepolia, on its current contract (past
+ones are paused), pointing at its deployment's route (staging's with the
+`x-vercel-protection-bypass` query parameter). Its query takes every event of the contract,
+of which the intake keeps the requests, and asks for the three fields the intake reads:
+
+```graphql
+{
+  block {
+    logs(filter: { addresses: ["<current contract>"], topics: [] }) {
+      data
+      topics
+      account { address }
+    }
+  }
+}
+```
+
+- Set `skip_empty_messages` on the webhook (the API's
+  `graphql_query: { query, skip_empty_messages: true }`): without it, Alchemy Notify delivers
+  every block, every 2 seconds, whether a log matched or not.
+- Keep the contract's address in the filter: an empty address list takes every contract's
+  events on Base Sepolia.
+- Keep exactly one rule per contract (`docs/domain.md` → Chain).
+
+## The reconciler
+
+`reconcile-ratings`, an Inngest cron every 30 minutes and a singleton, finds requests whose
+run stopped or never started, and sends each its rating event again
+([ADR 0020](../../docs/adr/0020-stuck-requests-recovered-only-oracle-cancels.md)). It only
+restarts runs: the run decides what is left (retry, cancel `invalid-target`, fulfil, or past
+24 hours cancel `expired`), and the reconciler never writes.
+
+- Each tick reads every contract of the environment (current and past, or Anvil's locally)
+  in a step of its own (`find-stale-<contract>`), one after the other: one page of 100 ids of
+  the pending set (`readPendingRequestIds`), page `tick mod pages`, so successive ticks reach
+  every request without a stored cursor, then each request, 10 at a time (`readPending`), so
+  the tick never has more than 10 calls at the RPC at once. A step ends within Vercel's 300 s
+  even when every call waits out the RPC's 10 s timeout. One pending more than 4 hours gets
+  its event, with the id
+  `rating:<request id>:<window>`, the 4-hour window of the tick: every tick of a window sends
+  the same id, so Inngest starts at most one run per request per window whatever the
+  throttle does, and the singleton keeps it off a run still going.
+- 4 hours: a run waits up to about 2 hours on a Gemini outage and has 5 hours in all, so a
+  run that stopped is restarted within 4.5 hours of the request. A restart that finds the
+  first run still going is skipped, and the next window sends it again, 4 hours later. With
+  the 24-hour maximum age, a stuck request gets about 5 runs before it is
+  cancelled; the maximum age must exceed the threshold, the interval and a run's budget, and
+  a test holds it.
+- A scorer outage therefore leaves a request pending until a restart finds Gemini back. A
+  contract that does not answer is logged `reconcile-unreachable` and read on the next tick;
+  requests that do not answer are logged `reconcile-unreadable: <contract>: <n> of <m>
+  requests` and read again when their page comes round.
+- It runs wherever the oracle key is (ADR 0019), a developer's computer included, where it
+  starts a request the page never announced.
+
+## Notifications and alerts
+
+One `notify({ level, text })` (`createNotify`) tells the maintainer everything, in one Telegram
+chat for every environment ([ADR 0038](../../docs/adr/0038-alerts-go-to-one-telegram-chat.md)):
+each message is prefixed with the environment and the level (`[staging · alert] …`). Without
+`TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` it only logs the message; a send that fails is
+logged `notify-unavailable: telegram: …` and never fails the run that sent it. Every send is a
+step of its own, so a replay never sends it twice.
+
+- **Activity:** a paper published (the publish run's **notify**), a rating scored or cancelled
+  (the rating run's **notify**), with a link to the page (`siteUrlOf`).
+- **A failed or cancelled run:** `alert-on-failure`, on every function's
+  `inngest/function.failed`, names the function, the run and the first line of its error,
+  whose `publish-failed:`, `rating-failed:` or `oracle-failed:` prefix says why; on
+  `inngest/function.cancelled`, sent for a run past its time budget (`timeouts.finish`) or one
+  cancelled by hand, it names the function and the run.
+- **The oracle and orphans:** an oracle without funds (**alert-no-funds**), a transaction at
+  the fee cap (**alert-fee-cap**), an orphan R-KA (the rating run's **alert-orphan**), and an
+  R-KA an oracle move may leave unrecorded (**alert-oracle-moved**).
+- **Every hour,** `check-health` alerts on the oracle's ETH, and each publisher wallet's ETH on
+  Base Sepolia, under 0.005; a publisher wallet's TRAC under 100; and requests pending past 6
+  hours, with how many and the oldest. It reads the balances in one step (`check-balances`),
+  then each contract in a step of its own (`check-pending-<contract>`), one after the other:
+  at most 2 pages of pending ids a contract an hour (200 requests, 10 at a time), each hour
+  going on from the last, so a spam backlog is read in turns and the alert says how many it
+  read. A balance that does not answer is logged `health-unreadable: <role> <address>:
+  ETH|TRAC` (`oracle` or `publisher`) and read again the next hour; a contract is logged
+  `health-unreachable`, and requests that do not answer `health-unreadable` with their number. One alert lists every problem, from its
+  own step (`alert`); nothing is sent when all is well. It runs where the oracle key is.
 
 ## The pages' calls
 
@@ -431,7 +573,20 @@ Or rate through the pages, after steps 1 to 4:
 3. Open a published paper's page, click **Rate this paper** and confirm in the wallet. The page
    waits for the receipt, then has the server announce the request (`announceLocalRating`),
    and opens the rating's page, which follows it to its score. A Gemini outage shows as the
-   first step taking long: the run retries, then stops after its five attempts.
+   first step taking long: the run waits up to about 2 hours, then stops, and the reconciler
+   restarts it after 4 hours.
+
+To check the webhook route and the reconciler locally:
+
+1. Set `ALCHEMY_WEBHOOK_SIGNING_KEY` to any value in the root `.env.local`, and restart
+   `pnpm dev`.
+2. `pnpm --filter @verisci/workflows rate-paper <target UAL> --no-event` requests a rating
+   without sending its event, and prints the transaction.
+3. `pnpm --filter @verisci/workflows post-webhook <transaction>` posts that transaction's logs
+   to the route as a signed Alchemy Notify delivery; it prints the route's answer, and the run
+   starts in the dev server.
+4. Or leave the request unannounced: the reconciler starts its run once it is 4 hours old, if
+   the dev server runs crons (`docs/domain.md` → Inngest and Vercel).
 
 Restarting Anvil empties it: deploy again (the first deploy on a fresh chain gets the same
 address). Request ids still never repeat, since each one hashes the contract's deploy time
@@ -441,12 +596,11 @@ cap, whatever earlier runs left pending. Requests from your own wallet, through 
 against its cap of 3 while they are pending, announced or not; restarting Anvil clears them.
 
 The script, and the paper page through `announceLocalRating`, stand in for the Alchemy Notify
-webhook, which comes with the next plan: each reads the `Phase1Requested` log from the
-request's receipt and builds the event with `ratingRequestedEvent`, the function the webhook
-route will call. From the event on, the run
+webhook: each reads the `Phase1Requested` log from the request's receipt and builds the event
+with `ratingRequestedEvent`, the function the webhook's intake calls. From the event on, the run
 is the one staging runs: the contract and its oracle, the target read from the staging graph,
 Gemini's score, the R-KA minted on Base Sepolia, and the oracle's transaction and receipt.
-Alchemy's signed delivery, Inngest crons in a branch environment and Base's handling of a
+The Alchemy Notify webhook's signed delivery, Inngest crons in a branch environment and Base's handling of a
 stuck transaction are checked on `develop`; the unit tests cover every branch with mocks.
 
 ## Scripts
@@ -456,10 +610,12 @@ stuck transaction are checked on `develop`; the unit tests cover every branch wi
 | `pnpm --filter @verisci/workflows typecheck` | Typechecks the package and its scripts |
 | `pnpm --filter @verisci/workflows test` | Runs its Vitest project (`vitest run`) with mocked adapters |
 | `pnpm --filter @verisci/workflows publish-pdf <file.pdf>` | Dev only: pins a PDF, signs it and sends `verisci/paper.submitted` to the local dev server |
-| `pnpm --filter @verisci/workflows rate-paper <target UAL> [--raw]` | Dev only, `APP_ENV=local`: requests a rating on the Anvil contract from a throwaway requester and sends `verisci/rating.requested` to the local dev server |
+| `pnpm --filter @verisci/workflows rate-paper <target UAL> [--raw] [--no-event]` | Dev only, `APP_ENV=local`: requests a rating on the Anvil contract from a throwaway requester and sends `verisci/rating.requested` to the local dev server; `--no-event` sends nothing and prints the transaction |
+| `pnpm --filter @verisci/workflows post-webhook <tx hash> [--url <route>]` | Dev only, `APP_ENV=local`: posts a transaction's logs on Anvil to the webhook route as an Alchemy Notify delivery signed with `ALCHEMY_WEBHOOK_SIGNING_KEY` |
 | `pnpm --filter @verisci/workflows fund-local <address>` | Dev only, `APP_ENV=local`: gives the address 1 ETH on Anvil, so its wallet can request a rating from the paper page |
 | `pnpm --filter @verisci/workflows score-papers [--field] [id…]` | Dev only, `APP_ENV=local`: scores the reference papers with Gemini and compares each with what is expected, or with `--field` runs only the publish run's field check on them (Measuring the scorer above) |
 
 Ships TypeScript source (`src/index.ts`, `src/env.ts`), with no build step. The source is
-grouped by feature: `src/publish/`, `src/rating/`, `src/pdf/`, `src/gemini/` and `src/site/`
+grouped by feature: `src/publish/`, `src/rating/`, `src/pdf/`, `src/gemini/`, `src/site/` and
+`src/alerts/`
 (`CLAUDE.md` here).

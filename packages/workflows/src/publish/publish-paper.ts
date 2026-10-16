@@ -8,6 +8,8 @@ import {
 } from "@verisci/core";
 import type { DkgClient, DkgFailure } from "@verisci/dkg";
 import { type Inngest, NonRetriableError } from "inngest";
+import { publishedText } from "../alerts/messages.ts";
+import type { Notify } from "../alerts/notify.ts";
 import type { FieldCheckResult } from "./field-check.ts";
 import type { SubmissionRefusal, VerifiedSubmission, VerifyResult } from "./verify-submission.ts";
 
@@ -139,6 +141,10 @@ export interface PublishDeps {
   /** Asks Gemini whether a new paper is in VeriSci's field (ADR 0037). */
   checkField(paper: FieldCheckInput): Promise<FieldCheckResult>;
   readonly dkg: Pick<DkgClient, "readAsset" | "storeAsset" | "startMint">;
+  /** Tells the maintainer's Telegram chat (ADR 0038); never throws. */
+  notify: Notify;
+  /** The site's address, for the message's link to the paper's page (`siteUrlOf`). */
+  readonly siteUrl: string | undefined;
 }
 
 type Attempt =
@@ -166,6 +172,9 @@ type Attempt =
  * credential, Gemini refuses the field check's request, the node does not serve the graph, or
  * the attempts run out.
  *
+ * A paper this run minted, and not an earlier one, is announced once (`notify`, ADR 0038), by its
+ * title when this run read it, else by its CID.
+ *
  * The deadline is checked against `receivedAt`, so retries during an outage never expire a
  * signature that was valid when it arrived. `receivedAt` is the event's `ts`, which its
  * sender may set: only verisci's own server and scripts send this event, and the server
@@ -187,10 +196,17 @@ export async function runPublish(
   let last = "";
   let lastFailure: PublishFailure = "node-unreachable";
   const field: FieldState = { checked: false };
+  const news: News = { minting: false };
   for (let attempt = 1; attempt <= PUBLISH_SETTINGS.attempts; attempt++) {
-    const context = { attempt, name: name.name, submission, step, deps, logger, field };
+    const context = { attempt, name: name.name, submission, step, deps, logger, field, news };
     const result = await publishOnce(context);
-    if (result.kind === "done") return result.outcome;
+    if (result.kind === "done") {
+      if (result.outcome.state === "minted" && news.minting) {
+        const text = publishedText({ cid: submission.cid, title: news.title }, deps.siteUrl);
+        await step.run("notify", () => deps.notify({ level: "activity", text }));
+      }
+      return result.outcome;
+    }
     if (result.kind === "fatal") throw stop("setup", `publish of ${name.name}: ${result.reason}`);
     last = result.kind === "retry" ? result.reason : "mint not seen";
     lastFailure = result.kind === "retry" ? result.failure : "mint-not-confirmed";
@@ -232,6 +248,12 @@ interface FieldState {
   checked: boolean;
 }
 
+/** What the run's message says: whether this run started the mint, and the title it read. */
+interface News {
+  minting: boolean;
+  title?: string;
+}
+
 interface AttemptContext {
   readonly attempt: number;
   readonly name: string;
@@ -240,6 +262,7 @@ interface AttemptContext {
   readonly deps: PublishDeps;
   readonly logger: PublishLogger;
   readonly field: FieldState;
+  readonly news: News;
 }
 
 async function publishOnce(context: AttemptContext): Promise<Attempt> {
@@ -262,6 +285,7 @@ async function publishOnce(context: AttemptContext): Promise<Attempt> {
           return { kind: "fatal", reason: "GROBID unauthorized" };
         return { kind: "done", outcome: { state: "refused", reason: paper.reason } };
       }
+      context.news.title = paper.metadata.title;
       if (!context.field.checked) {
         const { title, abstract } = paper.metadata;
         const input = { title, ...(abstract ? { abstract } : {}), opening: paper.opening };
@@ -285,6 +309,7 @@ async function publishOnce(context: AttemptContext): Promise<Attempt> {
     deps.dkg.startMint(name, { listenMs: PUBLISH_SETTINGS.listenMs }),
   );
   if (!mint.ok) return failed(mint);
+  context.news.minting = true;
   if (mint.state === "minted") return minted(mint.ual);
 
   for (let poll = 1; poll <= PUBLISH_SETTINGS.pollsPerMint; poll++) {

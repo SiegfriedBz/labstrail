@@ -120,6 +120,7 @@ describe("RatingProgress", () => {
 
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("This paper can't be rated");
     expect(screen.getByText(/outside the life sciences/)).toBeTruthy();
+    expect(screen.getByText(/the scoring model couldn't give a usable answer for it/)).toBeTruthy();
   });
 
   it("follows a pending rating every 5 s and stops once it is scored", async () => {

@@ -36,6 +36,11 @@ export type ReadRequestIdsResult =
   | { readonly ok: true; readonly ids: readonly Hex[] }
   | { readonly ok: false; readonly reason: "unreachable" };
 
+/** The result of {@link readPendingCount}. */
+export type ReadPendingCountResult =
+  | { readonly ok: true; readonly count: number }
+  | { readonly ok: false; readonly reason: "unreachable" };
+
 /** The result of {@link readOracleAgent}. */
 export type ReadOracleResult =
   | { readonly ok: true; readonly oracle: string }
@@ -112,6 +117,51 @@ export async function readRequestIdsOf(
       ids.push(...page);
     }
     return { ok: true, ids };
+  } catch {
+    return { ok: false, reason: "unreachable" };
+  }
+}
+
+/**
+ * How many requests a RatingController holds pending (`pendingCount`, ADR 0020). An RPC error
+ * or timeout, or a reply that does not decode, is `unreachable`.
+ */
+export async function readPendingCount(
+  client: ContractReader,
+  contract: Hex,
+): Promise<ReadPendingCountResult> {
+  try {
+    const count = await client.readContract({
+      address: contract,
+      abi: ratingControllerAbi,
+      functionName: "pendingCount",
+    });
+    return { ok: true, count: Number(count) };
+  } catch {
+    return { ok: false, reason: "unreachable" };
+  }
+}
+
+/**
+ * One page of a RatingController's pending request ids, in lowercase (`pendingRequestIds`,
+ * ADR 0020): at most `limit` from `offset`, in the set's order, which a fulfil or cancel
+ * reshuffles, so a reader pages through it again rather than trusting an earlier page. An RPC
+ * error or timeout, or a reply that does not decode, is `unreachable`.
+ */
+export async function readPendingRequestIds(
+  client: ContractReader,
+  contract: Hex,
+  offset: number,
+  limit: number,
+): Promise<ReadRequestIdsResult> {
+  try {
+    const ids = await client.readContract({
+      address: contract,
+      abi: ratingControllerAbi,
+      functionName: "pendingRequestIds",
+      args: [BigInt(offset), BigInt(limit)],
+    });
+    return { ok: true, ids: ids.map((id) => id.toLowerCase() as Hex) };
   } catch {
     return { ok: false, reason: "unreachable" };
   }

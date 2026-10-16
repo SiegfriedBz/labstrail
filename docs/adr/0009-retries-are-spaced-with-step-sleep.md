@@ -20,3 +20,4 @@ Mints can fail fast on quorum (`storage_ack_insufficient`, `CORE_TEMPORARILY_UNA
 ## History
 
 - 2026-10-10: each workflow that retries sets its own values, starting from these, so tuning one workflow's leaves the others' alone; the publish run uses them unchanged (branch review, user's choice).
+- 2026-10-16: the rating run waits 2, 5, 15, 30, then 60 minutes between its 6 attempts, and its budget grows to match: a Gemini outage outlasted 10 minutes of retries on 2026-10-13 and 14. Reading the request and finding the target keep 2 minutes and 5 tries (intake and recovery, user's choice).

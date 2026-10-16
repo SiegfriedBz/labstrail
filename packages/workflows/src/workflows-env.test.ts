@@ -89,6 +89,33 @@ describe("createWorkflowsEnv", () => {
     ).toBeUndefined();
   });
 
+  it("takes the Telegram bot and chat as optional, and refuses malformed ones without their value", () => {
+    expect(createWorkflowsEnv(runtimeEnv).TELEGRAM_BOT_TOKEN).toBeUndefined();
+    const env = createWorkflowsEnv({
+      ...runtimeEnv,
+      TELEGRAM_BOT_TOKEN: "123456:AAH-secret_token",
+      TELEGRAM_CHAT_ID: "-1001234567",
+    });
+    expect(env.TELEGRAM_BOT_TOKEN).toBe("123456:AAH-secret_token");
+    expect(env.TELEGRAM_CHAT_ID).toBe("-1001234567");
+
+    let caught: unknown;
+    try {
+      createWorkflowsEnv({
+        ...runtimeEnv,
+        TELEGRAM_BOT_TOKEN: "leaked token",
+        TELEGRAM_CHAT_ID: "chat",
+      });
+    } catch (error) {
+      caught = error;
+    }
+    expect((caught as EnvError).issues.map((issue) => issue.variable).sort()).toEqual([
+      "TELEGRAM_BOT_TOKEN",
+      "TELEGRAM_CHAT_ID",
+    ]);
+    expect(String((caught as EnvError).message)).not.toContain("leaked token");
+  });
+
   it("requires the Pinata key", () => {
     expect(() => createWorkflowsEnv({ ...runtimeEnv, PINATA_JWT: "" })).toThrow(EnvError);
   });

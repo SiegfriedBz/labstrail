@@ -6,6 +6,8 @@ import {
   cancelCalldata,
   fulfilCalldata,
   readOracleAgent,
+  readPendingCount,
+  readPendingRequestIds,
   readRatingRequest,
   readRequestIdsOf,
 } from "./rating-controller.ts";
@@ -231,5 +233,60 @@ describe("readRequestIdsOf", () => {
       ok: false,
       reason: "unreachable",
     });
+  });
+});
+
+describe("pending requests", () => {
+  const id = (n: number) => `0x${n.toString(16).padStart(64, "A")}` as const;
+  const pending = Array.from({ length: 120 }, (_, n) => id(n));
+
+  /** A contract holding `pending`, answering `pendingCount` and `pendingRequestIds`. */
+  function contract() {
+    return reader(async () => undefined).readContract.mockImplementation(
+      async ({ functionName, args }: { functionName: string; args?: readonly unknown[] }) => {
+        if (functionName === "pendingCount") return BigInt(pending.length);
+        const [offset, limit] = args as [bigint, bigint];
+        return pending.slice(Number(offset), Number(offset) + Number(limit));
+      },
+    );
+  }
+
+  it("reads how many requests are pending", async () => {
+    const readContract = contract();
+
+    expect(await readPendingCount({ readContract } as never, CONTRACT)).toEqual({
+      ok: true,
+      count: 120,
+    });
+    expect(readContract).toHaveBeenCalledWith({
+      address: CONTRACT,
+      abi: ratingControllerAbi,
+      functionName: "pendingCount",
+    });
+  });
+
+  it("reads one page of pending request ids, in lowercase", async () => {
+    const readContract = contract();
+
+    const page = await readPendingRequestIds({ readContract } as never, CONTRACT, 100, 50);
+
+    expect(page).toEqual({ ok: true, ids: pending.slice(100).map((n) => n.toLowerCase()) });
+    expect(page.ok && page.ids).toHaveLength(20);
+    expect(readContract).toHaveBeenCalledWith({
+      address: CONTRACT,
+      abi: ratingControllerAbi,
+      functionName: "pendingRequestIds",
+      args: [100n, 50n],
+    });
+  });
+
+  it.each([
+    ["an RPC error", () => Promise.reject(new Error("HTTP request failed"))],
+    ["a reply that doesn't decode", () => Promise.reject(new AbiDecodingZeroDataError())],
+  ])("gives unreachable for %s", async (_, answer) => {
+    const unreachable = { ok: false, reason: "unreachable" };
+
+    expect(await readPendingCount(reader(answer), CONTRACT)).toEqual(unreachable);
+    expect(await readPendingRequestIds(reader(answer), CONTRACT, 0, 50)).toEqual(unreachable);
   });
 });

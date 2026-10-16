@@ -187,7 +187,9 @@ edge`, testnet), Base Sepolia.
   `DKGKnowledgeAssets` (symbol DKA, ERC-721) `0x2b2e1bcb7c52a1587264e01f6b53782d791e6fa0`, whose
   `Transfer` minted the token to the node's agent address; `KnowledgeAssetsLifecycle`
   `0x835f921a0fc8d6365c34a0bb9b37d10c98c1b8c3`, the contract the node's transaction calls; and
-  the fee token "V9 Test TRAC" `0x2a58bdd13176d85906d804cdbffa0d9119282dc8`. A V10 UAL's token
+  the fee token "V9 Test TRAC" `0x2a58bdd13176d85906d804cdbffa0d9119282dc8` (symbol `v9TRAC`, 18
+  decimals; OriginTrail's contract list names it as the V10 testnet's TRAC, and the agent wallet
+  held 900 of it on 2026-10-16), whose balance the health check watches. A V10 UAL's token
   id is the author's address shifted left 96 bits, OR the asset number (asset 8's id equals the
   `batchId` the daemon logs). Basescan shows a token at `/nft/<contract>/<token id>`. Recorded
   in `@verisci/core` as `ORIGINTRAIL_CONTRACTS`; re-check after an OriginTrail upgrade.
@@ -206,9 +208,9 @@ edge`, testnet), Base Sepolia.
   keeps history from block 46,500,000 only ("pruned history unavailable").
 - **The daemon reads the chain constantly** (previous host, DKG 10.0.16, two graphs,
   2026-09 to 2026-10): it re-resolves each graph's authority from chain history again and
-  again. With every call except log reads sent to Alchemy first and no limit, Alchemy's free
-  tier was used up after a few weeks; from about 2026-10-05 the chain head froze and every
-  write failed, while `/api/status` still answered. The proxy now keeps Alchemy last,
+  again. With every call except log reads sent to Alchemy RPC first and no limit, Alchemy RPC's
+  free tier was used up after a few weeks; from about 2026-10-05 the chain head froze and every
+  write failed, while `/api/status` still answered. The proxy now keeps Alchemy RPC last,
   within a daily budget (`infra/rpc-proxy`). Unverified: whether a later release reads
   less.
 
@@ -359,20 +361,33 @@ score the same day (plan 021).
 
 ## Chain
 
-Observed on Base Sepolia (chain id 84532) with Alchemy.
+Observed on Base Sepolia (chain id 84532) with Alchemy RPC and the Alchemy Notify webhook.
 
 - **Base produces a block every 2 seconds; a block is final only once its batch is final on
   L1,** minutes later. Reorgs before that are rare but possible (Base docs), which is why
   request ids are bound to their content ([ADR 0016](adr/0016-asset-names-derive-from-request-id.md)).
 - **The free RPC tier caps `eth_getLogs` at 10 blocks,** so nothing may depend on scanning
   history; read current contract state instead ([ADR 0020](adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
-- **Alchemy delivers a log to every webhook rule matching its contract:** keep exactly one
+- **The Alchemy Notify webhook delivers a log to every rule matching its contract:** keep exactly one
   rule per contract, or one request reaches two oracles.
-- **Each Alchemy webhook signs with its own secret:** a route checking another
-  environment's secret answers 401, so repeated 401s mean a secret swapped between
-  environments ([ADR 0017](adr/0017-chain-events-are-ingested-at-least-once.md)).
+- **Each Alchemy Notify webhook signs with its own key:** `X-Alchemy-Signature` is the hex
+  HMAC-SHA256 of the raw body under the webhook's signing key (Alchemy's webhook docs), so the
+  body must be checked as received, before any parse; a route checking another environment's
+  key answers 401, so repeated 401s mean a key swapped between environments
+  ([ADR 0017](adr/0017-chain-events-are-ingested-at-least-once.md)). A Custom Webhook's
+  delivery carries the fields its GraphQL query asks for (`packages/workflows` README → The
+  Alchemy Notify webhook).
+- **A Custom Webhook delivers every block its query runs on, matching or not,** unless it is
+  created with `skip_empty_messages` (the API's `graphql_query: { query, skip_empty_messages:
+  true }`); on Base, a delivery every 2 seconds. In its log filter, an empty `topics` list
+  matches every event of the listed addresses, and an empty address list every address
+  (Alchemy's Custom Webhooks docs).
+- **After a reorg, the Alchemy Notify webhook delivers the new block** (Alchemy's Custom
+  Webhooks FAQ): the same block number with a new hash means the earlier delivery's logs
+  left the chain. Its GraphQL logs carry no per-log `removed` mark, so a run reads the
+  request on chain before acting ([ADR 0017](adr/0017-chain-events-are-ingested-at-least-once.md)).
 - **Base has no public mempool:** the RPC forwards transactions to the sequencer, so
-  whether Alchemy's pending nonce (`eth_getTransactionCount(…, "pending")`) shows a
+  whether Alchemy RPC's pending nonce (`eth_getTransactionCount(…, "pending")`) shows a
   transaction not yet included is to verify ([ADR 0019](adr/0019-oracle-transactions-are-serialized.md)).
 - **Anvil, for local rating runs** (Foundry 1.8.4, 2026-10-11,
   [ADR 0036](adr/0036-local-rating-runs-use-anvil.md)): its default port 8545 is the one the
@@ -408,12 +423,18 @@ Observed on Vercel Hobby with Inngest Cloud, except where a fact cites the vendo
   cannot reach `/api/inngest`. The stable `develop` deployment is a preview too, so the
   staging webhook needs the same bypass; a caller that cannot set headers passes it as the
   `x-vercel-protection-bypass` query parameter (Vercel docs, to verify on our plan).
+- **A run past its time budget is cancelled, not failed** (Inngest docs, system events): Inngest
+  sends `inngest/function.cancelled` for it, as for a run cancelled by hand or through the API,
+  with the function and run ids (the docs add an error "function cancelled"; inngest 4.22.0's
+  types carry only the ids), and
+  `inngest/function.failed` only for a run that failed after its retries. An alert on failures
+  alone misses a run that ran out of time ([ADR 0038](adr/0038-alerts-go-to-one-telegram-chat.md)).
 - **Inngest archives a branch environment 3 days after its latest deploy** (Inngest docs),
   unless auto-archive is disabled for it in the dashboard. Archiving stops its functions
   from triggering, so staging stops after three quiet days on `develop` ([ADR 0005](adr/0005-staging-and-production-are-isolated.md)).
 - **Unverified: cron functions in a branch environment.** Inngest's docs do not say
   whether a branch environment runs scheduled functions; staging's reconciler relies on
-  it, so the rating plan checks it on `develop` ([ADR 0020](adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
+  it, so the first deploy checks it on `develop` ([ADR 0020](adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
 - **Only production and the stable `develop` deployment receive webhooks:** feature
   previews have no stable URL to register.
 - **Inngest concurrency limits count running steps, not runs:** a run that is sleeping or
@@ -421,6 +442,14 @@ Observed on Vercel Hobby with Inngest Cloud, except where a fact cites the vendo
   the same request ([ADR 0020](adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
 - **Inngest `singleton` (mode `skip`) locks a whole run, sleeps included:** while a run for
   a key is active, new runs for that key are skipped (Inngest docs) ([ADR 0020](adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
+- **Unverified: whether runs the throttle holds count as active for `singleton`.** Inngest's
+  docs describe each alone (2026-10-16): the throttle queues runs, the singleton skips new ones
+  while one is active. If queued runs do not count, every restart event for a request would
+  queue another run; the reconciler's event id carries a 4-hour window, so it sends one restart
+  per request per window either way ([ADR 0020](adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
+- **Unverified: whether the local dev server runs cron functions on their schedule.** Inngest's
+  docs say crons trigger functions, not how the dev server fires them (2026-10-16); the local
+  reconciler relies on it (`packages/workflows` README → Running a rating locally).
 - **Inngest deduplicates event ids for 24 hours only:** an event re-sent later with the
   same id starts a new run ([ADR 0017](adr/0017-chain-events-are-ingested-at-least-once.md)).
   Within the 24 hours the dev server still logs "initializing fn" but starts no run, and

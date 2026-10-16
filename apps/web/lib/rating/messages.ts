@@ -14,7 +14,7 @@ export function cancelMessage(reason: "invalid-target" | "expired"): {
   return reason === "invalid-target"
     ? {
         title: "This paper can't be rated",
-        body: "VeriSci rates life-science and health papers it published itself, and reads them from their PDF. This one is outside the life sciences and health, its PDF's text couldn't be read (a scan, or a file over the size limit), or its address isn't one of VeriSci's papers.",
+        body: "VeriSci rates life-science and health papers it published itself, and reads them from their PDF. This one is outside the life sciences and health, its PDF's text couldn't be read (a scan, or a file over the size limit), its address isn't one of VeriSci's papers, or the scoring model couldn't give a usable answer for it.",
       }
     : {
         title: "The rating couldn't finish within a day",

@@ -1,11 +1,12 @@
 created: 2026-10-12T05:46:24.565Z
-updated: 2026-10-12T06:11:49.697Z
-update_count: 3
-last_field: diagram
+updated: 2026-10-16T18:31:14.194Z
+update_count: 9
+last_field: description
 kind: nested-class
 title: rating-run
 children:
   - cancel
+  - check-field
   - find-pdf
   - find-target
   - fulfil
@@ -22,12 +23,14 @@ prev_diagram: >
       find-target -->|"a paper verisci published"| read-rka["Read R-KA\nstep read-rka-n"]
       find-target -->|"anything else"| cancel["Cancel\noracle cancel"]
       read-rka -->|"missing"| find-pdf["Find PDF\nstep find-pdf-n"]
+      read-rka -->|"past 24 hours, not minted: expired"| cancel
       find-pdf -->|"ipfs:// CID"| read-text["Read Text\nstep read-paper-n"]
+      find-pdf -->|"a link that is not an IPFS CID"| cancel
       read-text -->|"the paper's text"| score-paper["Score Paper\nstep score-paper-n"]
+      read-text -->|"no text, too large, 3 bad reads"| cancel
       score-paper -->|"score, study type, checks"| store-mint["Store and Mint\nsteps store-n, mint-n, poll-n-k"]
+      score-paper -->|"outside the field"| cancel
       read-rka -->|"stored or draft"| store-mint
       store-mint -->|"minted R-KA"| read-score["Read Score\nstep read-score-n"]
       read-rka -->|"minted"| read-score
       read-score -->|"score from the R-KA"| fulfil["Fulfil\noracle fulfil"]
-      score-paper -->|"outside the field"| cancel
-      read-text -->|"no text, too large, 3 bad reads"| cancel

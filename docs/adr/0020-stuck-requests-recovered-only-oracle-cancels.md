@@ -15,7 +15,7 @@ Requests can stop halfway ([0007](0007-all-writes-converge.md)), or never start 
 - Each run reads the request on chain and its R-KA on the daemon, then does what is left of score, store, mint and fulfil. A stored score is read back, never recomputed ([0018](0018-phase-1-scorer-output-contract.md)). Past a maximum age, it fulfils if the R-KA is minted, and otherwise cancels.
 - The v2 contract keeps an enumerable set of pending request ids with their request time, so recovery reads current state, never log history.
 - A reconciler, an Inngest cron, reads that set and starts the function for every request pending longer than a threshold. It never writes itself.
-- Only the oracle cancels a pending request, and a cancel records why: maximum age or invalid target. In an emergency, the owner replaces the oracle's address, and the new oracle cancels.
+- Only the oracle cancels a pending request, and a cancel records why: maximum age, or invalid target for a target VeriSci does not rate under that UAL: one that is not its paper or that it cannot rate ([0011](0011-a-rating-is-a-separate-r-ka.md)), or a UAL not in canonical form ([0031](0031-uals-are-normalized-before-the-contract.md)). In an emergency, the owner replaces the oracle's address, and the new oracle cancels.
 
 ## Consequences
 
@@ -25,7 +25,7 @@ Requests can stop halfway ([0007](0007-all-writes-converge.md)), or never start 
 - Correctness rests on the singleton, on convergent writes ([0007](0007-all-writes-converge.md)) and on the contract's own checks.
 - The function and the reconciler run only where the oracle key is ([0019](0019-oracle-transactions-are-serialized.md)). Staging's reconciler needs crons in a branch environment, which is unverified ([domain](../domain.md)).
 - While the owner has pointed the oracle role at another key, the backend's oracle transactions fail until it is pointed back.
-- The contracts plan builds the pending set and the cancel path; the rating plan sets the threshold, the cron interval and the maximum age.
+- The contracts plan builds the pending set and the cancel path; the rating plan sets the maximum age, and the intake and recovery plan the threshold and the cron interval.
 
 ## History
 
@@ -34,3 +34,6 @@ Requests can stop halfway ([0007](0007-all-writes-converge.md)), or never start 
 - 2026-10-07: retitled to name everything it now covers (was "A cron reconciler recovers stuck requests").
 - 2026-10-10: corrected: "the agents plan" is now "the rating plan", since the agents package was renamed `workflows`.
 - 2026-10-15: locally, the page that sent a request also starts its function; the reconciler still finds any request the page misses ([0036](0036-local-rating-runs-use-anvil.md)) (rating UI review, user's choice).
+- 2026-10-16: the intake and recovery plan sets the threshold and the cron interval, and builds the reconciler (intake and recovery).
+- 2026-10-16: "invalid target" covers every paper VeriSci cannot rate, one the scorer gives two refused answers for included ([0011](0011-a-rating-is-a-separate-r-ka.md)), so the recorded reason still says why the request stopped (intake and recovery review, user's choice).
+- 2026-10-16: corrected: "invalid target" also covers a UAL not in canonical form, as [0031](0031-uals-are-normalized-before-the-contract.md) decides (ADR sweep, user's choice).

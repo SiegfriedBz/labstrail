@@ -36,9 +36,12 @@ describe("workflows' layout", () => {
       "createRatingEnv",
       "createWorkflowsEnv",
       "describeFailure",
+      "failureAlerts",
       "functions",
       "getRatingService",
       "getUploadService",
+      "getWebhookIntake",
+      "healthCheck",
       "inngest",
       "oracleTransaction",
       "publishFailureReason",
@@ -47,6 +50,7 @@ describe("workflows' layout", () => {
       "ratingFailureReason",
       "ratingRequestedEvent",
       "ratingSettingsRequired",
+      "reconcileRatings",
       "servedFunctions",
       "servesRating",
       "summariseRatings",
@@ -59,6 +63,8 @@ describe("workflows' layout", () => {
     const root = ["index", "env", "functions", "inngest", "layout"];
 
     expect(files.length).toBeGreaterThan(20);
-    expect(misplaced(files, root, ["publish", "rating", "pdf", "site", "gemini"])).toEqual([]);
+    expect(
+      misplaced(files, root, ["publish", "rating", "pdf", "site", "gemini", "alerts"]),
+    ).toEqual([]);
   });
 });

@@ -13,7 +13,8 @@
     "publish-pdf": "node --env-file-if-exists=../../.env.local scripts/publish-pdf.ts",
     "rate-paper": "node --env-file-if-exists=../../.env.local scripts/rate-paper.ts",
     "score-papers": "node --env-file-if-exists=../../.env.local scripts/score-papers.ts",
-    "fund-local": "node --env-file-if-exists=../../.env.local scripts/fund-local.ts"
+    "fund-local": "node --env-file-if-exists=../../.env.local scripts/fund-local.ts",
+    "post-webhook": "node --env-file-if-exists=../../.env.local scripts/post-webhook.ts"
   },
   "dependencies": {
     "@verisci/contracts": "workspace:*",

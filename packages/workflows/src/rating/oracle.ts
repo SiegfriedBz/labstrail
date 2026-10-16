@@ -103,7 +103,7 @@ export interface OracleSteps {
   sleep(id: string, duration: string): Promise<void>;
 }
 
-/** Where errors go until alerts exist (plan 022 routes these tags). */
+/** Where the oracle logs its tagged errors; those that need the maintainer also go to `alert`. */
 export interface OracleLogger {
   error(message: string): void;
 }
@@ -125,7 +125,7 @@ type SendStep =
   | { readonly kind: "done"; readonly at: number; readonly result: OracleResult }
   | { readonly kind: "conflict"; readonly at: number; readonly rKaUal: string }
   | { readonly kind: "busy"; readonly at: number }
-  | { readonly kind: "again"; readonly at: number }
+  | { readonly kind: "again"; readonly at: number; readonly noFunds?: string }
   | { readonly kind: "sent"; readonly at: number; readonly tx: SentTx };
 
 type ReceiptStep =
@@ -172,12 +172,16 @@ export function parseOracleInput(data: unknown): OracleInput {
  *   raised by `bumpPercent`, up to `feeCapWei`; at the cap it is logged and the checks go on.
  * - A reverted receipt, or a nonce another transaction took, reads the request again.
  * - Nothing settled within `budgetMs` fails `oracle-stuck`.
+ *
+ * An oracle without funds, and a transaction at the fee cap, are logged and alerted on (`alert`,
+ * ADR 0038), each once a run, from a step of its own so a replay never sends it again.
  */
 export async function runOracle(
   input: OracleInput,
   step: OracleSteps,
   chain: OracleChain,
   logger: OracleLogger,
+  alert: (message: string) => Promise<void>,
 ): Promise<OracleResult> {
   const data =
     input.action.kind === "fulfil"
@@ -185,6 +189,9 @@ export async function runOracle(
       : cancelCalldata(input.requestId, input.action.reason);
   let startedAt: number | undefined;
   let busySince: number | undefined;
+  // Rebuilt on every replay from the memoized steps, so each alert step runs once a run.
+  let alertedNoFunds = false;
+  let alertedFeeCap = false;
   const overBudget = (at: number) => {
     startedAt ??= at;
     if (at - startedAt >= ORACLE_SETTINGS.budgetMs) {
@@ -215,6 +222,11 @@ export async function runOracle(
     }
     busySince = undefined;
     if (sent.kind === "again") {
+      const { noFunds } = sent;
+      if (noFunds && !alertedNoFunds) {
+        alertedNoFunds = true;
+        await step.run("alert-no-funds", () => alert(noFunds).then(() => null));
+      }
       await step.sleep(`wait-${attempt}`, ORACLE_SETTINGS.busyPoll);
       continue;
     }
@@ -229,6 +241,11 @@ export async function runOracle(
       overBudget(checked.at);
       if (checked.kind === "again") break;
       tx = checked.tx;
+      if (tx.atCap && !alertedFeeCap) {
+        alertedFeeCap = true;
+        const text = feeCapText(input, tx);
+        await step.run("alert-fee-cap", () => alert(text).then(() => null));
+      }
     }
   }
 }
@@ -298,7 +315,9 @@ async function sendStep(
   }
   if (sent.reason === "in-flight") return { kind: "busy", at };
   if (sent.reason === "no-funds") {
-    logger.error(`oracle-no-funds: ${chain.account} cannot pay for request ${input.requestId}`);
+    const noFunds = `oracle-no-funds: ${chain.account} cannot pay for request ${input.requestId}`;
+    logger.error(noFunds);
+    return { kind: "again", at, noFunds };
   }
   return { kind: "again", at };
 }
@@ -326,11 +345,7 @@ async function receiptStep(
     maxPriorityFeePerGas: BigInt(tx.maxPriorityFeePerGas),
   });
   if (fees.maxFeePerGas > ORACLE_SETTINGS.feeCapWei) {
-    if (!tx.atCap) {
-      logger.error(
-        `oracle-at-fee-cap: request ${input.requestId} unmined at nonce ${tx.nonce}; every rating waits on it`,
-      );
-    }
+    if (!tx.atCap) logger.error(feeCapText(input, tx));
     return { kind: "pending", at, tx: { ...tx, atCap: true } };
   }
   const sent = await chain.send({ to: input.contract, data, nonce: tx.nonce, fees });
@@ -397,7 +412,11 @@ function raise(value: bigint): bigint {
  * key), with `finishTimeout`. `getChain` builds the chain on the first run, so importing the
  * function validates no settings.
  */
-export function createOracleTransaction(inngest: Inngest.Any, getChain: () => OracleChain) {
+export function createOracleTransaction(
+  inngest: Inngest.Any,
+  getChain: () => OracleChain,
+  alert: (message: string) => Promise<void>,
+) {
   return inngest.createFunction(
     {
       id: "oracle-transaction",
@@ -413,8 +432,14 @@ export function createOracleTransaction(inngest: Inngest.Any, getChain: () => Or
         },
         loadChain(getChain),
         logger,
+        alert,
       ),
   );
+}
+
+/** The `oracle-at-fee-cap` line, logged and alerted on: every rating waits on this nonce. */
+function feeCapText(input: OracleInput, tx: SentTx): string {
+  return `oracle-at-fee-cap: request ${input.requestId} unmined at nonce ${tx.nonce}; every rating waits on it`;
 }
 
 /** The chain from `getChain`; missing or invalid settings stop the run (`setup`). */

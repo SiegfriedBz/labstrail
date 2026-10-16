@@ -8,7 +8,7 @@ Domain logic. Core does no IO: no `fetch`, no `node:*` imports and no other
 `node:*` and `@verisci/*` into errors ("core does no IO").
 
 Status: shared constants, UAL parsing, asset names, a Target KA's content and submission,
-the publish run's field check (its prompt and the check of its answer),
+the field check both runs make (its prompt and the check of its answer),
 reading a paper's record back (`paperRecordQuery`, `parsePaperRecord`), listing published
 papers a page at a time (`paperListQuery` and its parsers), OriginTrail's
 contracts with the token behind a UAL (`ORIGINTRAIL_CONTRACTS`, `knowledgeAssetToken`), and a
@@ -47,10 +47,10 @@ so an import of another `@verisci/*` package fails to typecheck.
 | `MAX_PDF_BYTES` | The largest PDF verisci publishes and rates, 15 MB: read by the upload page, the publish run and the rating run |
 | `parseTeiHeader(xml)` | A paper's `PaperMetadata` (title, authors, abstract, DOI) from GROBID's TEI header, or `not-tei` or `no-title`; returns a result for every input |
 | `PaperMetadata`, `TeiResult` | The metadata read from a TEI header, and the result of `parseTeiHeader` |
-| `fieldCheckPrompt(paper)`, `FieldCheckInput`, `FIELD_OUTPUT_SCHEMA` | The publish run's field check: the system and user text for a new paper's title, abstract and opening (an absent abstract or an empty opening leaves out its label), and the JSON Schema its answer must match |
+| `fieldCheckPrompt(paper)`, `FieldCheckInput`, `FIELD_OUTPUT_SCHEMA` | The field check, which the publish run makes for a new paper and the rating run before scoring: the system and user text for a paper's title, abstract and opening (an absent abstract or an empty opening leaves out its label), and the JSON Schema its answer must match |
 | `parseFieldAnswer(text)` | The field check's answer checked: a known field and a reason that is not empty, cut at a word to 300 characters, or `{ ok: false }` |
 | `FIELD_RULE` | The sentence that defines VeriSci's field ([ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)), in both the field check's and the scorer's prompt |
-| `ORIGINTRAIL_CONTRACTS`, `OriginTrailContracts`, `knowledgeAssetToken(ual)` | OriginTrail's `DKGKnowledgeAssets` (the ERC-721 holding every asset's token) and `KnowledgeAssetsLifecycle` addresses by chain id, and the contract and token id behind a UAL: the id itself when the UAL names the contract, else the author's address above the asset number in the low 96 bits; `undefined` for a chain with no recorded contracts |
+| `ORIGINTRAIL_CONTRACTS`, `OriginTrailContracts`, `knowledgeAssetToken(ual)` | OriginTrail's `DKGKnowledgeAssets` (the ERC-721 holding every asset's token), `KnowledgeAssetsLifecycle` and TRAC token (which the health check reads publisher wallets' balances of) addresses by chain id, and the contract and token id behind a UAL: the id itself when the UAL names the contract, else the author's address above the asset number in the low 96 bits; `undefined` for a chain with no recorded contracts |
 | `paperRecordQuery(cid, contextGraph, ual)`, `parsePaperRecord(cid, bindings)` | The SPARQL that reads a paper's Target KA back from that asset's own graph (named by its UAL; `undefined` when another agent than the graph's minted it), and the `PaperRecord` (title, authors in order, abstract, DOI, PDF link, submitter, signature, deadline) from its rows, or `undefined` when a required field is missing |
 | `PaperRecord`, `QueryBinding` | A record read back, and one row of a SPARQL answer |
 | `paperListQuery(contextGraph, { limit, offset })`, `parsePaperListing(bindings)` | The SPARQL for one page of a graph's published papers, newest mint first, and the `PaperListing`s (CID, normalized UAL, mint date, title, submitter, signature, deadline, author count) from its rows, each paper once; a row that does not parse is left out. The query is `undefined` for a graph id that is not a full one or whose name holds one of `<>"{}|^` `` ` `` `\`, or a limit or offset that is negative or not a safe integer (limit at least 1) |
@@ -61,7 +61,7 @@ so an import of another `@verisci/*` package fails to typecheck.
 | `Triple`, `PaperSubmission`, `VERISCI_NS` | One triple as the DKG node takes it, the submitter's address, signature and deadline, and the `urn:verisci:` prefix |
 | `classifyTarget(targetUal, contextGraph)`, `TargetClass` | How a rating run treats a target: `ours` (canonical, on Base Sepolia, minted by our node), or `invalid` (does not parse, not canonical, another chain, another publisher, or the older UAL form), which is cancelled |
 | `publishedPaperQuery(contextGraph, ual)` | The SPARQL that finds one UAL among the graph's published papers, with the papers list's patterns: one row for a paper our node published, none otherwise (an R-KA included); `undefined` for a UAL that is not canonical or a graph id that is not a full one |
-| `paperPdfQuery(contextGraph, ual)`, `pdfCidOf(bindings)` | The SPARQL reading the `schema:url` of a paper our node minted, from its own graph (`undefined` for another author or a malformed graph id), and the canonical CID of the `ipfs://` PDF it links, or `undefined` |
+| `paperPdfQuery(contextGraph, ual)`, `pdfCidOf(bindings)`, `paperHeadOf(bindings)` | The SPARQL reading the `schema:url` of a paper our node minted, with its title and abstract when it has them, from its own graph (`undefined` for another author or a malformed graph id); the canonical CID of the `ipfs://` PDF it links, or `undefined`; and its title (empty when none) and abstract, unquoted, for the rating run's field check |
 | `triplesFromBindings(bindings)` | The `Triple`s in the rows of a `SELECT ?s ?p ?o` |
 | `preparePaperText(pages, maxChars)`, `PaperText`, `PreparePaperResult` | A paper's text from its PDF's pages, cleaned and fitted to `maxChars` (the reference list left out first, then the end cut, marked `[…]`), or `no-text` for pages holding almost no letters |
 | `normalizeForQuote(text)`, `quoteTextOf(text)`, `QuoteText`, `quoteFound(paper, quote)` | The letters and digits a quote is matched on (lowercase, accents and ligatures undone, letters such as `ı` or `ß` folded), a paper's text prepared once for matching, and whether a quote is made of up to three passages of the paper in order, each long enough to show something, with only numbers or whole lines between them; a quote not found whole may leave out whole sentences, each gap marked by an ellipsis (`…`, `...`, `. . .`, bracketed or not), up to two: the part before ends a sentence and the part after starts one, a full stop counting only before a space and a capital or digit and never after an abbreviation (`et al.`, `Fig.`, `no.`) or an initial, so an ellipsis never removes words from inside a sentence the quote keeps |
@@ -163,7 +163,7 @@ A Target KA describes a paper and who submitted it
   reads with no new mint.
 
 - **The field check:** before a new paper is stored, the publish run asks a small model
-  whether it is in VeriSci's field ([ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)).
+  whether it is in VeriSci's field, and the rating run asks it again before scoring ([ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)).
   `fieldCheckPrompt` defines the field with `FIELD_RULE`, the same sentence the scorer's
   prompt uses, tells the model the paper's text is data, never instructions, and gives it the
   title, the abstract and the opening of the text, each under its label. The answer is

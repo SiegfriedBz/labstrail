@@ -23,7 +23,7 @@ there is no public entry, since nothing outside calls the node yet.
 the app (Vercel) ──HTTPS 443, credential──▶ Caddy ──┬──▶ DKG daemon API  127.0.0.1:9200
                                           (server)  └──▶ GROBID          127.0.0.1:8070
 
-DKG daemon ──JSON-RPC──▶ RPC proxy 127.0.0.1:8545 ──▶ public Base Sepolia endpoints, then Alchemy
+DKG daemon ──JSON-RPC──▶ RPC proxy 127.0.0.1:8545 ──▶ public Base Sepolia endpoints, then Alchemy RPC
 DKG daemon ◀──peer-to-peer──▶ other DKG nodes and the testnet relays
 ```
 
@@ -32,7 +32,7 @@ DKG daemon ◀──peer-to-peer──▶ other DKG nodes and the testnet relays
 | The app → the node or GROBID | On a server: through Caddy only, over HTTPS, with a credential. On the developer's computer: directly on `127.0.0.1` |
 | The node → Base Sepolia (reads, transactions) | Through the RPC proxy only: `chain.rpcUrl` is `http://127.0.0.1:8545` and no backup RPC URL is set |
 | The node ↔ other DKG nodes | Directly, on its peer-to-peer port (sync, storage acknowledgements, relays) |
-| The RPC proxy → the chain | Directly, to the public endpoints first and Alchemy last |
+| The RPC proxy → the chain | Directly, to the public endpoints first and Alchemy RPC last |
 
 ## What runs
 
@@ -54,7 +54,7 @@ Nothing below is ever committed or pasted into a chat.
 
 | Secret | Where |
 | --- | --- |
-| Alchemy URL (key included) | `~/.config/verisci/rpc-proxy.env`, mode 600 |
+| Alchemy RPC URL (key included) | `~/.config/verisci/rpc-proxy.env`, mode 600 |
 | Node keys and wallets | `~/.dkg` (`agent-key.bin`, `agent-keystore.json`, `wallets.json`, `wallets.key`) |
 | Admin token | `~/.dkg/auth.token` |
 | Backup passphrase | The developer's password manager |
@@ -73,7 +73,7 @@ Check: `ls -d ~/.dkg*` lists only the renamed folder.
 
 ## 2. The RPC proxy
 
-Its settings file holds Alchemy's Base Sepolia URL. Create it empty and readable only by
+Its settings file holds Alchemy RPC's Base Sepolia URL. Create it empty and readable only by
 you, then write the URL with a text editor, so the key never lands in the shell history:
 
 ```bash
@@ -201,7 +201,10 @@ gpg -d ~/verisci-dkg-keys-YYYY-MM-DD.tar.gz.gpg 2>/dev/null | tar -tzf - | wc -l
 
 `~/.dkg/wallets.json` holds an admin wallet and three publisher wallets. The node's agent
 address is the first publisher wallet: it owns the graphs. Mints are signed by any of the
-three, so each needs ETH and TRAC. Print the addresses (public, no key):
+three, so each needs ETH and TRAC. Print the addresses (public, no key), and list the three
+publisher addresses, comma-separated, in each deployment's `PUBLISHER_ADDRESSES` (a deployment
+that serves ratings refuses to start without it), so the hourly health check alerts when one
+runs low (`packages/workflows` README → Notifications and alerts):
 
 ```bash
 python3 -c "import json,os; w=json.load(open(os.path.expanduser('~/.dkg/wallets.json'))); print('admin', w['adminWallet']['address']); [print('publisher', x['address']) for x in w['wallets']]"
