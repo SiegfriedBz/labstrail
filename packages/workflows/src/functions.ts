@@ -194,7 +194,7 @@ export const publishPaper = createPublishPaper(inngest, getPublishDeps);
 export const oracleTransaction = createOracleTransaction(
   inngest,
   () => getRatingChain().chain,
-  (text) => alert(text),
+  (text) => alertMaintainer(text),
 );
 
 /** Rates a requested paper and has the oracle record it (`verisci/rating.requested`). */
@@ -202,11 +202,14 @@ export const ratePaper = createRatePaper(inngest, getRatingDeps, oracleTransacti
   throttle: sharedEnv.APP_ENV !== "local",
 });
 
-/** Alerts the maintainer on Telegram (ADR 0038). */
-const alert = (text: string) => getNotify()({ level: "alert", text });
+/**
+ * Alerts the maintainer on Telegram (ADR 0038), from the Telegram settings alone, so a run
+ * that failed on another bad setting is still alerted on.
+ */
+export const alertMaintainer = (text: string) => getNotify()({ level: "alert", text });
 
 /** Alerts on every function's failure (ADR 0038). */
-export const failureAlerts = createFailureAlerts(inngest, alert);
+export const failureAlerts = createFailureAlerts(inngest, alertMaintainer);
 
 let healthDeps: HealthDeps | undefined;
 
@@ -249,7 +252,7 @@ function getHealthDeps(): HealthDeps {
 }
 
 /** Checks wallet balances and old pending requests every hour (ADR 0038). */
-export const healthCheck = createHealthCheck(inngest, getHealthDeps, alert);
+export const healthCheck = createHealthCheck(inngest, getHealthDeps, alertMaintainer);
 
 /**
  * Restarts requests pending past the threshold, every 30 minutes (ADR 0020), on the rating

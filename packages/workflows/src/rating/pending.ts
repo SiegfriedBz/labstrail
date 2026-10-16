@@ -5,7 +5,10 @@ import type {
 } from "@verisci/contracts";
 import type { Hex } from "viem";
 
-/** Requests read at once, so a page of 100 stays within the RPC's rate limit. */
+/**
+ * Requests read at once: a page of 100 never puts more than 10 calls at the RPC together, which
+ * the rating runs and the pages share.
+ */
 export const PENDING_CONCURRENCY = 10;
 
 /**

@@ -54,16 +54,15 @@ function deps(
 const windowOf = (now: number) => Math.floor(now / RECONCILER_SETTINGS.thresholdMs);
 
 describe("findStaleRequests", () => {
-  it("restarts only requests pending longer than the threshold, on every contract", async () => {
+  it("restarts only requests pending longer than the threshold", async () => {
     const { io } = deps({
       [CURRENT]: [
         [id(1), 5 * HOUR],
         [id(2), 3 * HOUR],
       ],
-      [PAST]: [[id(3), 10 * 60_000]],
     });
 
-    expect(await findStaleRequests(io, NOW)).toEqual([
+    expect(await findStaleRequests(io, CURRENT, NOW)).toEqual([
       {
         name: "verisci/rating.requested",
         id: `rating:${id(1)}:${windowOf(NOW)}`,
@@ -76,9 +75,9 @@ describe("findStaleRequests", () => {
     const { io } = deps({ [PAST]: [[id(1), 9 * HOUR]] });
     const start = windowOf(NOW) * RECONCILER_SETTINGS.thresholdMs;
 
-    const first = await findStaleRequests(io, start + 1);
-    const second = await findStaleRequests(io, start + 30 * 60_000);
-    const next = await findStaleRequests(io, start + RECONCILER_SETTINGS.thresholdMs);
+    const first = await findStaleRequests(io, PAST, start + 1);
+    const second = await findStaleRequests(io, PAST, start + 30 * 60_000);
+    const next = await findStaleRequests(io, PAST, start + RECONCILER_SETTINGS.thresholdMs);
 
     expect(first.map((event) => event.id)).toEqual(second.map((event) => event.id));
     expect(next[0]?.id).not.toBe(first[0]?.id);
@@ -94,7 +93,7 @@ describe("findStaleRequests", () => {
     const tick = Math.floor(NOW / intervalMs);
 
     const ticks = await Promise.all(
-      [0, 1, 2].map((later) => findStaleRequests(io, NOW + later * intervalMs)),
+      [0, 1, 2].map((later) => findStaleRequests(io, CURRENT, NOW + later * intervalMs)),
     );
 
     for (const events of ticks) expect(events.length).toBeLessThanOrEqual(pageSize);
@@ -102,18 +101,13 @@ describe("findStaleRequests", () => {
     expect(new Set(ticks.flat().map((event) => event.data.requestId)).size).toBe(stale.length);
   });
 
-  it("still reconciles the other contracts when one doesn't answer, and logs it", async () => {
+  it("logs a contract that doesn't answer, and leaves it for the next tick", async () => {
     const { io, warn } = deps(
-      { [CURRENT]: [[id(1), 5 * HOUR]], [PAST]: [[id(2), 5 * HOUR]] },
-      {
-        readPendingCount: async (contract) =>
-          contract === CURRENT ? { ok: false, reason: "unreachable" } : { ok: true, count: 1 },
-      },
+      { [CURRENT]: [[id(1), 5 * HOUR]] },
+      { readPendingCount: async () => ({ ok: false, reason: "unreachable" }) },
     );
 
-    expect((await findStaleRequests(io, NOW)).map((event) => event.data.requestId)).toEqual([
-      id(2),
-    ]);
+    expect(await findStaleRequests(io, CURRENT, NOW)).toEqual([]);
     expect(warn).toHaveBeenCalledWith(`reconcile-unreachable: ${CURRENT}`);
   });
 
@@ -144,19 +138,19 @@ describe("findStaleRequests", () => {
       },
     );
 
-    expect(await findStaleRequests(io, NOW)).toEqual([]);
+    expect(await findStaleRequests(io, CURRENT, NOW)).toEqual([]);
     expect(warn).toHaveBeenCalledWith(`reconcile-unreadable: ${CURRENT}: 1 of 2 requests`);
   });
 });
 
-/** Steps that run at once and record every step id and the events sent. */
+/** Steps that run at once, round-trip each output through JSON, and record ids and events. */
 function fakeSteps() {
   const log: string[] = [];
   const sent: unknown[] = [];
   const step: ReconcilerSteps = {
     async run(id, fn) {
       log.push(id);
-      return fn();
+      return JSON.parse(JSON.stringify(await fn()));
     },
     async sendEvent(id, events) {
       log.push(id);
@@ -167,19 +161,62 @@ function fakeSteps() {
 }
 
 describe("runReconciler", () => {
-  it("sends every restart event from one step", async () => {
-    const { io } = deps({ [CURRENT]: [[id(1), 5 * HOUR]], [PAST]: [[id(2), 5 * HOUR]] });
+  it("reads each contract in a step of its own, one after the other, and sends every restart from one step", async () => {
+    const { io } = deps({
+      [CURRENT]: [[id(1), 5 * HOUR]],
+      [PAST]: [
+        [id(2), 5 * HOUR],
+        [id(3), 10 * 60_000],
+      ],
+    });
+    let inFlight = 0;
+    let most = 0;
+    const counted: ReconcilerDeps = {
+      ...io,
+      readPendingCount: async (contract) => {
+        inFlight += 1;
+        most = Math.max(most, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        inFlight -= 1;
+        return io.readPendingCount(contract);
+      },
+    };
     const { step, log, sent } = fakeSteps();
 
     expect(
       await runReconciler(
         step,
-        () => io,
+        () => counted,
         () => NOW,
       ),
     ).toEqual({ restarted: 2 });
-    expect(log).toEqual(["find-stale", "restart"]);
-    expect(sent).toEqual(await findStaleRequests(io, NOW));
+    expect(log).toEqual([`find-stale-${CURRENT}`, `find-stale-${PAST}`, "restart"]);
+    expect(most).toBe(1);
+    expect(sent).toEqual([
+      ...(await findStaleRequests(io, CURRENT, NOW)),
+      ...(await findStaleRequests(io, PAST, NOW)),
+    ]);
+  });
+
+  it("still restarts the other contracts' requests when one doesn't answer", async () => {
+    const { io } = deps(
+      { [CURRENT]: [[id(1), 5 * HOUR]], [PAST]: [[id(2), 5 * HOUR]] },
+      {
+        readPendingCount: async (contract) =>
+          contract === CURRENT ? { ok: false, reason: "unreachable" } : { ok: true, count: 1 },
+      },
+    );
+    const { step, sent } = fakeSteps();
+
+    await runReconciler(
+      step,
+      () => io,
+      () => NOW,
+    );
+
+    expect(sent.map((event) => (event as { data: { requestId: string } }).data.requestId)).toEqual([
+      id(2),
+    ]);
   });
 
   it("sends nothing when no request is stale", async () => {
@@ -193,7 +230,7 @@ describe("runReconciler", () => {
         () => NOW,
       ),
     ).toEqual({ restarted: 0 });
-    expect(log).toEqual(["find-stale"]);
+    expect(log).toEqual([`find-stale-${CURRENT}`]);
   });
 });
 

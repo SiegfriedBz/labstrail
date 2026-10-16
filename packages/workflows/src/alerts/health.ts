@@ -22,10 +22,11 @@ export const HEALTH_SETTINGS = {
   pageSize: 100,
   /**
    * Pages of pending ids read per contract an hour, each hour going on from the last: all of
-   * them up to 300 pending requests, and past that a spam backlog in turns, so a check never
-   * reads more than 300 requests (`readPending` reads them 10 at a time).
+   * them up to 200 pending requests, and past that a spam backlog in turns. With one count, 2
+   * pages and 20 batches of 10 requests (`readPending`), a contract's step ends within Vercel's
+   * 300 s even when every call waits out the RPC's 10 s timeout.
    */
-  pagesPerHour: 3,
+  pagesPerHour: 2,
 } as const;
 
 /** The reads the health check makes; tests pass fakes. */
@@ -48,102 +49,137 @@ export interface HealthSteps {
   run<T>(id: string, fn: () => Promise<T>): Promise<T>;
 }
 
+/** A request pending past `oldestPendingMs`, with how long it has been pending. */
+interface OldRequest {
+  readonly contract: string;
+  readonly requestId: Hex;
+  readonly ageMs: number;
+}
+
+/** What one contract's check found: its old requests, and how many it read of how many pending. */
+interface ContractPending {
+  readonly old: OldRequest[];
+  readonly read: number;
+  readonly count: number;
+}
+
 /**
- * What needs the maintainer, one line each: the oracle or a publisher wallet under its ETH
- * threshold, a publisher wallet under its TRAC threshold, and requests pending past
- * `oldestPendingMs` (how many, the oldest, and how many were read when a backlog is read in
- * turns). A balance that does not answer is left for the next hour; a contract is logged
- * `health-unreachable`, and requests that do not answer `health-unreadable` with their number.
- * An empty list means all is well.
+ * One health check (ADR 0038): reads the balances in a step (`check-balances`), then each
+ * contract's pending requests in a step of its own (`check-pending-<contract>`), one after the
+ * other, reading the time inside it, and sends what needs the maintainer as one alert from
+ * another step (`alert`), only when there is something. The lines: the oracle or a publisher
+ * wallet under its ETH threshold, a publisher wallet under its TRAC threshold, and requests
+ * pending past `oldestPendingMs` (how many, the oldest, and how many were read when a backlog
+ * is read in turns). A balance that does not answer is logged `health-unreadable` and read
+ * again the next hour; a contract that does not answer is logged `health-unreachable`, and
+ * requests that do not answer `health-unreadable` with their number.
  */
-export async function healthProblems(deps: HealthDeps, nowMs: number): Promise<string[]> {
+export async function runHealthCheck(
+  step: HealthSteps,
+  getDeps: () => HealthDeps,
+  alert: (text: string) => Promise<void>,
+  now: () => number,
+): Promise<{ readonly problems: string[] }> {
+  const deps = getDeps();
+  const problems = await step.run("check-balances", () => balanceProblems(deps));
+  const found: ContractPending[] = [];
+  for (const contract of deps.contracts) {
+    found.push(
+      await step.run(`check-pending-${contract}`, () => contractPending(deps, contract, now())),
+    );
+  }
+  problems.push(...pendingProblem(found));
+  if (problems.length > 0) {
+    await step.run("alert", () => alert(problems.join("\n")).then(() => null));
+  }
+  return { problems };
+}
+
+/** The oracle's and the publisher wallets' balances under their thresholds, one line each. */
+async function balanceProblems(deps: HealthDeps): Promise<string[]> {
   const { minEthWei, minTracWei } = HEALTH_SETTINGS;
   const wallets = [
     { role: "oracle", address: deps.oracle, trac: false },
     ...deps.publishers.map((address) => ({ role: "publisher", address, trac: true })),
   ];
-  const balances = await Promise.all(
-    wallets.map(async (wallet) => ({
-      ...wallet,
-      eth: await deps.readEth(wallet.address),
-      tracWei: wallet.trac ? await deps.readTrac(wallet.address) : undefined,
-    })),
-  );
   const problems: string[] = [];
-  for (const { role, address, eth, tracWei } of balances) {
-    if (eth !== undefined && eth < minEthWei) {
+  for (const { role, address, trac } of wallets) {
+    const [eth, tracWei] = await Promise.all([
+      deps.readEth(address),
+      trac ? deps.readTrac(address) : Promise.resolve(0n),
+    ]);
+    if (eth === undefined) deps.logger.warn(`health-unreadable: ${role} ${address}: ETH`);
+    else if (eth < minEthWei) {
       problems.push(
         `${role} ${address} holds ${formatEther(eth)} ETH, under ${formatEther(minEthWei)}`,
       );
     }
-    if (tracWei !== undefined && tracWei < minTracWei) {
+    if (!trac) continue;
+    if (tracWei === undefined) deps.logger.warn(`health-unreadable: ${role} ${address}: TRAC`);
+    else if (tracWei < minTracWei) {
       problems.push(
         `${role} ${address} holds ${formatEther(tracWei)} TRAC, under ${formatEther(minTracWei)}`,
       );
     }
   }
-  const { old, read, count } = await oldPending(deps, nowMs);
-  const oldest = old[0];
-  if (oldest) {
-    const hours = Math.floor((nowMs - oldest.requestedAt * 1000) / 3_600_000);
-    const sampled = read < count ? ` (${read} of the ${count} pending read this hour)` : "";
-    problems.push(
-      `${old.length} rating requests pending over ${HEALTH_SETTINGS.oldestPendingMs / 3_600_000} h; the oldest, ${oldest.requestId} on ${oldest.contract}, for ${hours} h${sampled}`,
-    );
-  }
   return problems;
 }
 
 /**
- * The requests read this hour that are pending past `oldestPendingMs`, on every contract, the
- * oldest first, with how many were read and how many are pending.
+ * One contract's requests pending past `oldestPendingMs` among those read this hour:
+ * `pagesPerHour` pages of ids, the first after the last hour's, so a backlog of more is read in
+ * turns, and their requests 10 at a time (`readPending`).
  */
-async function oldPending(deps: HealthDeps, nowMs: number) {
-  const { oldestPendingMs } = HEALTH_SETTINGS;
-  const found = await Promise.all(
-    deps.contracts.map(async (contract) => {
-      const { ids, count } = await idsThisHour(deps, contract as Hex, nowMs);
-      const { pending, unreadable } = await readPending(deps, contract as Hex, ids);
-      if (unreadable > 0) {
-        deps.logger.warn(`health-unreadable: ${contract}: ${unreadable} of ${ids.length} requests`);
-      }
-      return { pending: pending.map((request) => ({ ...request, contract })), ids, count };
-    }),
-  );
-  return {
-    old: found
-      .flatMap(({ pending }) => pending)
-      .filter((request) => nowMs - request.requestedAt * 1000 > oldestPendingMs)
-      .sort((a, b) => a.requestedAt - b.requestedAt),
-    read: found.reduce((sum, { ids }) => sum + ids.length, 0),
-    count: found.reduce((sum, { count }) => sum + count, 0),
-  };
-}
-
-/**
- * The pending ids a contract's check reads this hour: `pagesPerHour` pages, the first after
- * the last hour's, so a backlog of more is read in turns; none, logged, when it does not answer.
- */
-async function idsThisHour(deps: HealthDeps, contract: Hex, nowMs: number) {
-  const { pageSize, pagesPerHour } = HEALTH_SETTINGS;
-  const count = await deps.readPendingCount(contract);
+async function contractPending(
+  deps: HealthDeps,
+  contract: string,
+  nowMs: number,
+): Promise<ContractPending> {
+  const { pageSize, pagesPerHour, oldestPendingMs } = HEALTH_SETTINGS;
+  const address = contract as Hex;
+  const count = await deps.readPendingCount(address);
   if (!count.ok) {
     deps.logger.warn(`health-unreachable: ${contract}`);
-    return { ids: [], count: 0 };
+    return { old: [], read: 0, count: 0 };
   }
   const pages = Math.ceil(count.count / pageSize);
   const hour = Math.floor(nowMs / 3_600_000);
   const ids: Hex[] = [];
   for (let n = 0; n < Math.min(pages, pagesPerHour); n += 1) {
     const page = (hour * pagesPerHour + n) % pages;
-    const read = await deps.readPendingIds(contract, page * pageSize, pageSize);
+    const read = await deps.readPendingIds(address, page * pageSize, pageSize);
     if (!read.ok) {
       deps.logger.warn(`health-unreachable: ${contract}`);
       break;
     }
     ids.push(...read.ids);
   }
-  return { ids, count: count.count };
+  const { pending, unreadable } = await readPending(deps, address, ids);
+  if (unreadable > 0) {
+    deps.logger.warn(`health-unreadable: ${contract}: ${unreadable} of ${ids.length} requests`);
+  }
+  const old = pending
+    .map(({ requestId, requestedAt }) => ({
+      contract,
+      requestId,
+      ageMs: nowMs - requestedAt * 1000,
+    }))
+    .filter(({ ageMs }) => ageMs > oldestPendingMs);
+  return { old, read: ids.length, count: count.count };
+}
+
+/** The line for the requests pending past `oldestPendingMs` on every contract, if any. */
+function pendingProblem(found: readonly ContractPending[]): string[] {
+  const old = found.flatMap((contract) => contract.old).sort((a, b) => b.ageMs - a.ageMs);
+  const oldest = old[0];
+  if (!oldest) return [];
+  const read = found.reduce((sum, contract) => sum + contract.read, 0);
+  const count = found.reduce((sum, contract) => sum + contract.count, 0);
+  const hours = Math.floor(oldest.ageMs / 3_600_000);
+  const sampled = read < count ? ` (${read} of the ${count} pending read this hour)` : "";
+  return [
+    `${old.length} rating requests pending over ${HEALTH_SETTINGS.oldestPendingMs / 3_600_000} h; the oldest, ${oldest.requestId} on ${oldest.contract}, for ${hours} h${sampled}`,
+  ];
 }
 
 /**
@@ -163,21 +199,4 @@ export function createHealthCheck(
         Date.now(),
       ),
   );
-}
-
-/**
- * One health check: finds the problems in a step (`check`), reading the time inside it, and
- * sends them as one alert from another (`alert`), only when there are some.
- */
-export async function runHealthCheck(
-  step: HealthSteps,
-  getDeps: () => HealthDeps,
-  alert: (text: string) => Promise<void>,
-  now: () => number,
-): Promise<{ readonly problems: number }> {
-  const problems = await step.run("check", () => healthProblems(getDeps(), now()));
-  if (problems.length > 0) {
-    await step.run("alert", () => alert(problems.join("\n")).then(() => null));
-  }
-  return { problems: problems.length };
 }

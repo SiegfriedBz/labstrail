@@ -2,13 +2,7 @@ import type { ReadRequestResult } from "@verisci/contracts";
 import { Inngest } from "inngest";
 import type { Hex } from "viem";
 import { describe, expect, it, vi } from "vitest";
-import {
-  createHealthCheck,
-  HEALTH_SETTINGS,
-  type HealthDeps,
-  healthProblems,
-  runHealthCheck,
-} from "./health.ts";
+import { createHealthCheck, HEALTH_SETTINGS, type HealthDeps, runHealthCheck } from "./health.ts";
 
 const HOUR = 3_600_000;
 const NOW = 1_791_900_000_000;
@@ -59,20 +53,42 @@ function deps(
   };
 }
 
-describe("healthProblems", () => {
-  it("finds nothing when every balance is above its threshold and no request is old", async () => {
-    expect(await healthProblems(deps({ pending: [[id(1), HOUR]] }), NOW)).toEqual([]);
+/** Runs one check on `io` at `nowMs` with steps that round-trip each output through JSON. */
+async function check(io: HealthDeps, nowMs = NOW) {
+  const log: string[] = [];
+  const alert = vi.fn(async (_text: string) => {});
+  const step = {
+    async run<T>(stepId: string, fn: () => Promise<T>): Promise<T> {
+      log.push(stepId);
+      return JSON.parse(JSON.stringify(await fn()));
+    },
+  };
+  const { problems } = await runHealthCheck(
+    step,
+    () => io,
+    alert,
+    () => nowMs,
+  );
+  return { problems, log, alert };
+}
+
+describe("runHealthCheck", () => {
+  it("reads the balances, then each contract in a step of its own, and sends nothing when all is well", async () => {
+    const { problems, log, alert } = await check(deps({ pending: [[id(1), HOUR]] }));
+
+    expect(problems).toEqual([]);
+    expect(log).toEqual(["check-balances", `check-pending-${CONTRACT}`]);
+    expect(alert).not.toHaveBeenCalled();
   });
 
   it("names the oracle and each publisher wallet under their ETH threshold, and TRAC under its own", async () => {
     const low = HEALTH_SETTINGS.minEthWei - 1n;
 
-    expect(
-      await healthProblems(
-        deps({ eth: { [ORACLE]: low, [PUBLISHER]: low }, trac: { [PUBLISHER]: 42n * ETH } }),
-        NOW,
-      ),
-    ).toEqual([
+    const { problems } = await check(
+      deps({ eth: { [ORACLE]: low, [PUBLISHER]: low }, trac: { [PUBLISHER]: 42n * ETH } }),
+    );
+
+    expect(problems).toEqual([
       `oracle ${ORACLE} holds 0.004999999999999999 ETH, under 0.005`,
       `publisher ${PUBLISHER} holds 0.004999999999999999 ETH, under 0.005`,
       `publisher ${PUBLISHER} holds 42 TRAC, under 100`,
@@ -80,7 +96,7 @@ describe("healthProblems", () => {
   });
 
   it("names how many requests are pending past 6 hours, and the oldest", async () => {
-    const problems = await healthProblems(
+    const { problems } = await check(
       deps({
         pending: [
           [id(1), 7 * HOUR],
@@ -88,7 +104,6 @@ describe("healthProblems", () => {
           [id(3), HOUR],
         ],
       }),
-      NOW,
     );
 
     expect(problems).toEqual([
@@ -96,11 +111,17 @@ describe("healthProblems", () => {
     ]);
   });
 
-  it("says nothing of a balance it couldn't read: the next hour reads it again", async () => {
-    expect(await healthProblems(deps({ eth: { [ORACLE]: undefined } }), NOW)).toEqual([]);
+  it("logs a balance it couldn't read, and leaves it for the next hour", async () => {
+    const io = deps({ eth: { [ORACLE]: undefined }, trac: { [PUBLISHER]: undefined } });
+
+    const { problems } = await check(io);
+
+    expect(problems).toEqual([]);
+    expect(io.logger.warn).toHaveBeenCalledWith(`health-unreadable: oracle ${ORACLE}: ETH`);
+    expect(io.logger.warn).toHaveBeenCalledWith(`health-unreadable: publisher ${PUBLISHER}: TRAC`);
   });
 
-  it("reads at most 3 pages a contract an hour, going on from the last hour's, and says how many it read", async () => {
+  it("reads at most 2 pages a contract an hour, going on from the last hour's, and says how many it read", async () => {
     const { pageSize, pagesPerHour } = HEALTH_SETTINGS;
     const old = Array.from({ length: pageSize * 5 }, (_, n) => [id(n + 1), 7 * HOUR] as const);
     const offsets: number[] = [];
@@ -113,13 +134,14 @@ describe("healthProblems", () => {
       },
     };
 
-    const problems = await healthProblems(counted, NOW);
-    await healthProblems(counted, NOW + HOUR);
+    const { problems } = await check(counted);
+    await check(counted, NOW + HOUR);
+    await check(counted, NOW + 2 * HOUR);
 
-    expect(offsets).toHaveLength(2 * pagesPerHour);
+    expect(offsets).toHaveLength(3 * pagesPerHour);
     expect(new Set(offsets)).toEqual(new Set([0, 1, 2, 3, 4].map((page) => page * pageSize)));
     expect(problems).toEqual([
-      `300 rating requests pending over 6 h; the oldest, ${id((offsets[0] ?? 0) + 1)} on ${CONTRACT}, for 7 h (300 of the 500 pending read this hour)`,
+      `200 rating requests pending over 6 h; the oldest, ${id((offsets[0] ?? 0) + 1)} on ${CONTRACT}, for 7 h (200 of the 500 pending read this hour)`,
     ]);
   });
 
@@ -146,8 +168,8 @@ describe("healthProblems", () => {
       },
     );
 
-    await healthProblems(unreachable, NOW);
-    const problems = await healthProblems(partial, NOW);
+    await check(unreachable);
+    const { problems } = await check(partial);
 
     expect(unreachable.logger.warn).toHaveBeenCalledWith(`health-unreachable: ${CONTRACT}`);
     expect(partial.logger.warn).toHaveBeenCalledWith(
@@ -157,52 +179,38 @@ describe("healthProblems", () => {
       `1 rating requests pending over 6 h; the oldest, ${id(2)} on ${CONTRACT}, for 7 h`,
     ]);
   });
-});
 
-/** A step that runs at once and records its id. */
-function fakeStep() {
-  const log: string[] = [];
-  return {
-    log,
-    step: {
-      async run<T>(stepId: string, fn: () => Promise<T>) {
-        log.push(stepId);
-        return fn();
+  it("reads one contract at a time", async () => {
+    const other = "0x1111111111111111111111111111111111111111";
+    const io = deps({ pending: [[id(1), HOUR]] });
+    let inFlight = 0;
+    let most = 0;
+    const counted: HealthDeps = {
+      ...io,
+      contracts: [CONTRACT, other],
+      readPendingCount: async (contract) => {
+        inFlight += 1;
+        most = Math.max(most, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        inFlight -= 1;
+        return io.readPendingCount(contract);
       },
-    },
-  };
-}
+    };
 
-describe("runHealthCheck", () => {
-  it("sends nothing when all is well", async () => {
-    const { step, log } = fakeStep();
-    const alert = vi.fn(async (_text: string) => {});
+    const { log } = await check(counted);
 
-    expect(
-      await runHealthCheck(
-        step,
-        () => deps({}),
-        alert,
-        () => NOW,
-      ),
-    ).toEqual({ problems: 0 });
-    expect(log).toEqual(["check"]);
-    expect(alert).not.toHaveBeenCalled();
+    expect(log).toEqual(["check-balances", `check-pending-${CONTRACT}`, `check-pending-${other}`]);
+    expect(most).toBe(1);
   });
 
   it("sends one alert, from a step of its own, listing every problem", async () => {
-    const { step, log } = fakeStep();
-    const alert = vi.fn(async (_text: string) => {});
     const low = HEALTH_SETTINGS.minEthWei - 1n;
 
-    await runHealthCheck(
-      step,
-      () => deps({ eth: { [ORACLE]: low }, pending: [[id(1), 7 * HOUR]] }),
-      alert,
-      () => NOW,
+    const { log, alert } = await check(
+      deps({ eth: { [ORACLE]: low }, pending: [[id(1), 7 * HOUR]] }),
     );
 
-    expect(log).toEqual(["check", "alert"]);
+    expect(log).toEqual(["check-balances", `check-pending-${CONTRACT}`, "alert"]);
     expect(alert).toHaveBeenCalledExactlyOnceWith(
       `oracle ${ORACLE} holds 0.004999999999999999 ETH, under 0.005\n1 rating requests pending over 6 h; the oldest, ${id(1)} on ${CONTRACT}, for 7 h`,
     );

@@ -40,7 +40,7 @@ export interface ReconcilerSteps {
 }
 
 /**
- * The requests to restart at `nowMs`: on each contract, one page of the pending set, page
+ * The requests to restart on `contract` at `nowMs`: one page of its pending set, page
  * `tick mod pages` (`tick` counting `intervalMs` periods), so successive ticks reach every
  * request without a stored cursor; of those, each still pending longer than `thresholdMs`. The
  * event id carries the 4-hour window, `rating:<requestId>:<window>`, so every tick of a window
@@ -53,58 +53,63 @@ export interface ReconcilerSteps {
  */
 export async function findStaleRequests(
   deps: ReconcilerDeps,
+  contract: string,
   nowMs: number,
 ): Promise<RestartEvent[]> {
   const { pageSize, intervalMs, thresholdMs } = RECONCILER_SETTINGS;
   const tick = Math.floor(nowMs / intervalMs);
   const window = Math.floor(nowMs / thresholdMs);
-  const perContract = await Promise.all(
-    deps.contracts.map(async (contract) => {
-      const address = contract as Hex;
-      const count = await deps.readPendingCount(address);
-      if (!count.ok) {
-        deps.logger.warn(`reconcile-unreachable: ${contract}`);
-        return [];
-      }
-      if (count.count === 0) return [];
-      const page = tick % Math.ceil(count.count / pageSize);
-      const ids = await deps.readPendingIds(address, page * pageSize, pageSize);
-      if (!ids.ok) {
-        deps.logger.warn(`reconcile-unreachable: ${contract}`);
-        return [];
-      }
-      const { pending, unreadable } = await readPending(deps, address, ids.ids);
-      if (unreadable > 0) {
-        deps.logger.warn(
-          `reconcile-unreadable: ${contract}: ${unreadable} of ${ids.ids.length} requests`,
-        );
-      }
-      return pending.flatMap(({ requestId, requestedAt }): RestartEvent[] =>
-        nowMs - requestedAt * 1000 > thresholdMs
-          ? [
-              {
-                name: RATING_REQUESTED,
-                id: `rating:${requestId}:${window}`,
-                data: { contract, requestId },
-              },
-            ]
-          : [],
-      );
-    }),
+  const address = contract as Hex;
+  const count = await deps.readPendingCount(address);
+  if (!count.ok) {
+    deps.logger.warn(`reconcile-unreachable: ${contract}`);
+    return [];
+  }
+  if (count.count === 0) return [];
+  const page = tick % Math.ceil(count.count / pageSize);
+  const ids = await deps.readPendingIds(address, page * pageSize, pageSize);
+  if (!ids.ok) {
+    deps.logger.warn(`reconcile-unreachable: ${contract}`);
+    return [];
+  }
+  const { pending, unreadable } = await readPending(deps, address, ids.ids);
+  if (unreadable > 0) {
+    deps.logger.warn(
+      `reconcile-unreadable: ${contract}: ${unreadable} of ${ids.ids.length} requests`,
+    );
+  }
+  return pending.flatMap(({ requestId, requestedAt }): RestartEvent[] =>
+    nowMs - requestedAt * 1000 > thresholdMs
+      ? [
+          {
+            name: RATING_REQUESTED,
+            id: `rating:${requestId}:${window}`,
+            data: { contract, requestId },
+          },
+        ]
+      : [],
   );
-  return perContract.flat();
 }
 
 /**
- * One reconciler tick: finds the stale requests in a step (`find-stale`), reading the time
- * inside it, and sends their restart events from another (`restart`), only when there are some.
+ * One reconciler tick: finds each contract's stale requests in a step of its own
+ * (`find-stale-<contract>`), one contract after the other, reading the time inside it, and
+ * sends their restart events from another (`restart`), only when there are some. A step reads
+ * one count, one page and 100 requests 10 at a time, so it ends within Vercel's 300 s even when
+ * every call waits out the RPC's 10 s timeout.
  */
 export async function runReconciler(
   step: ReconcilerSteps,
   getDeps: () => ReconcilerDeps,
   now: () => number,
 ): Promise<{ readonly restarted: number }> {
-  const events = await step.run("find-stale", () => findStaleRequests(getDeps(), now()));
+  const deps = getDeps();
+  const events: RestartEvent[] = [];
+  for (const contract of deps.contracts) {
+    events.push(
+      ...(await step.run(`find-stale-${contract}`, () => findStaleRequests(deps, contract, now()))),
+    );
+  }
   if (events.length > 0) await step.sendEvent("restart", events);
   return { restarted: events.length };
 }

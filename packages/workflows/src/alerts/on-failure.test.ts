@@ -42,14 +42,17 @@ describe("failureText", () => {
 });
 
 describe("alertOnFailure", () => {
-  /** A step that runs at once and records its id, and an alert that records its text. */
+  /**
+   * A step that runs at once, round-trips its output through JSON and records its id, and an
+   * alert that records its text.
+   */
   function setup() {
     const log: string[] = [];
     const alert = vi.fn(async (_text: string) => {});
     const step = {
-      async run<T>(id: string, fn: () => Promise<T>) {
+      async run<T>(id: string, fn: () => Promise<T>): Promise<T> {
         log.push(id);
-        return fn();
+        return JSON.parse(JSON.stringify(await fn()));
       },
     };
     return { log, alert, step };
