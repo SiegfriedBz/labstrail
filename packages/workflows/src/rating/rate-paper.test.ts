@@ -521,10 +521,28 @@ describe("runRating: rating a paper", () => {
       "read-rka-1",
       "read-score-1",
       "oracle fulfil",
+      "find-paper",
       "notify",
     ]);
     expect(deps.readPaper).not.toHaveBeenCalled();
     expect(oracleCalls).toEqual([fulfil(72)]);
+  });
+
+  it("looks the paper up for its message when the run never read it, so the message names it and links its rating", async () => {
+    const { run, deps } = rate({ reads: [minted] });
+
+    await run;
+
+    expect(deps.notify.mock.calls[0]?.[0].text).toBe(
+      `Rated 72/100: A trial\n${SITE}/papers/${CID}/ratings/${REQUEST_ID}`,
+    );
+  });
+
+  it("names the paper by its UAL, with no link, when the node doesn't answer that look-up", async () => {
+    const { run, deps } = rate({ reads: [minted], pdfRows: [unreachable] });
+
+    expect(await run).toMatchObject({ state: "fulfilled" });
+    expect(deps.notify.mock.calls[0]?.[0].text).toBe(`Rated 72/100: ${TARGET}`);
   });
 
   it("mints an R-KA already stored at once, polls every 30 s, then fulfils, never scoring", async () => {
@@ -545,6 +563,7 @@ describe("runRating: rating a paper", () => {
       "poll-1-2",
       "read-score-1",
       "oracle fulfil",
+      "find-paper",
       "notify",
     ]);
     expect(dkg.storeAsset).not.toHaveBeenCalled();
@@ -571,14 +590,31 @@ describe("runRating: rating a paper", () => {
     expect(log.slice(-2)).toEqual(["alert-orphan", "notify"]);
   });
 
-  it("skips, with no message, when the oracle finds the contract's oracle changed, or the request gone", async () => {
+  it("alerts on the minted R-KA as an orphan, with no activity message, when the oracle finds the contract's oracle changed, or the request gone", async () => {
     const changed = rate({ oracleAnswer: () => ({ state: "not-our-oracle" }) });
-    expect(await changed.run).toEqual({ state: "skipped", reason: "not-our-oracle" });
-    expect(changed.deps.notify).not.toHaveBeenCalled();
-    expect(await rate({ oracleAnswer: () => ({ state: "unknown" }) }).run).toEqual({
-      state: "skipped",
-      reason: "not-pending",
+    expect(await changed.run).toEqual({ state: "skipped", reason: "not-our-oracle", orphan: R_KA });
+    expect(changed.log.slice(-1)).toEqual(["alert-orphan"]);
+    expect(changed.deps.notify.mock.calls.map(([notice]) => notice.level)).toEqual(["alert"]);
+    expect(changed.deps.notify.mock.calls[0]?.[0].text).toBe(
+      `rating-orphan: ${R_KA} was minted for a request whose contract's oracle changed`,
+    );
+    expect(changed.logger.error).toHaveBeenCalledWith(expect.stringMatching(/^rating-orphan: /));
+
+    const gone = rate({ oracleAnswer: () => ({ state: "unknown" }) });
+    expect(await gone.run).toEqual({ state: "skipped", reason: "not-pending", orphan: R_KA });
+    expect(gone.deps.notify.mock.calls[0]?.[0].text).toBe(
+      `rating-orphan: ${R_KA} was minted for a request no longer pending`,
+    );
+  });
+
+  it("skips with no message when the oracle can't record a cancel that left no R-KA", async () => {
+    const { run, deps } = rate({
+      requests: [pending({ targetUal: ELSEWHERE })],
+      oracleAnswer: () => ({ state: "not-our-oracle" }),
     });
+
+    expect(await run).toEqual({ state: "skipped", reason: "not-our-oracle" });
+    expect(deps.notify).not.toHaveBeenCalled();
   });
 });
 

@@ -128,8 +128,9 @@ const RATING_FAILURES: readonly RatingFailure[] = [
 ];
 
 /**
- * How a rating run ends, unless it fails: the request fulfilled or cancelled (an `orphan` is an
- * R-KA the contract never recorded, ADR 0014), or skipped.
+ * How a rating run ends, unless it fails: the request fulfilled or cancelled, or skipped. An
+ * `orphan` is an R-KA the contract will never record (ADR 0014): one minted for a request
+ * cancelled meanwhile, or for one the oracle found gone or no longer its own.
  */
 export type RatingOutcome =
   | { readonly state: "fulfilled"; readonly score: number; readonly rKaUal: string }
@@ -141,6 +142,7 @@ export type RatingOutcome =
   | {
       readonly state: "skipped";
       readonly reason: "bad-event" | "unknown-contract" | "not-pending" | "not-our-oracle";
+      readonly orphan?: string;
     };
 
 /** The step tools a rating run uses: `step.run`, `step.sleep`, and `step.invoke` of the oracle. */
@@ -260,22 +262,27 @@ export async function runRating(
   if (read.oracle !== deps.oracle) return { state: "skipped", reason: "not-our-oracle" };
 
   const oracle = (id: string, input: OracleInput) => callOracle(id, input, step);
-  /** The outcome of the oracle's answer, announced once settled, a step per message (ADR 0038). */
+  /**
+   * The outcome of the oracle's answer, announced once settled, a step per message (ADR 0038):
+   * an orphan R-KA alerted on, then a settled request's activity message, naming the paper a
+   * run that never read it looks up first (`find-paper`).
+   */
   const settle = async (answer: OracleResult, orphan: string | undefined, run?: RunContext) => {
     const outcome = outcomeOf(answer, orphan, logger);
-    if (outcome.state === "skipped") return outcome;
-    const paper = {
-      requestId,
-      targetUal: request.targetUal,
-      cid: run?.cid,
-      title: run?.head?.title,
-    };
-    if (outcome.state === "cancelled" && outcome.orphan) {
-      const alert = orphanText(outcome.orphan, outcome.reason);
+    if (outcome.orphan) {
+      const alert = orphanText(outcome.orphan, orphanWhy(outcome));
       await step.run("alert-orphan", () =>
         deps.notify({ level: "alert", text: alert }).then(() => null),
       );
     }
+    if (outcome.state === "skipped") return outcome;
+    const found = run && !run.cid ? await paperOf(run) : undefined;
+    const paper = {
+      requestId,
+      targetUal: request.targetUal,
+      cid: run?.cid ?? found?.cid,
+      title: run?.head?.title ?? found?.title,
+    };
     const text = ratedText(outcome, paper, deps.siteUrl);
     await step.run("notify", () => deps.notify({ level: "activity", text }).then(() => null));
     return outcome;
@@ -608,28 +615,59 @@ async function callOracle(id: string, input: OracleInput, step: RatingSteps) {
 }
 
 /** The `rating-orphan` line, logged and alerted on: an R-KA the contract will never record. */
-function orphanText(orphan: string, reason: "expired" | "invalid-target"): string {
-  return `rating-orphan: ${orphan} was minted for a request cancelled ${reason}`;
+function orphanText(orphan: string, why: string): string {
+  return `rating-orphan: ${orphan} was minted for a request ${why}`;
 }
 
-/** The run's outcome from the oracle's answer; `orphan` is an R-KA a cancel leaves unrecorded. */
+/** Why an outcome's R-KA is an orphan, for {@link orphanText}. */
+function orphanWhy(outcome: RatingOutcome): string {
+  if (outcome.state === "cancelled") return `cancelled ${outcome.reason}`;
+  return outcome.state === "skipped" && outcome.reason === "not-our-oracle"
+    ? "whose contract's oracle changed"
+    : "no longer pending";
+}
+
+/**
+ * The run's outcome from the oracle's answer, given the R-KA it minted or left stored
+ * (`orphan`): unrecorded when the oracle cancelled the request meanwhile, found it gone (a
+ * reorg after the run's read), or found the contract's oracle changed; each such orphan is
+ * logged.
+ */
 function outcomeOf(
   answer: OracleResult,
   orphan: string | undefined,
   logger: OracleLogger,
-): RatingOutcome {
-  switch (answer.state) {
-    case "fulfilled":
-      return { state: "fulfilled", score: answer.score, rKaUal: answer.rKaUal };
-    case "cancelled":
-      if (!orphan) return { state: "cancelled", reason: answer.reason };
-      logger.error(orphanText(orphan, answer.reason));
-      return { state: "cancelled", reason: answer.reason, orphan };
-    case "not-our-oracle":
-      return { state: "skipped", reason: "not-our-oracle" };
-    case "unknown":
-      return { state: "skipped", reason: "not-pending" };
+): RatingOutcome & { readonly orphan?: string } {
+  const outcome = ((): RatingOutcome => {
+    switch (answer.state) {
+      case "fulfilled":
+        return { state: "fulfilled", score: answer.score, rKaUal: answer.rKaUal };
+      case "cancelled":
+        return { state: "cancelled", reason: answer.reason, ...(orphan ? { orphan } : {}) };
+      case "not-our-oracle":
+        return { state: "skipped", reason: "not-our-oracle", ...(orphan ? { orphan } : {}) };
+      case "unknown":
+        return { state: "skipped", reason: "not-pending", ...(orphan ? { orphan } : {}) };
+    }
+  })();
+  if (outcome.state !== "fulfilled" && outcome.orphan) {
+    logger.error(orphanText(outcome.orphan, orphanWhy(outcome)));
   }
+  return outcome;
+}
+
+/**
+ * The paper's PDF CID and title, for the message of a run that never read them (a restart
+ * that found the R-KA minted), in a step of its own; none when the node does not answer.
+ */
+async function paperOf(
+  run: RunContext,
+): Promise<{ readonly cid: string | undefined; readonly title: string } | undefined> {
+  const sparql = paperPdfQuery(run.deps.contextGraph, run.targetUal);
+  if (!sparql) return undefined;
+  const rows = await run.step.run("find-paper", () => run.deps.dkg.query(sparql));
+  if (!rows.ok || rows.bindings.length === 0) return undefined;
+  return { cid: pdfCidOf(rows.bindings), title: paperHeadOf(rows.bindings).title };
 }
 
 /**
