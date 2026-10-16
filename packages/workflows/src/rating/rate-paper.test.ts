@@ -604,7 +604,7 @@ describe("runRating: rating a paper", () => {
 
   it("alerts that the minted R-KA may go unrecorded when the contract's oracle changed, without calling it an orphan", async () => {
     const changed = rate({ oracleAnswer: () => ({ state: "not-our-oracle" }) });
-    const text = `rating-oracle-moved: ${R_KA} was written for request ${REQUEST_ID}, but the contract's oracle is no longer this deployment's key; a later run records it once the deployment holds that key again, unless the request is cancelled by hand meanwhile`;
+    const text = `rating-oracle-moved: ${R_KA} was minted for request ${REQUEST_ID}, but the contract's oracle is no longer this deployment's key; a later run records it once the deployment holds that key again, unless the request is cancelled by hand meanwhile`;
 
     expect(await changed.run).toEqual({
       state: "skipped",
@@ -642,6 +642,19 @@ describe("runRating: past the maximum age", () => {
 
     expect(await run).toEqual({ state: "fulfilled", score: 72, rKaUal: R_KA });
     expect(dkg.startMint).not.toHaveBeenCalled();
+  });
+
+  it("says a stored R-KA is recorded only if its mint landed when the contract's oracle changed before the expired cancel", async () => {
+    const { run, deps, logger } = rate({
+      requests: [old],
+      reads: [stored],
+      oracleAnswer: () => ({ state: "not-our-oracle" }),
+    });
+    const text = `rating-oracle-moved: ${R_KA} was stored, never minted, for request ${REQUEST_ID}, past its maximum age, but the contract's oracle is no longer this deployment's key; a later run under that key records it only if its mint landed, and otherwise cancels the request expired, leaving it unrecorded`;
+
+    expect(await run).toEqual({ state: "skipped", reason: "not-our-oracle", rKaUal: R_KA });
+    expect(deps.notify.mock.calls).toEqual([[{ level: "alert", text }]]);
+    expect(logger.error).toHaveBeenCalledWith(text);
   });
 
   it("cancels it expired when the stored R-KA is never minted, naming it as an orphan", async () => {

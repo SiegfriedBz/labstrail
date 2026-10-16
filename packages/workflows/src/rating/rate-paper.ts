@@ -129,11 +129,11 @@ const RATING_FAILURES: readonly RatingFailure[] = [
 
 /**
  * How a rating run ends, unless it fails: the request fulfilled or cancelled, or skipped. An
- * `orphan` is an R-KA the contract will never record (ADR 0014): one minted for a request
- * cancelled meanwhile, or for one the oracle found gone (a reorg after the run's read, ADR
- * 0017). `rKaUal` is the R-KA a run minted or stored before finding the contract's oracle
- * changed: a later run records it once the deployment holds the contract's oracle key again,
- * unless the request is cancelled by hand meanwhile.
+ * `orphan` is an R-KA the contract will never record (ADR 0014): one stored, never minted,
+ * when the run cancels the request expired, or one written for a request cancelled meanwhile
+ * or found gone (a reorg after the run's read, ADR 0017). `rKaUal` is the R-KA a run minted,
+ * or stored past the maximum age, before finding the contract's oracle changed; its
+ * `rating-oracle-moved` alert says when a later run records it.
  */
 export type RatingOutcome =
   | { readonly state: "fulfilled"; readonly score: number; readonly rKaUal: string }
@@ -272,8 +272,8 @@ export async function runRating(
    * (`alert-oracle-moved`), then a settled request's activity message, naming the paper a run
    * that never read it looks up first (`find-paper`).
    */
-  const settle = async (answer: OracleResult, orphan: string | undefined, run?: RunContext) => {
-    const outcome = outcomeOf(answer, orphan, logger);
+  const settle = async (answer: OracleResult, written: Written | undefined, run?: RunContext) => {
+    const outcome = outcomeOf(answer, written?.ual, logger);
     if (outcome.orphan) {
       const alert = orphanText(outcome.orphan, orphanWhy(outcome));
       await step.run("alert-orphan", () =>
@@ -281,7 +281,7 @@ export async function runRating(
       );
     }
     if (outcome.state === "skipped" && outcome.rKaUal) {
-      const alert = movedText(outcome.rKaUal, requestId);
+      const alert = movedText(outcome.rKaUal, requestId, written?.minted ?? false);
       logger.error(alert);
       await step.run("alert-oracle-moved", () =>
         deps.notify({ level: "alert", text: alert }).then(() => null),
@@ -327,11 +327,11 @@ export async function runRating(
         requestId,
         action: { kind: "fulfil", score: result.score, rKaUal: result.rKaUal },
       });
-      return settle(answer, result.rKaUal, run);
+      return settle(answer, { ual: result.rKaUal, minted: true }, run);
     }
     if (result.kind === "expire") {
       const answer = await oracle("cancel", cancelOf(contract, requestId, "expired"));
-      return settle(answer, result.orphan, run);
+      return settle(answer, result.orphan ? { ual: result.orphan, minted: false } : undefined, run);
     }
     if (result.kind === "invalid-target") {
       const answer = await oracle("cancel", cancelOf(contract, requestId, "invalid-target"));
@@ -345,6 +345,12 @@ export async function runRating(
   const failure = last?.kind === "retry" ? last.failure : "mint-not-confirmed";
   const reason = last?.kind === "retry" ? last.reason : "mint not seen";
   throw stop(failure, `${name.name} gave up after ${RATING_SETTINGS.attempts} attempts: ${reason}`);
+}
+
+/** The R-KA a run hands the oracle's answer: minted (a fulfil) or only stored (an expired cancel). */
+interface Written {
+  readonly ual: string;
+  readonly minted: boolean;
 }
 
 interface RunContext {
@@ -632,13 +638,17 @@ function orphanText(orphan: string, why: string): string {
 }
 
 /**
- * The `rating-oracle-moved` line, logged and alerted on: an R-KA minted or stored for a request
- * whose contract's oracle changed meanwhile. A later run records it once the deployment holds
- * the contract's oracle key again, the role pointed back (ADR 0020) or a rotated key deployed
- * (ADR 0019); a cancel by hand under another key meanwhile leaves it unrecorded.
+ * The `rating-oracle-moved` line, logged and alerted on: an R-KA written for a request whose
+ * contract's oracle changed before the oracle function sent. A minted one is recorded by a
+ * later run once the deployment holds the contract's oracle key again, the role pointed back
+ * (ADR 0020) or a rotated key deployed (ADR 0019), unless the request is cancelled by hand
+ * meanwhile. A stored one, past the maximum age, is recorded only if its mint landed: a later
+ * run otherwise cancels the request expired (ADR 0020).
  */
-function movedText(rKaUal: string, requestId: string): string {
-  return `rating-oracle-moved: ${rKaUal} was written for request ${requestId}, but the contract's oracle is no longer this deployment's key; a later run records it once the deployment holds that key again, unless the request is cancelled by hand meanwhile`;
+function movedText(rKaUal: string, requestId: string, minted: boolean): string {
+  return minted
+    ? `rating-oracle-moved: ${rKaUal} was minted for request ${requestId}, but the contract's oracle is no longer this deployment's key; a later run records it once the deployment holds that key again, unless the request is cancelled by hand meanwhile`
+    : `rating-oracle-moved: ${rKaUal} was stored, never minted, for request ${requestId}, past its maximum age, but the contract's oracle is no longer this deployment's key; a later run under that key records it only if its mint landed, and otherwise cancels the request expired, leaving it unrecorded`;
 }
 
 /** Why an outcome's R-KA is an orphan, for {@link orphanText}. */
