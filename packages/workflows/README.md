@@ -40,8 +40,8 @@ server (`APP_ENV` other than `local`) checks them when it starts, through
 | `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY` | Inngest's keys, required unless `APP_ENV` is `local`: the SDK reads them itself, and the signing key also reads runs for the upload page. Secret |
 | `VERCEL_GIT_COMMIT_REF` | Set by Vercel: on staging, the branch, which names the Inngest branch environment runs are read from |
 | `VERCEL_PROJECT_PRODUCTION_URL`, `VERCEL_BRANCH_URL` | Set by Vercel: production's domain and the branch's URL, which notifications link to (`siteUrlOf`); locally, `http://localhost:3000` |
-| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Optional: the bot's token (`<bot id>:<secret>`, from @BotFather) and the numeric id of the chat notifications go to, one for every environment ([ADR 0038](../../docs/adr/0038-alerts-go-to-one-telegram-chat.md)). Unset, as locally, notifications are only logged. The token is secret |
-| `ALCHEMY_WEBHOOK_SIGNING_KEY` | Optional: the signing key of this environment's Alchemy Notify webhook, read only by `getWebhookIntake` (declared in `webhookSchema`); without it the webhook route answers 404, as on feature previews. Locally, any value lets `post-webhook` check the route. Secret |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Optional: the bot's token (`<bot id>:<secret>`, from @BotFather) and the numeric id of the chat notifications go to, one for every environment ([ADR 0038](../../docs/adr/0038-alerts-go-to-one-telegram-chat.md)). Unset, as locally, notifications are only logged. On Vercel, set them on production and on `develop` only (scoped to that branch, like the oracle key), so a feature preview, whose messages would also read `staging`, only logs. The notifier reads only these and the shared settings, so an alert still goes out when another setting is bad. The token is secret |
+| `ALCHEMY_WEBHOOK_SIGNING_KEY` | Optional: the signing key of this environment's Alchemy Notify webhook (`webhookKeySchema`), read by `getWebhookIntake` and checked at start with the settings above; without it the webhook route answers 404, as on feature previews. Locally, any value lets `post-webhook` check the route. Secret |
 
 The rating functions read four more, declared in `src/rating-env.ts`
 (`createRatingEnv`) and validated with the settings above in one pass, so one `EnvError`
@@ -54,7 +54,7 @@ production, which refuses to start without the key, and on staging when the key 
 | --- | --- |
 | `ORACLE_PRIVATE_KEY` | The oracle's key, `0x` and 64 hex: on Vercel only `develop` (staging's, scoped to that branch) and production hold one; locally, Anvil's second default account's key. Secret |
 | `PUBLISHER_ADDRESSES` | Optional: the DKG node's publisher wallets, comma-separated ([`docs/node-host.md`](../../docs/node-host.md) lists them), whose ETH and TRAC the health check watches |
-| `LOCAL_CHAIN_RPC_URL`, `LOCAL_RATING_CONTRACT` | Required only when `APP_ENV=local`: Anvil's URL (`http://127.0.0.1:8546`) and the RatingController deployed there ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)). The pages' rating calls (`getRatingService`) and the `fund-local` script read them too. Elsewhere the contracts come from the committed deployments file, current and past ([ADR 0028](../../docs/adr/0028-deployed-addresses-are-committed.md)) |
+| `LOCAL_CHAIN_RPC_URL`, `LOCAL_RATING_CONTRACT` | Required only when `APP_ENV=local`: Anvil's URL (`http://127.0.0.1:8546`) and the RatingController deployed there ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)). The pages' rating calls (`getRatingService`), the `rate-paper`, `fund-local` and `post-webhook` scripts read them too (`post-webhook` only the URL), and the webhook's intake reads the contract, locally only (`webhookSchema`). Elsewhere the contracts come from the committed deployments file, current and past ([ADR 0028](../../docs/adr/0028-deployed-addresses-are-committed.md)) |
 
 `DKG_CONTEXT_GRAPH` must spell its address in EIP-55 checksum case, as the node lists it
 (`@verisci/dkg`'s rule): a query with the address in another case reads another, empty
@@ -198,7 +198,7 @@ is left ([ADR 0007](../../docs/adr/0007-all-writes-converge.md)):
      lowered from 30 to 15 MB), cancels `invalid-target`
      ([ADR 0011](../../docs/adr/0011-a-rating-is-a-separate-r-ka.md)). A gateway that does not
      give the file the first time in a run is asked once more 15 s later
-     (`read-paper-<n>-again`): it failed the first read of every run in local tests and gave
+     (`read-paper-<n>-wait`, then `read-paper-<n>-again`): it failed the first read of every run in local tests and gave
      the next. A failed read names its cause (`HTTP <status>`, a timeout, the network error).
      A file that is not a PDF or does not parse is read again on the next attempt, since the
      gateway may have given another file; after 4 such reads, at least 22 minutes apart in
@@ -225,8 +225,9 @@ Past the maximum age (24 hours after the request's block), a minted R-KA is stil
 a stored one is polled for 10 minutes without a new mint, and is fulfilled if it lands;
 anything else is cancelled `expired`. A stored R-KA left behind, or one minted for a request
 cancelled meanwhile, is an orphan: the outcome names it, and the run logs it and alerts on
-it. Once the oracle settles the request, a **notify** step sends one activity message: the
-score or why it was cancelled, the paper, and the rating's page.
+it from an **alert-orphan** step. Once the oracle settles the request, a **notify** step sends
+one activity message: the score or why it was cancelled, the paper (by its title, or its UAL
+when it has none), and the rating's page.
 
 Retries ([ADR 0009](../../docs/adr/0009-retries-are-spaced-with-step-sleep.md)): a chain
 that does not answer is read again every 2 minutes, up to 5 times, and so is a node that does
@@ -333,7 +334,8 @@ Deployed, the rating run starts from the Alchemy Notify webhook
 - sends one `verisci/rating.requested` event per `Phase1Requested` log of an environment
   contract, built with `ratingRequestedEvent` (id `rating:<request id>`, so a repeated delivery
   makes no second run); a log marked `removed`, of another contract or of another event sends
-  nothing;
+  nothing. After a reorg, Alchemy Notify delivers the new block, and a request the reorg
+  dropped is stopped by the run's read of the request on chain (`docs/domain.md` → Chain);
 - answers 503, logged `webhook-unavailable: inngest: …`, when Inngest refuses the events, so
   the Alchemy Notify webhook delivers again; otherwise 200.
 
@@ -374,17 +376,21 @@ restarts runs: the run decides what is left (retry, cancel `invalid-target`, ful
 - Each tick reads, on every contract of the environment (current and past, or Anvil's
   locally), one page of 100 ids of the pending set (`readPendingRequestIds`), page `tick mod
   pages`, so successive ticks reach every request without a stored cursor, and reads each
-  request. One pending more than 4 hours gets its event, with the id
+  request, 10 at a time (`readPending`), so a page stays within the RPC's rate limit. One
+  pending more than 4 hours gets its event, with the id
   `rating:<request id>:<window>`, the 4-hour window of the tick: every tick of a window sends
   the same id, so Inngest starts at most one run per request per window whatever the
   throttle does, and the singleton keeps it off a run still going.
 - 4 hours: a run waits up to about 2 hours on a Gemini outage and has 5 hours in all, so a
-  run that stopped is restarted within 4.5 hours of the request, and one still going is
-  skipped. With the 24-hour maximum age, a stuck request gets about 5 runs before it is
+  run that stopped is restarted within 4.5 hours of the request. A restart that finds the
+  first run still going is skipped, and the next window sends it again, 4 hours later. With
+  the 24-hour maximum age, a stuck request gets about 5 runs before it is
   cancelled; the maximum age must exceed the threshold, the interval and a run's budget, and
   a test holds it.
 - A scorer outage therefore leaves a request pending until a restart finds Gemini back. A
-  contract that does not answer is logged `reconcile-unreachable` and read on the next tick.
+  contract that does not answer is logged `reconcile-unreachable` and read on the next tick;
+  requests that do not answer are logged `reconcile-unreadable: <contract>: <n> of <m>
+  requests` and read again when their page comes round.
 - It runs wherever the oracle key is (ADR 0019), a developer's computer included, where it
   starts a request the page never announced.
 
@@ -402,12 +408,16 @@ step of its own, so a replay never sends it twice.
 - **A failed run:** `alert-on-failure`, on every function's `inngest/function.failed`, names
   the function, the run and the first line of its error, whose `publish-failed:`,
   `rating-failed:` or `oracle-failed:` prefix says why.
-- **The oracle and orphans:** an oracle without funds, a transaction at the fee cap, and an
-  orphan R-KA.
+- **The oracle and orphans:** an oracle without funds (**alert-no-funds**), a transaction at
+  the fee cap (**alert-fee-cap**), and an orphan R-KA (the rating run's **alert-orphan**).
 - **Every hour,** `check-health` alerts on the oracle's ETH, and each publisher wallet's ETH on
   Base Sepolia, under 0.005; a publisher wallet's TRAC under 100; and requests pending past 6
-  hours, with how many and the oldest. A balance or contract that does not answer is read
-  again the next hour; nothing is sent when all is well. It runs where the oracle key is.
+  hours, with how many and the oldest. It reads at most 3 pages of pending ids a contract an
+  hour (300 requests, 10 at a time), each hour going on from the last, so a spam backlog is
+  read in turns and the alert says how many it read. A balance that does not answer is read
+  again the next hour; a contract is logged `health-unreachable`, and requests that do not
+  answer `health-unreadable` with their number. Nothing is sent when all is well. It runs
+  where the oracle key is.
 
 ## The pages' calls
 

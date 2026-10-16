@@ -30,7 +30,8 @@ published paper is listed at `/papers`, newest first, read a page at a time from
 Ratings work end to end locally, against a contract on Anvil: a published paper's page
 requests one from the visitor's wallet, each rating has a page that follows it to its score
 and then shows every check and quote behind it, and the papers list shows each paper's
-score. What starts a rating on staging, and what restarts a stuck one, come next. The repo, its packages and the EIP-712 domain keep the lowercase name `verisci`.
+score. Deployed, a webhook starts each rating and a cron restarts a stuck one; they reach
+users with the first deploy. The repo, its packages and the EIP-712 domain keep the lowercase name `verisci`.
 Everything runs on testnets.
 
 ## How it works
@@ -50,8 +51,8 @@ Built:
   ([ADR 0007](docs/adr/0007-all-writes-converge.md)).
 - **Staging and production are kept apart**, with their own contracts, graphs,
   oracle wallets and limit stores (production's graph and store come with its first app
-  deployment); the DKG node, the Reown project and the pinning account are shared
-  ([ADR 0005](docs/adr/0005-staging-and-production-are-isolated.md)).
+  deployment); the DKG node, the Reown project, the pinning account and the alerts chat
+  are shared ([ADR 0005](docs/adr/0005-staging-and-production-are-isolated.md)).
 - **A requested paper is rated.** A rating run reads the paper's text, has an LLM answer
   the reporting checklist of its kind of study (a trial, an animal study, a review…) with
   quotes, and computes the score from those answers, once: it measures whether the paper

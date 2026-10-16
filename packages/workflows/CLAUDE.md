@@ -21,8 +21,8 @@ Inngest workflows that combine `core` logic with the `dkg` and `contracts` adapt
   webhook's intake follows 0017, the reconciler 0020, and notifications and alerts 0038.
   See [`docs/adr/`](../../docs/adr/README.md).
 - Workflow logic takes its step tools and adapters as arguments (`PublishSteps`,
-  `PublishDeps`, `RatingSteps`, `RatingDeps`, `OracleSteps`, `OracleChain`), so tests run
-  it with fakes; `src/functions.ts` builds the real adapters
+  `PublishDeps`, `RatingSteps`, `RatingDeps`, `OracleSteps`, `OracleChain`,
+  `ReconcilerSteps`, `HealthSteps`), so tests run it with fakes; `src/functions.ts` builds the real adapters
   on a function's first run. Never import `src/env.ts` from the main entry: `web` imports
   it, and `next build` must pass with only `APP_ENV` set.
 - **Layout:** `src/publish/` (the publish run and its adapters: GROBID, Pinata),
@@ -32,16 +32,18 @@ Inngest workflows that combine `core` logic with the `dkg` and `contracts` adapt
   the publish run's field check share), `src/site/` (the services the web app calls: upload
   URLs, submissions, a paper's status, the papers list, its ratings, and the Alchemy Notify
   webhook's intake), `src/alerts/` (the Telegram notifier, the messages, the failure alerts and
-  the health check). The reconciler sits in `src/rating/`. At the root only the entry
+  the health check). The reconciler sits in `src/rating/`, with the pending reads
+  (`pending.ts`) the health check shares. At the root only the entry
   (`index.ts`), the settings (`env.ts`, `*-env.ts`), the wiring (`functions.ts`) and the
   Inngest client. What both runs use goes in a shared folder such as `pdf/` or `gemini/`; a folder may
   import from another (the site service checks submissions with `publish/`, and reads
   ratings with `rating/`).
   `src/layout.test.ts` checks that each file sits in one of these folders (any `*-env.ts` at
   the root) and that the entry exports the same names.
-- Step ids are unique per run (`read-1`, `wait-1-3`, `poll-1-3`); every wait is a
-  `step.sleep`, never a sleep inside a step. A notification is sent from a step of its own
-  (`notify`, `alert-fee-cap`), never from the function body, which replays. A step whose result changes shape gets a new id
+- Step ids are unique per run, sleeps included (`read-1`, `wait-1-3`, `poll-1-3`,
+  `read-paper-1-wait`); the rating run's fake steps fail a run that uses one twice. Every wait is a
+  `step.sleep`, never a sleep inside a step. Each notification is sent from a step of its own
+  (`notify`, `alert-orphan`, `alert-fee-cap`), never from the function body, which replays. A step whose result changes shape gets a new id
   (`score-paper-1` replaced `score-1`), so a run already going never reads an old result as a
   new one.
 - Adapters return typed results and never throw for an expected failure, as ADR 0021

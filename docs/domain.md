@@ -377,6 +377,10 @@ Observed on Base Sepolia (chain id 84532) with Alchemy RPC and the Alchemy Notif
   ([ADR 0017](adr/0017-chain-events-are-ingested-at-least-once.md)). A Custom Webhook's
   delivery carries the fields its GraphQL query asks for (`packages/workflows` README → The
   Alchemy Notify webhook).
+- **After a reorg, the Alchemy Notify webhook delivers the new block** (Alchemy's Custom
+  Webhooks FAQ): the same block number with a new hash means the earlier delivery's logs
+  left the chain. Its GraphQL logs carry no per-log `removed` mark, so a run reads the
+  request on chain before acting ([ADR 0017](adr/0017-chain-events-are-ingested-at-least-once.md)).
 - **Base has no public mempool:** the RPC forwards transactions to the sequencer, so
   whether Alchemy RPC's pending nonce (`eth_getTransactionCount(…, "pending")`) shows a
   transaction not yet included is to verify ([ADR 0019](adr/0019-oracle-transactions-are-serialized.md)).
@@ -419,7 +423,7 @@ Observed on Vercel Hobby with Inngest Cloud, except where a fact cites the vendo
   from triggering, so staging stops after three quiet days on `develop` ([ADR 0005](adr/0005-staging-and-production-are-isolated.md)).
 - **Unverified: cron functions in a branch environment.** Inngest's docs do not say
   whether a branch environment runs scheduled functions; staging's reconciler relies on
-  it, so the rating plan checks it on `develop` ([ADR 0020](adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
+  it, so the first deploy checks it on `develop` ([ADR 0020](adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
 - **Only production and the stable `develop` deployment receive webhooks:** feature
   previews have no stable URL to register.
 - **Inngest concurrency limits count running steps, not runs:** a run that is sleeping or

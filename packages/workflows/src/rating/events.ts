@@ -22,7 +22,8 @@ export interface ContractLog {
 /**
  * The event that starts the rating run for a `Phase1Requested` log, with an id derived from
  * the request id, so a log delivered twice becomes one event (ADR 0017); `undefined` for
- * any other log. The dev script `rate-paper` sends it, and so will the webhook.
+ * any other log. The webhook's intake sends it, and locally the page's announce and the
+ * `rate-paper` dev script.
  */
 export function ratingRequestedEvent(
   log: ContractLog,

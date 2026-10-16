@@ -265,9 +265,9 @@ accepted.
 | `readRequestIdsOf(client, contract, targetUal)` | Every request id the contract holds for a target UAL, oldest first, read in pages of 50 (`requestCountOf`, then `requestIdsOf`), or `unreachable` when the RPC fails or a reply does not decode; the pages list a paper's ratings with it |
 | `readOracleAgent(client, contract)` | The contract's oracle address in lowercase, or `unreachable` |
 | `readPendingCount(client, contract)` | How many requests the contract holds pending (`pendingCount`), or `unreachable` |
-| `readPendingRequestIds(client, contract, offset, limit)` | One page of pending request ids in lowercase (`pendingRequestIds`), or `unreachable`; a fulfil or cancel reorders the set, so the reconciler pages through it again on each tick ([ADR 0020](../../docs/adr/0020-stuck-requests-recovered-only-oracle-cancels.md)) |
+| `readPendingRequestIds(client, contract, offset, limit)` | One page of pending request ids in lowercase (`pendingRequestIds`), or `unreachable`; a fulfil or cancel reorders the set, so the reconciler reads one page a tick, in turns, and reads each request it lists before acting ([ADR 0020](../../docs/adr/0020-stuck-requests-recovered-only-oracle-cancels.md)) |
 | `fulfilCalldata(requestId, score, rKaUal)`, `cancelCalldata(requestId, reason)` | The calldata of `fulfilPhase1` and of `cancelRequest` (`expired` or `invalid-target`), which the oracle signs and sends |
-| `ContractReader`, `RequestStatus`, `CancelReason`, `ReadRequestResult`, `ReadRequestIdsResult`, `ReadOracleResult` | What the reads take from a viem public client, and their types |
+| `ContractReader`, `RequestStatus`, `CancelReason`, `ReadRequestResult`, `ReadRequestIdsResult`, `ReadPendingCountResult`, `ReadOracleResult` | What the reads take from a viem public client, and their types |
 | `contractsName` | The package name, imported by the web app's package test |
 
 Each `Deployment` records the contract `address`, the deployment `txHash` and
