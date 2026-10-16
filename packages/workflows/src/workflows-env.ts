@@ -14,8 +14,24 @@ export const geminiSchema = {
 };
 
 /**
+ * The Telegram bot and chat every environment's notifications go to (ADR 0038), optional: without
+ * them, `createNotify` only logs. The token is secret.
+ */
+export const telegramSchema = {
+  TELEGRAM_BOT_TOKEN: z
+    .string()
+    .regex(/^\d+:[\w-]+$/, "must be a bot token, <bot id>:<secret>")
+    .optional(),
+  TELEGRAM_CHAT_ID: z
+    .string()
+    .regex(/^-?\d+$/, "must be a numeric chat id")
+    .optional(),
+};
+
+/**
  * Validates the workflows' settings from `runtimeEnv` (default `process.env`): GROBID, the
- * Pinata gateway and key, the Gemini key, a Base Sepolia RPC URL, and Inngest's event and signing keys
+ * Pinata gateway and key, the Gemini key, a Base Sepolia RPC URL, the optional Telegram bot and chat,
+ * and Inngest's event and signing keys
  * outside `local` (the dev server needs none), plus the DKG node's (`dkgSchema`, in the
  * same pass, with the context graph's address in the node's checksum case) and the shared
  * ones. The Inngest SDK reads its keys itself; they are checked
@@ -44,6 +60,7 @@ export function workflowsSchema(appEnv: SharedEnv["APP_ENV"]) {
     ...geminiSchema,
     INNGEST_EVENT_KEY: inngestKey,
     INNGEST_SIGNING_KEY: inngestKey,
+    ...telegramSchema,
     /** Set by Vercel: the branch, which names a staging deployment's Inngest environment. */
     VERCEL_GIT_COMMIT_REF: z.string().optional(),
   };
