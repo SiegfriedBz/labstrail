@@ -79,6 +79,7 @@ export {
 } from "./rating/paper-text.ts";
 export {
   classifyTarget,
+  paperHeadOf,
   paperPdfQuery,
   parseRating,
   pdfCidOf,

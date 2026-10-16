@@ -3,6 +3,7 @@ import type { QueryBinding } from "../papers/paper-record.ts";
 import type { Triple } from "../publish/target-ka.ts";
 import {
   classifyTarget,
+  paperHeadOf,
   paperPdfQuery,
   parseRating,
   pdfCidOf,
@@ -75,13 +76,25 @@ describe("classifyTarget", () => {
 });
 
 describe("paperPdfQuery and pdfCidOf", () => {
-  it("reads the paper's schema:url from its own graph", () => {
+  it("reads the paper's schema:url, and its title and abstract when it has them, from its own graph", () => {
     const query = paperPdfQuery(GRAPH, OUR_UAL) ?? "";
 
-    expect(query).toContain("SELECT ?url");
+    expect(query).toContain("SELECT ?url ?title ?abstract");
     expect(query).toContain(
-      `GRAPH <did:dkg:context-graph:${GRAPH}/_verifiable_memory/${AGENT}/7> { ?paper <http://schema.org/url> ?url }`,
+      `GRAPH <did:dkg:context-graph:${GRAPH}/_verifiable_memory/${AGENT}/7> {\n    ?paper <http://schema.org/url> ?url .`,
     );
+    expect(query).toContain("OPTIONAL { ?paper <http://schema.org/name> ?title }");
+    expect(query).toContain("OPTIONAL { ?paper <http://schema.org/abstract> ?abstract }");
+  });
+
+  it("reads the paper's title and abstract from the same rows, unquoted", () => {
+    expect(
+      paperHeadOf([
+        { url: `ipfs://${CID}`, title: '"RNAi \\"therapies\\""', abstract: '"Small RNAs."' },
+      ]),
+    ).toEqual({ title: 'RNAi "therapies"', abstract: "Small RNAs." });
+    expect(paperHeadOf([{ url: `ipfs://${CID}` }])).toEqual({ title: "" });
+    expect(paperHeadOf([])).toEqual({ title: "" });
   });
 
   it("is undefined for a paper another agent minted", () => {

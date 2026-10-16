@@ -69,12 +69,30 @@ export function classifyTarget(targetUal: string, contextGraph: string): TargetC
 
 /**
  * The SPARQL that reads the `schema:url` of a paper our node minted, from the asset's own
- * graph: the `ipfs://` link to its PDF (ADR 0010), for {@link pdfCidOf}. `undefined` for a UAL
- * another agent minted or a malformed graph id.
+ * graph: the `ipfs://` link to its PDF (ADR 0010), for {@link pdfCidOf}, with its title and
+ * abstract when it has them, for {@link paperHeadOf}. `undefined` for a UAL another agent minted
+ * or a malformed graph id.
  */
 export function paperPdfQuery(contextGraph: string, ual: string): string | undefined {
   const graph = assetGraphIri(contextGraph, ual);
-  return graph && `SELECT ?url WHERE {\n  GRAPH <${graph}> { ?paper <${SCHEMA}url> ?url }\n}`;
+  return (
+    graph &&
+    `SELECT ?url ?title ?abstract WHERE {\n  GRAPH <${graph}> {\n    ?paper <${SCHEMA}url> ?url .\n    OPTIONAL { ?paper <${SCHEMA}name> ?title }\n    OPTIONAL { ?paper <${SCHEMA}abstract> ?abstract }\n  }\n}`
+  );
+}
+
+/**
+ * A paper's title and abstract, unquoted, from the rows of {@link paperPdfQuery}, for the
+ * rating run's field check (ADR 0037): an empty title when no row holds one, and no abstract
+ * when the paper has none.
+ */
+export function paperHeadOf(bindings: readonly QueryBinding[]): {
+  readonly title: string;
+  readonly abstract?: string;
+} {
+  const row = bindings.find((binding) => binding.title !== undefined) ?? bindings[0];
+  const title = row?.title === undefined ? "" : unquote(row.title);
+  return row?.abstract === undefined ? { title } : { title, abstract: unquote(row.abstract) };
 }
 
 /**
