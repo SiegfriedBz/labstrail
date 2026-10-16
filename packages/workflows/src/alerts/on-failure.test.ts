@@ -39,6 +39,15 @@ describe("failureText", () => {
     expect(failureText(failed("verisci-alert-on-failure", "x"))).toBeUndefined();
     expect(failureText({ nothing: true })).toBeUndefined();
   });
+
+  it("names a cancelled run, which Inngest cancels past its time budget, and skips its own", () => {
+    expect(failureText(failed("verisci-publish-paper", "function cancelled"), "cancelled")).toBe(
+      "verisci-publish-paper cancelled (run 01JRUN): past its time budget, or by hand",
+    );
+    expect(
+      failureText(failed("verisci-alert-on-failure", "function cancelled"), "cancelled"),
+    ).toBeUndefined();
+  });
 });
 
 describe("alertOnFailure", () => {
@@ -62,7 +71,14 @@ describe("alertOnFailure", () => {
     const { log, alert, step } = setup();
 
     expect(
-      await alertOnFailure(failed("verisci-publish-paper", "publish-failed:setup: x"), step, alert),
+      await alertOnFailure(
+        {
+          name: "inngest/function.failed",
+          data: failed("verisci-publish-paper", "publish-failed:setup: x"),
+        },
+        step,
+        alert,
+      ),
     ).toEqual({ alerted: true });
     expect(log).toEqual(["alert"]);
     expect(alert).toHaveBeenCalledExactlyOnceWith(
@@ -70,22 +86,46 @@ describe("alertOnFailure", () => {
     );
   });
 
+  it("alerts on a cancelled run too", async () => {
+    const { alert, step } = setup();
+
+    await alertOnFailure(
+      {
+        name: "inngest/function.cancelled",
+        data: failed("verisci-rate-paper", "function cancelled"),
+      },
+      step,
+      alert,
+    );
+
+    expect(alert).toHaveBeenCalledExactlyOnceWith(
+      "verisci-rate-paper cancelled (run 01JRUN): past its time budget, or by hand",
+    );
+  });
+
   it("sends nothing for its own failure, so a failing alert never alerts again", async () => {
     const { log, alert, step } = setup();
 
-    expect(await alertOnFailure(failed("verisci-alert-on-failure", "x"), step, alert)).toEqual({
-      alerted: false,
-    });
+    expect(
+      await alertOnFailure(
+        { name: "inngest/function.failed", data: failed("verisci-alert-on-failure", "x") },
+        step,
+        alert,
+      ),
+    ).toEqual({ alerted: false });
     expect(log).toEqual([]);
     expect(alert).not.toHaveBeenCalled();
   });
 });
 
 describe("createFailureAlerts", () => {
-  it("runs on every function's failure", () => {
+  it("runs on every function's failure and cancel", () => {
     const fn = createFailureAlerts(new Inngest({ id: "verisci-test" }), async () => {});
 
     expect(fn.opts.id).toBe("alert-on-failure");
-    expect(fn.opts.triggers).toEqual([{ event: "inngest/function.failed" }]);
+    expect(fn.opts.triggers).toEqual([
+      { event: "inngest/function.failed" },
+      { event: "inngest/function.cancelled" },
+    ]);
   });
 });
