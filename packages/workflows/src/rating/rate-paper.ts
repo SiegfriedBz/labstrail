@@ -639,7 +639,7 @@ function orphanText(orphan: string, why: string): string {
 
 /**
  * The `rating-oracle-moved` line, logged and alerted on: an R-KA written for a request whose
- * contract's oracle changed before the oracle function sent. A minted one is recorded by a
+ * contract's oracle changed mid-run. A minted one is recorded by a
  * later run once the deployment holds the contract's oracle key again, the role pointed back
  * (ADR 0020) or a rotated key deployed (ADR 0019), unless the request is cancelled by hand
  * meanwhile. A stored one, past the maximum age, is recorded only if its mint landed: a later
