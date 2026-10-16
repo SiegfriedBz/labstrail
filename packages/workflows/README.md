@@ -373,11 +373,13 @@ run stopped or never started, and sends each its rating event again
 restarts runs: the run decides what is left (retry, cancel `invalid-target`, fulfil, or past
 24 hours cancel `expired`), and the reconciler never writes.
 
-- Each tick reads, on every contract of the environment (current and past, or Anvil's
-  locally), one page of 100 ids of the pending set (`readPendingRequestIds`), page `tick mod
-  pages`, so successive ticks reach every request without a stored cursor, and reads each
-  request, 10 at a time (`readPending`), so a page stays within the RPC's rate limit. One
-  pending more than 4 hours gets its event, with the id
+- Each tick reads every contract of the environment (current and past, or Anvil's locally)
+  in a step of its own (`find-stale-<contract>`), one after the other: one page of 100 ids of
+  the pending set (`readPendingRequestIds`), page `tick mod pages`, so successive ticks reach
+  every request without a stored cursor, then each request, 10 at a time (`readPending`), so
+  the tick never has more than 10 calls at the RPC at once. A step ends within Vercel's 300 s
+  even when every call waits out the RPC's 10 s timeout. One pending more than 4 hours gets
+  its event, with the id
   `rating:<request id>:<window>`, the 4-hour window of the tick: every tick of a window sends
   the same id, so Inngest starts at most one run per request per window whatever the
   throttle does, and the singleton keeps it off a run still going.
@@ -412,12 +414,14 @@ step of its own, so a replay never sends it twice.
   the fee cap (**alert-fee-cap**), and an orphan R-KA (the rating run's **alert-orphan**).
 - **Every hour,** `check-health` alerts on the oracle's ETH, and each publisher wallet's ETH on
   Base Sepolia, under 0.005; a publisher wallet's TRAC under 100; and requests pending past 6
-  hours, with how many and the oldest. It reads at most 3 pages of pending ids a contract an
-  hour (300 requests, 10 at a time), each hour going on from the last, so a spam backlog is
-  read in turns and the alert says how many it read. A balance that does not answer is read
-  again the next hour; a contract is logged `health-unreachable`, and requests that do not
-  answer `health-unreadable` with their number. Nothing is sent when all is well. It runs
-  where the oracle key is.
+  hours, with how many and the oldest. It reads the balances in one step (`check-balances`),
+  then each contract in a step of its own (`check-pending-<contract>`), one after the other:
+  at most 2 pages of pending ids a contract an hour (200 requests, 10 at a time), each hour
+  going on from the last, so a spam backlog is read in turns and the alert says how many it
+  read. A balance that does not answer is logged `health-unreadable: <wallet>: ETH|TRAC` and
+  read again the next hour; a contract is logged `health-unreachable`, and requests that do
+  not answer `health-unreadable` with their number. One alert lists every problem, from its
+  own step (`alert`); nothing is sent when all is well. It runs where the oracle key is.
 
 ## The pages' calls
 

@@ -22,7 +22,7 @@ Inngest workflows that combine `core` logic with the `dkg` and `contracts` adapt
   See [`docs/adr/`](../../docs/adr/README.md).
 - Workflow logic takes its step tools and adapters as arguments (`PublishSteps`,
   `PublishDeps`, `RatingSteps`, `RatingDeps`, `OracleSteps`, `OracleChain`,
-  `ReconcilerSteps`, `HealthSteps`), so tests run it with fakes; `src/functions.ts` builds the real adapters
+  `ReconcilerSteps`, `HealthSteps`, `FailureAlertSteps`), so tests run it with fakes; `src/functions.ts` builds the real adapters
   on a function's first run. Never import `src/env.ts` from the main entry: `web` imports
   it, and `next build` must pass with only `APP_ENV` set.
 - **Layout:** `src/publish/` (the publish run and its adapters: GROBID, Pinata),
