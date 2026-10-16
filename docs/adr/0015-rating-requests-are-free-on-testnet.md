@@ -5,7 +5,7 @@
 
 ## Context
 
-Every rating costs LLM calls (on Gemini's free tier, capped per day for each model: a field check and up to two scorer requests, [0018](0018-phase-1-scorer-output-contract.md), [0037](0037-verisci-rates-life-science-and-health-papers.md)), the oracle's `fulfil` gas and a DKG publish. The previous repo made requests free to keep the first version simple, and named that an abuse surface.
+Every rating costs LLM calls (on Gemini's free tier, capped per day for each model: a field check, and a scorer request per attempt until one is answered, [0018](0018-phase-1-scorer-output-contract.md), [0037](0037-verisci-rates-life-science-and-health-papers.md)), the oracle's `fulfil` gas and a DKG publish. The previous repo made requests free to keep the first version simple, and named that an abuse surface.
 
 ## Decision
 
@@ -26,4 +26,4 @@ Every rating costs LLM calls (on Gemini's free tier, capped per day for each mod
 - 2026-10-10: corrected: "the agents plan" is now "the rating plan", since the agents package was renamed `workflows`.
 - 2026-10-12: corrected: the LLM call runs on Gemini's free tier, capped per day (ADR 0018), not at a cost per call, and that daily cap bounds ratings too (ADR sweep, user's choice).
 - 2026-10-16: the balances are alerted on through the one alerts chat ([0038](0038-alerts-go-to-one-telegram-chat.md)) (intake and recovery).
-- 2026-10-16: corrected: a rating costs a field check and up to two scorer requests, each model with its own daily cap ([0018](0018-phase-1-scorer-output-contract.md), [0037](0037-verisci-rates-life-science-and-health-papers.md)), not one LLM call (ADR sweep, user's choice).
+- 2026-10-16: corrected: a rating costs a field check and a scorer request per attempt until one is answered, each model with its own daily cap ([0018](0018-phase-1-scorer-output-contract.md), [0037](0037-verisci-rates-life-science-and-health-papers.md)), not one LLM call (ADR sweep and branch review, user's choices).
