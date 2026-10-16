@@ -36,7 +36,7 @@ server (`APP_ENV` other than `local`) checks them when it starts, through
 | `PINATA_GATEWAY_URL` | The Pinata account's dedicated gateway, `https://<name>.mypinata.cloud`, through which the publish and rating runs read PDFs; one account serves every environment ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)) |
 | `CHAIN_RPC_URL` | A Base Sepolia RPC URL, to check smart-contract wallets' signatures and, on staging and production, for the rating functions to read and write the rating contracts and the pages to read their ratings |
 | `PINATA_JWT` | A Pinata API key (JWT) allowed to upload, list and delete files; the `publish-pdf` dev script reads it too. Secret |
-| `GEMINI_API_KEY` | A Gemini API key from Google AI Studio, for the publish run's field check ([ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)) and the rating functions' scorer ([ADR 0018](../../docs/adr/0018-phase-1-scorer-output-contract.md)); the `score-papers` dev script reads it too. Every deployment checks it at start, previews included. Secret |
+| `GEMINI_API_KEY` | A Gemini API key from Google AI Studio, for the field check both runs make ([ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)) and the rating functions' scorer ([ADR 0018](../../docs/adr/0018-phase-1-scorer-output-contract.md)); the `score-papers` dev script reads it too. Every deployment checks it at start, previews included. Secret |
 | `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY` | Inngest's keys, required unless `APP_ENV` is `local`: the SDK reads them itself, and the signing key also reads runs for the upload page. Secret |
 | `VERCEL_GIT_COMMIT_REF` | Set by Vercel: on staging, the branch, which names the Inngest branch environment runs are read from |
 | `VERCEL_PROJECT_PRODUCTION_URL`, `VERCEL_BRANCH_URL` | Set by Vercel: production's domain and the branch's URL, which notifications link to (`siteUrlOf`); locally, `http://localhost:3000` |
@@ -75,7 +75,7 @@ upload page reads runs there, with no keys.
 | `ratePaper`, `oracleTransaction` | The `rate-paper` function, run by `verisci/rating.requested`, and the `oracle-transaction` function it invokes (below) |
 | `RATING_REQUESTED`, `RatingRequested`, `ratingRequestedEvent(log)` | The rating event's name, `verisci/rating.requested`, its data `{ contract, requestId }`, and the event for a `Phase1Requested` log (id `rating:<request id>`), or `undefined` for any other log |
 | `RATING_SETTINGS`, `ORACLE_SETTINGS` | The rating run's and the oracle function's limits (below) |
-| `RatingOutcome`, `RatingFailure`, `ratingFailureReason(output)` | How a rating run ends (`fulfilled`, `cancelled` with an optional orphan R-KA, `skipped`), and why one stopped instead: each error it throws starts `rating-failed:<reason>:` |
+| `RatingOutcome`, `RatingFailure`, `ratingFailureReason(output)` | How a rating run ends (`fulfilled`, `cancelled` with an optional orphan R-KA, `skipped`, with an orphan R-KA when the oracle found the request gone), and why one stopped instead: each error it throws starts `rating-failed:<reason>:` |
 | `OracleAction`, `OracleInput`, `OracleResult`, `OracleFailure` | What the oracle function is asked, what it answers, and why it stops (`oracle-failed:<reason>:`) |
 | `createRatingEnv(runtimeEnv)`, `RatingEnv`, `checkRatingSettings(runtimeEnv)`, `ratingSettingsRequired(runtimeEnv)`, `servesRating(runtimeEnv)` | The rating settings and their type, the start check `apps/web/instrumentation.ts` runs, when it requires them, and whether a deployment serves the rating functions |
 | `PAPER_SUBMITTED` | The event's name, `verisci/paper.submitted` |
@@ -224,9 +224,11 @@ is left ([ADR 0007](../../docs/adr/0007-all-writes-converge.md)):
 Past the maximum age (24 hours after the request's block), a minted R-KA is still fulfilled;
 a stored one is polled for 10 minutes without a new mint, and is fulfilled if it lands;
 anything else is cancelled `expired`. A stored R-KA left behind, or one minted for a request
-cancelled meanwhile, gone when the oracle reads it (a reorg after the run's read), or whose
-contract's oracle changed, is an orphan: the outcome names it, and the run logs it and alerts
-on it from an **alert-orphan** step. Once the oracle settles the request, a **notify** step
+cancelled meanwhile or gone when the oracle reads it (a reorg after the run's read), is an
+orphan: the outcome names it, and the run logs it and alerts
+on it from an **alert-orphan** step. When the contract's oracle changed mid-run, the request
+stays pending, and a restart under its key records the same R-KA, so the run ends quietly.
+Once the oracle settles the request, a **notify** step
 sends one activity message: the score or why it was cancelled, the paper (by its title, or its
 UAL when it has none), and the rating's page. A run that never read the paper, a restart that
 found the R-KA minted, looks it up first (**find-paper**); without the node's answer, the
@@ -338,8 +340,10 @@ Deployed, the rating run starts from the Alchemy Notify webhook
 - sends one `verisci/rating.requested` event per `Phase1Requested` log of an environment
   contract, built with `ratingRequestedEvent` (id `rating:<request id>`, so a repeated delivery
   makes no second run); a log marked `removed`, of another contract or of another event sends
-  nothing. After a reorg, Alchemy Notify delivers the new block, and a request the reorg
-  dropped is stopped by the run's read of the request on chain (`docs/domain.md` → Chain);
+  nothing. After a reorg, Alchemy Notify delivers the new block; the run's read of the request
+  on chain stops one the reorg dropped before the run started, and the oracle function's read
+  one dropped later, whose R-KA minted meanwhile is an orphan, alerted on (`docs/domain.md` →
+  Chain, [ADR 0017](../../docs/adr/0017-chain-events-are-ingested-at-least-once.md));
 - answers 503, logged `webhook-unavailable: inngest: …`, when Inngest refuses the events, so
   the Alchemy Notify webhook delivers again; otherwise 200.
 

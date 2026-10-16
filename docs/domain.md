@@ -425,7 +425,8 @@ Observed on Vercel Hobby with Inngest Cloud, except where a fact cites the vendo
   `x-vercel-protection-bypass` query parameter (Vercel docs, to verify on our plan).
 - **A run past its time budget is cancelled, not failed** (Inngest docs, system events): Inngest
   sends `inngest/function.cancelled` for it, as for a run cancelled by hand or through the API,
-  with the function and run ids and the error "function cancelled", and
+  with the function and run ids (the docs add an error "function cancelled"; inngest 4.22.0's
+  types carry only the ids), and
   `inngest/function.failed` only for a run that failed after its retries. An alert on failures
   alone misses a run that ran out of time ([ADR 0038](adr/0038-alerts-go-to-one-telegram-chat.md)).
 - **Inngest archives a branch environment 3 days after its latest deploy** (Inngest docs),

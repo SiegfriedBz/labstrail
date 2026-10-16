@@ -46,7 +46,7 @@ const answer = z.object({
 });
 
 /**
- * One `generateContent` call, shared by the scorer and the publish run's field check: the
+ * One `generateContent` call, shared by the scorer and the field check both runs make: the
  * prompt's system and user text, temperature 0, JSON output held to `schema`. Returns the
  * answer's text, leaving out thoughts, and the model version Gemini reports (the model asked
  * for when it reports none). An answer that did not finish with `STOP` is `invalid-output`.

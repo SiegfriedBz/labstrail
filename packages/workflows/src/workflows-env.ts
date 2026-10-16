@@ -6,7 +6,7 @@ import { z } from "zod";
 export const pinataSchema = { PINATA_JWT: z.string().min(1) };
 
 /**
- * The Gemini key, read by the publish run's field check (ADR 0037), the rating functions'
+ * The Gemini key, read by the field check both runs make (ADR 0037), the rating functions'
  * scorer (ADR 0018) and the `score-papers` dev script. Secret.
  */
 export const geminiSchema = {
