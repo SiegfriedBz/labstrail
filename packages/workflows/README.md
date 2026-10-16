@@ -225,12 +225,13 @@ Past the maximum age (24 hours after the request's block), a minted R-KA is stil
 a stored one is polled for 10 minutes without a new mint, and is fulfilled if it lands;
 anything else is cancelled `expired`. A stored R-KA left behind, or one minted for a request
 cancelled meanwhile or gone when the oracle reads it (a reorg after the run's read), is an
-orphan: the outcome names it, and the run logs it and alerts
-on it from an **alert-orphan** step. When the contract's oracle changed mid-run, the run
-logs and alerts (**alert-oracle-moved**) that the R-KA it minted is recorded only if a run
-under the new key fulfils it: a planned key rotation does, the emergency path, a cancel by
-hand under the new key, never does ([ADR 0019](../../docs/adr/0019-oracle-transactions-are-serialized.md)).
-Once the oracle settles the request, a **notify** step
+orphan: the outcome names it, and the run logs it and alerts on it from an **alert-orphan**
+step. When the contract's oracle changed mid-run, the run logs and alerts
+(**alert-oracle-moved**) that the R-KA it wrote waits: a later run records it once the
+deployment holds the contract's oracle key again, the role pointed back
+([ADR 0020](../../docs/adr/0020-stuck-requests-recovered-only-oracle-cancels.md)) or a rotated
+key deployed ([ADR 0019](../../docs/adr/0019-oracle-transactions-are-serialized.md)), unless
+the request is cancelled by hand meanwhile. Once the oracle settles the request, a **notify** step
 sends one activity message: the score or why it was cancelled, the paper (by its title, or its
 UAL when it has none), and the rating's page. A run that never read the paper, a restart that
 found the R-KA minted, looks it up first (**find-paper**); without the node's answer, the
