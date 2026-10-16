@@ -67,8 +67,9 @@ const payloadSchema = z.object({
  * a repeated delivery shares. A log marked `removed`, of another contract or of another event
  * sends nothing. After a reorg, Alchemy Notify delivers the new block; the run's read of the
  * request on chain stops one the reorg dropped before the run started, and the oracle
- * function's read one dropped later (ADR 0017). Inngest refusing the events answers 503 (logged `webhook-unavailable`), so Alchemy Notify delivers again. Without a
- * signing key it answers 404 and reads nothing.
+ * function's read one dropped later (ADR 0017). Inngest refusing the events answers 503
+ * (logged `webhook-unavailable`), so Alchemy Notify delivers again. Without a signing key it
+ * answers 404 and reads nothing.
  */
 export function createWebhookIntake(io: WebhookIo): WebhookIntake {
   return {

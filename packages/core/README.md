@@ -8,7 +8,7 @@ Domain logic. Core does no IO: no `fetch`, no `node:*` imports and no other
 `node:*` and `@verisci/*` into errors ("core does no IO").
 
 Status: shared constants, UAL parsing, asset names, a Target KA's content and submission,
-the publish run's field check (its prompt and the check of its answer),
+the field check both runs make (its prompt and the check of its answer),
 reading a paper's record back (`paperRecordQuery`, `parsePaperRecord`), listing published
 papers a page at a time (`paperListQuery` and its parsers), OriginTrail's
 contracts with the token behind a UAL (`ORIGINTRAIL_CONTRACTS`, `knowledgeAssetToken`), and a
