@@ -69,6 +69,23 @@ describe("createRatingEnv", () => {
     ).toEqual(["LOCAL_CHAIN_RPC_URL", "LOCAL_RATING_CONTRACT"]);
   });
 
+  it("takes the node's publisher wallets as an optional comma-separated list, lowercase", () => {
+    expect(createRatingEnv(rating).PUBLISHER_ADDRESSES).toEqual([]);
+    expect(
+      createRatingEnv({
+        ...rating,
+        PUBLISHER_ADDRESSES:
+          "0xD701ed157232ad5E14BC4134a8D10D64D86f13B3, 0x9a17ec95e96f8a7c40b7ac1411e8a844c7bf9111",
+      }).PUBLISHER_ADDRESSES,
+    ).toEqual([
+      "0xd701ed157232ad5e14bc4134a8d10d64d86f13b3",
+      "0x9a17ec95e96f8a7c40b7ac1411e8a844c7bf9111",
+    ]);
+    expect(() => createRatingEnv({ ...rating, PUBLISHER_ADDRESSES: "0x12,nope" })).toThrow(
+      /PUBLISHER_ADDRESSES/,
+    );
+  });
+
   it("names every bad setting, the workflows' included, in one error", () => {
     expect(
       issues({ ...rating, ORACLE_PRIVATE_KEY: undefined, GEMINI_API_KEY: "", GROBID_URL: "x" })

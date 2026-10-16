@@ -187,7 +187,9 @@ edge`, testnet), Base Sepolia.
   `DKGKnowledgeAssets` (symbol DKA, ERC-721) `0x2b2e1bcb7c52a1587264e01f6b53782d791e6fa0`, whose
   `Transfer` minted the token to the node's agent address; `KnowledgeAssetsLifecycle`
   `0x835f921a0fc8d6365c34a0bb9b37d10c98c1b8c3`, the contract the node's transaction calls; and
-  the fee token "V9 Test TRAC" `0x2a58bdd13176d85906d804cdbffa0d9119282dc8`. A V10 UAL's token
+  the fee token "V9 Test TRAC" `0x2a58bdd13176d85906d804cdbffa0d9119282dc8` (symbol `v9TRAC`, 18
+  decimals; OriginTrail's contract list names it as the V10 testnet's TRAC, and the agent wallet
+  held 900 of it on 2026-10-16), whose balance the health check watches. A V10 UAL's token
   id is the author's address shifted left 96 bits, OR the asset number (asset 8's id equals the
   `batchId` the daemon logs). Basescan shows a token at `/nft/<contract>/<token id>`. Recorded
   in `@verisci/core` as `ORIGINTRAIL_CONTRACTS`; re-check after an OriginTrail upgrade.

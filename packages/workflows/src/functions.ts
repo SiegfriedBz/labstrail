@@ -1,11 +1,14 @@
 import { readPendingCount, readPendingRequestIds } from "@verisci/contracts";
+import { ORIGINTRAIL_CONTRACTS } from "@verisci/core";
 import { createDkgClient } from "@verisci/dkg";
 import { type RuntimeEnv, sharedEnv } from "@verisci/env";
-import { createPublicClient, createWalletClient, type Hex, http } from "viem";
+import { createPublicClient, createWalletClient, erc20Abi, type Hex, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { anvil, baseSepolia } from "viem/chains";
+import { createHealthCheck, type HealthDeps } from "./alerts/health.ts";
 import { siteUrlOf } from "./alerts/messages.ts";
 import { createNotify, type Notify } from "./alerts/notify.ts";
+import { createFailureAlerts } from "./alerts/on-failure.ts";
 import { inngest } from "./inngest.ts";
 import { readPaperText } from "./pdf/paper-text.ts";
 import { checkField } from "./publish/field-check.ts";
@@ -88,8 +91,10 @@ function getPublishDeps(): PublishDeps {
 interface RatingChain {
   readonly env: RatingEnv;
   readonly chain: OracleChain;
-  /** The reads the reconciler makes on the same chain. */
+  /** The reads the reconciler and the health check make on the same chain. */
   readonly pending: Pick<ReconcilerDeps, "readPendingCount" | "readPendingIds">;
+  /** An address's ETH on the rating chain, `undefined` when it does not answer. */
+  readEth(address: string): Promise<bigint | undefined>;
   readonly chainId: number;
   /** The environment's contracts, lowercase. */
   readonly contracts: readonly string[];
@@ -125,6 +130,7 @@ function getRatingChain(): RatingChain {
       readPendingIds: (contract, offset, limit) =>
         readPendingRequestIds(client as never, contract, offset, limit),
     },
+    readEth: (address) => client.getBalance({ address: address as Hex }).catch(() => undefined),
     chainId: chain.id,
     contracts: environmentContracts(env.APP_ENV, env.LOCAL_RATING_CONTRACT),
   };
@@ -185,13 +191,61 @@ export const publishPaper = createPublishPaper(inngest, getPublishDeps);
 export const oracleTransaction = createOracleTransaction(
   inngest,
   () => getRatingChain().chain,
-  (text) => getNotify()({ level: "alert", text }),
+  (text) => alert(text),
 );
 
 /** Rates a requested paper and has the oracle record it (`verisci/rating.requested`). */
 export const ratePaper = createRatePaper(inngest, getRatingDeps, oracleTransaction, {
   throttle: sharedEnv.APP_ENV !== "local",
 });
+
+/** Alerts the maintainer on Telegram (ADR 0038). */
+const alert = (text: string) => getNotify()({ level: "alert", text });
+
+/** Alerts on every function's failure (ADR 0038). */
+export const failureAlerts = createFailureAlerts(inngest, alert);
+
+let healthDeps: HealthDeps | undefined;
+
+/**
+ * The health check's reads: the oracle's ETH on the rating chain, and the node's publisher
+ * wallets' ETH and TRAC on Base Sepolia, where the node publishes, locally too.
+ */
+function getHealthDeps(): HealthDeps {
+  if (healthDeps) return healthDeps;
+  const { env, chain, pending, contracts, readEth } = getRatingChain();
+  const base = createPublicClient({
+    chain: baseSepolia,
+    transport: http(env.CHAIN_RPC_URL, { timeout: ORACLE_SETTINGS.rpcTimeoutMs, retryCount: 0 }),
+  });
+  const trac = ORIGINTRAIL_CONTRACTS[baseSepolia.id]?.trac;
+  healthDeps = {
+    oracle: chain.account,
+    publishers: env.PUBLISHER_ADDRESSES,
+    contracts,
+    ...pending,
+    readRequest: chain.readRequest,
+    readEth: (address) =>
+      address === chain.account
+        ? readEth(address)
+        : base.getBalance({ address: address as Hex }).catch(() => undefined),
+    readTrac: (address) =>
+      trac
+        ? base
+            .readContract({
+              address: trac,
+              abi: erc20Abi,
+              functionName: "balanceOf",
+              args: [address as Hex],
+            })
+            .catch(() => undefined)
+        : Promise.resolve(undefined),
+  };
+  return healthDeps;
+}
+
+/** Checks wallet balances and old pending requests every hour (ADR 0038). */
+export const healthCheck = createHealthCheck(inngest, getHealthDeps, alert);
 
 /**
  * Restarts requests pending past the threshold, every 30 minutes (ADR 0020), on the rating
@@ -203,14 +257,15 @@ export const reconcileRatings = createReconciler(inngest, () => {
 });
 
 /**
- * The functions a deployment serves: the publish function, plus the rating, oracle and
- * reconciler functions where the oracle key is set (ADRs 0019, 0020). Reads the key's presence
- * only.
+ * The functions a deployment serves: the publish function and the failure alerts, plus the
+ * rating, oracle, reconciler and health functions where the oracle key is set (ADRs 0019,
+ * 0020, 0038). Reads the key's presence only.
  */
 export function servedFunctions(runtimeEnv: RuntimeEnv = process.env) {
+  const always = [publishPaper, failureAlerts];
   return servesRating(runtimeEnv)
-    ? [publishPaper, ratePaper, oracleTransaction, reconcileRatings]
-    : [publishPaper];
+    ? [...always, ratePaper, oracleTransaction, reconcileRatings, healthCheck]
+    : always;
 }
 
 /** Every Inngest function this deployment serves, for `web`'s `/api/inngest` route (ADR 0003). */

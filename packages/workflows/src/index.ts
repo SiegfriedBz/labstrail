@@ -2,7 +2,9 @@
 export const workflowsName = "@verisci/workflows";
 
 export {
+  failureAlerts,
   functions,
+  healthCheck,
   oracleTransaction,
   publishPaper,
   ratePaper,

@@ -6,16 +6,19 @@ export interface OriginTrailContracts {
   readonly knowledgeAssets: `0x${string}`;
   /** `KnowledgeAssetsLifecycle`: the contract a node calls to publish and update assets. */
   readonly lifecycle: `0x${string}`;
+  /** The TRAC token (ERC-20, 18 decimals) the node's publisher wallets pay publishing with. */
+  readonly trac: `0x${string}`;
 }
 
 /**
- * OriginTrail's contracts by chain id, read from a mint by our node on Base Sepolia
- * (`docs/domain.md` → DKG). A chain missing here has no known contracts.
+ * OriginTrail's contracts by chain id, read from a mint by our node on Base Sepolia, its fee
+ * token included (`docs/domain.md` → DKG). A chain missing here has no known contracts.
  */
 export const ORIGINTRAIL_CONTRACTS: Readonly<Record<number, OriginTrailContracts>> = {
   84532: {
     knowledgeAssets: "0x2b2e1bcb7c52a1587264e01f6b53782d791e6fa0",
     lifecycle: "0x835f921a0fc8d6365c34a0bb9b37d10c98c1b8c3",
+    trac: "0x2a58bdd13176d85906d804cdbffa0d9119282dc8",
   },
 };
 
