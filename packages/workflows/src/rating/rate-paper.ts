@@ -131,7 +131,8 @@ const RATING_FAILURES: readonly RatingFailure[] = [
  * How a rating run ends, unless it fails: the request fulfilled or cancelled, or skipped. An
  * `orphan` is an R-KA the contract will never record (ADR 0014): one minted for a request
  * cancelled meanwhile, or for one the oracle found gone (a reorg after the run's read, ADR
- * 0017).
+ * 0017). `rKaUal` is the R-KA a run minted or stored before finding the contract's oracle
+ * changed: recorded only if a run under the new key fulfils it.
  */
 export type RatingOutcome =
   | { readonly state: "fulfilled"; readonly score: number; readonly rKaUal: string }
@@ -144,6 +145,7 @@ export type RatingOutcome =
       readonly state: "skipped";
       readonly reason: "bad-event" | "unknown-contract" | "not-pending" | "not-our-oracle";
       readonly orphan?: string;
+      readonly rKaUal?: string;
     };
 
 /** The step tools a rating run uses: `step.run`, `step.sleep`, and `step.invoke` of the oracle. */
@@ -265,14 +267,22 @@ export async function runRating(
   const oracle = (id: string, input: OracleInput) => callOracle(id, input, step);
   /**
    * The outcome of the oracle's answer, announced once settled, a step per message (ADR 0038):
-   * an orphan R-KA alerted on, then a settled request's activity message, naming the paper a
-   * run that never read it looks up first (`find-paper`).
+   * an orphan R-KA alerted on (`alert-orphan`), or one an oracle move may leave unrecorded
+   * (`alert-oracle-moved`), then a settled request's activity message, naming the paper a run
+   * that never read it looks up first (`find-paper`).
    */
   const settle = async (answer: OracleResult, orphan: string | undefined, run?: RunContext) => {
     const outcome = outcomeOf(answer, orphan, logger);
     if (outcome.orphan) {
       const alert = orphanText(outcome.orphan, orphanWhy(outcome));
       await step.run("alert-orphan", () =>
+        deps.notify({ level: "alert", text: alert }).then(() => null),
+      );
+    }
+    if (outcome.state === "skipped" && outcome.rKaUal) {
+      const alert = movedText(outcome.rKaUal, requestId);
+      logger.error(alert);
+      await step.run("alert-oracle-moved", () =>
         deps.notify({ level: "alert", text: alert }).then(() => null),
       );
     }
@@ -620,6 +630,15 @@ function orphanText(orphan: string, why: string): string {
   return `rating-orphan: ${orphan} was minted for a request ${why}`;
 }
 
+/**
+ * The `rating-oracle-moved` line, logged and alerted on: an R-KA minted for a request whose
+ * contract's oracle changed meanwhile, which a planned key rotation records on a later run and
+ * the emergency path, a cancel by hand under the new key, never does (ADRs 0019, 0020).
+ */
+function movedText(rKaUal: string, requestId: string): string {
+  return `rating-oracle-moved: ${rKaUal} was minted for request ${requestId}, but the contract's oracle changed; it is recorded only if a run under the new key fulfils it`;
+}
+
 /** Why an outcome's R-KA is an orphan, for {@link orphanText}. */
 function orphanWhy(outcome: RatingOutcome): string {
   return outcome.state === "cancelled" ? `cancelled ${outcome.reason}` : "no longer pending";
@@ -629,7 +648,7 @@ function orphanWhy(outcome: RatingOutcome): string {
  * The run's outcome from the oracle's answer, given the R-KA it minted or left stored
  * (`orphan`): unrecorded when the oracle cancelled the request meanwhile or found it gone (a
  * reorg after the run's read); each such orphan is logged. When the contract's oracle changed,
- * the request stays pending, and a restart under its key records the R-KA.
+ * the R-KA is kept as `rKaUal` and logged: recorded only if a run under the new key fulfils it.
  */
 function outcomeOf(
   answer: OracleResult,
@@ -643,8 +662,11 @@ function outcomeOf(
       case "cancelled":
         return { state: "cancelled", reason: answer.reason, ...(orphan ? { orphan } : {}) };
       case "not-our-oracle":
-        // The request stays pending: a restart under the contract's oracle key records the R-KA.
-        return { state: "skipped", reason: "not-our-oracle" };
+        return {
+          state: "skipped",
+          reason: "not-our-oracle",
+          ...(orphan ? { rKaUal: orphan } : {}),
+        };
       case "unknown":
         return { state: "skipped", reason: "not-pending", ...(orphan ? { orphan } : {}) };
     }

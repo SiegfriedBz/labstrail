@@ -602,12 +602,18 @@ describe("runRating: rating a paper", () => {
     expect(gone.logger.error).toHaveBeenCalledWith(expect.stringMatching(/^rating-orphan: /));
   });
 
-  it("skips with no message when the contract's oracle changed: the request stays pending, and a restart under the right key records the R-KA", async () => {
+  it("alerts that the minted R-KA may go unrecorded when the contract's oracle changed, without calling it an orphan", async () => {
     const changed = rate({ oracleAnswer: () => ({ state: "not-our-oracle" }) });
+    const text = `rating-oracle-moved: ${R_KA} was minted for request ${REQUEST_ID}, but the contract's oracle changed; it is recorded only if a run under the new key fulfils it`;
 
-    expect(await changed.run).toEqual({ state: "skipped", reason: "not-our-oracle" });
-    expect(changed.deps.notify).not.toHaveBeenCalled();
-    expect(changed.logger.error).not.toHaveBeenCalled();
+    expect(await changed.run).toEqual({
+      state: "skipped",
+      reason: "not-our-oracle",
+      rKaUal: R_KA,
+    });
+    expect(changed.log.slice(-1)).toEqual(["alert-oracle-moved"]);
+    expect(changed.deps.notify.mock.calls).toEqual([[{ level: "alert", text }]]);
+    expect(changed.logger.error).toHaveBeenCalledWith(text);
   });
 
   it("skips with no message when the oracle can't record a cancel that left no R-KA", async () => {
