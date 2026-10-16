@@ -71,7 +71,7 @@ export const RATING_SETTINGS = {
   rereadWait: "15s",
   /**
    * Gemini answers the check refuses before the request is cancelled `invalid-target` (ADR
-   * 0020): the same paper and prompt tend to give the same answer again, and each answer uses one
+   * 0011): the same paper and prompt tend to give the same answer again, and each answer uses one
    * of the free tier's 20 requests a day, which every reconciler restart would spend again.
    */
   unusableAnswers: 2,
@@ -260,7 +260,7 @@ export async function runRating(
   if (read.oracle !== deps.oracle) return { state: "skipped", reason: "not-our-oracle" };
 
   const oracle = (id: string, input: OracleInput) => callOracle(id, input, step);
-  /** The outcome of the oracle's answer, announced once settled (ADR 0038). */
+  /** The outcome of the oracle's answer, announced once settled, a step per message (ADR 0038). */
   const settle = async (answer: OracleResult, orphan: string | undefined, run?: RunContext) => {
     const outcome = outcomeOf(answer, orphan, logger);
     if (outcome.state === "skipped") return outcome;
@@ -270,13 +270,14 @@ export async function runRating(
       cid: run?.cid,
       title: run?.head?.title,
     };
-    await step.run("notify", async () => {
-      if (outcome.state === "cancelled" && outcome.orphan) {
-        await deps.notify({ level: "alert", text: orphanText(outcome.orphan, outcome.reason) });
-      }
-      await deps.notify({ level: "activity", text: ratedText(outcome, paper, deps.siteUrl) });
-      return null;
-    });
+    if (outcome.state === "cancelled" && outcome.orphan) {
+      const alert = orphanText(outcome.orphan, outcome.reason);
+      await step.run("alert-orphan", () =>
+        deps.notify({ level: "alert", text: alert }).then(() => null),
+      );
+    }
+    const text = ratedText(outcome, paper, deps.siteUrl);
+    await step.run("notify", () => deps.notify({ level: "activity", text }).then(() => null));
     return outcome;
   };
   const ours = classifyTarget(request.targetUal, deps.contextGraph) === "ours";
@@ -472,7 +473,7 @@ async function score(
     let read = await step.run(`read-paper-${attempt}`, () => deps.readPaper(cid));
     if (!read.ok && read.reason === "unreachable" && !run.reread) {
       run.reread = true;
-      await step.sleep(`read-paper-${attempt}-again`, RATING_SETTINGS.rereadWait);
+      await step.sleep(`read-paper-${attempt}-wait`, RATING_SETTINGS.rereadWait);
       read = await step.run(`read-paper-${attempt}-again`, () => deps.readPaper(cid));
     }
     if (!read.ok && (read.reason === "no-text" || read.reason === "too-large")) {
@@ -633,9 +634,10 @@ function outcomeOf(
 
 /**
  * The `rate-paper` Inngest function, run by `verisci/rating.requested`: a singleton per
- * request id in mode `skip` (ADR 0020), with a 180-minute budget, throttled when `throttle`
- * (outside `local`, ADR 0015). It invokes `oracle` to fulfil or cancel. `getDeps` builds the
- * adapters on the first run, so importing the function validates no settings.
+ * request id in mode `skip` (ADR 0020), with a 300-minute budget (`finishTimeout`), throttled
+ * when `throttle` (outside `local`, ADR 0015). It invokes `oracle` to fulfil or cancel.
+ * `getDeps` builds the adapters on the first run, so importing the function validates no
+ * settings.
  */
 export function createRatePaper(
   inngest: Inngest.Any,

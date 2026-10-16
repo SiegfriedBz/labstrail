@@ -103,19 +103,30 @@ const pending = (state: Partial<RatingRequestState> = {}): ReadRequestResult => 
   },
 });
 
-/** Steps that run at once and record every step id, sleep and oracle call. */
+/**
+ * Steps that run at once and record every step id, sleep and oracle call. Like Inngest, they
+ * share one set of ids, and an id used twice in a run fails it.
+ */
 function fakeSteps(oracleAnswer: (input: OracleInput) => OracleResult) {
   const log: string[] = [];
   const oracleCalls: OracleInput[] = [];
+  const ids = new Set<string>();
+  const once = (id: string) => {
+    if (ids.has(id)) throw new Error(`step id used twice: ${id}`);
+    ids.add(id);
+  };
   const step: RatingSteps = {
     async run(id, fn) {
+      once(id);
       log.push(id);
       return JSON.parse(JSON.stringify(await fn()));
     },
     async sleep(id, duration) {
+      once(id);
       log.push(`sleep ${id} ${duration}`);
     },
     async oracle(id, input) {
+      once(id);
       log.push(`oracle ${id}`);
       oracleCalls.push(input);
       return oracleAnswer(input);
@@ -548,8 +559,8 @@ describe("runRating: rating a paper", () => {
     expect(deps.readPaper).not.toHaveBeenCalled();
   });
 
-  it("names the R-KA as an orphan when the request was cancelled meanwhile, and alerts on it", async () => {
-    const { run, logger, deps } = rate({
+  it("names the R-KA as an orphan when the request was cancelled meanwhile, and alerts on it from a step of its own", async () => {
+    const { run, logger, deps, log } = rate({
       oracleAnswer: () => ({ state: "cancelled", reason: "expired" }),
     });
 
@@ -557,6 +568,7 @@ describe("runRating: rating a paper", () => {
     expect(logger.error).toHaveBeenCalledWith(expect.stringMatching(/^rating-orphan: /));
     expect(deps.notify.mock.calls.map(([notice]) => notice.level)).toEqual(["alert", "activity"]);
     expect(deps.notify.mock.calls[0]?.[0].text).toMatch(new RegExp(`^rating-orphan: ${R_KA}`));
+    expect(log.slice(-2)).toEqual(["alert-orphan", "notify"]);
   });
 
   it("skips, with no message, when the oracle finds the contract's oracle changed, or the request gone", async () => {
@@ -636,7 +648,7 @@ describe("runRating: retries", () => {
     expect(await run).toMatchObject({ state: "fulfilled" });
     expect(log.slice(4, 8)).toEqual([
       "read-paper-1",
-      "sleep read-paper-1-again 15s",
+      "sleep read-paper-1-wait 15s",
       "read-paper-1-again",
       "check-field-1",
     ]);
