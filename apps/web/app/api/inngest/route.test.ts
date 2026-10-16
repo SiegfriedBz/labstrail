@@ -13,7 +13,7 @@ describe("/api/inngest", () => {
     expect([GET, POST, PUT].every((handler) => typeof handler === "function")).toBe(true);
   });
 
-  it("describes the workflows' functions to the dev server", async () => {
+  it("describes the workflows' functions to the dev server: publish and the failure alerts, with no oracle key", async () => {
     const { GET } = await route();
 
     const response = await GET(
@@ -23,6 +23,6 @@ describe("/api/inngest", () => {
     const body = (await response.json()) as { function_count?: number };
 
     expect(response.status).toBe(200);
-    expect(body.function_count).toBe(1);
+    expect(body.function_count).toBe(2);
   });
 });
