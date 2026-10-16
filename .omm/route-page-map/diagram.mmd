@@ -10,7 +10,7 @@ graph LR
     paper -->|"Rate this paper, Read the checks, Follow it, Details"| rating["Rating Page\napp/papers/[cid]/ratings/[requestId]/page.tsx"]
     rating -->|"polls until scored or cancelled"| api-ratings["Rating Status\napp/api/ratings/[requestId]/route.ts"]
     inngest["Inngest\nexternal"] -->|"calls the served functions"| inngest-route["Inngest Route\napp/api/inngest/route.ts"]
-    alchemy-notify["Alchemy Notify\nexternal"] -->|"signed Phase1Requested logs"| api-webhooks["Alchemy Webhook\napp/api/webhooks/alchemy/route.ts"]
+    alchemy-notify["Alchemy Notify\nexternal"] -->|"signed contract events, requests among them"| api-webhooks["Alchemy Webhook\napp/api/webhooks/alchemy/route.ts"]
     classDef entry fill:#89b4fa,stroke:#89b4fa,color:#1e1e2e
     classDef external fill:#585b70,stroke:#585b70,color:#cdd6f4
     class home,inngest-route,api-webhooks entry

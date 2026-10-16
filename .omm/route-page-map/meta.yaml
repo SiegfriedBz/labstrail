@@ -1,10 +1,10 @@
 created: 2026-10-12T05:49:40.626Z
-updated: 2026-10-16T08:48:55.239Z
-update_count: 15
-last_field: todo
-git_commit: 4fc8ae9
+updated: 2026-10-16T13:33:23.857Z
+update_count: 16
+last_field: diagram
+git_commit: 9a09c80
 git_branch: feat/031-intake-recovery
-prev_diagram: >
+prev_diagram: >-
   graph LR
       home["Home\napp/page.tsx"] -->|"Publish a paper"| publish["Publish\napp/publish/page.tsx"]
       home -->|"Browse papers"| papers["Papers List\napp/papers/page.tsx"]
@@ -17,10 +17,11 @@ prev_diagram: >
       paper -->|"Rate this paper, Read the checks, Follow it, Details"| rating["Rating Page\napp/papers/[cid]/ratings/[requestId]/page.tsx"]
       rating -->|"polls until scored or cancelled"| api-ratings["Rating Status\napp/api/ratings/[requestId]/route.ts"]
       inngest["Inngest\nexternal"] -->|"calls the served functions"| inngest-route["Inngest Route\napp/api/inngest/route.ts"]
+      alchemy-notify["Alchemy Notify\nexternal"] -->|"signed Phase1Requested logs"| api-webhooks["Alchemy Webhook\napp/api/webhooks/alchemy/route.ts"]
       classDef entry fill:#89b4fa,stroke:#89b4fa,color:#1e1e2e
       classDef external fill:#585b70,stroke:#585b70,color:#cdd6f4
-      class home,inngest-route entry
-      class inngest external
+      class home,inngest-route,api-webhooks entry
+      class inngest,alchemy-notify external
 children:
   - alchemy-notify
   - api-papers

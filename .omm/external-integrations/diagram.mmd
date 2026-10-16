@@ -8,7 +8,7 @@ graph LR
     verisci -->|"rate-limit counters"| upstash["Upstash Redis\napps/web/lib/publish/limits.ts"]
     verisci -->|"wallet connection"| reown["Reown AppKit\napps/web/components/wallet/"]
     verisci -->|"activity and alerts"| telegram["Telegram\nworkflows/src/alerts/notify.ts"]
-    alchemy-notify["Alchemy Notify\nwebhook"] -->|"signed Phase1Requested logs"| verisci
+    alchemy-notify["Alchemy Notify\nwebhook"] -->|"signed contract events, requests among them"| verisci
     vercel["Vercel\nhosting"] -->|"hosts the site and its functions"| verisci
     classDef external fill:#585b70,stroke:#585b70,color:#cdd6f4
     class dkg-node,grobid,pinata,base-rpc,gemini,inngest,upstash,reown,telegram,alchemy-notify,vercel external

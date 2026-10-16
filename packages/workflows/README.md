@@ -416,9 +416,9 @@ step of its own, so a replay never sends it twice.
   then each contract in a step of its own (`check-pending-<contract>`), one after the other:
   at most 2 pages of pending ids a contract an hour (200 requests, 10 at a time), each hour
   going on from the last, so a spam backlog is read in turns and the alert says how many it
-  read. A balance that does not answer is logged `health-unreadable: <wallet>: ETH|TRAC` and
-  read again the next hour; a contract is logged `health-unreachable`, and requests that do
-  not answer `health-unreadable` with their number. One alert lists every problem, from its
+  read. A balance that does not answer is logged `health-unreadable: <role> <address>:
+  ETH|TRAC` (`oracle` or `publisher`) and read again the next hour; a contract is logged
+  `health-unreachable`, and requests that do not answer `health-unreadable` with their number. One alert lists every problem, from its
   own step (`alert`); nothing is sent when all is well. It runs where the oracle key is.
 
 ## The pages' calls
