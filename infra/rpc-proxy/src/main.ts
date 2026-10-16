@@ -3,7 +3,7 @@ import { createDailyBudget } from "./budget.ts";
 import { readConfig } from "./config.ts";
 import { createProxy, type Post } from "./proxy.ts";
 
-/** Free Base Sepolia endpoints, asked before Alchemy, the one with more free slots first. */
+/** Free Base Sepolia endpoints, asked before Alchemy RPC, the one with more free slots first. */
 const PUBLIC_RPCS = ["https://sepolia.base.org", "https://base-sepolia-rpc.publicnode.com"];
 const STATUS_EVERY_MS = 30_000;
 /** The daemon's requests are small; this bounds memory if something sends a huge body. */
@@ -16,7 +16,7 @@ if (!configResult.ok) {
 }
 const config = configResult.config;
 
-/** Real upstream calls. Messages never include the URL, which holds Alchemy's key. */
+/** Real upstream calls. Messages never include the URL, which holds Alchemy RPC's key. */
 const post: Post = async (url, body, timeoutMs) => {
   try {
     const res = await fetch(url, {

@@ -25,9 +25,9 @@ export interface JsonRpcResponse {
 
 /** What {@link createProxy} needs; the network and the clock are injected. */
 export interface ProxyOptions {
-  /** Alchemy's URL, key included: asked last, within `budget`. */
+  /** Alchemy RPC's URL, key included: asked last, within `budget`. */
   readonly alchemyUrl: string;
-  /** Free public endpoints, asked before Alchemy, the one with more free slots first. */
+  /** Free public endpoints, asked before Alchemy RPC, the one with more free slots first. */
   readonly publicUrls: readonly string[];
   readonly budget: DailyBudget;
   readonly post: Post;
@@ -50,11 +50,11 @@ type Lane = "fast" | "bulk";
 
 /**
  * Log ranges per request: publicnode accepts 2,000 blocks, sepolia.base.org 200 (checked
- * 2026-10-09), Alchemy's free tier 10.
+ * 2026-10-09), Alchemy RPC's free tier 10.
  */
 const PUBLIC_SPAN = 2_000;
 const ALCHEMY_SPAN = 10;
-/** Below this, a window the public endpoints refuse goes to Alchemy in slices. */
+/** Below this, a window the public endpoints refuse goes to Alchemy RPC in slices. */
 const MIN_PUBLIC_SPAN = 125;
 /** Logs this many blocks below the head no longer change, so they are cached. */
 const FINALITY_BLOCKS = 64;
@@ -89,7 +89,7 @@ interface LogFilter {
 
 /**
  * A JSON-RPC proxy for the DKG daemon, which takes a single `rpcUrl`. It asks free public
- * endpoints first and Alchemy last, within a daily budget; splits `eth_getLogs` ranges into
+ * endpoints first and Alchemy RPC last, within a daily budget; splits `eth_getLogs` ranges into
  * windows the endpoints accept; and answers repeated reads from memory.
  */
 export function createProxy(options: ProxyOptions): Proxy {
@@ -136,7 +136,7 @@ export function createProxy(options: ProxyOptions): Proxy {
 
   async function call(url: string, body: object, lane: Lane): Promise<UpstreamReply> {
     const raw = await withSlot(url, lane, () => post(url, body, LANES[lane].timeoutMs));
-    // Alchemy's URL holds its key: an error that echoes it shows "(alchemy)" instead.
+    // Alchemy RPC's URL holds its key: an error that echoes it shows "(alchemy)" instead.
     const reply: UpstreamReply =
       "error" in raw
         ? {
@@ -159,7 +159,7 @@ export function createProxy(options: ProxyOptions): Proxy {
     return reply;
   }
 
-  /** Alchemy's URL holds its key: text that echoes it shows "(alchemy)" instead. */
+  /** Alchemy RPC's URL holds its key: text that echoes it shows "(alchemy)" instead. */
   function masked(text: string): string {
     return text.split(alchemyUrl).join("(alchemy)");
   }
@@ -181,7 +181,7 @@ export function createProxy(options: ProxyOptions): Proxy {
     }
   }
 
-  /** Public endpoints with free slots come first, Alchemy last. */
+  /** Public endpoints with free slots come first, Alchemy RPC last. */
   function byLoad(urls: readonly string[], lane: Lane): string[] {
     const load = (url: string) =>
       url === alchemyUrl
@@ -191,7 +191,7 @@ export function createProxy(options: ProxyOptions): Proxy {
   }
 
   /**
-   * Tries each endpoint, retrying transient failures; Alchemy only within budget. With
+   * Tries each endpoint, retrying transient failures; Alchemy RPC only within budget. With
    * `askEvery`, an endpoint's own error (a refused log range) moves on to the next endpoint,
    * and is answered only if none succeeds in that round.
    */
@@ -310,16 +310,16 @@ export function createProxy(options: ProxyOptions): Proxy {
   /**
    * One window, on the public endpoints that keep its history and accept its size. When
    * none accepts the size, or the ones that do are down, it is cut to the largest cap of the
-   * others. Only the part no public endpoint keeps goes to Alchemy slices. A refusal that
+   * others. Only the part no public endpoint keeps goes to Alchemy RPC slices. A refusal that
    * teaches a cap or a pruned history plans the window again; any other refusal halves it,
-   * down to Alchemy slices. An outage of every endpoint that keeps the window's history fails
+   * down to Alchemy RPC slices. An outage of every endpoint that keeps the window's history fails
    * the request, so the daemon retries later.
    */
   async function fetchWindow(filter: LogFilter, lo: number, hi: number): Promise<unknown[]> {
     const span = hi - lo + 1;
     const holding = publicUrls.filter((u) => (historyFrom.get(u) ?? 0) <= lo);
     if (holding.length === 0) {
-      // Only the part no public endpoint keeps goes to Alchemy.
+      // Only the part no public endpoint keeps goes to Alchemy RPC.
       const kept = Math.min(...publicUrls.map((u) => historyFrom.get(u) ?? 0));
       if (kept > hi) return alchemySlices(filter, lo, hi);
       return [

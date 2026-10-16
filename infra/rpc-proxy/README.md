@@ -2,7 +2,7 @@
 
 A small JSON-RPC proxy that runs beside the DKG daemon, on `127.0.0.1:8545`. The DKG
 daemon takes a single `chain.rpcUrl`; this proxy is that URL. It spreads the daemon's Base
-Sepolia reads over free public endpoints and keeps Alchemy, the fallback, within
+Sepolia reads over free public endpoints and keeps Alchemy RPC, the fallback, within
 a daily budget.
 
 Status: in use beside the DKG node on a developer's computer, started by hand; its server
@@ -25,16 +25,16 @@ connect).
 ## Why it exists
 
 Before it accepts a write, the daemon resolves each context graph's policy from chain
-history: long `eth_getLogs` ranges plus many `eth_call`s, again and again. Alchemy's free
+history: long `eth_getLogs` ranges plus many `eth_call`s, again and again. Alchemy RPC's free
 tier caps `eth_getLogs` at 10 blocks, and public endpoints throttle bursts. On the previous
-host, the earlier proxy sent every call except log reads to Alchemy first, with no limit,
+host, the earlier proxy sent every call except log reads to Alchemy RPC first, with no limit,
 and used up the free tier after a few weeks (`docs/domain.md` → DKG).
 
 ## What it does
 
-- **Public endpoints first, Alchemy last.** Calls go to `sepolia.base.org` and
-  `base-sepolia-rpc.publicnode.com`, the one with more free slots first, then to Alchemy.
-- **A paced daily Alchemy budget.** At most `ALCHEMY_DAILY_LIMIT` Alchemy calls per UTC day
+- **Public endpoints first, Alchemy RPC last.** Calls go to `sepolia.base.org` and
+  `base-sepolia-rpc.publicnode.com`, the one with more free slots first, then to Alchemy RPC.
+- **A paced daily Alchemy RPC budget.** At most `ALCHEMY_DAILY_LIMIT` Alchemy RPC calls per UTC day
   (default 10,000), and at most a 24th of it in any hour, so a burst cannot spend the day's
   budget in minutes. When it is used up, a call the public endpoints cannot answer gets a
   JSON-RPC error.
@@ -46,9 +46,9 @@ and used up the free tier after a few weeks (`docs/domain.md` → DKG).
   only rises. A window goes only to the public endpoints that keep its history and accept
   its size; when none accepts the size, or the ones that do are down, it is cut to the
   largest cap of the others. Only the part of a window that no public endpoint keeps goes
-  to Alchemy, in 10-block slices within the budget.
+  to Alchemy RPC, in 10-block slices within the budget.
 - **Other refused ranges are halved** ("block range limit exceeded", "too many results"),
-  down to 125 blocks, then sent to Alchemy in 10-block slices within the budget; the slices
+  down to 125 blocks, then sent to Alchemy RPC in 10-block slices within the budget; the slices
   stop at the first failure. An outage of every public endpoint that keeps the window's
   history (timeouts, 5xx, throttling) fails the request, and the daemon retries it later.
 - **Answers from memory.** Log windows more than 64 blocks below the head are kept (20,000
@@ -58,7 +58,7 @@ and used up the free tier after a few weeks (`docs/domain.md` → DKG).
   10,000 blocks at once, so one wrong answer cannot push it ahead.
 - **Throttled endpoints rest** for 1.5 s (HTTP 429, rate limits), and transient failures
   (the network, timeouts, any HTTP 5xx) are retried on the next endpoint, as is history an
-  endpoint has pruned. A call at history every public endpoint pruned goes to Alchemy,
+  endpoint has pruned. A call at history every public endpoint pruned goes to Alchemy RPC,
   which keeps it all, within the budget.
 - **Two lanes:** the daemon's quick calls (its head probe times out after about 4 s) have
   their own slots, separate from the log backfill.
@@ -67,8 +67,8 @@ and used up the free tier after a few weeks (`docs/domain.md` → DKG).
   data), which the daemon decodes, for example to approve a TRAC deposit before registering
   a context graph.
 - **A status line every 30 s** in the log: requests served and failed, then calls and
-  failures per endpoint with the last failure's reason, and Alchemy's use of its daily
-  budget. Alchemy's URL is never shown, in the log or in an error sent to the daemon.
+  failures per endpoint with the last failure's reason, and Alchemy RPC's use of its daily
+  budget. Alchemy RPC's URL is never shown, in the log or in an error sent to the daemon.
 
 ## Settings
 
@@ -78,9 +78,9 @@ them itself rather than through `@verisci/env` ([ADR 0004](../../docs/adr/0004-e
 
 | Variable | Required | Default | Meaning |
 | --- | --- | --- | --- |
-| `UPSTREAM_RPC` | yes | | Alchemy's Base Sepolia URL, key included (`https://`) |
+| `UPSTREAM_RPC` | yes | | Alchemy RPC's Base Sepolia URL, key included (`https://`) |
 | `PORT` | no | `8545` | Port on `127.0.0.1` |
-| `ALCHEMY_DAILY_LIMIT` | no | `10000` | Alchemy calls allowed per UTC day |
+| `ALCHEMY_DAILY_LIMIT` | no | `10000` | Alchemy RPC calls allowed per UTC day |
 
 A bad setting stops the proxy at start-up with a message naming it, never its value.
 
