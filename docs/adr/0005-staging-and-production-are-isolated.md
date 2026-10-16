@@ -21,7 +21,7 @@ verisci runs in production (`main`) and staging (`develop`), each at a stable UR
 - Staging can never touch production's contract, oracle wallet or webhook, and a misconfiguration fails at startup.
 - The shared node is the gap: staging's credentials could write the production graph, and both environments spend the same node funds. The `-prod` guard is mandatory until the node supports one token per graph. A node outage takes down both.
 - Only `develop` processes staging's ratings, so a rating workflow change is tested end to end on `develop`, not on a preview.
-- Every external resource but the node host, the Reown project and the pinning account is created twice. Staging's test uploads use the same pinning quota as production's. Staging's Inngest environment needs auto-archive disabled, or it stops after three quiet days ([domain](../domain.md)).
+- Every external resource but the node host, the Reown project, the pinning account and the alerts chat is created twice. Staging's test uploads use the same pinning quota as production's. Staging's Inngest environment needs auto-archive disabled, or it stops after three quiet days ([domain](../domain.md)).
 
 ## History
 
@@ -33,3 +33,4 @@ verisci runs in production (`main`) and staging (`develop`), each at a stable UR
 - 2026-10-10: a refused file is unpinned only if it is not a PDF (was: when it fails a check every environment applies), since a change to a size limit reaches `develop` before `main` (branch review, user's choice).
 - 2026-10-15: local development rates on its own Anvil contract, pages included, not on staging's (rating UI, user's choice).
 - 2026-10-16: one Telegram chat takes every environment's alerts and activity, each message naming its environment ([0038](0038-alerts-go-to-one-telegram-chat.md)); corrected: the webhook is the Alchemy Notify webhook, and its secret its signing key (intake and recovery).
+- 2026-10-16: corrected: the alerts chat joins the resources created once (intake and recovery review).

@@ -13,7 +13,7 @@ Phase 1 scores a paper by machine. The first scorer judged the Target KA's tripl
 - In one request, the model says whether the paper is in VeriSci's field ([0037](0037-verisci-rates-life-science-and-health-papers.md)) and which kind of study it is, and answers each check of that kind of study's checklist (shown, partly shown, missing, or not applicable for a check that may not apply), quoting the passage that shows it.
 - Code computes the score from those answers: a point for each check shown, half a point for each partly shown, over the checks that apply. An answer whose quote is not in the paper's text counts as missing. The model never gives the number.
 - The scorer returns `{ score, rationale, studyType, checks }`: `score` an integer from 0 to 100, `rationale` text, `studyType` the kind of study, `checks` each check's answer and quote.
-- Its output is schema-validated; anything else fails the step instead of reaching the chain.
+- Its output is schema-validated; anything else never reaches the chain: the step fails, and a paper the scorer gives two such answers for is cancelled "invalid target" ([0011](0011-a-rating-is-a-separate-r-ka.md)).
 - A hosted model is not deterministic, even at temperature 0, so the score is computed once, persisted in the R-KA, and read back by every retry.
 - The R-KA records the model and prompt version. The model and provider are configuration; a better scorer is recorded in this ADR.
 - The scorer is Gemini, `gemini-3.8-flash`, on the Gemini API's free tier: VeriSci pays for every rating ([0015](0015-rating-requests-are-free-on-testnet.md)), and Claude's API, considered first, has no free tier.
@@ -35,3 +35,4 @@ Phase 1 scores a paper by machine. The first scorer judged the Target KA's tripl
 - 2026-10-11: the scorer is Gemini `gemini-3.8-flash` on the free tier, since VeriSci pays for every rating and Claude's API has no free tier (rating run plan, user's choice).
 - 2026-10-11: the scorer reads the paper's full text, answers its kind of study's checklist with quotes, and code computes the score; the output becomes `{ score, rationale, studyType, checks }`, since the record alone showed little of what a reader checks (scorer v2 plan, user's choice).
 - 2026-10-12: the score is presented as reproducibility readiness, and what it cannot detect is stated (scope and branding plan, user's choice).
+- 2026-10-16: a paper the scorer gives two answers its check refuses is cancelled "invalid target" ([0011](0011-a-rating-is-a-separate-r-ka.md)), since the same paper tends to give the same answer and each try spends the daily quota (intake and recovery review, user's choice).
