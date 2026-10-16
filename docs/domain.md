@@ -377,6 +377,11 @@ Observed on Base Sepolia (chain id 84532) with Alchemy RPC and the Alchemy Notif
   ([ADR 0017](adr/0017-chain-events-are-ingested-at-least-once.md)). A Custom Webhook's
   delivery carries the fields its GraphQL query asks for (`packages/workflows` README → The
   Alchemy Notify webhook).
+- **A Custom Webhook delivers every block its query runs on, matching or not,** unless it is
+  created with `skip_empty_messages` (the API's `graphql_query: { query, skip_empty_messages:
+  true }`); on Base, a delivery every 2 seconds. In its log filter, an empty `topics` list
+  matches every event of the listed addresses, and an empty address list every address
+  (Alchemy's Custom Webhooks docs).
 - **After a reorg, the Alchemy Notify webhook delivers the new block** (Alchemy's Custom
   Webhooks FAQ): the same block number with a new hash means the earlier delivery's logs
   left the chain. Its GraphQL logs carry no per-log `removed` mark, so a run reads the

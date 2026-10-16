@@ -202,8 +202,9 @@ gpg -d ~/verisci-dkg-keys-YYYY-MM-DD.tar.gz.gpg 2>/dev/null | tar -tzf - | wc -l
 `~/.dkg/wallets.json` holds an admin wallet and three publisher wallets. The node's agent
 address is the first publisher wallet: it owns the graphs. Mints are signed by any of the
 three, so each needs ETH and TRAC. Print the addresses (public, no key), and list the three
-publisher addresses, comma-separated, in each deployment's `PUBLISHER_ADDRESSES`, so the hourly
-health check alerts when one runs low (`packages/workflows` README → Notifications and alerts):
+publisher addresses, comma-separated, in each deployment's `PUBLISHER_ADDRESSES` (a deployment
+that serves ratings refuses to start without it), so the hourly health check alerts when one
+runs low (`packages/workflows` README → Notifications and alerts):
 
 ```bash
 python3 -c "import json,os; w=json.load(open(os.path.expanduser('~/.dkg/wallets.json'))); print('admin', w['adminWallet']['address']); [print('publisher', x['address']) for x in w['wallets']]"

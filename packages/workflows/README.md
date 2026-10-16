@@ -53,7 +53,7 @@ production, which refuses to start without the key, and on staging when the key 
 | Variable | Value |
 | --- | --- |
 | `ORACLE_PRIVATE_KEY` | The oracle's key, `0x` and 64 hex: on Vercel only `develop` (staging's, scoped to that branch) and production hold one; locally, Anvil's second default account's key. Secret |
-| `PUBLISHER_ADDRESSES` | Optional: the DKG node's publisher wallets, comma-separated ([`docs/node-host.md`](../../docs/node-host.md) lists them), whose ETH and TRAC the health check watches |
+| `PUBLISHER_ADDRESSES` | The DKG node's publisher wallets, comma-separated ([`docs/node-host.md`](../../docs/node-host.md) lists them), whose ETH and TRAC the health check watches. Required outside `local`, so a deployment that would watch none refuses to start ([ADR 0015](../../docs/adr/0015-rating-requests-are-free-on-testnet.md)); optional locally |
 | `LOCAL_CHAIN_RPC_URL`, `LOCAL_RATING_CONTRACT` | Required only when `APP_ENV=local`: Anvil's URL (`http://127.0.0.1:8546`) and the RatingController deployed there ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)). The pages' rating calls (`getRatingService`), the `rate-paper`, `fund-local` and `post-webhook` scripts read them too (`post-webhook` only the URL), and the webhook's intake reads the contract, locally only (`webhookSchema`). Elsewhere the contracts come from the committed deployments file, current and past ([ADR 0028](../../docs/adr/0028-deployed-addresses-are-committed.md)) |
 
 `DKG_CONTEXT_GRAPH` must spell its address in EIP-55 checksum case, as the node lists it
@@ -341,29 +341,27 @@ Deployed, the rating run starts from the Alchemy Notify webhook
 
 Each environment registers one Custom Webhook on Base Sepolia, on its current contract (past
 ones are paused), pointing at its deployment's route (staging's with the
-`x-vercel-protection-bypass` query parameter), with this query, whose fields the intake reads:
+`x-vercel-protection-bypass` query parameter). Its query takes every event of the contract,
+of which the intake keeps the requests, and asks for the three fields the intake reads:
 
 ```graphql
 {
   block {
-    hash
-    number
-    logs(filter: {
-      addresses: ["<current contract>"],
-      topics: [["0x37b2ea07968dcd51469f05ab350c8b1342ba1504293a2428d589933a3680a098"]]
-    }) {
+    logs(filter: { addresses: ["<current contract>"], topics: [] }) {
       data
       topics
-      index
       account { address }
-      transaction { hash }
     }
   }
 }
 ```
 
-The topic is `Phase1Requested(bytes32,address,bytes32,string,uint64)`'s. Keep exactly one rule
-per contract (`docs/domain.md` → Chain).
+- Set `skip_empty_messages` on the webhook (the API's
+  `graphql_query: { query, skip_empty_messages: true }`): without it, Alchemy Notify delivers
+  every block, every 2 seconds, whether a log matched or not.
+- Keep the contract's address in the filter: an empty address list takes every contract's
+  events on Base Sepolia.
+- Keep exactly one rule per contract (`docs/domain.md` → Chain).
 
 ## The reconciler
 
