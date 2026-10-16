@@ -6,7 +6,9 @@ function route() {
   return import("./route.ts");
 }
 
-describe("/api/inngest", () => {
+// The first import compiles the whole workflows package, which can take over Vitest's default
+// 5 s while every workspace tests at once.
+describe("/api/inngest", { timeout: 30_000 }, () => {
   it("answers Inngest's GET, POST and PUT", async () => {
     const { GET, POST, PUT } = await route();
 
