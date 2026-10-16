@@ -17,8 +17,8 @@ Architecture views: [`.omm/overall-architecture/workflows/`](../../.omm/overall-
 
 `@verisci/core`, `@verisci/env`, `@verisci/dkg`, `@verisci/contracts`; Inngest, viem
 (signature checks, the rating contract, the oracle's transactions), Zod and unpdf (a PDF's
-text, for the scorer and the field check). The scorer and the publish run's field check call
-the Gemini API over `fetch` (`src/gemini/`), with no SDK.
+text, for the scorer and the field check). The scorer and the field check, which both the
+publish and the rating runs make, call the Gemini API over `fetch` (`src/gemini/`), with no SDK.
 
 ## Environment
 
@@ -224,10 +224,13 @@ is left ([ADR 0007](../../docs/adr/0007-all-writes-converge.md)):
 Past the maximum age (24 hours after the request's block), a minted R-KA is still fulfilled;
 a stored one is polled for 10 minutes without a new mint, and is fulfilled if it lands;
 anything else is cancelled `expired`. A stored R-KA left behind, or one minted for a request
-cancelled meanwhile, is an orphan: the outcome names it, and the run logs it and alerts on
-it from an **alert-orphan** step. Once the oracle settles the request, a **notify** step sends
-one activity message: the score or why it was cancelled, the paper (by its title, or its UAL
-when it has none), and the rating's page.
+cancelled meanwhile, gone when the oracle reads it (a reorg after the run's read), or whose
+contract's oracle changed, is an orphan: the outcome names it, and the run logs it and alerts
+on it from an **alert-orphan** step. Once the oracle settles the request, a **notify** step
+sends one activity message: the score or why it was cancelled, the paper (by its title, or its
+UAL when it has none), and the rating's page. A run that never read the paper, a restart that
+found the R-KA minted, looks it up first (**find-paper**); without the node's answer, the
+message names the paper by its UAL, with no link.
 
 Retries ([ADR 0009](../../docs/adr/0009-retries-are-spaced-with-step-sleep.md)): a chain
 that does not answer is read again every 2 minutes, up to 5 times, and so is a node that does
@@ -245,8 +248,9 @@ does not serve the graph, and
 (`rating-unreadable`) on a minted R-KA whose score does not parse. A failed run leaves the
 request pending and alerts the maintainer; the reconciler restarts it (below).
 
-The scorer makes one request to `gemini-3.8-flash` per paper, since the free tier allows 20
-a day (`docs/domain.md` → Gemini): `scorePaper` sends `scorerPrompt`, temperature 0 and
+The scorer asks `gemini-3.8-flash` once per attempt until it gets an answer, at most 6 times
+a run, and each restart asks again, against the free tier's 20 a day (`docs/domain.md` →
+Gemini; [ADR 0018](../../docs/adr/0018-phase-1-scorer-output-contract.md)): `scorePaper` sends `scorerPrompt`, temperature 0 and
 `SCORER_OUTPUT_SCHEMA`, checks the answer with `parseScorerAnswer` (`askScorer`), then scores
 a paper in the field with `scoreChecks`. A 429 is `rate-limited`; any other 4xx is
 `refused`; a 5xx, a network error or no answer within 240 s is `unreachable`; each failure
@@ -405,9 +409,11 @@ step of its own, so a replay never sends it twice.
 
 - **Activity:** a paper published (the publish run's **notify**), a rating scored or cancelled
   (the rating run's **notify**), with a link to the page (`siteUrlOf`).
-- **A failed run:** `alert-on-failure`, on every function's `inngest/function.failed`, names
-  the function, the run and the first line of its error, whose `publish-failed:`,
-  `rating-failed:` or `oracle-failed:` prefix says why.
+- **A failed or cancelled run:** `alert-on-failure`, on every function's
+  `inngest/function.failed`, names the function, the run and the first line of its error,
+  whose `publish-failed:`, `rating-failed:` or `oracle-failed:` prefix says why; on
+  `inngest/function.cancelled`, sent for a run past its time budget (`timeouts.finish`) or one
+  cancelled by hand, it names the function and the run.
 - **The oracle and orphans:** an oracle without funds (**alert-no-funds**), a transaction at
   the fee cap (**alert-fee-cap**), and an orphan R-KA (the rating run's **alert-orphan**).
 - **Every hour,** `check-health` alerts on the oracle's ETH, and each publisher wallet's ETH on

@@ -423,6 +423,11 @@ Observed on Vercel Hobby with Inngest Cloud, except where a fact cites the vendo
   cannot reach `/api/inngest`. The stable `develop` deployment is a preview too, so the
   staging webhook needs the same bypass; a caller that cannot set headers passes it as the
   `x-vercel-protection-bypass` query parameter (Vercel docs, to verify on our plan).
+- **A run past its time budget is cancelled, not failed** (Inngest docs, system events): Inngest
+  sends `inngest/function.cancelled` for it, as for a run cancelled by hand or through the API,
+  with the function and run ids and the error "function cancelled", and
+  `inngest/function.failed` only for a run that failed after its retries. An alert on failures
+  alone misses a run that ran out of time ([ADR 0038](adr/0038-alerts-go-to-one-telegram-chat.md)).
 - **Inngest archives a branch environment 3 days after its latest deploy** (Inngest docs),
   unless auto-archive is disabled for it in the dashboard. Archiving stops its functions
   from triggering, so staging stops after three quiet days on `develop` ([ADR 0005](adr/0005-staging-and-production-are-isolated.md)).

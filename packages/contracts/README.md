@@ -41,7 +41,9 @@ pending on it
   ([ADR 0011](../../docs/adr/0011-a-rating-is-a-separate-r-ka.md)), or whose paper
   is outside the life sciences and health
   ([ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)), or
-  whose PDF cannot be read for its text, such as a scan or a file over the size limit
+  whose PDF link is not an IPFS CID, whose PDF cannot be read for its text, such as a scan,
+  a file over the size limit or one that read 4 times as no PDF, or for which the scorer gave
+  two answers its check refused
   ([ADR 0011](../../docs/adr/0011-a-rating-is-a-separate-r-ka.md)).
 - **Fulfil.** The oracle calls `fulfilPhase1(requestId, score, rKaUal)` with a
   score from 0 to 100 and the R-KA's UAL. The record holds the phase-1 score;

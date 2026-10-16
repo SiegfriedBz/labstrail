@@ -47,7 +47,7 @@ so an import of another `@verisci/*` package fails to typecheck.
 | `MAX_PDF_BYTES` | The largest PDF verisci publishes and rates, 15 MB: read by the upload page, the publish run and the rating run |
 | `parseTeiHeader(xml)` | A paper's `PaperMetadata` (title, authors, abstract, DOI) from GROBID's TEI header, or `not-tei` or `no-title`; returns a result for every input |
 | `PaperMetadata`, `TeiResult` | The metadata read from a TEI header, and the result of `parseTeiHeader` |
-| `fieldCheckPrompt(paper)`, `FieldCheckInput`, `FIELD_OUTPUT_SCHEMA` | The publish run's field check: the system and user text for a new paper's title, abstract and opening (an absent abstract or an empty opening leaves out its label), and the JSON Schema its answer must match |
+| `fieldCheckPrompt(paper)`, `FieldCheckInput`, `FIELD_OUTPUT_SCHEMA` | The field check, which the publish run makes for a new paper and the rating run before scoring: the system and user text for a paper's title, abstract and opening (an absent abstract or an empty opening leaves out its label), and the JSON Schema its answer must match |
 | `parseFieldAnswer(text)` | The field check's answer checked: a known field and a reason that is not empty, cut at a word to 300 characters, or `{ ok: false }` |
 | `FIELD_RULE` | The sentence that defines VeriSci's field ([ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)), in both the field check's and the scorer's prompt |
 | `ORIGINTRAIL_CONTRACTS`, `OriginTrailContracts`, `knowledgeAssetToken(ual)` | OriginTrail's `DKGKnowledgeAssets` (the ERC-721 holding every asset's token), `KnowledgeAssetsLifecycle` and TRAC token (which the health check reads publisher wallets' balances of) addresses by chain id, and the contract and token id behind a UAL: the id itself when the UAL names the contract, else the author's address above the asset number in the low 96 bits; `undefined` for a chain with no recorded contracts |
@@ -163,7 +163,7 @@ A Target KA describes a paper and who submitted it
   reads with no new mint.
 
 - **The field check:** before a new paper is stored, the publish run asks a small model
-  whether it is in VeriSci's field ([ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)).
+  whether it is in VeriSci's field, and the rating run asks it again before scoring ([ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)).
   `fieldCheckPrompt` defines the field with `FIELD_RULE`, the same sentence the scorer's
   prompt uses, tells the model the paper's text is data, never instructions, and gives it the
   title, the abstract and the opening of the text, each under its label. The answer is

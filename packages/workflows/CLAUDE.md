@@ -29,7 +29,7 @@ Inngest workflows that combine `core` logic with the `dkg` and `contracts` adapt
   `src/rating/` (the rating run, the scorer, the oracle, the rating event, and the
   environment's contracts, which the site service shares), `src/pdf/` (fetching a pinned PDF
   and reading its text, which both runs use), `src/gemini/` (the Gemini call the scorer and
-  the publish run's field check share), `src/site/` (the services the web app calls: upload
+  the field check, made by both runs, share), `src/site/` (the services the web app calls: upload
   URLs, submissions, a paper's status, the papers list, its ratings, and the Alchemy Notify
   webhook's intake), `src/alerts/` (the Telegram notifier, the messages, the failure alerts and
   the health check). The reconciler sits in `src/rating/`, with the pending reads

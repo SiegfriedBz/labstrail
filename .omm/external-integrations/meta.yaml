@@ -1,8 +1,8 @@
 created: 2026-10-12T05:47:09.425Z
-updated: 2026-10-16T13:33:24.762Z
-update_count: 18
-last_field: concern
-git_commit: 9a09c80
+updated: 2026-10-16T16:33:16.257Z
+update_count: 19
+last_field: diagram
+git_commit: d7984f9
 git_branch: feat/031-intake-recovery
 children:
   - alchemy-notify
@@ -28,7 +28,7 @@ prev_diagram: >-
       verisci -->|"rate-limit counters"| upstash["Upstash Redis\napps/web/lib/publish/limits.ts"]
       verisci -->|"wallet connection"| reown["Reown AppKit\napps/web/components/wallet/"]
       verisci -->|"activity and alerts"| telegram["Telegram\nworkflows/src/alerts/notify.ts"]
-      alchemy-notify["Alchemy Notify\nwebhook"] -->|"signed Phase1Requested logs"| verisci
+      alchemy-notify["Alchemy Notify\nwebhook"] -->|"signed contract events, requests among them"| verisci
       vercel["Vercel\nhosting"] -->|"hosts the site and its functions"| verisci
       classDef external fill:#585b70,stroke:#585b70,color:#cdd6f4
       class dkg-node,grobid,pinata,base-rpc,gemini,inngest,upstash,reown,telegram,alchemy-notify,vercel external
