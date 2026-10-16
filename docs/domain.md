@@ -208,9 +208,9 @@ edge`, testnet), Base Sepolia.
   keeps history from block 46,500,000 only ("pruned history unavailable").
 - **The daemon reads the chain constantly** (previous host, DKG 10.0.16, two graphs,
   2026-09 to 2026-10): it re-resolves each graph's authority from chain history again and
-  again. With every call except log reads sent to Alchemy first and no limit, Alchemy's free
-  tier was used up after a few weeks; from about 2026-10-05 the chain head froze and every
-  write failed, while `/api/status` still answered. The proxy now keeps Alchemy last,
+  again. With every call except log reads sent to Alchemy RPC first and no limit, Alchemy RPC's
+  free tier was used up after a few weeks; from about 2026-10-05 the chain head froze and every
+  write failed, while `/api/status` still answered. The proxy now keeps Alchemy RPC last,
   within a daily budget (`infra/rpc-proxy`). Unverified: whether a later release reads
   less.
 
@@ -361,20 +361,24 @@ score the same day (plan 021).
 
 ## Chain
 
-Observed on Base Sepolia (chain id 84532) with Alchemy.
+Observed on Base Sepolia (chain id 84532) with Alchemy RPC and the Alchemy Notify webhook.
 
 - **Base produces a block every 2 seconds; a block is final only once its batch is final on
   L1,** minutes later. Reorgs before that are rare but possible (Base docs), which is why
   request ids are bound to their content ([ADR 0016](adr/0016-asset-names-derive-from-request-id.md)).
 - **The free RPC tier caps `eth_getLogs` at 10 blocks,** so nothing may depend on scanning
   history; read current contract state instead ([ADR 0020](adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
-- **Alchemy delivers a log to every webhook rule matching its contract:** keep exactly one
+- **The Alchemy Notify webhook delivers a log to every rule matching its contract:** keep exactly one
   rule per contract, or one request reaches two oracles.
-- **Each Alchemy webhook signs with its own secret:** a route checking another
-  environment's secret answers 401, so repeated 401s mean a secret swapped between
-  environments ([ADR 0017](adr/0017-chain-events-are-ingested-at-least-once.md)).
+- **Each Alchemy Notify webhook signs with its own key:** `X-Alchemy-Signature` is the hex
+  HMAC-SHA256 of the raw body under the webhook's signing key (Alchemy's webhook docs), so the
+  body must be checked as received, before any parse; a route checking another environment's
+  key answers 401, so repeated 401s mean a key swapped between environments
+  ([ADR 0017](adr/0017-chain-events-are-ingested-at-least-once.md)). A Custom Webhook's
+  delivery carries the fields its GraphQL query asks for (`packages/workflows` README → The
+  Alchemy Notify webhook).
 - **Base has no public mempool:** the RPC forwards transactions to the sequencer, so
-  whether Alchemy's pending nonce (`eth_getTransactionCount(…, "pending")`) shows a
+  whether Alchemy RPC's pending nonce (`eth_getTransactionCount(…, "pending")`) shows a
   transaction not yet included is to verify ([ADR 0019](adr/0019-oracle-transactions-are-serialized.md)).
 - **Anvil, for local rating runs** (Foundry 1.8.4, 2026-10-11,
   [ADR 0036](adr/0036-local-rating-runs-use-anvil.md)): its default port 8545 is the one the
@@ -423,6 +427,14 @@ Observed on Vercel Hobby with Inngest Cloud, except where a fact cites the vendo
   the same request ([ADR 0020](adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
 - **Inngest `singleton` (mode `skip`) locks a whole run, sleeps included:** while a run for
   a key is active, new runs for that key are skipped (Inngest docs) ([ADR 0020](adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
+- **Unverified: whether runs the throttle holds count as active for `singleton`.** Inngest's
+  docs describe each alone (2026-10-16): the throttle queues runs, the singleton skips new ones
+  while one is active. If queued runs do not count, every restart event for a request would
+  queue another run; the reconciler's event id carries a 4-hour window, so it sends one restart
+  per request per window either way ([ADR 0020](adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
+- **Unverified: whether the local dev server runs cron functions on their schedule.** Inngest's
+  docs say crons trigger functions, not how the dev server fires them (2026-10-16); the local
+  reconciler relies on it (`packages/workflows` README → Running a rating locally).
 - **Inngest deduplicates event ids for 24 hours only:** an event re-sent later with the
   same id starts a new run ([ADR 0017](adr/0017-chain-events-are-ingested-at-least-once.md)).
   Within the 24 hours the dev server still logs "initializing fn" but starts no run, and

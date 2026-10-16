@@ -6,8 +6,10 @@ Status: the home page; the upload pages, where a visitor connects a wallet, publ
 follows it until its Target KA is minted and verifies its record; the list of published
 papers, with each paper's score; ratings, where a published paper's page lists its ratings
 and requests one from the wallet, and each rating's page follows it to its score and shows
-every check behind it; and `/api/inngest`, which serves the workflows' Inngest functions
-([ADR 0003](../../docs/adr/0003-inngest-functions-live-in-workflows.md)).
+every check behind it; `/api/inngest`, which serves the workflows' Inngest functions
+([ADR 0003](../../docs/adr/0003-inngest-functions-live-in-workflows.md)); and
+`/api/webhooks/alchemy`, which takes the Alchemy Notify webhook's rating requests
+([ADR 0017](../../docs/adr/0017-chain-events-are-ingested-at-least-once.md)).
 
 Architecture views: [`.omm/overall-architecture/web-app/`](../../.omm/overall-architecture/web-app/), [`.omm/route-page-map/`](../../.omm/route-page-map/), [`.omm/state-transitions/paper-page/`](../../.omm/state-transitions/paper-page/), [`.omm/state-transitions/rating-page/`](../../.omm/state-transitions/rating-page/) (`pnpm exec omm view --port 4000` shows them; root README → Architecture).
 
@@ -34,7 +36,8 @@ points the optional `@x402/*` packages, reached through wagmi's connectors, at
 | `/api/papers/<cid>?event=<id>` | The same as JSON (`PaperView`: the stage, and the record once published), never cached: a read, so a route rather than a server action |
 | `/papers/<cid>/ratings/<requestId>` | One rating: where it stands until it is scored, then its score and every check behind it, or why it was cancelled (below), under "Papers / <title> / Rating" breadcrumbs |
 | `/api/ratings/<requestId>` | The same as JSON (`RatingView`), never cached, for the rating page to poll; not-found for an id that is not `0x` + 64 hex digits, or where no contract takes ratings |
-| `/api/inngest` | Serves the Inngest functions: the publish function, plus the rating and oracle functions where the oracle key is set |
+| `/api/inngest` | Serves the Inngest functions: the publish function and the failure alerts, plus the rating, oracle, reconciler and health functions where the oracle key is set |
+| `POST /api/webhooks/alchemy` | The Alchemy Notify webhook's deliveries: hands the raw body and `X-Alchemy-Signature` to the workflows' intake (`getWebhookIntake`) and answers its status, with an empty body: 200, 401 (bad signature), 400 (not a delivery), 503 (Inngest refused, so Alchemy Notify delivers again), or 404 where `ALCHEMY_WEBHOOK_SIGNING_KEY` is unset (`packages/workflows` README → The Alchemy Notify webhook) |
 | any other path | `app/not-found.tsx`; a page that fails to render shows `app/error.tsx` with a retry |
 
 `app/actions.ts` holds three server actions. Locally, `announceLocalRating(txHash)` has the
@@ -236,8 +239,8 @@ stateDiagram-v2
   whether the paper's text was shortened; the model and prompt version; and links to the R-KA
   and the contract (unlinked on Anvil).
 - Cancelled: why, in plain words (`lib/rating/messages.ts` → `cancelMessage`): the paper can't
-  be rated (outside the field, a PDF whose text can't be read, or not one of VeriSci's
-  papers), or the rating couldn't finish within a day.
+  be rated (outside the field, a PDF whose text can't be read, not one of VeriSci's papers,
+  or no usable answer from the scoring model), or the rating couldn't finish within a day.
 - A rating no contract holds, one of another paper, or any under a paper that isn't
   published, is the not-found page. A chain that does not answer is asked again, and a rating
   it then shows of another paper reads "No rating here". A DKG node that does not answer leaves the rating showing,

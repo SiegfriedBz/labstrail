@@ -1,2 +1,3 @@
-- On staging nothing turns a rating request into a run yet: locally the paper's page or the rate-paper dev script sends the event; the webhook and the reconciler that restarts stuck runs are the next plan's (ADRs 0017, 0020). Until then, a run that gives up after its attempts leaves its request pending.
+- A scorer outage leaves a request pending: its run waits up to about 2 hours, then stops, and the reconciler restarts it every 4-hour window until Gemini answers or 24 hours pass and it is cancelled expired (ADRs 0009, 0020).
 - The scorer reads at most 150,000 characters of a paper; a longer one is cut, which can cost it points (the R-KA records textShortened).
+- Whether the throttle's queued runs count as active for the singleton is unverified; the reconciler's per-window event id keeps restarts to one per request per window either way (docs/domain.md → Inngest and Vercel).

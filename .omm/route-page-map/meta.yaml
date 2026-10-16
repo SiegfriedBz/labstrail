@@ -1,26 +1,31 @@
 created: 2026-10-12T05:49:40.626Z
-updated: 2026-10-15T13:06:44.448Z
-update_count: 13
-last_field: concern
-git_commit: 94013bb
-git_branch: feat/029-rating-ui
+updated: 2026-10-16T08:48:55.239Z
+update_count: 15
+last_field: todo
+git_commit: 4fc8ae9
+git_branch: feat/031-intake-recovery
 prev_diagram: >
   graph LR
       home["Home\napp/page.tsx"] -->|"Publish a paper"| publish["Publish\napp/publish/page.tsx"]
       home -->|"Browse papers"| papers["Papers List\napp/papers/page.tsx"]
       home -->|"a latest paper's row"| paper["Paper Page\napp/papers/[cid]/page.tsx"]
-      papers -->|"a row"| paper
+      papers -->|"a row, or Rate to #rating"| paper
       publish -->|"requestUpload, submitPaper"| server-actions["Server Actions\napp/actions.ts"]
       publish -->|"after submitting, ?event=<id>"| paper
       paper -->|"polls while publishing"| api-papers["Paper Status\napp/api/papers/[cid]/route.ts"]
+      paper -->|"announceLocalRating, locally"| server-actions
+      paper -->|"Rate this paper, Read the checks, Follow it, Details"| rating["Rating Page\napp/papers/[cid]/ratings/[requestId]/page.tsx"]
+      rating -->|"polls until scored or cancelled"| api-ratings["Rating Status\napp/api/ratings/[requestId]/route.ts"]
       inngest["Inngest\nexternal"] -->|"calls the served functions"| inngest-route["Inngest Route\napp/api/inngest/route.ts"]
       classDef entry fill:#89b4fa,stroke:#89b4fa,color:#1e1e2e
       classDef external fill:#585b70,stroke:#585b70,color:#cdd6f4
       class home,inngest-route entry
       class inngest external
 children:
+  - alchemy-notify
   - api-papers
   - api-ratings
+  - api-webhooks
   - home
   - inngest
   - inngest-route

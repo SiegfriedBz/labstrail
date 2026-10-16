@@ -4,12 +4,14 @@ graph LR
     find-target -->|"anything else"| cancel["Cancel\noracle cancel"]
     read-rka -->|"missing"| find-pdf["Find PDF\nstep find-pdf-n"]
     read-rka -->|"past 24 hours, not minted: expired"| cancel
-    find-pdf -->|"ipfs:// CID"| read-text["Read Text\nstep read-paper-n"]
+    find-pdf -->|"ipfs:// CID, title, abstract"| read-text["Read Text\nstep read-paper-n"]
     find-pdf -->|"a link that is not an IPFS CID"| cancel
-    read-text -->|"the paper's text"| score-paper["Score Paper\nstep score-paper-n"]
-    read-text -->|"no text, too large, 3 bad reads"| cancel
+    read-text -->|"the paper's text"| check-field["Check Field\nstep check-field-n"]
+    read-text -->|"no text, too large, 4 bad reads"| cancel
+    check-field -->|"in the field, or no answer"| score-paper["Score Paper\nstep score-paper-n"]
+    check-field -->|"outside the field"| cancel
     score-paper -->|"score, study type, checks"| store-mint["Store and Mint\nsteps store-n, mint-n, poll-n-k"]
-    score-paper -->|"outside the field"| cancel
+    score-paper -->|"outside the field, two refused answers"| cancel
     read-rka -->|"stored or draft"| store-mint
     store-mint -->|"minted R-KA"| read-score["Read Score\nstep read-score-n"]
     read-rka -->|"minted"| read-score

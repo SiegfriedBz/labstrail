@@ -17,7 +17,8 @@ Inngest workflows that combine `core` logic with the `dkg` and `contracts` adapt
   contract owns scores and the DKG content (0014), requests free and throttled on testnet
   (0015), the R-KA named from the request id (0016), events taken at least once (0017), a
   fix is a redeploy, so past contracts are still served (0023), canonical UALs (0031),
-  only life-science and health papers rated (0037).
+  only life-science and health papers rated (0037), checked first with Flash-Lite. The
+  webhook's intake follows 0017, the reconciler 0020, and notifications and alerts 0038.
   See [`docs/adr/`](../../docs/adr/README.md).
 - Workflow logic takes its step tools and adapters as arguments (`PublishSteps`,
   `PublishDeps`, `RatingSteps`, `RatingDeps`, `OracleSteps`, `OracleChain`), so tests run
@@ -29,7 +30,9 @@ Inngest workflows that combine `core` logic with the `dkg` and `contracts` adapt
   environment's contracts, which the site service shares), `src/pdf/` (fetching a pinned PDF
   and reading its text, which both runs use), `src/gemini/` (the Gemini call the scorer and
   the publish run's field check share), `src/site/` (the services the web app calls: upload
-  URLs, submissions, a paper's status, the papers list, and its ratings). At the root only the entry
+  URLs, submissions, a paper's status, the papers list, its ratings, and the Alchemy Notify
+  webhook's intake), `src/alerts/` (the Telegram notifier, the messages, the failure alerts and
+  the health check). The reconciler sits in `src/rating/`. At the root only the entry
   (`index.ts`), the settings (`env.ts`, `*-env.ts`), the wiring (`functions.ts`) and the
   Inngest client. What both runs use goes in a shared folder such as `pdf/` or `gemini/`; a folder may
   import from another (the site service checks submissions with `publish/`, and reads
@@ -37,14 +40,14 @@ Inngest workflows that combine `core` logic with the `dkg` and `contracts` adapt
   `src/layout.test.ts` checks that each file sits in one of these folders (any `*-env.ts` at
   the root) and that the entry exports the same names.
 - Step ids are unique per run (`read-1`, `wait-1-3`, `poll-1-3`); every wait is a
-  `step.sleep`, never a sleep inside a step. A step whose result changes shape gets a new id
+  `step.sleep`, never a sleep inside a step. A notification is sent from a step of its own
+  (`notify`, `alert-fee-cap`), never from the function body, which replays. A step whose result changes shape gets a new id
   (`score-paper-1` replaced `score-1`), so a run already going never reads an old result as a
   new one.
 - Adapters return typed results and never throw for an expected failure, as ADR 0021
   asks of server reads. A run throws `NonRetriableError` only when its settings or
   its invocation's data are invalid (`loadDeps`, `loadRatingDeps`, the oracle's `setup`),
-  when the node or GROBID refuses our credential or Gemini the request, when Gemini gives
-  two answers the check refuses (`scorer-unusable`), when the node does
+  when the node or GROBID refuses our credential or Gemini the request, when the node does
   not serve the graph, when a minted R-KA's score does not parse (`rating-unreadable`),
   when the oracle function fails or finds the request fulfilled with another R-KA
   (`oracle-failed`, `oracle-conflict`), and when its attempts or budget run out; its message starts `publish-failed:<reason>:` (`PublishFailure`, which the paper's

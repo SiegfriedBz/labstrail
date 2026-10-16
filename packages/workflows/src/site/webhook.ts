@@ -7,7 +7,7 @@ import { environmentContracts } from "../rating/contracts.ts";
 import { type RatingRequested, ratingRequestedEvent } from "../rating/events.ts";
 import { webhookSchema } from "../workflows-env.ts";
 
-/** What the webhook route answers Alchemy: 2xx ends the delivery, 5xx has it delivered again. */
+/** What the webhook route answers Alchemy Notify: 2xx ends the delivery, 5xx has it delivered again. */
 export type WebhookStatus = 200 | 400 | 401 | 404 | 503;
 
 /** One `verisci/rating.requested` event, as {@link createWebhookIntake} sends it. */
@@ -39,7 +39,7 @@ const hex = z.string().regex(/^0x[0-9a-fA-F]*$/);
 /**
  * The part of a Custom Webhook (GraphQL) delivery the intake reads: the block's logs, with the
  * fields our registered query asks for (`packages/workflows` README → The Alchemy Notify
- * webhook). Other fields Alchemy adds are ignored.
+ * webhook). Other fields Alchemy Notify adds are ignored.
  */
 const payloadSchema = z.object({
   type: z.literal("GRAPHQL"),
@@ -60,13 +60,13 @@ const payloadSchema = z.object({
 });
 
 /**
- * Builds the webhook intake (ADR 0017): it checks the `X-Alchemy-Signature` HMAC-SHA256 over the
+ * Builds the webhook intake (ADR 0017): it checks the `X-Alchemy Notify-Signature` HMAC-SHA256 over the
  * raw body in constant time before parsing (401 when absent or wrong), reads the payload (400,
  * logged `webhook-unreadable`, when it is not one), and sends one `verisci/rating.requested`
  * event per `Phase1Requested` log of an environment contract, with the id `rating:<requestId>`
  * a repeated delivery shares. A log marked removed, of another contract or of another event
  * sends nothing. Inngest refusing the events answers 503 (logged `webhook-unavailable`), so
- * Alchemy delivers again. Without a signing key it answers 404 and reads nothing.
+ * Alchemy Notify delivers again. Without a signing key it answers 404 and reads nothing.
  */
 export function createWebhookIntake(io: WebhookIo): WebhookIntake {
   return {

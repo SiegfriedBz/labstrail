@@ -12,7 +12,7 @@ export interface RatingRequested {
   readonly requestId: string;
 }
 
-/** A log as viem, an Alchemy webhook or a receipt gives it. */
+/** A log as viem, an Alchemy Notify webhook or a receipt gives it. */
 export interface ContractLog {
   readonly address: string;
   readonly topics: readonly Hex[];
