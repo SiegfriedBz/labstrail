@@ -75,7 +75,7 @@ upload page reads runs there, with no keys.
 | `ratePaper`, `oracleTransaction` | The `rate-paper` function, run by `verisci/rating.requested`, and the `oracle-transaction` function it invokes (below) |
 | `RATING_REQUESTED`, `RatingRequested`, `ratingRequestedEvent(log)` | The rating event's name, `verisci/rating.requested`, its data `{ contract, requestId }`, and the event for a `Phase1Requested` log (id `rating:<request id>`), or `undefined` for any other log |
 | `RATING_SETTINGS`, `ORACLE_SETTINGS` | The rating run's and the oracle function's limits (below) |
-| `RatingOutcome`, `RatingFailure`, `ratingFailureReason(output)` | How a rating run ends (`fulfilled`, `cancelled` with an optional orphan R-KA, `skipped`, with an orphan R-KA when the oracle found the request gone), and why one stopped instead: each error it throws starts `rating-failed:<reason>:` |
+| `RatingOutcome`, `RatingFailure`, `ratingFailureReason(output)` | How a rating run ends (`fulfilled`, `cancelled` with an optional orphan R-KA, `skipped`, with an orphan R-KA when the oracle found the request gone, or the R-KA an oracle move may leave unrecorded), and why one stopped instead: each error it throws starts `rating-failed:<reason>:` |
 | `OracleAction`, `OracleInput`, `OracleResult`, `OracleFailure` | What the oracle function is asked, what it answers, and why it stops (`oracle-failed:<reason>:`) |
 | `createRatingEnv(runtimeEnv)`, `RatingEnv`, `checkRatingSettings(runtimeEnv)`, `ratingSettingsRequired(runtimeEnv)`, `servesRating(runtimeEnv)` | The rating settings and their type, the start check `apps/web/instrumentation.ts` runs, when it requires them, and whether a deployment serves the rating functions |
 | `PAPER_SUBMITTED` | The event's name, `verisci/paper.submitted` |
@@ -226,8 +226,10 @@ a stored one is polled for 10 minutes without a new mint, and is fulfilled if it
 anything else is cancelled `expired`. A stored R-KA left behind, or one minted for a request
 cancelled meanwhile or gone when the oracle reads it (a reorg after the run's read), is an
 orphan: the outcome names it, and the run logs it and alerts
-on it from an **alert-orphan** step. When the contract's oracle changed mid-run, the request
-stays pending, and a restart under its key records the same R-KA, so the run ends quietly.
+on it from an **alert-orphan** step. When the contract's oracle changed mid-run, the run
+logs and alerts (**alert-oracle-moved**) that the R-KA it minted is recorded only if a run
+under the new key fulfils it: a planned key rotation does, the emergency path, a cancel by
+hand under the new key, never does ([ADR 0019](../../docs/adr/0019-oracle-transactions-are-serialized.md)).
 Once the oracle settles the request, a **notify** step
 sends one activity message: the score or why it was cancelled, the paper (by its title, or its
 UAL when it has none), and the rating's page. A run that never read the paper, a restart that
@@ -419,7 +421,8 @@ step of its own, so a replay never sends it twice.
   `inngest/function.cancelled`, sent for a run past its time budget (`timeouts.finish`) or one
   cancelled by hand, it names the function and the run.
 - **The oracle and orphans:** an oracle without funds (**alert-no-funds**), a transaction at
-  the fee cap (**alert-fee-cap**), and an orphan R-KA (the rating run's **alert-orphan**).
+  the fee cap (**alert-fee-cap**), an orphan R-KA (the rating run's **alert-orphan**), and an
+  R-KA an oracle move may leave unrecorded (**alert-oracle-moved**).
 - **Every hour,** `check-health` alerts on the oracle's ETH, and each publisher wallet's ETH on
   Base Sepolia, under 0.005; a publisher wallet's TRAC under 100; and requests pending past 6
   hours, with how many and the oldest. It reads the balances in one step (`check-balances`),
