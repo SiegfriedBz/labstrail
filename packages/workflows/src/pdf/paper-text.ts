@@ -11,9 +11,12 @@ import { type FetchPdfOptions, fetchPdf } from "./fetch-pdf.ts";
  */
 export type ReadPaperTextResult =
   | { readonly ok: true; readonly paper: PaperText }
+  | { readonly ok: false; readonly reason: "too-large" | "unreadable" | "no-text" }
   | {
       readonly ok: false;
-      readonly reason: "unreachable" | "too-large" | "unreadable" | "no-text";
+      readonly reason: "unreachable";
+      /** Why the gateway did not give the file (`fetchPdf`). */
+      readonly detail: string;
     };
 
 /** Where {@link readPaperText} reads a PDF, and how much of its text it keeps. */
@@ -34,6 +37,7 @@ export async function readPaperText(
 ): Promise<ReadPaperTextResult> {
   const pdf = await fetchPdf(cid, options);
   if (!pdf.ok) {
+    if (pdf.reason === "unreachable") return pdf;
     return { ok: false, reason: pdf.reason === "not-a-pdf" ? "unreadable" : pdf.reason };
   }
   return paperTextOf(pdf.bytes, options.maxChars);

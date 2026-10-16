@@ -5,7 +5,13 @@
  */
 export type FetchPdfResult =
   | { readonly ok: true; readonly bytes: Uint8Array }
-  | { readonly ok: false; readonly reason: "not-a-pdf" | "too-large" | "unreachable" };
+  | { readonly ok: false; readonly reason: "not-a-pdf" | "too-large" }
+  | {
+      readonly ok: false;
+      readonly reason: "unreachable";
+      /** Why, for logs: `HTTP <status>`, `no answer within <ms> ms`, or the network error. */
+      readonly detail: string;
+    };
 
 /** Where and how {@link fetchPdf} reads a pinned file. */
 export interface FetchPdfOptions {
@@ -22,7 +28,7 @@ const PDF_MAGIC = new TextEncoder().encode("%PDF-");
  * Reads a pinned PDF by its CID through the IPFS gateway. Stops reading once the file
  * passes `maxBytes`, and refuses a file that does not start with `%PDF-`. Never throws for
  * an expected failure: any status other than 2xx, a network error or a timeout is
- * `unreachable`.
+ * `unreachable`, with its cause in `detail`.
  */
 export async function fetchPdf(cid: string, options: FetchPdfOptions): Promise<FetchPdfResult> {
   const signal = AbortSignal.timeout(options.timeoutMs);
@@ -32,7 +38,7 @@ export async function fetchPdf(cid: string, options: FetchPdfOptions): Promise<F
     });
     if (!response.ok || !response.body) {
       await response.body?.cancel();
-      return { ok: false, reason: "unreachable" };
+      return { ok: false, reason: "unreachable", detail: `HTTP ${response.status}` };
     }
     if (Number(response.headers.get("content-length") ?? 0) > options.maxBytes) {
       await response.body.cancel();
@@ -42,8 +48,13 @@ export async function fetchPdf(cid: string, options: FetchPdfOptions): Promise<F
     if (!bytes) return { ok: false, reason: "too-large" };
     if (!startsWith(bytes, PDF_MAGIC)) return { ok: false, reason: "not-a-pdf" };
     return { ok: true, bytes };
-  } catch {
-    return { ok: false, reason: "unreachable" };
+  } catch (error) {
+    const detail = signal.aborted
+      ? `no answer within ${options.timeoutMs} ms`
+      : error instanceof Error
+        ? error.message
+        : String(error);
+    return { ok: false, reason: "unreachable", detail };
   }
 }
 

@@ -87,24 +87,32 @@ describe("fetchPdf", () => {
     expect(pulls).toBeLessThan(6);
   });
 
-  it.each([404, 500, 502])("reports unreachable on %i", async (status) => {
+  it.each([404, 500, 502])("reports unreachable on %i, naming the status", async (status) => {
     const { fetch } = fakeFetch(() => new Response("nope", { status }));
 
-    expect(await get(fetch)).toEqual({ ok: false, reason: "unreachable" });
+    expect(await get(fetch)).toEqual({
+      ok: false,
+      reason: "unreachable",
+      detail: `HTTP ${status}`,
+    });
   });
 
-  it("reports unreachable on a network error", async () => {
+  it("reports unreachable on a network error, naming it", async () => {
     const { fetch } = fakeFetch(() => Promise.reject(new TypeError("fetch failed")));
 
-    expect(await get(fetch)).toEqual({ ok: false, reason: "unreachable" });
+    expect(await get(fetch)).toEqual({ ok: false, reason: "unreachable", detail: "fetch failed" });
   });
 
-  it("reports unreachable when the gateway does not answer in time", async () => {
+  it("reports unreachable when the gateway does not answer in time, naming the timeout", async () => {
     const fetch = ((_: string, init?: RequestInit) =>
       new Promise((_resolve, reject) => {
         init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
       })) as typeof globalThis.fetch;
 
-    expect(await get(fetch, { timeoutMs: 10 })).toEqual({ ok: false, reason: "unreachable" });
+    expect(await get(fetch, { timeoutMs: 10 })).toEqual({
+      ok: false,
+      reason: "unreachable",
+      detail: "no answer within 10 ms",
+    });
   });
 });

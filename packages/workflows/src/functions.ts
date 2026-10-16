@@ -141,6 +141,13 @@ function getRatingDeps(): RatingDeps {
         fetch: (input: string | URL | Request, init?: RequestInit) => fetch(input, init),
         timeoutMs: RATING_SETTINGS.scorerTimeoutMs,
       }),
+    checkField: (paper) =>
+      checkField(paper, {
+        apiKey: env.GEMINI_API_KEY,
+        model: PUBLISH_SETTINGS.fieldModel,
+        fetch: (input: string | URL | Request, init?: RequestInit) => fetch(input, init),
+        timeoutMs: PUBLISH_SETTINGS.fieldTimeoutMs,
+      }),
   };
   return ratingDeps;
 }

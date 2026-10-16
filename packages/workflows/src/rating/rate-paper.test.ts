@@ -14,6 +14,8 @@ import { Inngest, NonRetriableError } from "inngest";
 import type { Hex } from "viem";
 import { describe, expect, it, vi } from "vitest";
 import type { ReadPaperTextResult } from "../pdf/paper-text.ts";
+import type { FieldCheckResult } from "../publish/field-check.ts";
+import { PUBLISH_SETTINGS } from "../publish/publish-paper.ts";
 import type { OracleInput, OracleResult } from "./oracle.ts";
 import {
   createRatePaper,
@@ -24,6 +26,7 @@ import {
   ratingFailureReason,
   runRating,
 } from "./rate-paper.ts";
+import { RECONCILER_SETTINGS } from "./reconciler.ts";
 import type { ScoreResult } from "./scorer.ts";
 
 const CONTRACT = "0x5fbdb2315678afecb367f032d93f642f64180aa3";
@@ -74,6 +77,15 @@ const minted: AssetResult = { ok: true, state: "minted", ual: R_KA };
 const minting: MintResult = { ok: true, state: "minting" };
 const mintedNow: MintResult = { ok: true, state: "minted", ual: R_KA };
 const unreachable = { ok: false as const, reason: "unreachable" as const };
+/** The gateway not giving the PDF, as `readPaperText` reports it. */
+const gatewayDown = { ok: false as const, reason: "unreachable" as const, detail: "HTTP 504" };
+const LITE = "gemini-3.5-flash-lite-001";
+const inField: FieldCheckResult = {
+  ok: true,
+  field: "life-sciences",
+  reason: "A trial.",
+  model: LITE,
+};
 
 const pending = (state: Partial<RatingRequestState> = {}): ReadRequestResult => ({
   ok: true,
@@ -122,6 +134,7 @@ interface Script {
   ratingRows?: QueryResult[];
   papers?: ReadPaperTextResult[];
   scores?: ScoreResult[];
+  fields?: FieldCheckResult[];
   oracleAnswer?: (input: OracleInput) => OracleResult;
 }
 
@@ -141,7 +154,14 @@ function rate(script: Script, data: unknown = EVENT) {
   const mints = [...(script.mints ?? [mintedNow])];
   const found = [...(script.found ?? [{ ok: true, bindings: [{ ka: TARGET }] }])];
   const graph = [...(script.graph ?? [{ ok: true as const }])];
-  const pdfRows = [...(script.pdfRows ?? [{ ok: true, bindings: [{ url: `ipfs://${CID}` }] }])];
+  const pdfRows = [
+    ...(script.pdfRows ?? [
+      {
+        ok: true,
+        bindings: [{ url: `ipfs://${CID}`, title: '"A trial"', abstract: '"Sixty patients."' }],
+      },
+    ]),
+  ];
   const ratingRowsAnswers = [
     ...(script.ratingRows ?? [{ ok: true, bindings: ratingRows(OUTPUT.score) }]),
   ];
@@ -149,6 +169,7 @@ function rate(script: Script, data: unknown = EVENT) {
   const scores = [
     ...(script.scores ?? [{ ok: true, field: "life-sciences", output: OUTPUT, model: MODEL }]),
   ];
+  const fields = [...(script.fields ?? [inField])];
   const foundQuery = publishedPaperQuery(GRAPH, TARGET);
   const pdfQuery = paperPdfQuery(GRAPH, TARGET);
   const dkg = {
@@ -172,6 +193,7 @@ function rate(script: Script, data: unknown = EVENT) {
     dkg: dkg as unknown as RatingDeps["dkg"],
     readPaper: vi.fn(async () => next(papers)),
     score: vi.fn(async () => next(scores)),
+    checkField: vi.fn(async () => next(fields)),
   } satisfies RatingDeps;
   const { step, log, oracleCalls } = fakeSteps(script.oracleAnswer ?? settles);
   const logger = { error: vi.fn() };
@@ -315,7 +337,7 @@ describe("runRating: which requests it takes", () => {
 
     await expect(run).rejects.toThrow(/^rating-failed:node-unreachable: /);
     expect(oracleCalls).toEqual([]);
-    expect(log).toContain(`find-target-${RATING_SETTINGS.attempts}`);
+    expect(log).toContain(`find-target-${RATING_SETTINGS.lookupAttempts}`);
   });
 });
 
@@ -332,6 +354,7 @@ describe("runRating: rating a paper", () => {
       "read-rka-1",
       "find-pdf-1",
       "read-paper-1",
+      "check-field-1",
       "score-paper-1",
       "store-1",
       "mint-1",
@@ -340,6 +363,11 @@ describe("runRating: rating a paper", () => {
     ]);
     expect(dkg.query).toHaveBeenCalledWith(paperPdfQuery(GRAPH, TARGET));
     expect(deps.readPaper).toHaveBeenCalledExactlyOnceWith(CID);
+    expect(deps.checkField).toHaveBeenCalledExactlyOnceWith({
+      title: "A trial",
+      abstract: "Sixty patients.",
+      opening: PAPER.text.slice(0, PUBLISH_SETTINGS.openingChars),
+    });
     expect(deps.score).toHaveBeenCalledExactlyOnceWith(PAPER);
     expect(dkg.storeAsset).toHaveBeenCalledWith(
       NAME,
@@ -371,6 +399,44 @@ describe("runRating: rating a paper", () => {
         },
       ]),
     );
+  });
+
+  it("cancels invalid-target a paper the Flash-Lite field check reads as outside, never scoring", async () => {
+    const { run, deps, dkg, log, oracleCalls } = rate({
+      fields: [{ ok: true, field: "outside", reason: "Machine translation.", model: LITE }],
+    });
+
+    expect(await run).toEqual({ state: "cancelled", reason: "invalid-target" });
+    expect(deps.score).not.toHaveBeenCalled();
+    expect(dkg.storeAsset).not.toHaveBeenCalled();
+    expect(oracleCalls).toEqual([cancel("invalid-target")]);
+    expect(log.slice(-2)).toEqual(["check-field-1", "oracle cancel"]);
+  });
+
+  it.each([
+    ["doesn't answer", { ok: false, reason: "unreachable", status: 503 } as const],
+    ["gives an answer it can't use", { ok: false, reason: "invalid-output" } as const],
+  ])(
+    "goes on to the scorer, which decides the field, when the field check %s",
+    async (_, failure) => {
+      const { run, deps } = rate({ fields: [failure] });
+
+      expect(await run).toMatchObject({ state: "fulfilled" });
+      expect(deps.checkField).toHaveBeenCalledOnce();
+      expect(deps.score).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("checks the field once a run, even when scoring is tried again", async () => {
+    const { run, deps } = rate({
+      scores: [
+        { ok: false, reason: "unreachable", status: 503 },
+        { ok: true, field: "life-sciences", output: OUTPUT, model: MODEL },
+      ],
+    });
+
+    expect(await run).toMatchObject({ state: "fulfilled" });
+    expect(deps.checkField).toHaveBeenCalledOnce();
   });
 
   it("cancels invalid-target a paper outside the field, storing nothing", async () => {
@@ -548,26 +614,39 @@ describe("runRating: retries", () => {
     expect(log).toContain("find-pdf-2");
   });
 
-  it("reads the PDF again after 2 minutes when the gateway does not give it", async () => {
+  it("reads the PDF again 15 s later, in the same attempt, when the gateway fails the first read", async () => {
+    const { run, deps, log } = rate({ papers: [gatewayDown, { ok: true, paper: PAPER }] });
+
+    expect(await run).toMatchObject({ state: "fulfilled" });
+    expect(log.slice(4, 8)).toEqual([
+      "read-paper-1",
+      "sleep read-paper-1-again 15s",
+      "read-paper-1-again",
+      "check-field-1",
+    ]);
+    expect(log).not.toContain("sleep retry-1 2m");
+    expect(deps.readPaper).toHaveBeenCalledTimes(2);
+  });
+
+  it("waits 2 minutes and reads the PDF again when the second read fails too", async () => {
     const { run, deps, log } = rate({
-      papers: [
-        { ok: false, reason: "unreachable" },
-        { ok: true, paper: PAPER },
-      ],
+      papers: [gatewayDown, gatewayDown, { ok: true, paper: PAPER }],
     });
 
     expect(await run).toMatchObject({ state: "fulfilled" });
     expect(log).toContain("sleep retry-1 2m");
     expect(log).toContain("read-paper-2");
     expect(log).not.toContain("find-pdf-2");
-    expect(deps.readPaper).toHaveBeenCalledTimes(2);
+    expect(deps.readPaper).toHaveBeenCalledTimes(3);
   });
 
-  it("fails paper-unreachable, with no cancel, when the PDF never comes", async () => {
-    const { run, deps, oracleCalls } = rate({ papers: [{ ok: false, reason: "unreachable" }] });
+  it("fails paper-unreachable, naming why, with no cancel, when the PDF never comes", async () => {
+    const { run, deps, oracleCalls } = rate({ papers: [gatewayDown] });
 
-    await expect(run).rejects.toThrow(/^rating-failed:paper-unreachable: /);
-    expect(deps.readPaper).toHaveBeenCalledTimes(RATING_SETTINGS.attempts);
+    await expect(run).rejects.toThrow(
+      /^rating-failed:paper-unreachable: .*did not come \(HTTP 504\)/,
+    );
+    expect(deps.readPaper).toHaveBeenCalledTimes(RATING_SETTINGS.attempts + 1);
     expect(oracleCalls).toEqual([]);
   });
 
@@ -578,32 +657,34 @@ describe("runRating: retries", () => {
     expect(oracleCalls).toEqual([]);
   });
 
-  it("cancels invalid-target a PDF that reads badly three times, scoring nothing", async () => {
+  it("cancels invalid-target a PDF that reads badly 4 times, over at least 22 minutes, scoring nothing", async () => {
     const { run, deps, dkg, oracleCalls, log } = rate({
       papers: [{ ok: false, reason: "unreadable" }],
     });
 
     expect(await run).toEqual({ state: "cancelled", reason: "invalid-target" });
-    expect(deps.readPaper).toHaveBeenCalledTimes(RATING_SETTINGS.unreadableReads);
-    expect(log).toContain(`sleep retry-${RATING_SETTINGS.unreadableReads - 1} 2m`);
+    expect(RATING_SETTINGS.unreadableReads).toBe(4);
+    expect(deps.readPaper).toHaveBeenCalledTimes(4);
+    expect(log.filter((entry) => entry.startsWith("sleep retry-"))).toEqual([
+      "sleep retry-1 2m",
+      "sleep retry-2 5m",
+      "sleep retry-3 15m",
+    ]);
     expect(deps.score).not.toHaveBeenCalled();
     expect(dkg.storeAsset).not.toHaveBeenCalled();
     expect(oracleCalls).toEqual([cancel("invalid-target")]);
   });
 
-  it("fails paper-unreadable, with no cancel, when the attempts run out before three bad reads", async () => {
+  it("fails paper-unreadable, with no cancel, when the attempts run out before 4 bad reads", async () => {
     const { run, deps, oracleCalls } = rate({
       papers: [
-        { ok: false, reason: "unreachable" },
-        { ok: false, reason: "unreachable" },
-        { ok: false, reason: "unreachable" },
-        { ok: false, reason: "unreachable" },
+        ...Array.from({ length: RATING_SETTINGS.attempts }, () => gatewayDown),
         { ok: false, reason: "unreadable" },
       ],
     });
 
     await expect(run).rejects.toThrow(/^rating-failed:paper-unreadable: /);
-    expect(deps.readPaper).toHaveBeenCalledTimes(RATING_SETTINGS.attempts);
+    expect(deps.readPaper).toHaveBeenCalledTimes(RATING_SETTINGS.attempts + 1);
     expect(oracleCalls).toEqual([]);
   });
 
@@ -629,12 +710,15 @@ describe("runRating: retries", () => {
     expect(oracleCalls).toEqual([cancel("invalid-target")]);
   });
 
-  it("asks Gemini at most twice for an answer the check refuses, then fails scorer-unusable", async () => {
-    const { run, deps, oracleCalls } = rate({ scores: [{ ok: false, reason: "invalid-output" }] });
+  it("cancels invalid-target after two answers the check refuses, storing nothing", async () => {
+    const { run, deps, dkg, oracleCalls } = rate({
+      scores: [{ ok: false, reason: "invalid-output" }],
+    });
 
-    await expect(run).rejects.toThrow(/^rating-failed:scorer-unusable: /);
+    expect(await run).toEqual({ state: "cancelled", reason: "invalid-target" });
     expect(deps.score).toHaveBeenCalledTimes(RATING_SETTINGS.unusableAnswers);
-    expect(oracleCalls).toEqual([]);
+    expect(dkg.storeAsset).not.toHaveBeenCalled();
+    expect(oracleCalls).toEqual([cancel("invalid-target")]);
   });
 
   it("scores after one answer the check refuses when the next one is usable", async () => {
@@ -658,6 +742,22 @@ describe("runRating: retries", () => {
     await expect(run).rejects.toThrow(/^rating-failed:scorer-unavailable: /);
     expect(deps.score).toHaveBeenCalledTimes(RATING_SETTINGS.attempts);
     expect(deps.readPaper).toHaveBeenCalledOnce();
+  });
+
+  it("waits 2, 5, 15, 30 and 60 minutes between its 6 attempts while Gemini stays down", async () => {
+    const { run, deps, log } = rate({
+      scores: [{ ok: false, reason: "unreachable", status: 503 }],
+    });
+
+    await expect(run).rejects.toThrow(/^rating-failed:scorer-unavailable: /);
+    expect(deps.score).toHaveBeenCalledTimes(6);
+    expect(log.filter((entry) => entry.startsWith("sleep retry-"))).toEqual([
+      "sleep retry-1 2m",
+      "sleep retry-2 5m",
+      "sleep retry-3 15m",
+      "sleep retry-4 30m",
+      "sleep retry-5 60m",
+    ]);
   });
 
   it("names Gemini's status when the scorer stays unavailable", async () => {
@@ -746,7 +846,7 @@ describe("runRating: retries", () => {
     const { run, deps, log } = rate({ requests: [unreachable] });
 
     await expect(run).rejects.toThrow(/^rating-failed:chain-unreachable: /);
-    expect(deps.readRequest).toHaveBeenCalledTimes(RATING_SETTINGS.attempts);
+    expect(deps.readRequest).toHaveBeenCalledTimes(RATING_SETTINGS.lookupAttempts);
     expect(log).toContain("read-request-5");
   });
 });
@@ -840,7 +940,15 @@ describe("createRatePaper", () => {
     expect(fn.opts.id).toBe("rate-paper");
     expect(fn.opts.triggers).toEqual([{ event: "verisci/rating.requested" }]);
     expect(fn.opts.singleton).toEqual({ key: "event.data.requestId", mode: "skip" });
-    expect(fn.opts.timeouts).toEqual({ finish: "180m" });
+    expect(fn.opts.timeouts).toEqual({ finish: "300m" });
+  });
+
+  it("keeps the maximum age above the reconciler's threshold and interval plus a run's budget", () => {
+    const budgetMs = Number.parseInt(RATING_SETTINGS.finishTimeout, 10) * 60_000;
+
+    expect(RATING_SETTINGS.maxAgeMs).toBeGreaterThan(
+      RECONCILER_SETTINGS.thresholdMs + RECONCILER_SETTINGS.intervalMs + budgetMs,
+    );
   });
 
   it("throttles to 3 starts an hour in a deployment, and not locally", () => {
