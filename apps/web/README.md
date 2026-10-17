@@ -361,6 +361,29 @@ not run during `next build`. On Vercel, a server starts on a request after the d
 live, so a missing setting makes every route fail: set them in each Vercel environment
 before its first deploy, and allow each deployed domain in the Reown project.
 
+## Deploying
+
+Vercel builds the site from one project (`verisci`, Hobby): Root Directory `apps/web`, the
+Next.js preset, the install and build commands it detects (pnpm from `packageManager`, Node
+24.x from `engines`), and no `vercel.json`. Production tracks `main`; every other branch is a
+preview, and `develop`'s, at its stable branch URL, is staging.
+
+- **Deployment Protection** keeps previews private. Its Protection Bypass for Automation
+  secret goes into Inngest's Vercel integration, which also sets `INNGEST_EVENT_KEY` and
+  `INNGEST_SIGNING_KEY` and syncs the app on each deploy, and at the end of the staging
+  webhook's URL ([`packages/workflows`](../../packages/workflows/README.md#the-alchemy-notify-webhook)).
+- **Variables** (Settings → Environment Variables): `APP_ENV` (`production`, or `staging` for
+  Preview), `DKG_CONTEXT_GRAPH` and `DKG_TOKEN` take one value per environment;
+  `ORACLE_PRIVATE_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` and
+  `ALCHEMY_WEBHOOK_SIGNING_KEY` go on Production and on Preview limited to the branch
+  `develop`, so feature previews never rate or post; every other variable takes one value
+  for both. System Environment Variables stay exposed: Inngest reads `VERCEL_GIT_COMMIT_REF`,
+  and the notifications' links `VERCEL_BRANCH_URL` and `VERCEL_PROJECT_PRODUCTION_URL`.
+- **Inngest's `develop` branch environment** has auto-archive off
+  ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)).
+- A deployed server checks its settings when it starts (above), so each variable is set
+  before the environment's first deploy.
+
 ## Scripts
 
 | Command | What it does |

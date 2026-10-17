@@ -16,7 +16,7 @@ other services can target it.
 
 Each environment has its own contract, context graph, webhook, oracle wallet, Inngest
 environment and upload-limit counters; the Reown project, the pinning account, the Upstash
-database, the Gemini key and the alerts chat are shared. The
+database, the Alchemy RPC account, the Gemini key and the alerts chat are shared. The
 DKG node is shared: its publisher wallets and one admin token serve both graphs, so the dkg
 package's env module refuses the production graph outside production and requires it in
 production

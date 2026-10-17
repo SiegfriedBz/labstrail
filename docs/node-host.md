@@ -42,7 +42,7 @@ DKG daemon ◀──peer-to-peer──▶ other DKG nodes and the testnet relays
 
 | Traffic | Path |
 | --- | --- |
-| The app → the node | `https://verisci-dkg.duckdns.org`, through Caddy, with the environment's credential |
+| The app → the node | `https://verisci-dkg.duckdns.org`, through Caddy, with the environment's credential; the health check's `/api/status` with none |
 | The app → GROBID | `https://verisci-grobid.duckdns.org`, through Caddy, with the same credential |
 | The node → Base Sepolia (reads, transactions) | Through the RPC proxy only: `chain.rpcUrl` is `http://127.0.0.1:8545` and no backup RPC URL is set |
 | The node ↔ other DKG nodes | Directly, on its peer-to-peer port (sync, storage acknowledgements, relays) |
