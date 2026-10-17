@@ -409,15 +409,20 @@ restarts runs: the run decides what is left (retry, cancel `invalid-target`, ful
 
 ## Notifications and alerts
 
-One `notify({ level, text })` (`createNotify`) tells the maintainer everything, in one Telegram
-chat for every environment ([ADR 0038](../../docs/adr/0038-alerts-go-to-one-telegram-chat.md)):
-each message is prefixed with the environment and the level (`[staging · alert] …`). Without
-`TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` it only logs the message; a send that fails is
+One `notify({ level, text, title, link })` (`createNotify`) tells the maintainer everything,
+in one Telegram chat for every environment
+([ADR 0038](../../docs/adr/0038-alerts-go-to-one-telegram-chat.md)), in Telegram's HTML: a bold
+headline and the environment (`🚨 Alert · staging`, or activity's own headline, such as
+`⭐ Rated 91/100 · staging`), then the alert's text, or the paper's title in bold and a short
+link (`→ Open the rating`); every part is escaped. Without `TELEGRAM_BOT_TOKEN` and
+`TELEGRAM_CHAT_ID` it only logs the message, as one plain line (`[staging · alert] …`); a send that fails is
 logged `notify-unavailable: telegram: …` and never fails the run that sent it. Every send is a
 step of its own, so a replay never sends it twice.
 
-- **Activity:** a paper published (the publish run's **notify**), a rating scored or cancelled
-  (the rating run's **notify**), with a link to the page (`siteUrlOf`).
+- **Activity:** a paper published (`📄 Published`, the publish run's **notify**), a rating
+  scored or cancelled (`⭐ Rated <score>/100`, `⚠️ Rating cancelled: <why>`, the rating run's
+  **notify**), each with the paper's title and a link to its page (`publishedNotice`,
+  `ratedNotice`, `siteUrlOf`).
 - **A failed or cancelled run:** `alert-on-failure`, on every function's
   `inngest/function.failed`, names the function, the run and the first line of its error,
   whose `publish-failed:`, `rating-failed:` or `oracle-failed:` prefix says why; on
@@ -426,9 +431,12 @@ step of its own, so a replay never sends it twice.
 - **The oracle and orphans:** an oracle without funds (**alert-no-funds**), a transaction at
   the fee cap (**alert-fee-cap**), an orphan R-KA (the rating run's **alert-orphan**), and an
   R-KA an oracle move may leave unrecorded (**alert-oracle-moved**).
-- **Every hour,** `check-health` alerts on the oracle's ETH, and each publisher wallet's ETH on
-  Base Sepolia, under 0.005; a publisher wallet's TRAC under 100; and requests pending past 6
-  hours, with how many and the oldest. It reads the balances in one step (`check-balances`),
+- **Every hour,** `check-health` alerts on the DKG node not answering its open `/api/status`
+  within 10 s, or listing the environment's graph not `accepted` from `finalized-chain` (or not
+  at all); the oracle's ETH, and each publisher wallet's ETH on Base Sepolia, under 0.005; a
+  publisher wallet's TRAC under 100; and requests pending past 6 hours, with how many and the
+  oldest. It reads the node in one step (`check-node`), the balances in another
+  (`check-balances`),
   then each contract in a step of its own (`check-pending-<contract>`), one after the other:
   at most 2 pages of pending ids a contract an hour (200 requests, 10 at a time), each hour
   going on from the last, so a spam backlog is read in turns and the alert says how many it

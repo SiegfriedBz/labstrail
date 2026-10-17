@@ -75,10 +75,10 @@ Built:
   requests; that request's run finishes or cancels it
   ([ADR 0020](docs/adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
 - **The maintainer hears of it on Telegram:** every paper published, every rating settled,
-  a failed run, wallets running low and requests pending too long
+  a failed run, the DKG node down, wallets running low and requests pending too long
   ([ADR 0038](docs/adr/0038-alerts-go-to-one-telegram-chat.md)).
 
-Next: the first deploy, so the deployed app reaches them.
+Deployed on Vercel: staging from `develop`, production from `main`.
 
 Terms:
 
@@ -129,7 +129,7 @@ which asks free public endpoints first and keeps Alchemy RPC within a daily budg
 rebuild it from the node's backup; its configuration files are in
 [`infra/node-server`](infra/node-server/README.md).
 Each environment also has its own oracle wallet, Alchemy Notify webhook, Inngest
-environment and Upstash store. Only `develop` holds staging's oracle key and runs
+environment and upload-limit counters, in one shared Upstash database. Only `develop` holds staging's oracle key and runs
 its ratings; previews share staging's contract and graph, and local development shares
 staging's graph but rates, pages included, on a contract on a local Anvil chain with its
 oracle key ([ADR 0019](docs/adr/0019-oracle-transactions-are-serialized.md),

@@ -434,7 +434,11 @@ Observed on Base Sepolia (chain id 84532) with Alchemy RPC and the Alchemy Notif
   created with `skip_empty_messages` (the API's `graphql_query: { query, skip_empty_messages:
   true }`); on Base, a delivery every 2 seconds. In its log filter, an empty `topics` list
   matches every event of the listed addresses, and an empty address list every address
-  (Alchemy's Custom Webhooks docs).
+  (Alchemy's Custom Webhooks docs). The dashboard's form has the same choice as an "Include
+  empty messages" box, unchecked by default (2026-10-17).
+- **The staging webhook reached `develop` through the protection bypass** (2026-10-17): a
+  request from the wallet started a rating run on the deployed app, which settled, minted its
+  R-KA and posted to Telegram.
 - **After a reorg, the Alchemy Notify webhook delivers the new block** (Alchemy's Custom
   Webhooks FAQ): the same block number with a new hash means the earlier delivery's logs
   left the chain. Its GraphQL logs carry no per-log `removed` mark, so a run reads the
@@ -475,7 +479,22 @@ Observed on Vercel Hobby with Inngest Cloud, except where a fact cites the vendo
 - **Preview deployments need Vercel's deployment-protection bypass** configured, or Inngest
   cannot reach `/api/inngest`. The stable `develop` deployment is a preview too, so the
   staging webhook needs the same bypass; a caller that cannot set headers passes it as the
-  `x-vercel-protection-bypass` query parameter (Vercel docs, to verify on our plan).
+  `x-vercel-protection-bypass` query parameter. On Hobby (2026-10-17), "Protection Bypass for
+  Automation" gives the secret; Inngest's Vercel integration takes it in its settings and
+  synced `develop`'s app, under the `develop` branch environment.
+- **The Inngest Vercel integration sets the keys itself** (2026-10-17): `INNGEST_EVENT_KEY`
+  and `INNGEST_SIGNING_KEY` for Production and for Preview, and it syncs the app on each deploy.
+- **Vercel's import offers a multi-service project for this repo** (2026-10-17), since it
+  detects more than one app, with a suggested `vercel.json`; one project with Root Directory
+  `apps/web` builds the site with neither.
+- **Turborepo warns on Vercel that the project's variables are missing from `turbo.json`
+  and "WILL NOT be available"** (2026-10-17): that holds for the build alone, which needs only
+  `APP_ENV` (`globalEnv`); the functions read every variable from Vercel when they run.
+- **MetaMask warns on a new `*.vercel.app` domain** (2026-10-17): "This site shows signs of
+  phishing or wallet-draining activity", on `develop`'s branch URL, before connecting.
+  MetaMask's `eth-phishing-detect` list takes false-positive reports.
+- **Upstash's free plan allows one database** (2026-10-17), so staging and production share
+  it, each counter named after its environment ([ADR 0005](adr/0005-staging-and-production-are-isolated.md)).
 - **A run past its time budget is cancelled, not failed** (Inngest docs, system events): Inngest
   sends `inngest/function.cancelled` for it, as for a run cancelled by hand or through the API,
   with the function and run ids (the docs add an error "function cancelled"; inngest 4.22.0's

@@ -213,9 +213,10 @@ function pendingProblem(found: readonly ContractPending[]): string[] {
 }
 
 /**
- * The `check-health` Inngest cron: every hour, reads the balances and the pending requests
- * and, when something needs the maintainer, sends one alert listing it (ADR 0038). `getDeps`
- * builds the reads on the first run, so importing the function validates no settings.
+ * The `check-health` Inngest cron: every hour, reads the DKG node, the balances and the
+ * pending requests and, when something needs the maintainer, sends one alert listing it
+ * (ADR 0038). `getDeps` builds the reads on the first run, so importing the function validates
+ * no settings.
  */
 export function createHealthCheck(
   inngest: Inngest.Any,

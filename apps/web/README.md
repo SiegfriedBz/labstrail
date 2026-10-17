@@ -345,7 +345,7 @@ unless `APP_ENV` is `local`:
 
 | Variable | Value |
 | --- | --- |
-| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis's REST address and token, for the limits: one database per environment, previews using staging's ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)). The token is secret |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis's REST address and token, for the limits: one database shared by every environment, each counter named after its `APP_ENV` (`verisci:staging:upload-url`), since Upstash's free plan allows one ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)). The token is secret |
 | `REOWN_PROJECT_ID` | The Reown project id for the wallet window, from one project shared by every environment, read on the server and handed to the page, so nothing is inlined at build time. Without it the pages say the wallet is not set up |
 | `LOCAL_CHAIN_RPC_URL`, `LOCAL_RATING_CONTRACT` | Optional, read only when `APP_ENV=local`: Anvil's URL and the RatingController deployed there. With both, the pages read and request ratings on that contract and the wallet window offers Anvil; without either, the paper and rating pages say ratings aren't set up, the papers list shows no Rate link, and the wallet window offers only Base Sepolia ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)) |
 

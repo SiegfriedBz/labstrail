@@ -200,6 +200,11 @@ Everything starts by itself when the server boots, the proxy before the daemon. 
 (`sudo systemctl reboot`) takes about 25 seconds; the graphs are back at `finalized-chain`
 about a minute later.
 
+Every hour, staging's and production's health check reads `/api/status` and alerts the
+Telegram chat when the node does not answer within 10 s, or lists the environment's graph
+other than `accepted` from `finalized-chain`
+([ADR 0038](adr/0038-alerts-go-to-one-telegram-chat.md)).
+
 ## The server: Oracle Cloud
 
 The server is an Oracle Cloud Always Free VM, chosen because it costs nothing and fits the
