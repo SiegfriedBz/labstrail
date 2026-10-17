@@ -11,13 +11,13 @@ The DKG daemon has a single admin token, valid for every graph on the node ([dom
 
 - Caddy, the host's only public entry, checks one bearer credential per environment: `local` (developers' computers), `staging` (`develop` and feature previews, which use staging's graph, [0005](0005-staging-and-production-are-isolated.md)) and `production`.
 - The same credential opens the daemon's API and GROBID. The app sends it to both as `DKG_TOKEN`.
-- Caddy forwards to the daemon with the admin token, which never leaves the host. GROBID gets no credential from Caddy.
-- `/api/status`, the health check, answers without a credential. Everything else without a valid credential is refused.
+- Caddy forwards to the daemon with the admin token, which no environment holds: it is kept on the host and in the node's encrypted key backups. GROBID gets no credential from Caddy.
+- `/api/status`, the health check, answers without a credential, and Caddy forwards it with no token. Everything else without a valid credential is refused.
 - Revoking or rotating one environment's credential leaves the others working.
 
 ## Consequences
 
-- The admin token stays on the host: not in Vercel, not on a developer's computer.
+- The admin token is held only on the host and in the node's encrypted backups. Off the host it opens nothing, since Caddy accepts only the environments' credentials.
 - Every credential still reaches both graphs, since the daemon has no token per graph: the `-prod` guard stays ([0005](0005-staging-and-production-are-isolated.md)).
 - Rotating the admin token means updating Caddy's settings on the host as well.
-- The credentials live on the host, in each environment's settings and in the maintainer's password manager, never in the repo.
+- The credentials live on the host and in each environment's settings, never in the repo.

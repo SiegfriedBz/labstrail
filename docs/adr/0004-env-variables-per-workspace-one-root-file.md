@@ -9,7 +9,7 @@ Every adapter needs configuration (URLs, keys, wallets). One central schema woul
 
 Foundry needs a few values of its own to deploy, such as an RPC URL and a block-explorer key. Forge reads them from the shell or from a `.env` file next to `foundry.toml`, and fails when one it uses is missing. No TypeScript reads them, so an env module would declare values that nothing in TypeScript uses. A deploy also takes choices that differ from one run to the next, such as which environment to deploy.
 
-Programs that run on the DKG node server, such as its RPC proxy, run alone there with plain Node: using `@verisci/env` would mean installing the repo's tools on the server for a handful of settings.
+The repo's own programs that run on the DKG node server, such as its RPC proxy, run alone there with plain Node: using `@verisci/env` would mean installing the repo's tools on the server for a handful of settings.
 
 ## Decision
 
@@ -18,14 +18,14 @@ Programs that run on the DKG node server, such as its RPC proxy, run alone there
 - `NODE_ENV` belongs to the tools. `APP_ENV` defaults to `local`, but is required in production builds, so a host that forgets it fails instead of running as `local`.
 - The app's env files live at the repo root, loaded by `apps/web/next.config.ts`. CI builds with `APP_ENV=local`.
 - Forge reads the same root env file as the app. Settings it needs for every deploy, such as the RPC URL and the block-explorer key, are listed in `.env.example` in their own section, with no env module; forge checks them when it uses them. Choices made per deploy, such as the environment, are passed on the deploy command, so each deploy names them.
-- Programs that run on the DKG node server read their settings themselves, from an env file on that server, so they run with plain Node and no install; they still fail at start-up on a bad setting, without showing its value, and each lists its variables in its README.
+- The repo's own programs that run on the DKG node server read their settings themselves, from an env file on that server, so they run with plain Node and no install; they still fail at start-up on a bad setting, without showing its value, and each lists its variables in its README.
 - `SKIP_ENV_VALIDATION` is needed by nothing today, and is never used for `next build` (it would prerender `undefined`) or in a running app.
 
 ## Consequences
 
 - A workspace's env object exposes only what it declares, and a bad config fails at startup with a clear message; a workflow's or the web app's, on a deployed server's start, or locally on its first run or request. This is hygiene, not isolation: every module in a deployment shares one `process.env`, so a secret set on a host is readable by all the code it runs. Forge sees every value in the root file, secrets included, as every module of a deployment does.
 - One place to fill in values, for the app and for deploys. A forge setting is checked only when a deploy uses it.
-- Each plan that reads a new variable adds it to its workspace's env module, or to the dev script that alone reads it, and to `.env.example`; a program on the DKG node server lists it in its README instead.
+- Each plan that reads a new variable adds it to its workspace's env module, or to the dev script that alone reads it, and to `.env.example`; a repo program on the DKG node server lists it in its README instead.
 - Usage is documented in the [`@verisci/env` README](../../packages/env/README.md).
 
 ## History
@@ -43,3 +43,4 @@ Programs that run on the DKG node server, such as its RPC proxy, run alone there
 - 2026-10-10: a deployment requires only the settings it uses, so a preview, with no oracle key, still starts; corrected: how a workflow's run ends on a bad setting moved to the agents README (ADR sweep).
 - 2026-10-10: the web app's own settings join the workflows' exception, checked at a deployed server's start rather than on import, since `next build` imports the web app with only `APP_ENV` set too (upload page).
 - 2026-10-16: the Telegram bot's settings are optional even where they are used, so a deployment without them starts and only logs its alerts ([0038](0038-alerts-go-to-one-telegram-chat.md)) (ADR sweep, user's choice).
+- 2026-10-17: scoped to the repo's own programs on the DKG node server, such as the RPC proxy; the programs installed there, Caddy and the DKG daemon, are configured from `infra/node-server` (node server, user's choice).

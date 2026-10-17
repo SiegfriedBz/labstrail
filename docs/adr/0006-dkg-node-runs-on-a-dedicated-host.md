@@ -11,7 +11,7 @@ A DKG node is a long-lived peer-to-peer daemon, and GROBID (PDF parsing) is a lo
 
 - The DKG daemon, GROBID and a JSON-RPC proxy for the daemon run on their own host (a VM), their APIs bound to `127.0.0.1`.
 - Caddy is the only public HTTP entry: it terminates TLS and requires authentication on every route except `/api/status`, the health check, with one credential per environment ([0039](0039-one-credential-per-environment.md)).
-- One host serves every environment, developers' computers included ([0005](0005-staging-and-production-are-isolated.md)).
+- One host serves every environment, developers' computers included ([0005](0005-staging-and-production-are-isolated.md)); a developer may also run GROBID on their own computer, since it keeps no state.
 - The node's keys and config (`~/.dkg`) are backed up off the host, encrypted: the node's agent address is part of every UAL it mints and of both context graph ids, so losing its keys orphans both graphs.
 
 ## Consequences
@@ -27,4 +27,4 @@ A DKG node is a long-lived peer-to-peer daemon, and GROBID (PDF parsing) is a lo
 - 2026-10-09: the node runs on a developer's computer until a deployed environment calls it, since no host is available yet; it moves to the host from its backup, and previews reach the node only once it is on the host.
 - 2026-10-09: a new node replaced the previous one, with a new agent address, so that the node is built only from the documented steps; the previous node's graphs are no longer used ([0005](0005-staging-and-production-are-isolated.md)).
 - 2026-10-09: corrected: the node pays publishes from several publisher wallets, not one; each is funded and alerted on (DKG spike, [domain](../domain.md)).
-- 2026-10-17: the node moved from the developer's computer to its host, with the same agent address; developers' computers now reach it like the deployed environments, through Caddy with a credential of their own (node server).
+- 2026-10-17: the node moved from the developer's computer to its host, with the same agent address; developers' computers now reach it like the deployed environments, through Caddy with a credential of their own; a developer may still run GROBID locally (node server).
