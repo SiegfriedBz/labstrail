@@ -10,7 +10,7 @@ Ratings run unattended. A scorer outage, an oracle out of gas or stuck at its fe
 ## Decision
 
 - One way tells the maintainer everything: a single `notify()` posting to one Telegram chat, through a bot, for every environment. Each message names its environment and whether it is an alert or activity.
-- Alerts: a run that failed for good, an oracle without funds or at its fee cap, an R-KA the contract will never record, and, from a check every hour, the oracle's or a publisher wallet's balance under its threshold and requests pending past the reconciler's reach.
+- Alerts: a run that failed for good, an oracle without funds or at its fee cap, an R-KA the contract will never record, and, from a check every hour, the DKG node not answering or the environment's graph not finalized, the oracle's or a publisher wallet's balance under its threshold, and requests pending past the reconciler's reach.
 - Activity: each paper a run published, and each rating the oracle settled, with a link to its page.
 - Each message is sent once, from a step of its own; a send that fails is logged and never fails the run that sent it.
 - The bot's settings are optional: a deployment without them, like a feature preview or a developer's computer, starts and only logs its messages ([0004](0004-env-variables-per-workspace-one-root-file.md)). Production and `develop` hold them.
@@ -21,8 +21,9 @@ Ratings run unattended. A scorer outage, an oracle out of gas or stuck at its fe
 - A deployment that misses the bot's settings still starts, and its alerts reach only its logs: setting them is part of deploying production and `develop`.
 - One chat mixes environments and levels; the prefix tells them apart. Activity grows with requests, bounded by the throttle ([0015](0015-rating-requests-are-free-on-testnet.md)).
 - Telegram sees the messages: paper titles, addresses, request ids and error text, never a key.
-- The DKG node's uptime is not watched yet; its health check, `/api/status`, is open ([0039](0039-one-credential-per-environment.md)).
+- The DKG node is watched through its open health check ([0039](0039-one-credential-per-environment.md)): an outage is heard of within the hour, once from each environment that runs the check.
 
 ## History
 
 - 2026-10-17: the node has its public address ([0006](0006-dkg-node-runs-on-a-dedicated-host.md)); its uptime stays unwatched until the first deployment adds a check (node server, user's choice).
+- 2026-10-17: the hourly check also reads the DKG node's status, so a node down, or its graph no longer finalized, is alerted on (first deploy).
