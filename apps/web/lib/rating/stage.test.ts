@@ -1,6 +1,6 @@
 import type { RatingView } from "@verisci/workflows";
 import { describe, expect, it } from "vitest";
-import { isFinalRating, isRequestId, ratingStage } from "./stage.ts";
+import { isFinalRating, isRequestId, newRatingPath, ratingStage, whileFresh } from "./stage.ts";
 
 const RATING = {
   requestId: `0x${"ab".repeat(32)}`,
@@ -64,5 +64,34 @@ describe("isRequestId", () => {
 
   it.each(["0x12", `${"ab".repeat(32)}`, `0x${"zz".repeat(32)}`])("refuses %s", (value) => {
     expect(isRequestId(value)).toBe(false);
+  });
+});
+
+describe("newRatingPath", () => {
+  it("opens a rating's page marked as just requested", () => {
+    expect(newRatingPath("bafy1", RATING.requestId)).toBe(
+      `/papers/bafy1/ratings/${RATING.requestId}?new=1`,
+    );
+  });
+});
+
+describe("whileFresh", () => {
+  it("reads a request the chain doesn't show yet as waiting, while the page is fresh", () => {
+    expect(whileFresh({ ok: false, reason: "not-found" }, true)).toEqual({
+      ok: false,
+      reason: "unavailable",
+    });
+  });
+
+  it("leaves not-found as it is once the page is no longer fresh", () => {
+    expect(whileFresh({ ok: false, reason: "not-found" }, false)).toEqual({
+      ok: false,
+      reason: "not-found",
+    });
+  });
+
+  it("leaves a rating the chain shows as it is", () => {
+    const view = pending("scoring");
+    expect(whileFresh(view, true)).toBe(view);
   });
 });

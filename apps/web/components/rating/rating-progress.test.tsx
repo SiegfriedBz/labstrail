@@ -53,6 +53,21 @@ function show(initial: RatingView, local = false, ual: string | undefined = UAL)
   );
 }
 
+/** The page as the Rate button opens it, before the chain shows the request. */
+function showFresh() {
+  render(
+    <RatingProgress
+      cid={CID}
+      title="RNAi therapies"
+      ual={UAL}
+      requestId={REQUEST_ID}
+      initial={{ ok: false, reason: "unavailable" }}
+      local={false}
+      fresh
+    />,
+  );
+}
+
 describe("RatingProgress", () => {
   afterEach(() => {
     cleanup();
@@ -178,6 +193,60 @@ describe("RatingProgress", () => {
       await vi.advanceTimersByTimeAsync(20_000);
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("waits for a request the chain doesn't show yet, when opened right after it, then follows it", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: false, reason: "not-found" }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          ok: true,
+          rating: { ...RATING, status: "pending" },
+          stage: "scoring",
+        }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    showFresh();
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Checking on this rating");
+    expect(screen.getByRole("list", { name: "Rating steps" })).toBeTruthy();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Checking on this rating");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Reading the paper");
+  });
+
+  it("says there is no rating here when the chain still doesn't show the request after 2 minutes", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => ({ ok: false, reason: "not-found" }) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    showFresh();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(115_000);
+    });
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Checking on this rating");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("No rating here");
+    const asked = fetchMock.mock.calls.length;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20_000);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(asked);
   });
 
   it("shows a rating it can't match to the paper, when the node didn't answer", () => {

@@ -11,6 +11,7 @@ import { announceLocalRating } from "../../app/actions.ts";
 import type { RatingChainConfig } from "../../lib/rating/chain.ts";
 import { requestMessage } from "../../lib/rating/messages.ts";
 import { type RequestResult, requestRating } from "../../lib/rating/request-flow.ts";
+import { newRatingPath } from "../../lib/rating/stage.ts";
 import { useWalletReady } from "../wallet/providers.tsx";
 
 /** How long the button waits for the request's transaction to be mined. */
@@ -80,7 +81,7 @@ function RateFlow({ ual, cid, config }: { ual: string; cid: string; config: Rati
     });
     setPhase("idle");
     if (answer.ok && "requestId" in answer && !answer.notAnnounced) {
-      router.push(`/papers/${cid}/ratings/${answer.requestId}`);
+      router.push(newRatingPath(cid, answer.requestId));
       return;
     }
     setResult(answer);

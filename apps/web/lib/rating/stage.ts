@@ -31,3 +31,25 @@ export function isFinalRating(stage: RatingPageStage): boolean {
 export function isRequestId(value: string): boolean {
   return /^0x[0-9a-fA-F]{64}$/.test(value);
 }
+
+/**
+ * How long a rating page opened right after its request ({@link newRatingPath}) waits for the
+ * site's RPC to show the request: the wallet's receipt can come back before the site's RPC
+ * holds the block, so the request reads as not found for a few seconds.
+ */
+export const FRESH_WAIT_MS = 120_000;
+
+/** A rating's page as the Rate button opens it, marked (`?new=1`) as just requested. */
+export function newRatingPath(cid: string, requestId: string): string {
+  return `/papers/${cid}/ratings/${requestId}?new=1`;
+}
+
+/**
+ * `view` as a just-requested rating's page shows it: while `waiting` (within `FRESH_WAIT_MS`),
+ * a request no contract holds yet reads as `unavailable`, so the page keeps following it.
+ */
+export function whileFresh(view: RatingView, waiting: boolean): RatingView {
+  return waiting && !view.ok && view.reason === "not-found"
+    ? { ok: false, reason: "unavailable" }
+    : view;
+}

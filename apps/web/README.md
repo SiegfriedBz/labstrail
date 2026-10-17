@@ -191,7 +191,7 @@ behind a skeleton with the real headings (`components/rating/ratings-section.tsx
   `requestPhase1(ual)` to the environment's current contract
   ([ADR 0023](../../docs/adr/0023-a-fix-is-a-redeploy-owner-powers-fixed.md)), waits up to 90 s
   for the receipt, reads the request id from its `Phase1Requested` log and opens the rating's
-  page. Locally, it first has the server announce the request (`announceLocalRating`), since no
+  page, marked `?new=1` as just requested (`lib/rating/stage.ts` → `newRatingPath`). Locally, it first has the server announce the request (`announceLocalRating`), since no
   Alchemy Notify webhook watches Anvil
   ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)); when that fails, it says the
   request is on chain but its rating didn't start, and that the `pnpm dev` terminal says why
@@ -242,7 +242,10 @@ stateDiagram-v2
   be rated (outside the field, a PDF whose text can't be read, not one of VeriSci's papers,
   or no usable answer from the scoring model), or the rating couldn't finish within a day.
 - A rating no contract holds, one of another paper, or any under a paper that isn't
-  published, is the not-found page. A chain that does not answer is asked again, and a rating
+  published, is the not-found page. Opened with `?new=1`, the page follows a request no
+  contract holds yet for 2 minutes (`FRESH_WAIT_MS`), headed "Checking on this rating", before
+  it reads "No rating here": the wallet's receipt can come back a few seconds before the site's
+  RPC shows the request (`whileFresh`). A chain that does not answer is asked again, and a rating
   it then shows of another paper reads "No rating here". A DKG node that does not answer leaves the rating showing,
   from the chain, under the paper's short address, with a note that the title and checks
   can't be shown ([ADR 0021](../../docs/adr/0021-server-reads-return-typed-results.md)).

@@ -1,6 +1,6 @@
 created: 2026-10-15T13:08:18.593Z
-updated: 2026-10-15T15:18:31.918Z
-update_count: 3
+updated: 2026-10-17T16:33:59.445Z
+update_count: 4
 last_field: diagram
 kind: nested-class
 title: rating-page
@@ -17,4 +17,4 @@ prev_diagram: >
       in-progress -->|"the oracle cancelled it"| cancelled["Cancelled\ninvalid target, or past a day"]
       in-progress -->|"the chain or the node did not answer"| unavailable["Unavailable\nasked again on the next poll"]
       unavailable -->|"next poll answers"| in-progress
-      not-found["Not Found\nno contract holds it, or another paper's"]
+      unavailable -->|"next poll answers with another paper's rating, or a just-made request still unseen after 2 min"| not-found["Not Found\nno contract holds it, another paper's, or the paper isn't published"]
