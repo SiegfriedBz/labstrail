@@ -39,6 +39,7 @@ decisions were taken, so a later ADR can sit in an earlier group.
 | [0030. The owner and the oracle are different addresses](0030-owner-and-oracle-are-different-addresses.md) | The owner's key stays offline; the oracle's key is on the deployment; the contract keeps them apart |
 | [0036. Local rating runs use an Anvil chain](0036-local-rating-runs-use-anvil.md) | A developer runs ratings, functions and pages, against a contract on a local Anvil chain, named by local-only settings; locally the page announces its own request; staging's and production's addresses stay committed |
 | [0038. Alerts and activity go to one Telegram chat](0038-alerts-go-to-one-telegram-chat.md) | One `notify()` posts to one Telegram chat for every environment: alerts on failed runs, the oracle, orphans, balances and old requests, and activity for each paper published and rating settled; each sent once, from a step, never failing its run |
+| [0039. Each environment reaches the node server with its own credential](0039-one-credential-per-environment.md) | Caddy checks one credential per environment (local, staging, production) for the daemon and GROBID, and forwards with the admin token, which stays on the host; `/api/status` is open |
 
 ## Writing to the DKG
 
@@ -112,7 +113,6 @@ Not decided yet. The plan that first needs an answer records it, in a new ADR or
 | Who may request phases 2 and 3? | Anyone, not only the phase-1 requester. Whoever requests, our node writes the R-KA update, since it owns the R-KA ([0012](0012-three-phases-settled-by-the-oracle.md)). Also open: whether a later phase's request gets its own id or reuses the rating's. | phase-2 plan |
 | Where does phases 2 and 3's human input wait before the oracle scores it? | None yet: on the DKG, as a draft the node holds, or in a store of the app's own, which would amend [0035](0035-limits-are-the-apps-only-state.md) ([0012](0012-three-phases-settled-by-the-oracle.md)). | phase-2 plan |
 | How are phase-2 reviewers drawn with Chainlink VRF? | None yet: the draw's contract, its VRF subscription and who funds it. It may touch [0023](0023-a-fix-is-a-redeploy-owner-powers-fixed.md) (the owner's powers), [0015](0015-rating-requests-are-free-on-testnet.md) (who pays) and [0019](0019-oracle-transactions-are-serialized.md) (oracle transactions) ([0012](0012-three-phases-settled-by-the-oracle.md)). | phase-2 plan |
-| Who holds the DKG node's credential? | Caddy keeps the daemon's admin token on the host and checks one credential per environment, so each can be revoked alone. The `-prod` guard stays ([0005](0005-staging-and-production-are-isolated.md)). | node server plan |
 
 ## Adding an ADR
 
