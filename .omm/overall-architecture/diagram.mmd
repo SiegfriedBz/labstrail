@@ -9,7 +9,8 @@ graph LR
     workflows -->|"read, store, mint, query assets"| dkg-client["DKG Client\npackages/dkg/"]
     workflows -->|"ABI, addresses and reads, for the oracle and the pages"| contracts
     workflows -->|"sends events, runs steps"| inngest
-    dkg-client -->|"authenticated HTTP API"| dkg-node["DKG Node\nnode host"]
+    dkg-client -->|"HTTPS with the environment's credential"| node-server["Node Server\ninfra/node-server/"]
+    node-server -->|"forwards with the admin token"| dkg-node["DKG Node\nnode server"]
     dkg-node -->|"Base JSON-RPC, within a budget"| rpc-proxy["RPC Proxy\ninfra/rpc-proxy/"]
     rpc-proxy -->|"forwards calls"| base-sepolia
     contracts -->|"RatingController deployed on"| base-sepolia
