@@ -2,7 +2,8 @@
 
 pnpm + Turborepo monorepo: a Next.js 16 app (`apps/web`), five internal packages
 (`packages/{env,core,dkg,contracts,workflows}`) and the DKG node server's RPC proxy
-(`infra/rpc-proxy`, run with plain Node, imported by nothing). TypeScript 6, strict.
+(`infra/rpc-proxy`, run with plain Node, imported by nothing), plus the node server's config
+files (`infra/node-server`, not a workspace). TypeScript 6, strict.
 Packages ship source (`exports` → `./src/index.ts`), no build step; Next compiles them via
 `transpilePackages`.
 
