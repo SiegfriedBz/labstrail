@@ -170,7 +170,7 @@ Nothing below is ever committed or pasted into a chat.
 | DuckDNS token | Server: `~/duckdns/duck.sh`, mode 700 |
 | SSH key | Developer's computer: `~/.ssh/id_ed25519_bz` |
 | Backup passphrase | Kept by the maintainer, apart from the backups |
-| Encrypted backups | Developer's computer and a USB key: `verisci-dkg-keys-<date>.tar.gz.gpg` (the six files that make the node), `verisci-dkg-moved-2026-10-17.tar.gz.gpg` (its whole folder as it left the developer's computer, graph store included), `verisci-dkg-old-2026-09.tar.gz.gpg` (the node before 2026-10-09) and `verisci-prototype-node-2026-10-17.tar.gz.gpg` (the prototype's node) |
+| Encrypted backups | Developer's computer and a USB key: `verisci-dkg-keys-<date>.tar.gz.gpg` (the six files that make the node), `verisci-dkg-moved-2026-10-17.tar.gz.gpg` (its whole folder as it left the developer's computer, graph store included) and `verisci-dkg-old-2026-09.tar.gz.gpg` (the node before 2026-10-09); developer's computer only: `verisci-prototype-node-2026-10-17.tar.gz.gpg` (the prototype's node) |
 
 Caddy's journal also holds the admin token and the credentials of the time, written at each
 start until 2026-10-17, when the drop-in stopped it; those credentials were replaced that
