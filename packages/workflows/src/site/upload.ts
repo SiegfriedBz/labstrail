@@ -7,7 +7,6 @@ import {
   targetKaName,
 } from "@verisci/core";
 import { type AssetResult, createDkgClient } from "@verisci/dkg";
-import { createPublicClient, http } from "viem";
 import { baseSepolia } from "viem/chains";
 import { inngest } from "../inngest.ts";
 import {
@@ -30,6 +29,7 @@ import {
 } from "../publish/submit-paper.ts";
 import { verifySubmission } from "../publish/verify-submission.ts";
 import { createWorkflowsEnv, type WorkflowsEnv } from "../workflows-env.ts";
+import { createSiteChainClient } from "./chain.ts";
 import {
   checkSignature,
   listPapers,
@@ -114,7 +114,7 @@ export interface UploadIo {
 /** Builds the pages' calls from validated settings. */
 export function createUploadService(env: WorkflowsEnv, io: UploadIo): UploadService {
   const pinata = { jwt: env.PINATA_JWT, fetch: io.fetch, timeoutMs: PAGE_TIMEOUT_MS };
-  const chain = createPublicClient({ chain: baseSepolia, transport: http(env.CHAIN_RPC_URL) });
+  const chain = createSiteChainClient(baseSepolia, env.CHAIN_RPC_URL, io.fetch);
   const dkg = createDkgClient({
     url: env.DKG_URL,
     token: env.DKG_TOKEN,

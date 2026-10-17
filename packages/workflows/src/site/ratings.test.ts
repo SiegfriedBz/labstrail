@@ -234,7 +234,7 @@ describe("paperRatingSummaries", () => {
     ]);
   });
 
-  it("gives unknown when the chain takes more than 3 s", async () => {
+  it("waits up to 6 s for the chain, then gives unknown", async () => {
     vi.useFakeTimers();
     try {
       const service = createRatingService({
@@ -242,8 +242,14 @@ describe("paperRatingSummaries", () => {
         readRequestIds: () => new Promise(() => {}),
       });
 
+      let settled = false;
       const summaries = service.paperRatingSummaries([TARGET]);
-      await vi.advanceTimersByTimeAsync(3_000);
+      void summaries.then(() => {
+        settled = true;
+      });
+      await vi.advanceTimersByTimeAsync(5_999);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
 
       expect(await summaries).toEqual([{ kind: "unknown" }]);
     } finally {

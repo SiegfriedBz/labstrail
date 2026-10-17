@@ -421,6 +421,14 @@ Observed on Base Sepolia (chain id 84532) with Alchemy RPC and the Alchemy Notif
   request ids are bound to their content ([ADR 0016](adr/0016-asset-names-derive-from-request-id.md)).
 - **The free RPC tier caps `eth_getLogs` at 10 blocks,** so nothing may depend on scanning
   history; read current contract state instead ([ADR 0020](adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
+- **Alchemy RPC's free tier serves 500 compute units a second, and an `eth_call` costs 26**
+  (Alchemy's pricing and compute-unit pages, read 2026-10-17): about 19 calls a second, past
+  which it answers 429. On 2026-10-17 the papers list, reading 10 papers on staging's 3
+  contracts at once (about 30 `eth_call`s, each its own request, tried once), showed a rated
+  paper as "Not checked" after a redeploy and on hard refreshes, and its score on a later load,
+  which fits that limit. The site's pages now send reads made together as one Multicall3 call
+  (`0xcA11bde05977b3631167028862bE2a173976CA11` on Base Sepolia, in viem's chain definition),
+  one `eth_call` for the whole page, and ask a failed call once more a second later.
 - **The Alchemy Notify webhook delivers a log to every rule matching its contract:** keep exactly one
   rule per contract, or one request reaches two oracles.
 - **Each Alchemy Notify webhook signs with its own key:** `X-Alchemy-Signature` is the hex

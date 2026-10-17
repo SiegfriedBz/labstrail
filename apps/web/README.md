@@ -93,7 +93,7 @@ shaped like the table (`components/papers/papers-table-skeleton.tsx`).
   in words, summed by `summariseRatings`, the rule the paper page
   shares: "Pending", "Can't be rated" (a request was cancelled as invalid), "Not rated" with a
   Rate link to the paper's Ratings section where a contract takes ratings, or "Not checked"
-  when the chain did not answer within 3 s, so a slow chain never holds the list
+  when the chain did not answer within 6 s, so a slow chain never holds the list
   (`lib/papers/ratings.ts` → `withRatings`).
 - A node that does not answer says the list can't be loaded, with a link to try again; an
   answer that can't be read (a refused query, or a page the total covers with no readable
