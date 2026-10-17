@@ -1,0 +1,45 @@
+# The DKG node server's only public entry (docs/node-host.md → Caddy), installed as
+# /etc/caddy/Caddyfile. Each environment's credential opens both sites (ADR 0039); a
+# credential left empty opens nothing. Every secret comes from /etc/caddy/verisci.env,
+# which caddy.service reads (caddy-env.conf here); none is written in this file.
+
+(credential) {
+	@credential expression `
+		("{$VERISCI_LOCAL_TOKEN}" != "" && {http.request.header.Authorization} == "Bearer {$VERISCI_LOCAL_TOKEN}")
+		|| ("{$VERISCI_STAGING_TOKEN}" != "" && {http.request.header.Authorization} == "Bearer {$VERISCI_STAGING_TOKEN}")
+		|| ("{$VERISCI_PRODUCTION_TOKEN}" != "" && {http.request.header.Authorization} == "Bearer {$VERISCI_PRODUCTION_TOKEN}")
+	`
+}
+
+# The DKG daemon's API. The health check is open; every other route needs a credential, and
+# the daemon gets its admin token instead, which never leaves the server.
+verisci-dkg.duckdns.org {
+	import credential
+	@status path /api/status
+	handle @status {
+		reverse_proxy 127.0.0.1:9200 {
+			header_up Authorization "Bearer {$DKG_ADMIN_TOKEN}"
+		}
+	}
+	handle @credential {
+		reverse_proxy 127.0.0.1:9200 {
+			header_up Authorization "Bearer {$DKG_ADMIN_TOKEN}"
+		}
+	}
+	handle {
+		respond 401
+	}
+}
+
+# GROBID, which takes no credential of its own: Caddy checks the environment's and drops it.
+verisci-grobid.duckdns.org {
+	import credential
+	handle @credential {
+		reverse_proxy 127.0.0.1:8070 {
+			header_up -Authorization
+		}
+	}
+	handle {
+		respond 401
+	}
+}

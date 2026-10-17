@@ -1,0 +1,22 @@
+# systemd unit for the DKG daemon on the node server (docs/node-host.md → The daemon).
+# Install: copy this file to /etc/systemd/system/, then
+#   sudo systemctl daemon-reload && sudo systemctl enable --now dkg
+# It starts after the RPC proxy: the daemon reads the chain only through it.
+[Unit]
+Description=OriginTrail DKG daemon
+After=network-online.target rpc-proxy.service
+Wants=network-online.target rpc-proxy.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+Environment=HOME=/home/ubuntu
+WorkingDirectory=/home/ubuntu
+LimitNOFILE=4096
+ExecStart=/usr/bin/dkg start -f
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
