@@ -327,7 +327,8 @@ The "Clinical" look: a clinical record with an on-chain proof, in Tailwind CSS v
   for the tab, in fixed colours that read on light and dark tabs) is a heartbeat whose last
   beat is a check, drawn from the record's blue into the proof's teal.
 - Keyboard users get a skip link and one accent focus ring; the header underlines the
-  current page's link in blue. On phones the wallet button is a wallet icon (with a dot
+  current section's link in blue: Publish on `/publish`, Papers on the list and on every paper
+  and rating page (`components/site/nav-link.tsx`). On phones the wallet button is a wallet icon (with a dot
   once connected) beside the theme button, so the header keeps one line; once connected it
   is named by the short address it shows, and AppKit's own window opens from it.
 - What the DKG node answers loads behind a skeleton shaped like what replaces it, streamed
