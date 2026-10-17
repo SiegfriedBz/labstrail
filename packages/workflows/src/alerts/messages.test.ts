@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { publishedText, ratedText, siteUrlOf } from "./messages.ts";
+import { publishedNotice, ratedNotice, siteUrlOf } from "./messages.ts";
 
 const CID = "bafkreigh2akiscaildcqabsyg3dfr6chu3fgpregiymsck7e7aqa4s52zy";
 const TARGET = "did:dkg:base:84532/0xd701ed157232ad5e14bc4134a8d10d64d86f13b3/7";
@@ -23,53 +23,65 @@ describe("siteUrlOf", () => {
   });
 });
 
-describe("publishedText", () => {
-  it("names the paper by its title, with a link to its page", () => {
-    expect(publishedText({ cid: CID, title: "RNAi therapies" }, SITE)).toBe(
-      `Published: RNAi therapies\n${SITE}/papers/${CID}`,
-    );
+describe("publishedNotice", () => {
+  it("names the paper by its title, with a short link to its page", () => {
+    expect(publishedNotice({ cid: CID, title: "RNAi therapies" }, SITE)).toEqual({
+      level: "activity",
+      text: "📄 Published",
+      title: "RNAi therapies",
+      link: { label: "Open the paper", url: `${SITE}/papers/${CID}` },
+    });
   });
 
   it("names it by its CID when the run didn't read the title, and leaves the link out without a site", () => {
-    expect(publishedText({ cid: CID }, undefined)).toBe(`Published: ${CID}`);
+    expect(publishedNotice({ cid: CID }, undefined)).toEqual({
+      level: "activity",
+      text: "📄 Published",
+      title: CID,
+    });
   });
 
   it("names it by its CID when its title is empty", () => {
-    expect(publishedText({ cid: CID, title: "" }, undefined)).toBe(`Published: ${CID}`);
+    expect(publishedNotice({ cid: CID, title: "" }, undefined).title).toBe(CID);
   });
 });
 
-describe("ratedText", () => {
+describe("ratedNotice", () => {
   const paper = { requestId: REQUEST_ID, targetUal: TARGET, cid: CID, title: "RNAi therapies" };
 
-  it("gives a score out of 100, the paper and the rating's page", () => {
-    expect(ratedText({ state: "fulfilled", score: 67 }, paper, SITE)).toBe(
-      `Rated 67/100: RNAi therapies\n${SITE}/papers/${CID}/ratings/${REQUEST_ID}`,
-    );
+  it("gives a score out of 100, the paper and a short link to the rating's page", () => {
+    expect(ratedNotice({ state: "fulfilled", score: 67 }, paper, SITE)).toEqual({
+      level: "activity",
+      text: "⭐ Rated 67/100",
+      title: "RNAi therapies",
+      link: { label: "Open the rating", url: `${SITE}/papers/${CID}/ratings/${REQUEST_ID}` },
+    });
   });
 
   it.each([
     ["invalid-target", "can't be rated"],
     ["expired", "not finished within a day"],
   ] as const)("says why a rating was cancelled %s", (reason, words) => {
-    expect(ratedText({ state: "cancelled", reason }, paper, undefined)).toBe(
-      `Rating cancelled, ${words}: RNAi therapies`,
-    );
+    expect(ratedNotice({ state: "cancelled", reason }, paper, undefined)).toEqual({
+      level: "activity",
+      text: `⚠️ Rating cancelled: ${words}`,
+      title: "RNAi therapies",
+    });
   });
 
   it("names a paper it never read by its UAL, with no link", () => {
     expect(
-      ratedText(
+      ratedNotice(
         { state: "cancelled", reason: "invalid-target" },
         { requestId: REQUEST_ID, targetUal: TARGET },
         SITE,
       ),
-    ).toBe(`Rating cancelled, can't be rated: ${TARGET}`);
+    ).toEqual({ level: "activity", text: "⚠️ Rating cancelled: can't be rated", title: TARGET });
   });
 
   it("names a paper whose title is empty by its UAL", () => {
-    expect(ratedText({ state: "fulfilled", score: 64 }, { ...paper, title: "" }, undefined)).toBe(
-      `Rated 64/100: ${TARGET}`,
-    );
+    expect(
+      ratedNotice({ state: "fulfilled", score: 64 }, { ...paper, title: "" }, undefined).title,
+    ).toBe(TARGET);
   });
 });

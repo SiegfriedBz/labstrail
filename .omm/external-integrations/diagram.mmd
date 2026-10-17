@@ -1,5 +1,5 @@
 graph LR
-    verisci["VeriSci\napps/web/, packages/workflows/"] -->|"store, mint, SPARQL"| dkg-node["DKG Node\npackages/dkg/src/client.ts"]
+    verisci["VeriSci\napps/web/, packages/workflows/"] -->|"store, mint, SPARQL, status"| dkg-node["DKG Node\npackages/dkg/src/client.ts"]
     verisci -->|"paper header TEI"| grobid["GROBID\nworkflows/src/publish/grobid.ts"]
     verisci -->|"signed upload URLs, gateway reads"| pinata["Pinata\nworkflows/src/publish/pinata.ts, pdf/fetch-pdf.ts"]
     verisci -->|"signatures, requests, oracle transactions, balances"| base-rpc["Base Sepolia RPC\nviem in workflows and web"]

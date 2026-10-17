@@ -30,8 +30,7 @@ published paper is listed at `/papers`, newest first, read a page at a time from
 Ratings work end to end locally, against a contract on Anvil: a published paper's page
 requests one from the visitor's wallet, each rating has a page that follows it to its score
 and then shows every check and quote behind it, and the papers list shows each paper's
-score. Deployed, a webhook starts each rating and a cron restarts a stuck one; they reach
-users with the first deploy. The repo, its packages and the EIP-712 domain keep the lowercase name `verisci`.
+score. Deployed, a webhook starts each rating and a cron restarts a stuck one. The repo, its packages and the EIP-712 domain keep the lowercase name `verisci`.
 Everything runs on testnets.
 
 ## How it works
@@ -50,8 +49,8 @@ Built:
   before acting, so a retry never duplicates anything
   ([ADR 0007](docs/adr/0007-all-writes-converge.md)).
 - **Staging and production are kept apart**, with their own contracts, graphs,
-  oracle wallets and limit stores (production's limit store comes with its first app
-  deployment); the DKG node, the Reown project, the pinning account and the alerts chat
+  oracle wallets and upload-limit counters; the DKG node, the Reown project, the pinning
+  account, the Upstash database, the Alchemy RPC account, the Gemini key and the alerts chat
   are shared ([ADR 0005](docs/adr/0005-staging-and-production-are-isolated.md)).
 - **A requested paper is rated.** A rating run reads the paper's text, has an LLM answer
   the reporting checklist of its kind of study (a trial, an animal study, a review…) with
@@ -75,10 +74,11 @@ Built:
   requests; that request's run finishes or cancels it
   ([ADR 0020](docs/adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
 - **The maintainer hears of it on Telegram:** every paper published, every rating settled,
-  a failed run, wallets running low and requests pending too long
+  a failed run, the DKG node down, wallets running low and requests pending too long
   ([ADR 0038](docs/adr/0038-alerts-go-to-one-telegram-chat.md)).
 
-Next: the first deploy, so the deployed app reaches them.
+Deployed on Vercel ([`apps/web` → Deploying](apps/web/README.md#deploying)): staging from
+`develop`, production from `main`.
 
 Terms:
 
@@ -129,7 +129,7 @@ which asks free public endpoints first and keeps Alchemy RPC within a daily budg
 rebuild it from the node's backup; its configuration files are in
 [`infra/node-server`](infra/node-server/README.md).
 Each environment also has its own oracle wallet, Alchemy Notify webhook, Inngest
-environment and Upstash store. Only `develop` holds staging's oracle key and runs
+environment and upload-limit counters, in one shared Upstash database. Only `develop` holds staging's oracle key and runs
 its ratings; previews share staging's contract and graph, and local development shares
 staging's graph but rates, pages included, on a contract on a local Anvil chain with its
 oracle key ([ADR 0019](docs/adr/0019-oracle-transactions-are-serialized.md),

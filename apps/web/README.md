@@ -345,7 +345,7 @@ unless `APP_ENV` is `local`:
 
 | Variable | Value |
 | --- | --- |
-| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis's REST address and token, for the limits: one database per environment, previews using staging's ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)). The token is secret |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis's REST address and token, for the limits: one database shared by every environment, each counter named after its `APP_ENV` (`verisci:staging:upload-url`), since Upstash's free plan allows one ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)). The token is secret |
 | `REOWN_PROJECT_ID` | The Reown project id for the wallet window, from one project shared by every environment, read on the server and handed to the page, so nothing is inlined at build time. Without it the pages say the wallet is not set up |
 | `LOCAL_CHAIN_RPC_URL`, `LOCAL_RATING_CONTRACT` | Optional, read only when `APP_ENV=local`: Anvil's URL and the RatingController deployed there. With both, the pages read and request ratings on that contract and the wallet window offers Anvil; without either, the paper and rating pages say ratings aren't set up, the papers list shows no Rate link, and the wallet window offers only Base Sepolia ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)) |
 
@@ -360,6 +360,29 @@ refuses to start without its oracle key, and on staging when the key is set
 not run during `next build`. On Vercel, a server starts on a request after the deploy is
 live, so a missing setting makes every route fail: set them in each Vercel environment
 before its first deploy, and allow each deployed domain in the Reown project.
+
+## Deploying
+
+Vercel builds the site from one project (`verisci`, Hobby): Root Directory `apps/web`, the
+Next.js preset, the install and build commands it detects (pnpm from `packageManager`, Node
+24.x from `engines`), and no `vercel.json`. Production tracks `main`; every other branch is a
+preview, and `develop`'s, at its stable branch URL, is staging.
+
+- **Deployment Protection** keeps previews private. Its Protection Bypass for Automation
+  secret goes into Inngest's Vercel integration, which also sets `INNGEST_EVENT_KEY` and
+  `INNGEST_SIGNING_KEY` and syncs the app on each deploy, and at the end of the staging
+  webhook's URL ([`packages/workflows`](../../packages/workflows/README.md#the-alchemy-notify-webhook)).
+- **Variables** (Settings → Environment Variables): `APP_ENV` (`production`, or `staging` for
+  Preview), `DKG_CONTEXT_GRAPH` and `DKG_TOKEN` take one value per environment;
+  `ORACLE_PRIVATE_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` and
+  `ALCHEMY_WEBHOOK_SIGNING_KEY` go on Production and on Preview limited to the branch
+  `develop`, so feature previews never rate or post; every other variable takes one value
+  for both. System Environment Variables stay exposed: Inngest reads `VERCEL_GIT_COMMIT_REF`,
+  and the notifications' links `VERCEL_BRANCH_URL` and `VERCEL_PROJECT_PRODUCTION_URL`.
+- **Inngest's `develop` branch environment** has auto-archive off
+  ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)).
+- A deployed server checks its settings when it starts (above), so each variable is set
+  before the environment's first deploy.
 
 ## Scripts
 

@@ -42,7 +42,7 @@ DKG daemon ◀──peer-to-peer──▶ other DKG nodes and the testnet relays
 
 | Traffic | Path |
 | --- | --- |
-| The app → the node | `https://verisci-dkg.duckdns.org`, through Caddy, with the environment's credential |
+| The app → the node | `https://verisci-dkg.duckdns.org`, through Caddy, with the environment's credential; the health check's `/api/status` with none |
 | The app → GROBID | `https://verisci-grobid.duckdns.org`, through Caddy, with the same credential |
 | The node → Base Sepolia (reads, transactions) | Through the RPC proxy only: `chain.rpcUrl` is `http://127.0.0.1:8545` and no backup RPC URL is set |
 | The node ↔ other DKG nodes | Directly, on its peer-to-peer port (sync, storage acknowledgements, relays) |
@@ -199,6 +199,11 @@ ssh -i ~/.ssh/id_ed25519_bz ubuntu@89.168.60.126
 Everything starts by itself when the server boots, the proxy before the daemon. A reboot
 (`sudo systemctl reboot`) takes about 25 seconds; the graphs are back at `finalized-chain`
 about a minute later.
+
+Every hour, staging's and production's health check reads `/api/status` and alerts the
+Telegram chat when the node does not answer within 10 s, or lists the environment's graph
+other than `accepted` from `finalized-chain`
+([ADR 0038](adr/0038-alerts-go-to-one-telegram-chat.md)).
 
 ## The server: Oracle Cloud
 

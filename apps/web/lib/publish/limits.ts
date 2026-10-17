@@ -1,6 +1,7 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { describeFailure, type LimitAnswer, type SubmitLimiter } from "@verisci/workflows";
+import type { WebEnv } from "../web-env.ts";
 
 /** How much one visitor may ask for, per rolling day (ADR 0035). */
 export const UPLOAD_LIMITS = {
@@ -93,8 +94,15 @@ export interface UpstashSettings {
   readonly token?: string;
 }
 
-/** The two limits, in Upstash when it is set, else in memory. */
-export function createLimits(upstash: UpstashSettings): { urls: Counter; submissions: Counter } {
+/**
+ * The two limits, in Upstash when it is set, else in memory. Every environment shares the one
+ * Upstash database, Upstash's free plan allowing one, so each counter's name carries `appEnv`
+ * (`verisci:staging:upload-url`): staging's hits never count against production's (ADR 0005).
+ */
+export function createLimits(
+  upstash: UpstashSettings,
+  appEnv: WebEnv["APP_ENV"],
+): { urls: Counter; submissions: Counter } {
   if (!upstash.url || !upstash.token) {
     return {
       urls: counter(memoryWindow(UPLOAD_LIMITS.urlsPerIpPerDay, DAY_MS)),
@@ -105,7 +113,9 @@ export function createLimits(upstash: UpstashSettings): { urls: Counter; submiss
   const window = (limit: number, prefix: string) =>
     new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(limit, "1 d"), prefix });
   return {
-    urls: counter(window(UPLOAD_LIMITS.urlsPerIpPerDay, "verisci:upload-url")),
-    submissions: counter(window(UPLOAD_LIMITS.submissionsPerAddressPerDay, "verisci:submission")),
+    urls: counter(window(UPLOAD_LIMITS.urlsPerIpPerDay, `verisci:${appEnv}:upload-url`)),
+    submissions: counter(
+      window(UPLOAD_LIMITS.submissionsPerAddressPerDay, `verisci:${appEnv}:submission`),
+    ),
   };
 }

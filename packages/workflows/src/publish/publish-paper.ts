@@ -8,7 +8,7 @@ import {
 } from "@verisci/core";
 import type { DkgClient, DkgFailure } from "@verisci/dkg";
 import { type Inngest, NonRetriableError } from "inngest";
-import { publishedText } from "../alerts/messages.ts";
+import { publishedNotice } from "../alerts/messages.ts";
 import type { Notify } from "../alerts/notify.ts";
 import type { FieldCheckResult } from "./field-check.ts";
 import type { SubmissionRefusal, VerifiedSubmission, VerifyResult } from "./verify-submission.ts";
@@ -202,8 +202,8 @@ export async function runPublish(
     const result = await publishOnce(context);
     if (result.kind === "done") {
       if (result.outcome.state === "minted" && news.minting) {
-        const text = publishedText({ cid: submission.cid, title: news.title }, deps.siteUrl);
-        await step.run("notify", () => deps.notify({ level: "activity", text }));
+        const notice = publishedNotice({ cid: submission.cid, title: news.title }, deps.siteUrl);
+        await step.run("notify", () => deps.notify(notice));
       }
       return result.outcome;
     }

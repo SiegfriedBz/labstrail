@@ -10,6 +10,8 @@ const ETH = 10n ** 18n;
 const ORACLE = "0x70997970c51812dc3a010c7d01b50e0d17dc79c8";
 const PUBLISHER = "0xd701ed157232ad5e14bc4134a8d10d64d86f13b3";
 const CONTRACT = "0xa5be5ee8e4b6825c4425cc208f0df09fb8147a90";
+const NODE = "https://verisci-dkg.duckdns.org";
+const GRAPH = "0xD701ed157232ad5E14BC4134a8D10D64D86f13B3/verisci-staging";
 const id = (n: number) => `0x${n.toString(16).padStart(64, "0")}` as Hex;
 
 function deps(
@@ -27,6 +29,12 @@ function deps(
     oracle: ORACLE,
     publishers: [PUBLISHER],
     contracts: [CONTRACT],
+    node: NODE,
+    graph: GRAPH,
+    readNodeStatus: async () => ({
+      ok: true,
+      graph: { authorityState: "accepted", policySource: "finalized-chain" },
+    }),
     readEth: async (address) => eth[address],
     readTrac: async (address) => trac[address],
     readPendingCount: async () => ({ ok: true, count: pending.length }),
@@ -73,11 +81,11 @@ async function check(io: HealthDeps, nowMs = NOW) {
 }
 
 describe("runHealthCheck", () => {
-  it("reads the balances, then each contract in a step of its own, and sends nothing when all is well", async () => {
+  it("reads the node, the balances, then each contract in a step of its own, and sends nothing when all is well", async () => {
     const { problems, log, alert } = await check(deps({ pending: [[id(1), HOUR]] }));
 
     expect(problems).toEqual([]);
-    expect(log).toEqual(["check-balances", `check-pending-${CONTRACT}`]);
+    expect(log).toEqual(["check-node", "check-balances", `check-pending-${CONTRACT}`]);
     expect(alert).not.toHaveBeenCalled();
   });
 
@@ -199,7 +207,12 @@ describe("runHealthCheck", () => {
 
     const { log } = await check(counted);
 
-    expect(log).toEqual(["check-balances", `check-pending-${CONTRACT}`, `check-pending-${other}`]);
+    expect(log).toEqual([
+      "check-node",
+      "check-balances",
+      `check-pending-${CONTRACT}`,
+      `check-pending-${other}`,
+    ]);
     expect(most).toBe(1);
   });
 
@@ -210,9 +223,63 @@ describe("runHealthCheck", () => {
       deps({ eth: { [ORACLE]: low }, pending: [[id(1), 7 * HOUR]] }),
     );
 
-    expect(log).toEqual(["check-balances", `check-pending-${CONTRACT}`, "alert"]);
+    expect(log).toEqual(["check-node", "check-balances", `check-pending-${CONTRACT}`, "alert"]);
     expect(alert).toHaveBeenCalledExactlyOnceWith(
       `oracle ${ORACLE} holds 0.004999999999999999 ETH, under 0.005\n1 rating requests pending over 6 h; the oldest, ${id(1)} on ${CONTRACT}, for 7 h`,
+    );
+  });
+});
+
+describe("runHealthCheck: the DKG node", () => {
+  it.each<[string, Awaited<ReturnType<HealthDeps["readNodeStatus"]>>, string]>([
+    ["does not answer", { ok: false, reason: "unreachable" }, "unreachable"],
+    ["answers with an error", { ok: false, reason: "unexpected", status: 502 }, "unexpected (502)"],
+    [
+      "refuses the status read",
+      { ok: false, reason: "unauthorized", status: 401 },
+      "unauthorized (401)",
+    ],
+  ])("alerts when the node %s", async (_, status, reason) => {
+    const { problems } = await check(deps({}, { readNodeStatus: async () => status }));
+
+    expect(problems).toEqual([`DKG node ${NODE}: status check failed, ${reason}`]);
+  });
+
+  it.each([
+    ["accepted", "chain-pending"],
+    ["authority-resolution-failed", "finalized-chain"],
+  ])("alerts when the environment's graph is %s from %s", async (authorityState, policySource) => {
+    const { problems } = await check(
+      deps(
+        {},
+        { readNodeStatus: async () => ({ ok: true, graph: { authorityState, policySource } }) },
+      ),
+    );
+
+    expect(problems).toEqual([`DKG node: ${GRAPH} is ${authorityState}/${policySource}`]);
+  });
+
+  it("alerts when the node does not list the environment's graph", async () => {
+    const { problems } = await check(
+      deps({}, { readNodeStatus: async () => ({ ok: true, graph: undefined }) }),
+    );
+
+    expect(problems).toEqual([`DKG node: ${GRAPH} is not listed`]);
+  });
+
+  it("lists the node's problem first, in the one alert", async () => {
+    const low = HEALTH_SETTINGS.minEthWei - 1n;
+
+    const { alert } = await check(
+      deps(
+        { eth: { [ORACLE]: low } },
+        { readNodeStatus: async () => ({ ok: false, reason: "unreachable" }) },
+      ),
+    );
+
+    expect(alert).toHaveBeenCalledExactlyOnceWith(
+      `DKG node ${NODE}: status check failed, unreachable
+oracle ${ORACLE} holds 0.004999999999999999 ETH, under 0.005`,
     );
   });
 });

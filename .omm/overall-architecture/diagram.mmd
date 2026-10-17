@@ -6,11 +6,11 @@ graph LR
     web-app -->|"CIDs, UALs, typed data to sign"| core["Core\npackages/core/"]
     web-app -->|"ABI and deployed addresses, for requests and the footer"| contracts["Contracts\npackages/contracts/"]
     workflows -->|"pure rules: prompts, scores, triples, names"| core
-    workflows -->|"read, store, mint, query assets"| dkg-client["DKG Client\npackages/dkg/"]
+    workflows -->|"read, store, mint, query assets, node status"| dkg-client["DKG Client\npackages/dkg/"]
     workflows -->|"ABI, addresses and reads, for the oracle and the pages"| contracts
     workflows -->|"sends events, runs steps"| inngest
     workflows -->|"PDFs to GROBID, with the environment's credential"| node-server["Node Server\ninfra/node-server/"]
-    dkg-client -->|"HTTPS with the environment's credential"| node-server
+    dkg-client -->|"HTTPS, the environment's credential, status open"| node-server
     node-server -->|"forwards with the admin token"| dkg-node["DKG Node\nnode server"]
     dkg-node -->|"Base JSON-RPC, within a budget"| rpc-proxy["RPC Proxy\ninfra/rpc-proxy/"]
     rpc-proxy -->|"forwards calls"| base-sepolia

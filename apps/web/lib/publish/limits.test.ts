@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { counter, createLimits, memoryWindow, type RateWindow, UPLOAD_LIMITS } from "./limits.ts";
 
 const DAY_MS = 86_400_000;
@@ -74,7 +74,7 @@ describe("counter", () => {
 
 describe("createLimits", () => {
   it("counts in memory without Upstash: 10 upload URLs and 5 submissions a day", async () => {
-    const { urls, submissions } = createLimits({});
+    const { urls, submissions } = createLimits({}, "local");
 
     for (let i = 0; i < UPLOAD_LIMITS.urlsPerIpPerDay; i++)
       expect(await urls.take("ip")).toBe("allowed");
@@ -85,8 +85,42 @@ describe("createLimits", () => {
   });
 
   it("builds Upstash limiters when Upstash is set, without calling it", () => {
-    const limits = createLimits({ url: "https://example.upstash.io", token: "secret" });
+    const limits = createLimits({ url: "https://example.upstash.io", token: "secret" }, "staging");
 
     expect(Object.keys(limits)).toEqual(["urls", "submissions"]);
+  });
+
+  describe("one Upstash database shared by the environments", () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    /** The keys of every command the limits send to Upstash while `use` runs. */
+    async function keysSent(
+      appEnv: "staging" | "production",
+      use: (limits: ReturnType<typeof createLimits>) => Promise<unknown>,
+    ) {
+      const bodies: string[] = [];
+      vi.stubGlobal("fetch", async (_input: unknown, init?: RequestInit) => {
+        bodies.push(String(init?.body ?? ""));
+        return new Response(JSON.stringify({ result: [1, 1] }), { status: 200 });
+      });
+      await use(createLimits({ url: "https://example.upstash.io", token: "secret" }, appEnv));
+      return bodies.join("\n");
+    }
+
+    it.each(["staging", "production"] as const)("names %s's counters after it", async (appEnv) => {
+      const sent = await keysSent(appEnv, async ({ urls, submissions }) => {
+        await urls.take("203.0.113.7");
+        await submissions.count("0xa");
+      });
+
+      expect(sent).toContain(`verisci:${appEnv}:upload-url`);
+      expect(sent).toContain(`verisci:${appEnv}:submission`);
+    });
+
+    it("leaves production's counters alone when staging counts a hit", async () => {
+      const sent = await keysSent("staging", async ({ urls }) => urls.take("203.0.113.7"));
+
+      expect(sent).not.toContain("verisci:production:");
+    });
   });
 });

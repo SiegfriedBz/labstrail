@@ -19,7 +19,7 @@ import type { DkgClient, DkgFailure } from "@verisci/dkg";
 import { type Inngest, type InngestFunction, NonRetriableError } from "inngest";
 import type { Hex } from "viem";
 import { z } from "zod";
-import { ratedText } from "../alerts/messages.ts";
+import { ratedNotice } from "../alerts/messages.ts";
 import type { Notify } from "../alerts/notify.ts";
 import type { GeminiFailureResult } from "../gemini/gemini.ts";
 import type { ReadPaperTextResult } from "../pdf/paper-text.ts";
@@ -295,8 +295,8 @@ export async function runRating(
       cid: run?.cid ?? found?.cid,
       title: run?.head?.title ?? found?.title,
     };
-    const text = ratedText(outcome, paper, deps.siteUrl);
-    await step.run("notify", () => deps.notify({ level: "activity", text }).then(() => null));
+    const notice = ratedNotice(outcome, paper, deps.siteUrl);
+    await step.run("notify", () => deps.notify(notice).then(() => null));
     return outcome;
   };
   const ours = classifyTarget(request.targetUal, deps.contextGraph) === "ours";

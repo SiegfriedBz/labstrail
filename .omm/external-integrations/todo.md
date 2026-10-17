@@ -1,2 +1,1 @@
 - A second pin of each PDF.
-- Register the Alchemy Notify webhooks and set the Telegram bot in each deployment (first deploy).

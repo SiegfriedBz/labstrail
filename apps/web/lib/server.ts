@@ -7,6 +7,9 @@ let limits: ReturnType<typeof createLimits> | undefined;
 export function getLimits(): ReturnType<typeof createLimits> {
   if (limits) return limits;
   const env = createWebEnv();
-  limits = createLimits({ url: env.UPSTASH_REDIS_REST_URL, token: env.UPSTASH_REDIS_REST_TOKEN });
+  limits = createLimits(
+    { url: env.UPSTASH_REDIS_REST_URL, token: env.UPSTASH_REDIS_REST_TOKEN },
+    env.APP_ENV,
+  );
   return limits;
 }
