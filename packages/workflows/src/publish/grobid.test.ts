@@ -13,8 +13,13 @@ function fakeFetch(response: () => Response | Promise<Response>) {
   return { fetch: fetch as typeof globalThis.fetch, requests };
 }
 
-function parse(fetch: typeof globalThis.fetch, timeoutMs = 1000) {
-  return parseHeader(PDF, { grobidUrl: "http://127.0.0.1:8070/", fetch, timeoutMs });
+function parse(fetch: typeof globalThis.fetch, timeoutMs = 1000, token?: string) {
+  return parseHeader(PDF, { grobidUrl: "http://127.0.0.1:8070/", fetch, timeoutMs, token });
+}
+
+/** The headers `fetch` was called with, as a `Headers` object. */
+function headersOf(init: RequestInit | undefined) {
+  return new Headers(init?.headers);
 }
 
 describe("parseHeader", () => {
@@ -30,6 +35,21 @@ describe("parseHeader", () => {
     const input = (body as FormData).get("input");
     expect(input).toBeInstanceOf(Blob);
     expect(new Uint8Array(await (input as Blob).arrayBuffer())).toEqual(PDF);
+  });
+
+  it("sends the environment's credential as a bearer token (ADR 0039)", async () => {
+    const { fetch, requests } = fakeFetch(() => new Response(TEI));
+
+    expect(await parse(fetch, 1000, "staging-credential")).toEqual({ ok: true, tei: TEI });
+    expect(headersOf(requests[0]?.init).get("authorization")).toBe("Bearer staging-credential");
+  });
+
+  it("sends no authorization header without a token, as to a local GROBID", async () => {
+    const { fetch, requests } = fakeFetch(() => new Response(TEI));
+
+    await parse(fetch);
+
+    expect(headersOf(requests[0]?.init).has("authorization")).toBe(false);
   });
 
   it.each([204, 400, 406, 415])("reports unparseable on %i", async (status) => {

@@ -1,0 +1,1 @@
+DuckDNS gives the node server its two free names, verisci-dkg.duckdns.org (the DKG daemon's API, DKG_URL) and verisci-grobid.duckdns.org (GROBID, GROBID_URL); a cron job on the server tells DuckDNS its address every 5 minutes, with the account's token kept in that job's script (docs/node-host.md → The two names).

@@ -32,7 +32,7 @@ server (`APP_ENV` other than `local`) checks them when it starts, through
 
 | Variable | Value |
 | --- | --- |
-| `GROBID_URL` | GROBID's base URL: `http://127.0.0.1:8070` locally ([`docs/node-host.md`](../../docs/node-host.md) → GROBID) |
+| `GROBID_URL` | GROBID's base URL: `https://verisci-grobid.duckdns.org`, on the node server, which takes the environment's `DKG_TOKEN` as its credential ([ADR 0039](../../docs/adr/0039-one-credential-per-environment.md)); or `http://127.0.0.1:8070` for a GROBID run locally in Docker ([`docs/node-host.md`](../../docs/node-host.md) → The developer's computer) |
 | `PINATA_GATEWAY_URL` | The Pinata account's dedicated gateway, `https://<name>.mypinata.cloud`, through which the publish and rating runs read PDFs; one account serves every environment ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)) |
 | `CHAIN_RPC_URL` | A Base Sepolia RPC URL, to check smart-contract wallets' signatures and, on staging and production, for the rating functions to read and write the rating contracts and the pages to read their ratings |
 | `PINATA_JWT` | A Pinata API key (JWT) allowed to upload, list and delete files; the `publish-pdf` dev script reads it too. Secret |
@@ -288,8 +288,9 @@ after each paper. It never publishes, stores or rates anything.
 
 `score-papers --field [id…]` runs only the publish run's field check instead: it reads each
 cached PDF as the publish run does (GROBID's header and the start of the text, so it also
-needs `GROBID_URL`), asks `checkField`, and prints the expected and the found field with
-Gemini's reason. Each paper costs one Flash-Lite request, which has its own daily limit.
+needs `GROBID_URL`, and `DKG_TOKEN` for the node server's GROBID), asks `checkField`, and
+prints the expected and the found field with Gemini's reason. Each paper costs one
+Flash-Lite request, which has its own daily limit.
 
 A scoring run costs one `gemini-3.8-flash` request per paper, and the free tier allows 20 of
 those a day per Google project (`docs/domain.md` → Gemini): a full run uses 14 of them. To try a change within a day, run
@@ -526,8 +527,10 @@ not answer costs a page about 5 s ([ADR 0021](../../docs/adr/0021-server-reads-r
 
 ## Running a publish locally
 
-1. Start the RPC proxy, the DKG node and GROBID ([`docs/node-host.md`](../../docs/node-host.md)).
-2. Fill the DKG and publish sections of the root `.env.local` ([`.env.example`](../../.env.example)).
+1. Fill the DKG and publish sections of the root `.env.local` ([`.env.example`](../../.env.example)):
+   the node server's URLs and the `local` credential
+   ([`docs/node-host.md`](../../docs/node-host.md) → The developer's computer).
+2. Nothing to start for the node or GROBID: both run on the node server.
 3. `pnpm dev`, then, in another terminal, `pnpm --filter @verisci/web inngest` (the
    Inngest dev server, at http://localhost:8288).
 4. `pnpm --filter @verisci/workflows publish-pdf <file.pdf>` pins the PDF on Pinata's public
@@ -547,8 +550,9 @@ The rating functions run only against a contract whose oracle key you hold: loca
 RatingController on Anvil ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)).
 R-KAs still go to the staging graph.
 
-1. Start the RPC proxy and the DKG node ([`docs/node-host.md`](../../docs/node-host.md)), and
-   `anvil --port 8546` in a terminal of its own: the proxy holds 8545, Anvil's default.
+1. Start `anvil --port 8546` in a terminal of its own (the port `.env.example` names, clear
+   of the RPC proxy's 8545 on a computer that runs a node). The DKG node is the node
+   server's ([`docs/node-host.md`](../../docs/node-host.md) → The developer's computer).
 2. Deploy the contract on Anvil
    ([`packages/contracts` → Deploying on Anvil](../contracts/README.md#deploying-on-anvil)).
 3. In the root `.env.local`, set `ORACLE_PRIVATE_KEY` to the key of Anvil's second account,

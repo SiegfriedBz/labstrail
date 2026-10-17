@@ -1,9 +1,9 @@
 created: 2026-10-12T05:41:14.825Z
-updated: 2026-10-16T08:48:55.687Z
-update_count: 13
-last_field: todo
-git_commit: 4fc8ae9
-git_branch: feat/031-intake-recovery
+updated: 2026-10-17T09:39:59.366Z
+update_count: 18
+last_field: diagram
+git_commit: f0c18a4
+git_branch: feat/032-node-server
 children:
   - base-sepolia
   - browser
@@ -13,23 +13,26 @@ children:
   - dkg-node
   - env
   - inngest
+  - node-server
   - rpc-proxy
   - web-app
   - workflows
 prev_diagram: >
   graph LR
       browser["Browser\nresearcher's wallet"] -->|"pages, server actions"| web-app["Web App\napps/web/"]
+      browser -->|"requestPhase1 from the wallet"| base-sepolia["Base Sepolia\nchain"]
       inngest["Inngest\nevent and step engine"] -->|"invokes functions at /api/inngest"| web-app
-      web-app -->|"serves its functions, calls its site service"| workflows["Workflows\npackages/workflows/"]
+      web-app -->|"serves its functions, calls its site services"| workflows["Workflows\npackages/workflows/"]
       web-app -->|"CIDs, UALs, typed data to sign"| core["Core\npackages/core/"]
-      web-app -->|"deployed addresses for the footer"| contracts["Contracts\npackages/contracts/"]
+      web-app -->|"ABI and deployed addresses, for requests and the footer"| contracts["Contracts\npackages/contracts/"]
       workflows -->|"pure rules: prompts, scores, triples, names"| core
       workflows -->|"read, store, mint, query assets"| dkg-client["DKG Client\npackages/dkg/"]
-      workflows -->|"ABI and addresses for oracle transactions"| contracts
+      workflows -->|"ABI, addresses and reads, for the oracle and the pages"| contracts
       workflows -->|"sends events, runs steps"| inngest
-      dkg-client -->|"authenticated HTTP API"| dkg-node["DKG Node\nnode host"]
+      dkg-client -->|"HTTPS with the environment's credential"| node-server["Node Server\ninfra/node-server/"]
+      node-server -->|"forwards with the admin token"| dkg-node["DKG Node\nnode server"]
       dkg-node -->|"Base JSON-RPC, within a budget"| rpc-proxy["RPC Proxy\ninfra/rpc-proxy/"]
-      rpc-proxy -->|"forwards calls"| base-sepolia["Base Sepolia\nchain"]
+      rpc-proxy -->|"forwards calls"| base-sepolia
       contracts -->|"RatingController deployed on"| base-sepolia
       web-app -->|"validated settings"| env["Env\npackages/env/"]
       workflows -->|"validated settings"| env

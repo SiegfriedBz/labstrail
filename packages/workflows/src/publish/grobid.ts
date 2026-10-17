@@ -11,10 +11,16 @@ export interface GrobidOptions {
   readonly grobidUrl: string;
   readonly fetch: typeof fetch;
   readonly timeoutMs: number;
+  /**
+   * The environment's credential for the node server, sent as a bearer token: the server's
+   * GROBID sits behind it (ADR 0039). Absent for a GROBID on the developer's computer.
+   */
+  readonly token?: string;
 }
 
 /**
- * Sends a PDF to GROBID's `processHeaderDocument` and returns the TEI of its header.
+ * Sends a PDF to GROBID's `processHeaderDocument` and returns the TEI of its header, with
+ * the credential when one is set.
  * GROBID answers 204 when it finds nothing and 503 when it is busy (`docs/domain.md`), so
  * 204 and other 4xx are `unparseable`; 401 and 403 are `unauthorized`; 408, 429, 5xx, a
  * network error or a timeout are `unreachable`.
@@ -35,7 +41,10 @@ export async function parseHeader(
       `${options.grobidUrl.replace(/\/+$/, "")}/api/processHeaderDocument`,
       {
         method: "POST",
-        headers: { accept: "application/xml" },
+        headers: {
+          accept: "application/xml",
+          ...(options.token ? { authorization: `Bearer ${options.token}` } : {}),
+        },
         body: form,
         signal: AbortSignal.timeout(options.timeoutMs),
       },

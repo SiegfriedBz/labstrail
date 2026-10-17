@@ -1,2 +1,2 @@
-- A second pin of each PDF; the DKG node, GROBID and the RPC proxy on a server.
+- A second pin of each PDF.
 - Register the Alchemy Notify webhooks and set the Telegram bot in each deployment (first deploy).

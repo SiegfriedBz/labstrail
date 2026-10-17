@@ -13,7 +13,7 @@ import { inngest } from "./inngest.ts";
 import { readPaperText } from "./pdf/paper-text.ts";
 import { checkField } from "./publish/field-check.ts";
 import { createPublishPaper, PUBLISH_SETTINGS, type PublishDeps } from "./publish/publish-paper.ts";
-import { readPaper } from "./publish/read-paper.ts";
+import { type ReadPaperOptions, readPaper } from "./publish/read-paper.ts";
 import { verifySubmission } from "./publish/verify-submission.ts";
 import { environmentContracts } from "./rating/contracts.ts";
 import { createOracleTransaction, ORACLE_SETTINGS, type OracleChain } from "./rating/oracle.ts";
@@ -22,7 +22,7 @@ import { createRatePaper, RATING_SETTINGS, type RatingDeps } from "./rating/rate
 import { createReconciler, type ReconcilerDeps } from "./rating/reconciler.ts";
 import { scorePaper } from "./rating/scorer.ts";
 import { createRatingEnv, type RatingEnv, servesRating } from "./rating-env.ts";
-import { createWorkflowsEnv, telegramSchema } from "./workflows-env.ts";
+import { createWorkflowsEnv, telegramSchema, type WorkflowsEnv } from "./workflows-env.ts";
 
 /** How long the gateway and GROBID each get, inside the 300 s a step may take on Vercel. */
 const IO_TIMEOUT_MS = 60_000;
@@ -50,6 +50,24 @@ function getNotify(): Notify {
   return notify;
 }
 
+/**
+ * How the publish run reads a paper: the PDF through the gateway, its header through GROBID
+ * with the environment's credential for the node server (ADR 0039).
+ */
+export function paperReaderOptions(
+  env: Pick<WorkflowsEnv, "PINATA_GATEWAY_URL" | "GROBID_URL" | "DKG_TOKEN">,
+): ReadPaperOptions {
+  return {
+    gatewayUrl: env.PINATA_GATEWAY_URL,
+    grobidUrl: env.GROBID_URL,
+    token: env.DKG_TOKEN,
+    fetch: (input: string | URL | Request, init?: RequestInit) => fetch(input, init),
+    maxBytes: PUBLISH_SETTINGS.maxPdfBytes,
+    timeoutMs: IO_TIMEOUT_MS,
+    openingChars: PUBLISH_SETTINGS.openingChars,
+  };
+}
+
 let publishDeps: PublishDeps | undefined;
 
 /** The publish run's adapters, built from the validated settings on the first run. */
@@ -57,14 +75,7 @@ function getPublishDeps(): PublishDeps {
   if (publishDeps) return publishDeps;
   const env = createWorkflowsEnv();
   const client = createPublicClient({ chain: baseSepolia, transport: http(env.CHAIN_RPC_URL) });
-  const paperOptions = {
-    gatewayUrl: env.PINATA_GATEWAY_URL,
-    grobidUrl: env.GROBID_URL,
-    fetch: (input: string | URL | Request, init?: RequestInit) => fetch(input, init),
-    maxBytes: PUBLISH_SETTINGS.maxPdfBytes,
-    timeoutMs: IO_TIMEOUT_MS,
-    openingChars: PUBLISH_SETTINGS.openingChars,
-  };
+  const paperOptions = paperReaderOptions(env);
   publishDeps = {
     verifySubmission: (data, receivedAt) =>
       verifySubmission(data, {

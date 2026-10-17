@@ -1,2 +1,2 @@
-- Move the DKG node to a server and deploy the rating functions (node server plan, deployment setup).
+- Deploy the site and the rating functions on Vercel (deployment setup).
 - Phases 2 (human review) and 3 (wet-lab replication) of a rating (ADR 0012).

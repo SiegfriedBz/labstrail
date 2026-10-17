@@ -157,12 +157,29 @@ edge`, testnet), Base Sepolia.
   with the agent key), valid for every graph on the node; there are no tokens scoped per
   graph, so whoever holds it can write every environment's graph ([ADR 0005](adr/0005-staging-and-production-are-isolated.md)).
   On 10.0.22 the file starts with a comment line; the token is its second line.
+- **`/api/status` answers without the admin token** (10.0.22, 2026-10-17); every other route
+  needs it. Its answer is the same with or without the token (same fields, same size). The
+  node server's Caddy leaves it open as the health check and forwards it with no token
+  ([ADR 0039](adr/0039-one-credential-per-environment.md)).
 - **Every context graph must be listed** under `contextGraphs` in the node's
   `~/.dkg/config.json`, or the node stops serving it after a restart.
+- **A node's folder moves between machines and architectures** (10.0.22, 2026-10-17): the
+  whole `~/.dkg`, copied from an x86_64 computer to an ARM (`aarch64`) server, started with
+  the same agent address, peers and graphs, and its Oxigraph store listed the same papers,
+  ratings and other assets. Left out of the copy: `oxigraph/`, the Oxigraph program built for
+  the old machine, which the daemon downloads again for the new one (`oxigraph-v0.5.8`, an
+  arm64 build), and the runtime files (`oxigraph-data/LOCK`,
+  `oxigraph-data/dkg-oxigraph-owner.json` with the old PIDs and program path, `daemon.pid`,
+  `api.port`, `daemon.log`). Two daemons with the same keys would share one peer identity and
+  the publisher wallets' nonces, so the old one stays stopped (`docs/node-host.md`).
+- **DKG 10.0.22 runs on ARM** (Ubuntu 24.04 `aarch64`, Node 24.21.0, 2026-10-17):
+  `better-sqlite3` builds from source during the global npm install, which needs
+  `build-essential`.
 - **A new graph reports `authority-resolution-failed` for up to about 20 minutes** (10.0.16).
   That is a slow chain read, not a bad registration: wait before re-registering. On
   10.0.22 (2026-10-09), `verisci-staging` reached `finalized-chain` right after
-  registering, and about a minute after a restart.
+  registering, and about a minute after a restart; on 2026-10-17, `verisci-prod` 10 s after
+  registering.
 - **Registering a context graph takes a 100 TRAC deposit** from the agent's wallet, plus
   gas (10.0.22, 2026-10-09). The CLI approves the deposit after decoding the contract's
   revert data, so an RPC path that drops a JSON-RPC error's `data` breaks registering.
@@ -206,13 +223,45 @@ edge`, testnet), Base Sepolia.
 - **Public Base Sepolia endpoints' log limits** (2026-10-09): `sepolia.base.org` answers
   `eth_getLogs` over at most 200 blocks; `base-sepolia-rpc.publicnode.com` over 2,000, but
   keeps history from block 46,500,000 only ("pruned history unavailable").
-- **The daemon reads the chain constantly** (previous host, DKG 10.0.16, two graphs,
-  2026-09 to 2026-10): it re-resolves each graph's authority from chain history again and
-  again. With every call except log reads sent to Alchemy RPC first and no limit, Alchemy RPC's
-  free tier was used up after a few weeks; from about 2026-10-05 the chain head froze and every
-  write failed, while `/api/status` still answered. The proxy now keeps Alchemy RPC last,
-  within a daily budget (`infra/rpc-proxy`). Unverified: whether a later release reads
-  less.
+- **The daemon reads the chain constantly** (the prototype's node, on the node server, DKG
+  10.0.16, two graphs, 2026-09 to 2026-10): it re-resolves each graph's authority from chain
+  history again and again. With every call except log reads sent to Alchemy RPC first and no
+  limit, Alchemy RPC's free tier was used up after a few weeks; from about 2026-10-05 the
+  chain head froze and every write failed, while `/api/status` still answered. The proxy now
+  keeps Alchemy RPC last, within a daily budget (`infra/rpc-proxy`). Unverified: whether a
+  later release reads less.
+
+## The node server
+
+Observed on the Oracle Cloud VM that runs the node (`docs/node-host.md`), 2026-10-17.
+
+- **The stack fits the Always Free ARM shape** (`VM.Standard.A1.Flex`, 2 OCPUs, 12 GB): with
+  the daemon, its RPC proxy, GROBID and Caddy running, 4.8 GB of the 11 GB the system sees
+  were in use (GROBID 3.5 GB, the daemon about 0.7 GB).
+- **A VM keeps running while its Oracle account is locked,** and is reachable over SSH, but
+  nothing about it can be changed from Oracle's side: firewall rules, its public address, a
+  stop or a start. A reboot from inside the VM works: on 2026-10-17 it came back in 24 s, on
+  the kernel unattended upgrades had installed (6.17 → 7.0).
+- **Oracle's Ubuntu image filters inbound traffic in `iptables`** besides Oracle's own rules;
+  the VM accepts 22, 80 and 443, and the DKG daemon's peer-to-peer port is closed from
+  outside. An `edge` node works behind it through the testnet relay.
+- **Caddy 2.6.2 reads `{$NAME}` placeholders from its environment when it loads the
+  Caddyfile,** so systemd's `EnvironmentFile` is read again on each `systemctl reload caddy`. A
+  variable missing from the environment becomes an empty string: the credential check guards
+  against it (`"{$NAME}" != ""`), so an empty credential opens nothing. `header_up
+  -Authorization` drops the header before GROBID.
+- **Ubuntu's `caddy.service` starts Caddy with `--environ`** (2.6.2), which writes every
+  environment variable, the `EnvironmentFile`'s secrets included, to the journal at each start.
+  The node server's drop-in starts it with its config alone; the credentials logged until then
+  were replaced on 2026-10-17.
+- **Caddy's `path` matcher compares a cleaned-up path** (lower-cased, `..` resolved, escapes
+  decoded), while `reverse_proxy` forwards the path as the client sent it: a route opened by a
+  path matcher can receive other raw paths.
+- **Caddy keeps its loaded config, `{$NAME}` values filled in,** behind its admin endpoint
+  (`localhost:2019`, open to any process on the server) and in `autosave.json`
+  (`/var/lib/caddy/.config/caddy/`, the `caddy` user's, mode 600).
+- **The DuckDNS update sets a name to the caller's address** when `ip=` is empty: the cron job
+  on the server keeps both names on the server's address.
 
 ## IPFS
 
@@ -263,6 +312,10 @@ docs, current at 2026-10-07; Pinata's from its v3 API docs, current at 2026-10-0
 ## GROBID
 
 Observed on `lfoppiano/grobid:0.9.1-crf`, 2026-10-09, except where a fact cites its docs.
+
+- **The CRF image runs on ARM** (`arm64`, the node server, 2026-10-17): ready about 25 s
+  after `docker run`, using about 3.5 GB of memory; it parsed arXiv 1706.03762's header like
+  the x86 build.
 
 - **`POST /api/processHeaderDocument`** takes the PDF as the multipart field `input` and,
   with `Accept: application/xml`, returns the header as TEI: the title under
@@ -390,9 +443,9 @@ Observed on Base Sepolia (chain id 84532) with Alchemy RPC and the Alchemy Notif
   whether Alchemy RPC's pending nonce (`eth_getTransactionCount(…, "pending")`) shows a
   transaction not yet included is to verify ([ADR 0019](adr/0019-oracle-transactions-are-serialized.md)).
 - **Anvil, for local rating runs** (Foundry 1.8.4, 2026-10-11,
-  [ADR 0036](adr/0036-local-rating-runs-use-anvil.md)): its default port 8545 is the one the
-  DKG node's RPC proxy holds, and a call to `127.0.0.1:8545` then answers as Base Sepolia
-  (chain id 84532), so Anvil runs on 8546. `forge script … --broadcast --unlocked --sender
+  [ADR 0036](adr/0036-local-rating-runs-use-anvil.md)): its default port 8545 is the DKG node's
+  RPC proxy's, and on a computer running the proxy a call to `127.0.0.1:8545` answers as Base
+  Sepolia (chain id 84532), so Anvil runs on 8546. `forge script … --broadcast --unlocked --sender
   <Anvil's first account>` deploys with no key passed, since Anvil signs for its built-in
   accounts; the first deploy on a fresh chain lands at
   `0x5FbDB2315678afecb367f032d93F642f64180aa3`. The base fee starts at 1 gwei; viem's

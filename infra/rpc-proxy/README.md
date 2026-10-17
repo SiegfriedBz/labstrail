@@ -5,8 +5,8 @@ daemon takes a single `chain.rpcUrl`; this proxy is that URL. It spreads the dae
 Sepolia reads over free public endpoints and keeps Alchemy RPC, the fallback, within
 a daily budget.
 
-Status: in use beside the DKG node on a developer's computer, started by hand; its server
-setup waits for the node server plan.
+Status: in use on the DKG node server since 2026-10-17, as `rpc-proxy.service`
+([`docs/node-host.md`](../../docs/node-host.md) → The RPC proxy).
 
 Architecture views: [`.omm/overall-architecture/rpc-proxy/`](../../.omm/overall-architecture/rpc-proxy/) (`pnpm exec omm view --port 4000` shows them; root README → Architecture).
 
@@ -26,8 +26,8 @@ connect).
 
 Before it accepts a write, the daemon resolves each context graph's policy from chain
 history: long `eth_getLogs` ranges plus many `eth_call`s, again and again. Alchemy RPC's free
-tier caps `eth_getLogs` at 10 blocks, and public endpoints throttle bursts. On the previous
-host, the earlier proxy sent every call except log reads to Alchemy RPC first, with no limit,
+tier caps `eth_getLogs` at 10 blocks, and public endpoints throttle bursts. On this same
+server, the prototype's proxy sent every call except log reads to Alchemy RPC first, with no limit,
 and used up the free tier after a few weeks (`docs/domain.md` → DKG).
 
 ## What it does
@@ -87,28 +87,25 @@ A bad setting stops the proxy at start-up with a message naming it, never its va
 ## Running it
 
 Node 22.18 or later runs the TypeScript source directly (type stripping): the server needs
-only this folder's `src/`. By hand, from the repo root, with the settings in a file
-([`docs/node-host.md`](../../docs/node-host.md) → The RPC proxy):
-
-```bash
-node --env-file="$HOME/.config/verisci/rpc-proxy.env" infra/rpc-proxy/src/main.ts
-```
-
-On a server, [`rpc-proxy.service`](rpc-proxy.service) is a starting systemd unit: it still
-carries the previous host's user and paths (`ubuntu`, `/home/ubuntu/rpc-proxy`), to adapt
-when the node server plan sets the node up there. That plan also gives the daemon its own
-unit (`dkg.service` below; `docs/node-host.md` starts it by hand for now), which must start
-after the proxy, or a reboot leaves the daemon without a chain:
-
-```ini
-# /etc/systemd/system/dkg.service.d/10-after-rpc-proxy.conf
-[Unit]
-After=rpc-proxy.service
-Wants=rpc-proxy.service
-```
+only this folder's `src/`, copied to `/home/ubuntu/rpc-proxy/src`, and its settings in
+`/home/ubuntu/rpc-proxy/env`. [`rpc-proxy.service`](rpc-proxy.service) runs it there with
+the server's Node 24.21.0, and the daemon's unit
+([`infra/node-server/dkg.service`](../node-server/dkg.service)) starts after it, so a reboot
+never leaves the daemon without a chain
+([`docs/node-host.md`](../../docs/node-host.md) → Setting up the server):
 
 ```bash
 journalctl -u rpc-proxy -f | grep stat    # the status line, every 30 s
+```
+
+After a change here is merged, copy `src/` to the server again and restart the unit
+([`docs/node-host.md`](../../docs/node-host.md) → Updating a program on the server).
+
+By hand, for a node started on a developer's computer, from the repo root, with the
+settings in a file ([`docs/node-host.md`](../../docs/node-host.md) → Building a new node):
+
+```bash
+node --env-file="$HOME/.config/verisci/rpc-proxy.env" infra/rpc-proxy/src/main.ts
 ```
 
 ## Scripts

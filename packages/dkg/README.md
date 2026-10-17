@@ -3,9 +3,9 @@
 Adapter between `core` and the DKG: reads and writes Knowledge Assets.
 
 The DKG node it calls runs on the DKG node server
-([ADR 0006](../../docs/adr/0006-dkg-node-runs-on-a-dedicated-host.md)): on a developer's
-computer at `http://127.0.0.1:9200` for now, and once on a host, over HTTPS through Caddy
-with a credential. The node reads the chain through
+([ADR 0006](../../docs/adr/0006-dkg-node-runs-on-a-dedicated-host.md)), at
+`https://verisci-dkg.duckdns.org`, behind Caddy, which checks each environment's credential
+([ADR 0039](../../docs/adr/0039-one-credential-per-environment.md)). The node reads the chain through
 [`infra/rpc-proxy`](../../infra/rpc-proxy/README.md)
 ([`docs/node-host.md`](../../docs/node-host.md) → How the parts connect); a publish that fails
 with `authority-resolution-failed` is often a chain-read problem there, not in this
@@ -32,8 +32,8 @@ the client's types never needs them.
 
 | Variable | Value |
 | --- | --- |
-| `DKG_URL` | The node's base URL: `http://127.0.0.1:9200` locally |
-| `DKG_TOKEN` | Bearer token: the node's admin token (`~/.dkg/auth.token`) locally; the environment's credential once the node is on its server |
+| `DKG_URL` | The node's base URL: `https://verisci-dkg.duckdns.org` in every environment ([`docs/node-host.md`](../../docs/node-host.md) → The two names) |
+| `DKG_TOKEN` | Bearer token: the environment's credential for the node server (`local`, `staging` or `production`, [`docs/node-host.md`](../../docs/node-host.md) → The credentials), which also opens GROBID. Secret |
 | `DKG_CONTEXT_GRAPH` | The full context graph id, `<agent address>/<graph name>`, with the address in EIP-55 checksum case as the node lists it, such as `0xD701…13B3/verisci-staging` |
 
 `DKG_CONTEXT_GRAPH` is refused when it is a bare name or its address is in another case

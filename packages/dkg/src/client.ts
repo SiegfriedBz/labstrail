@@ -11,9 +11,12 @@ const QUORUM_CODES = ["storage_ack_insufficient", "CORE_TEMPORARILY_UNAVAILABLE"
 
 /** Where the client sends its calls. */
 export interface DkgClientConfig {
-  /** The node's base URL, e.g. `http://127.0.0.1:9200`. */
+  /** The node's base URL, e.g. `https://verisci-dkg.duckdns.org`. */
   readonly url: string;
-  /** Bearer token: the node's admin token locally, the environment's credential on the server. */
+  /**
+   * Bearer token: the environment's credential for the node server, which Caddy checks
+   * before it forwards the call with the node's admin token (ADR 0039).
+   */
   readonly token: string;
   /** The full context graph id, `<agent address>/<name>` (`docs/domain.md` → DKG). */
   readonly contextGraphId: string;

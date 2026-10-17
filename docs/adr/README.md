@@ -23,7 +23,7 @@ decisions were taken, so a later ADR can sit in an earlier group.
 | ADR | Decision |
 | --- | --- |
 | [0001. Toolchain: Biome, TypeScript 6, Soldeer, exact pins](0001-toolchain-biome-ts6-soldeer-exact-pins.md) | Biome, TypeScript 6, Soldeer and solc 0.8.37; every dependency pinned exactly |
-| [0002. Internal packages ship TypeScript source](0002-internal-packages-ship-typescript-source.md) | Packages export their `.ts` source, with no build step; scripts and programs on the DKG node server run it with plain Node |
+| [0002. Internal packages ship TypeScript source](0002-internal-packages-ship-typescript-source.md) | Packages export their `.ts` source, with no build step; scripts and the repo's programs on the DKG node server run it with plain Node |
 | [0003. Inngest functions live in the workflows package](0003-inngest-functions-live-in-workflows.md) | Inngest functions live in `workflows`; `web` only serves them |
 | [0025. Reviews gate on ADR consistency and Foundry lint](0025-reviews-gate-on-adrs-and-lint.md) | A review blocks on an ADR conflict until the user decides; every Foundry lint finding fails, except lints excluded by name with a reason |
 
@@ -31,14 +31,15 @@ decisions were taken, so a later ADR can sit in an earlier group.
 
 | ADR | Decision |
 | --- | --- |
-| [0004. Env variables are declared per workspace, in one root file](0004-env-variables-per-workspace-one-root-file.md) | Each workspace validates the variables it reads, a deployed server its workflows' and the web app's when it starts; a dev script declares those only it reads; forge reads the same root env file; programs on the DKG node server read their own |
+| [0004. Env variables are declared per workspace, in one root file](0004-env-variables-per-workspace-one-root-file.md) | Each workspace validates the variables it reads, a deployed server its workflows' and the web app's when it starts; a dev script declares those only it reads; forge reads the same root env file; the repo's programs on the DKG node server read their own |
 | [0005. Staging and production use separate resources](0005-staging-and-production-are-isolated.md) | Staging and production each have their own contract, graph, webhook, oracle wallet, Inngest environment and Upstash store; the Reown project, the pinning account and the alerts chat are shared, and so is the DKG node, so a `-prod` guard protects production |
-| [0006. The DKG node runs on a dedicated host](0006-dkg-node-runs-on-a-dedicated-host.md) | The node, GROBID and an RPC proxy run on their own host, behind authentication, with keys backed up; on a developer's computer until a deployed environment calls the node |
+| [0006. The DKG node runs on a dedicated host](0006-dkg-node-runs-on-a-dedicated-host.md) | The node, GROBID and an RPC proxy run on their own host, behind authentication, with keys backed up; every environment, developers' computers included, calls it there, and a developer may run GROBID locally |
 | [0023. A fix is a redeploy, and the owner's powers are fixed](0023-a-fix-is-a-redeploy-owner-powers-fixed.md) | A fix is a redeploy; old contracts are paused and drained; the owner sets the oracle and cap, pauses and unpauses, and transfers ownership in two steps, never to the oracle, with no renounce |
 | [0028. Deployed addresses are committed](0028-deployed-addresses-are-committed.md) | Staging's and production's contract addresses live in a committed file, changed by a reviewed PR |
 | [0030. The owner and the oracle are different addresses](0030-owner-and-oracle-are-different-addresses.md) | The owner's key stays offline; the oracle's key is on the deployment; the contract keeps them apart |
 | [0036. Local rating runs use an Anvil chain](0036-local-rating-runs-use-anvil.md) | A developer runs ratings, functions and pages, against a contract on a local Anvil chain, named by local-only settings; locally the page announces its own request; staging's and production's addresses stay committed |
 | [0038. Alerts and activity go to one Telegram chat](0038-alerts-go-to-one-telegram-chat.md) | One `notify()` posts to one Telegram chat for every environment: alerts on failed runs, the oracle, orphans, balances and old requests, and activity for each paper published and rating settled; each sent once, from a step, never failing its run |
+| [0039. Each environment reaches the node server with its own credential](0039-one-credential-per-environment.md) | Caddy checks one credential per environment (local, staging, production) for the daemon and GROBID, and forwards with the admin token, which no environment holds; `/api/status` is open, with no token |
 
 ## Writing to the DKG
 
@@ -112,7 +113,6 @@ Not decided yet. The plan that first needs an answer records it, in a new ADR or
 | Who may request phases 2 and 3? | Anyone, not only the phase-1 requester. Whoever requests, our node writes the R-KA update, since it owns the R-KA ([0012](0012-three-phases-settled-by-the-oracle.md)). Also open: whether a later phase's request gets its own id or reuses the rating's. | phase-2 plan |
 | Where does phases 2 and 3's human input wait before the oracle scores it? | None yet: on the DKG, as a draft the node holds, or in a store of the app's own, which would amend [0035](0035-limits-are-the-apps-only-state.md) ([0012](0012-three-phases-settled-by-the-oracle.md)). | phase-2 plan |
 | How are phase-2 reviewers drawn with Chainlink VRF? | None yet: the draw's contract, its VRF subscription and who funds it. It may touch [0023](0023-a-fix-is-a-redeploy-owner-powers-fixed.md) (the owner's powers), [0015](0015-rating-requests-are-free-on-testnet.md) (who pays) and [0019](0019-oracle-transactions-are-serialized.md) (oracle transactions) ([0012](0012-three-phases-settled-by-the-oracle.md)). | phase-2 plan |
-| Who holds the DKG node's credential? | Caddy keeps the daemon's admin token on the host and checks one credential per environment, so each can be revoked alone. The `-prod` guard stays ([0005](0005-staging-and-production-are-isolated.md)). | node server plan |
 
 ## Adding an ADR
 

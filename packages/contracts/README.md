@@ -210,7 +210,7 @@ forge script script/DeployRatingController.s.sol --rpc-url http://127.0.0.1:8546
 `LOCAL_RATING_CONTRACT` in the root `.env.local` to the address the script prints, and
 `ORACLE_PRIVATE_KEY` to the second account's key
 ([`packages/workflows` → Running a rating locally](../workflows/README.md#running-a-rating-locally)).
-Anvil listens on 8546 because the DKG node's RPC proxy holds 8545, Anvil's default, and
+Anvil listens on 8546: its default, 8545, is the port of the DKG node's RPC proxy, which
 answers as Base Sepolia. Anvil forgets everything when it stops: deploy again after a restart.
 The new contract lands at the same address with a later deploy time, so its request ids never
 repeat those of the one before.

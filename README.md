@@ -50,7 +50,7 @@ Built:
   before acting, so a retry never duplicates anything
   ([ADR 0007](docs/adr/0007-all-writes-converge.md)).
 - **Staging and production are kept apart**, with their own contracts, graphs,
-  oracle wallets and limit stores (production's graph and store come with its first app
+  oracle wallets and limit stores (production's limit store comes with its first app
   deployment); the DKG node, the Reown project, the pinning account and the alerts chat
   are shared ([ADR 0005](docs/adr/0005-staging-and-production-are-isolated.md)).
 - **A requested paper is rated.** A rating run reads the paper's text, has an LLM answer
@@ -78,7 +78,7 @@ Built:
   a failed run, wallets running low and requests pending too long
   ([ADR 0038](docs/adr/0038-alerts-go-to-one-telegram-chat.md)).
 
-Next: the DKG node on a server, then the first deploy, so the deployed app reaches them.
+Next: the first deploy, so the deployed app reaches them.
 
 Terms:
 
@@ -110,22 +110,24 @@ shows them in a browser.
 ### Environments and resources
 
 Each environment has its own context graph on the shared DKG node
-([ADR 0005](docs/adr/0005-staging-and-production-are-isolated.md)); staging's exists today,
-production's comes with production's first app deployment. Our node
-publishes the ratings of every contract of an environment to that environment's
+([ADR 0005](docs/adr/0005-staging-and-production-are-isolated.md)): `verisci-staging` and
+`verisci-prod`. Our node publishes the ratings of every contract of an environment to that environment's
 graph, so a redeployed contract keeps the graph of the one it replaces; the old
 contract is paused and drained ([ADR 0023](docs/adr/0023-a-fix-is-a-redeploy-owner-powers-fixed.md)).
 Each contract's R-KA names are its own, because the request id hashes the chain
 id, the contract's address and its deploy time
 ([ADR 0016](docs/adr/0016-asset-names-derive-from-request-id.md)).
 
-The DKG node runs with GROBID and an RPC proxy, on its own server once a deployed
-environment calls it; until then on a developer's computer, started by hand
-([ADR 0006](docs/adr/0006-dkg-node-runs-on-a-dedicated-host.md)). The node reads
+The DKG node runs with GROBID and an RPC proxy on its own server, a free Oracle Cloud VM,
+reached at `https://verisci-dkg.duckdns.org` and `https://verisci-grobid.duckdns.org`
+([ADR 0006](docs/adr/0006-dkg-node-runs-on-a-dedicated-host.md)). Caddy is its only public
+entry, and each environment, developers' computers included, reaches it with its own
+credential ([ADR 0039](docs/adr/0039-one-credential-per-environment.md)). The node reads
 Base Sepolia only through that proxy, [`infra/rpc-proxy`](infra/rpc-proxy/README.md),
 which asks free public endpoints first and keeps Alchemy RPC within a daily budget.
-[`docs/node-host.md`](docs/node-host.md) is how to build the node and back it up; it
-also shows how the parts connect: on a server, Caddy is the only public entry.
+[`docs/node-host.md`](docs/node-host.md) describes the server, how to operate it and how to
+rebuild it from the node's backup; its configuration files are in
+[`infra/node-server`](infra/node-server/README.md).
 Each environment also has its own oracle wallet, Alchemy Notify webhook, Inngest
 environment and Upstash store. Only `develop` holds staging's oracle key and runs
 its ratings; previews share staging's contract and graph, and local development shares
@@ -289,6 +291,10 @@ TypeScript source, with no build step; Next.js compiles them through
 | [`packages/workflows`](packages/workflows/README.md) | Inngest workflows and the pages' calls | core, env, dkg, contracts |
 | [`infra/rpc-proxy`](infra/rpc-proxy/README.md) | JSON-RPC proxy run on the DKG node server | none |
 
+Also [`infra/node-server`](infra/node-server/README.md): the DKG node server's Caddy site and
+systemd units, configuration copied to the server by hand
+([`docs/node-host.md`](docs/node-host.md)).
+
 Each workspace may only import the workspaces it declares. pnpm does not
 hoist undeclared workspace packages, so breaking this rule fails `pnpm
 typecheck`.
@@ -311,8 +317,8 @@ pnpm install
 pnpm dev         # starts apps/web on http://localhost:3000
 ```
 
-To publish a PDF locally (the RPC proxy, the DKG node, GROBID and the Inngest dev server),
-follow [`packages/workflows` → Running a publish locally](packages/workflows/README.md#running-a-publish-locally),
+To publish a PDF locally (the Inngest dev server, with the node server's URLs and your
+credential in `.env.local`), follow [`packages/workflows` → Running a publish locally](packages/workflows/README.md#running-a-publish-locally),
 then open http://localhost:3000/publish (it needs the workflows' settings and
 `REOWN_PROJECT_ID`; see [`apps/web`](apps/web/README.md#environment)). To rate a paper
 locally, from its page or from a script, against a contract on Anvil, follow

@@ -21,4 +21,8 @@ Ratings run unattended. A scorer outage, an oracle out of gas or stuck at its fe
 - A deployment that misses the bot's settings still starts, and its alerts reach only its logs: setting them is part of deploying production and `develop`.
 - One chat mixes environments and levels; the prefix tells them apart. Activity grows with requests, bounded by the throttle ([0015](0015-rating-requests-are-free-on-testnet.md)).
 - Telegram sees the messages: paper titles, addresses, request ids and error text, never a key.
-- The DKG node's uptime is not watched until it has a public address ([0006](0006-dkg-node-runs-on-a-dedicated-host.md)).
+- The DKG node's uptime is not watched yet; its health check, `/api/status`, is open ([0039](0039-one-credential-per-environment.md)).
+
+## History
+
+- 2026-10-17: the node has its public address ([0006](0006-dkg-node-runs-on-a-dedicated-host.md)); its uptime stays unwatched until the first deployment adds a check (node server, user's choice).

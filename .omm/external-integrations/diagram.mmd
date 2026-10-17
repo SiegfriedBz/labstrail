@@ -10,5 +10,9 @@ graph LR
     verisci -->|"activity and alerts"| telegram["Telegram\nworkflows/src/alerts/notify.ts"]
     alchemy-notify["Alchemy Notify\nwebhook"] -->|"signed contract events, requests among them"| verisci
     vercel["Vercel\nhosting"] -->|"hosts the site and its functions"| verisci
+    oracle-cloud["Oracle Cloud\nnode server VM"] -->|"hosts the daemon"| dkg-node
+    oracle-cloud -->|"hosts GROBID"| grobid
+    duckdns["DuckDNS\nthe server's two names"] -->|"points both names at the server"| oracle-cloud
+    lets-encrypt["Let's Encrypt\ncertificates"] -->|"HTTPS certificates, through Caddy"| oracle-cloud
     classDef external fill:#585b70,stroke:#585b70,color:#cdd6f4
-    class dkg-node,grobid,pinata,base-rpc,gemini,inngest,upstash,reown,telegram,alchemy-notify,vercel external
+    class dkg-node,grobid,pinata,base-rpc,gemini,inngest,upstash,reown,telegram,alchemy-notify,vercel,oracle-cloud,duckdns,lets-encrypt external
