@@ -21,10 +21,12 @@ Ratings run unattended. A scorer outage, an oracle out of gas or stuck at its fe
 - A deployment that misses the bot's settings still starts, and its alerts reach only its logs: setting them is part of deploying production and `develop`.
 - One chat mixes environments and kinds; each message's headline tells them apart. Activity grows with requests, bounded by the throttle ([0015](0015-rating-requests-are-free-on-testnet.md)).
 - Telegram sees the messages: paper titles, addresses, request ids and error text, never a key.
-- The DKG node is watched through its open health check ([0039](0039-one-credential-per-environment.md)): an outage is heard of within the hour, once from each environment that runs the check.
+- The DKG node is watched through its open health check ([0039](0039-one-credential-per-environment.md)): an outage is heard of within the hour, from each environment that runs the check.
+- The hourly check keeps no state ([0035](0035-limits-are-the-apps-only-state.md)): a problem it finds is alerted on again every hour until it is fixed.
 
 ## History
 
 - 2026-10-17: the node has its public address ([0006](0006-dkg-node-runs-on-a-dedicated-host.md)); its uptime stays unwatched until the first deployment adds a check (node server, user's choice).
 - 2026-10-17: the hourly check also reads the DKG node's status, so a node down, or its graph no longer finalized, is alerted on (first deploy).
 - 2026-10-17: a message names its kind by its headline (an alert, or the activity itself) rather than by the word "activity", so the chat reads at a glance (first deploy, user's choice).
+- 2026-10-17: corrected: the hourly check keeps no state ([0035](0035-limits-are-the-apps-only-state.md)), so it alerts on a problem every hour it lasts, from each environment that runs it, rather than once (ADR sweep).

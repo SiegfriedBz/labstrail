@@ -21,6 +21,7 @@ A DKG node is a long-lived peer-to-peer daemon, and GROBID (PDF parsing) is a lo
 - A lost host is rebuilt from the backup, with the same agent address ([`docs/node-host.md`](../node-host.md)).
 - Its setup is documented in [`docs/node-host.md`](../node-host.md), with its configuration files in `infra/node-server`, since no code deploys it.
 - Developers work against the same node as the deployed environments, through their own credential, and run no node of their own.
+- The RPC proxy sends the daemon's chain reads to free public endpoints first and to the deployments' Alchemy RPC account last, within a daily budget ([0005](0005-staging-and-production-are-isolated.md)): the daemon, unbudgeted, once used up Alchemy RPC's free tier ([domain](../domain.md)).
 
 ## History
 
@@ -28,3 +29,4 @@ A DKG node is a long-lived peer-to-peer daemon, and GROBID (PDF parsing) is a lo
 - 2026-10-09: a new node replaced the previous one, with a new agent address, so that the node is built only from the documented steps; the previous node's graphs are no longer used ([0005](0005-staging-and-production-are-isolated.md)).
 - 2026-10-09: corrected: the node pays publishes from several publisher wallets, not one; each is funded and alerted on (DKG spike, [domain](../domain.md)).
 - 2026-10-17: the node moved from the developer's computer to its host, with the same agent address; developers' computers now reach it like the deployed environments, through Caddy with a credential of their own; a developer may still run GROBID locally (node server).
+- 2026-10-17: the RPC proxy falls back to the deployments' Alchemy RPC account, within a daily budget, so the daemon cannot use up the quota they share ([0005](0005-staging-and-production-are-isolated.md)) (ADR sweep).
