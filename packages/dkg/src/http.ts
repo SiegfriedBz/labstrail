@@ -14,21 +14,22 @@ export interface Connection {
 }
 
 /**
- * Sends one JSON request to the node with the bearer token and returns its reply. Never
- * throws for a network error or a timeout, so callers can tell "no answer" from a refusal.
+ * Sends one JSON request to the node, with the bearer token unless `open` (a route that needs
+ * none), and returns its reply. Never throws for a network error or a timeout, so callers can
+ * tell "no answer" from a refusal.
  */
 export async function send(
   connection: Connection,
   method: "GET" | "POST",
   path: string,
-  options: { readonly body?: unknown; readonly timeoutMs: number },
+  options: { readonly body?: unknown; readonly timeoutMs: number; readonly open?: boolean },
 ): Promise<Reply> {
   const signal = AbortSignal.timeout(options.timeoutMs);
   try {
     const response = await connection.fetch(`${connection.url.replace(/\/+$/, "")}${path}`, {
       method,
       headers: {
-        authorization: `Bearer ${connection.token}`,
+        ...(options.open ? {} : { authorization: `Bearer ${connection.token}` }),
         ...(options.body === undefined ? {} : { "content-type": "application/json" }),
       },
       body: options.body === undefined ? undefined : JSON.stringify(options.body),

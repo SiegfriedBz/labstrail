@@ -7,7 +7,9 @@ export type {
   AssetResult,
   AssetState,
   DkgFailure,
+  GraphStatus,
   MintResult,
+  NodeStatus,
   Quad,
   QueryResult,
 } from "./types.ts";

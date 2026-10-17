@@ -1,6 +1,14 @@
 import { normalizeUal } from "@verisci/core";
 import { type Connection, field, isSuccess, type Reply, send, toFailure } from "./http.ts";
-import type { AssetResult, DkgFailure, MintResult, Quad, QueryResult } from "./types.ts";
+import type {
+  AssetResult,
+  DkgFailure,
+  GraphStatus,
+  MintResult,
+  NodeStatus,
+  Quad,
+  QueryResult,
+} from "./types.ts";
 
 /** How long a read, store or share waits for the node by default before reporting it unreachable. */
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -64,6 +72,13 @@ export interface DkgClient {
    * "nothing there". Asked each time, never remembered: a node restart can drop the graph.
    */
   checkGraph(): Promise<{ readonly ok: true } | DkgFailure>;
+  /**
+   * Reads the node's health check (`GET /api/status`), which is open, so it sends no
+   * credential (ADR 0039): this client's graph as the node's catalog lists it (address in any
+   * case), `undefined` when it is not listed, or a failure when the node does not answer
+   * (`unreachable`) or answers otherwise (`unexpected` with its status).
+   */
+  readStatus(): Promise<NodeStatus>;
 }
 
 /** Builds a client for one context graph on one DKG node. Every UAL it returns is normalized (ADR 0031). */
@@ -180,6 +195,17 @@ export function createDkgClient(config: DkgClientConfig): DkgClient {
     return { ok: false, reason: "unexpected", status: reply.status };
   }
 
+  async function readStatus(): Promise<NodeStatus> {
+    const reply = await send(connection, "GET", "/api/status", { timeoutMs, open: true });
+    if (reply.kind !== "answer" || !isSuccess(reply)) return toFailure(reply);
+    const graphs = field(field(reply.body, "rfc64Catalog"), "contextGraphs");
+    if (!Array.isArray(graphs)) return { ok: false, reason: "unexpected", status: reply.status };
+    const entry = graphs.find((graph) =>
+      sameGraphId(String(field(graph, "contextGraphId")), config.contextGraphId),
+    );
+    return { ok: true, graph: entry === undefined ? undefined : toGraphStatus(entry) };
+  }
+
   async function query(sparql: string): Promise<QueryResult> {
     const reply = await send(connection, "POST", "/api/query", {
       body: { sparql, ...graph },
@@ -191,7 +217,15 @@ export function createDkgClient(config: DkgClientConfig): DkgClient {
     return { ok: true, bindings: rows.filter(isStringRow) };
   }
 
-  return { readAsset, storeAsset, startMint, query, checkGraph };
+  return { readAsset, storeAsset, startMint, query, checkGraph, readStatus };
+}
+
+/** A catalog entry's authority, as the node spells it. */
+function toGraphStatus(entry: unknown): GraphStatus {
+  return {
+    authorityState: String(field(entry, "authorityState")),
+    policySource: String(field(entry, "policySource")),
+  };
 }
 
 /** Same graph: the agent address in any case, the graph name exactly. */
