@@ -195,7 +195,7 @@ describe("RatingProgress", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("waits for a request the chain doesn't show yet, when opened right after it, then follows it", async () => {
+  it("waits for a request the chain doesn't show yet, when opened right after it, then follows it to its score", async () => {
     vi.useFakeTimers();
     const fetchMock = vi
       .fn()
@@ -207,12 +207,18 @@ describe("RatingProgress", () => {
           rating: { ...RATING, status: "pending" },
           stage: "scoring",
         }),
-      });
+      })
+      .mockResolvedValueOnce({ ok: true, json: async () => SCORED });
     vi.stubGlobal("fetch", fetchMock);
 
     showFresh();
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Checking on this rating");
-    expect(screen.getByRole("list", { name: "Rating steps" })).toBeTruthy();
+    const steps = within(screen.getByRole("list", { name: "Rating steps" })).getAllByRole(
+      "listitem",
+    );
+    expect(steps.some((step) => step.textContent?.includes("(in progress)"))).toBe(false);
+    expect(screen.getByRole("heading", { name: "What's happening" })).toBeTruthy();
+    expect(screen.getByText(/asking again every few seconds/)).toBeTruthy();
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5000);
@@ -223,6 +229,11 @@ describe("RatingProgress", () => {
       await vi.advanceTimersByTimeAsync(5000);
     });
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Reading the paper");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Scored 67 / 100");
   });
 
   it("says there is no rating here when the chain still doesn't show the request after 2 minutes", async () => {

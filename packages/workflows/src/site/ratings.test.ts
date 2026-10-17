@@ -234,6 +234,34 @@ describe("paperRatingSummaries", () => {
     ]);
   });
 
+  it("still gives the score when the chain's reads take a retry's extra second", async () => {
+    vi.useFakeTimers();
+    try {
+      const base = io({
+        requests: {
+          [CURRENT]: { [id(2)]: request({ status: "fulfilled", score: 67, rKaUal: R_KA }) },
+        },
+      });
+      const late =
+        <A extends unknown[], R>(read: (...args: A) => Promise<R>, ms: number) =>
+        (...args: A) =>
+          new Promise<R>((resolve) => setTimeout(() => resolve(read(...args)), ms));
+      // A refused first try, a 1 s wait and an answer: about 1.2 s for the ids, 0.2 s per request.
+      const service = createRatingService({
+        ...base,
+        readRequestIds: late(base.readRequestIds, 1_200),
+        readRequest: late(base.readRequest, 200),
+      });
+
+      const summaries = service.paperRatingSummaries([TARGET]);
+      await vi.advanceTimersByTimeAsync(2_000);
+
+      expect(await summaries).toEqual([{ kind: "scored", score: 67, requestId: id(2) }]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("waits up to 6 s for the chain, then gives unknown", async () => {
     vi.useFakeTimers();
     try {
