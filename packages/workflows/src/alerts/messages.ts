@@ -1,3 +1,5 @@
+import type { Notice } from "./notify.ts";
+
 /** The settings {@link siteUrlOf} reads: Vercel sets the two URLs on its deployments. */
 export interface SiteEnv {
   readonly APP_ENV: string;
@@ -16,18 +18,23 @@ export function siteUrlOf(env: SiteEnv): string | undefined {
   return host ? `https://${host}` : undefined;
 }
 
-const link = (siteUrl: string | undefined, path: string | undefined) =>
-  siteUrl && path ? `\n${siteUrl}${path}` : "";
+const link = (siteUrl: string | undefined, path: string | undefined, label: string) =>
+  siteUrl && path ? { label, url: `${siteUrl}${path}` } : undefined;
 
 /**
- * The activity message for a paper this run minted: its title, or its CID when it has none,
- * and its page.
+ * The activity message for a paper this run minted: `📄 Published`, its title (its CID when
+ * it has none) and a link to its page.
  */
-export function publishedText(
+export function publishedNotice(
   paper: { readonly cid: string; readonly title?: string | undefined },
   siteUrl: string | undefined,
-): string {
-  return `Published: ${paper.title || paper.cid}${link(siteUrl, `/papers/${paper.cid}`)}`;
+): Notice {
+  return {
+    level: "activity",
+    text: "📄 Published",
+    title: paper.title || paper.cid,
+    link: link(siteUrl, `/papers/${paper.cid}`, "Open the paper"),
+  };
 }
 
 /** What a settled rating needs from its run to be named. */
@@ -40,22 +47,26 @@ export interface RatedPaper {
 }
 
 /**
- * The activity message for a rating the oracle settled: the score out of 100, or why it was
- * cancelled, the paper by its title (its UAL when it has none), and the rating's page when the
- * paper was found.
+ * The activity message for a rating the oracle settled: `⭐ Rated <score>/100`, or
+ * `⚠️ Rating cancelled` and why, the paper by its title (its UAL when it has none), and a link
+ * to the rating's page when the paper was found.
  */
-export function ratedText(
+export function ratedNotice(
   outcome:
     | { readonly state: "fulfilled"; readonly score: number }
     | { readonly state: "cancelled"; readonly reason: "expired" | "invalid-target" },
   paper: RatedPaper,
   siteUrl: string | undefined,
-): string {
-  const name = paper.title || paper.targetUal;
+): Notice {
   const page = paper.cid ? `/papers/${paper.cid}/ratings/${paper.requestId}` : undefined;
-  const what =
+  const text =
     outcome.state === "fulfilled"
-      ? `Rated ${outcome.score}/100`
-      : `Rating cancelled, ${outcome.reason === "expired" ? "not finished within a day" : "can't be rated"}`;
-  return `${what}: ${name}${link(siteUrl, page)}`;
+      ? `⭐ Rated ${outcome.score}/100`
+      : `⚠️ Rating cancelled: ${outcome.reason === "expired" ? "not finished within a day" : "can't be rated"}`;
+  return {
+    level: "activity",
+    text,
+    title: paper.title || paper.targetUal,
+    link: link(siteUrl, page, "Open the rating"),
+  };
 }

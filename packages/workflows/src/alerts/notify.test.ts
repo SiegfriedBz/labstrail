@@ -19,7 +19,7 @@ function setup(overrides: Partial<NotifyOptions> = {}) {
 }
 
 describe("createNotify", () => {
-  it("posts one Telegram message, prefixed with the environment and the level", async () => {
+  it("posts one Telegram message in HTML, headed by the level and the environment", async () => {
     const { notify, fetch } = setup();
 
     await notify({ level: "alert", text: "oracle-no-funds: 0xabc cannot pay" });
@@ -30,18 +30,42 @@ describe("createNotify", () => {
     expect(init?.method).toBe("POST");
     expect(JSON.parse(String(init?.body))).toEqual({
       chat_id: "-1001234",
-      text: "[staging · alert] oracle-no-funds: 0xabc cannot pay",
+      text: "<b>🚨 Alert</b> · staging\noracle-no-funds: 0xabc cannot pay",
+      parse_mode: "HTML",
       disable_web_page_preview: true,
     });
   });
 
-  it("names activity apart from alerts", async () => {
+  it("shows activity as its headline, the paper's title in bold and a short link", async () => {
     const { notify, fetch } = setup({ appEnv: "production" });
 
-    await notify({ level: "activity", text: "Published: RNAi therapies" });
+    await notify({
+      level: "activity",
+      text: "📄 Published",
+      title: "RNAi therapies",
+      link: { label: "Open the paper", url: "https://verisci.example/papers/bafy" },
+    });
 
     expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body)).text).toBe(
-      "[production · activity] Published: RNAi therapies",
+      '<b>📄 Published</b> · production\n<b>RNAi therapies</b>\n→ <a href="https://verisci.example/papers/bafy">Open the paper</a>',
+    );
+  });
+
+  it("escapes what Telegram would read as HTML, in the text, the title and the link", async () => {
+    const { notify, fetch } = setup();
+
+    await notify({ level: "alert", text: "run failed: <timeout> & retried" });
+    await notify({
+      level: "activity",
+      text: "⭐ Rated 80/100",
+      title: "Mice <3 & men",
+      link: { label: "Open the rating", url: 'https://x.example/?a=1&b="2"' },
+    });
+
+    const texts = fetch.mock.calls.map((call) => JSON.parse(String(call[1]?.body)).text);
+    expect(texts[0]).toBe("<b>🚨 Alert</b> · staging\nrun failed: &lt;timeout&gt; &amp; retried");
+    expect(texts[1]).toBe(
+      '<b>⭐ Rated 80/100</b> · staging\n<b>Mice &lt;3 &amp; men</b>\n→ <a href="https://x.example/?a=1&amp;b=&quot;2&quot;">Open the rating</a>',
     );
   });
 
@@ -49,12 +73,17 @@ describe("createNotify", () => {
     const { notify, fetch, logger } = setup({ botToken: undefined, chatId: undefined });
 
     await notify({ level: "alert", text: "rating-orphan: …/14" });
-    await notify({ level: "activity", text: "Published: RNAi therapies" });
+    await notify({
+      level: "activity",
+      text: "📄 Published",
+      title: "RNAi therapies",
+      link: { label: "Open the paper", url: "http://localhost:3000/papers/bafy" },
+    });
 
     expect(fetch).not.toHaveBeenCalled();
     expect(logger.warn).toHaveBeenCalledWith("notify: [staging · alert] rating-orphan: …/14");
     expect(logger.info).toHaveBeenCalledWith(
-      "notify: [staging · activity] Published: RNAi therapies",
+      "notify: [staging · activity] 📄 Published: RNAi therapies http://localhost:3000/papers/bafy",
     );
   });
 

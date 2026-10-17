@@ -303,7 +303,8 @@ describe("runRating: which requests it takes", () => {
     expect(log).toEqual(["read-request", "find-target", "check-graph", "oracle cancel", "notify"]);
     expect(deps.notify).toHaveBeenCalledExactlyOnceWith({
       level: "activity",
-      text: `Rating cancelled, can't be rated: ${TARGET}`,
+      text: "⚠️ Rating cancelled: can't be rated",
+      title: TARGET,
     });
   });
 
@@ -383,7 +384,9 @@ describe("runRating: rating a paper", () => {
     ]);
     expect(deps.notify).toHaveBeenCalledExactlyOnceWith({
       level: "activity",
-      text: `Rated 64/100: A trial\n${SITE}/papers/${CID}/ratings/${REQUEST_ID}`,
+      text: "⭐ Rated 64/100",
+      title: "A trial",
+      link: { label: "Open the rating", url: `${SITE}/papers/${CID}/ratings/${REQUEST_ID}` },
     });
     expect(dkg.query).toHaveBeenCalledWith(paperPdfQuery(GRAPH, TARGET));
     expect(deps.readPaper).toHaveBeenCalledExactlyOnceWith(CID);
@@ -533,16 +536,21 @@ describe("runRating: rating a paper", () => {
 
     await run;
 
-    expect(deps.notify.mock.calls[0]?.[0].text).toBe(
-      `Rated 72/100: A trial\n${SITE}/papers/${CID}/ratings/${REQUEST_ID}`,
-    );
+    expect(deps.notify.mock.calls[0]?.[0]).toMatchObject({
+      title: "A trial",
+      link: { label: "Open the rating", url: `${SITE}/papers/${CID}/ratings/${REQUEST_ID}` },
+    });
   });
 
   it("names the paper by its UAL, with no link, when the node doesn't answer that look-up", async () => {
     const { run, deps } = rate({ reads: [minted], pdfRows: [unreachable] });
 
     expect(await run).toMatchObject({ state: "fulfilled" });
-    expect(deps.notify.mock.calls[0]?.[0].text).toBe(`Rated 72/100: ${TARGET}`);
+    expect(deps.notify.mock.calls[0]?.[0]).toEqual({
+      level: "activity",
+      text: "⭐ Rated 72/100",
+      title: TARGET,
+    });
   });
 
   it("mints an R-KA already stored at once, polls every 30 s, then fulfils, never scoring", async () => {

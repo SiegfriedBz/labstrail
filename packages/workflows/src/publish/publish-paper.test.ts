@@ -139,7 +139,9 @@ describe("runPublish", () => {
     expect(dkg.startMint).toHaveBeenCalledWith(NAME, { listenMs: PUBLISH_SETTINGS.listenMs });
     expect(deps.notify).toHaveBeenCalledExactlyOnceWith({
       level: "activity",
-      text: `Published: A Title\n${SITE}/papers/${CID}`,
+      text: "📄 Published",
+      title: "A Title",
+      link: { label: "Open the paper", url: `${SITE}/papers/${CID}` },
     });
   });
 
@@ -160,7 +162,9 @@ describe("runPublish", () => {
     expect(log).toEqual(["verify", "read-1", "mint-1", "notify"]);
     expect(deps.notify).toHaveBeenCalledExactlyOnceWith({
       level: "activity",
-      text: `Published: ${CID}\n${SITE}/papers/${CID}`,
+      text: "📄 Published",
+      title: CID,
+      link: { label: "Open the paper", url: `${SITE}/papers/${CID}` },
     });
     expect(deps.readPaper).not.toHaveBeenCalled();
     expect(dkg.storeAsset).not.toHaveBeenCalled();
