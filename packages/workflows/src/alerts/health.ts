@@ -1,3 +1,4 @@
+import type { NodeStatus } from "@verisci/dkg";
 import type { Inngest } from "inngest";
 import { formatEther, type Hex } from "viem";
 import { type PendingReads, readPending } from "../rating/pending.ts";
@@ -18,6 +19,8 @@ export const HEALTH_SETTINGS = {
    * interval, it should have been restarted and settled.
    */
   oldestPendingMs: 6 * 3_600_000,
+  /** How long the node's health check may take before the node counts as not answering. */
+  nodeTimeoutMs: 10_000,
   /** Pending ids read per call. */
   pageSize: 100,
   /**
@@ -31,6 +34,12 @@ export const HEALTH_SETTINGS = {
 
 /** The reads the health check makes; tests pass fakes. */
 export interface HealthDeps extends PendingReads {
+  /** The DKG node's base URL, named in its alert (`DKG_URL`). */
+  readonly node: string;
+  /** The environment's context graph id (`DKG_CONTEXT_GRAPH`), named in its alert. */
+  readonly graph: string;
+  /** The node's open health check, with the environment's graph as it lists it. */
+  readNodeStatus(): Promise<NodeStatus>;
   /** The oracle's address, lowercase (ADR 0019). */
   readonly oracle: string;
   /** The DKG node's publisher wallets, lowercase. */
@@ -64,10 +73,12 @@ interface ContractPending {
 }
 
 /**
- * One health check (ADR 0038): reads the balances in a step (`check-balances`), then each
+ * One health check (ADR 0038): reads the DKG node's status in a step (`check-node`), then the
+ * balances in a step (`check-balances`), then each
  * contract's pending requests in a step of its own (`check-pending-<contract>`), one after the
  * other, reading the time inside it, and sends what needs the maintainer as one alert from
- * another step (`alert`), only when there is something. The lines: the oracle or a publisher
+ * another step (`alert`), only when there is something. The lines: the node not answering, or
+ * the environment's graph not listed or not `accepted` from `finalized-chain`; the oracle or a publisher
  * wallet under its ETH threshold, a publisher wallet under its TRAC threshold, and requests
  * pending past `oldestPendingMs` (how many, the oldest, and how many were read when a backlog
  * is read in turns). A balance that does not answer is logged `health-unreadable` and read
@@ -81,7 +92,8 @@ export async function runHealthCheck(
   now: () => number,
 ): Promise<{ readonly problems: string[] }> {
   const deps = getDeps();
-  const problems = await step.run("check-balances", () => balanceProblems(deps));
+  const problems = await step.run("check-node", () => nodeProblems(deps));
+  problems.push(...(await step.run("check-balances", () => balanceProblems(deps))));
   const found: ContractPending[] = [];
   for (const contract of deps.contracts) {
     found.push(
@@ -93,6 +105,24 @@ export async function runHealthCheck(
     await step.run("alert", () => alert(problems.join("\n")).then(() => null));
   }
   return { problems };
+}
+
+/**
+ * The node's problem, if any: it does not answer (or answers with an error), or the
+ * environment's graph is not listed, or not accepted from finalized blocks, so writes to it
+ * may fail while the node still answers (`docs/domain.md` → DKG).
+ */
+async function nodeProblems(deps: HealthDeps): Promise<string[]> {
+  const status = await deps.readNodeStatus();
+  if (!status.ok) {
+    const reason =
+      status.status === undefined ? status.reason : `${status.reason} (${status.status})`;
+    return [`DKG node ${deps.node} did not answer: ${reason}`];
+  }
+  if (status.graph === undefined) return [`DKG node: ${deps.graph} is not listed`];
+  const { authorityState, policySource } = status.graph;
+  if (authorityState === "accepted" && policySource === "finalized-chain") return [];
+  return [`DKG node: ${deps.graph} is ${authorityState}/${policySource}`];
 }
 
 /** The oracle's and the publisher wallets' balances under their thresholds, one line each. */

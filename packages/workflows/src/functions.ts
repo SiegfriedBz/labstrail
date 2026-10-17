@@ -5,7 +5,7 @@ import { defineEnv, type RuntimeEnv, sharedEnv } from "@verisci/env";
 import { createPublicClient, createWalletClient, erc20Abi, type Hex, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { anvil, baseSepolia } from "viem/chains";
-import { createHealthCheck, type HealthDeps } from "./alerts/health.ts";
+import { createHealthCheck, HEALTH_SETTINGS, type HealthDeps } from "./alerts/health.ts";
 import { siteUrlOf } from "./alerts/messages.ts";
 import { createNotify, type Notify } from "./alerts/notify.ts";
 import { createFailureAlerts } from "./alerts/on-failure.ts";
@@ -225,8 +225,9 @@ export const failureAlerts = createFailureAlerts(inngest, alertMaintainer);
 let healthDeps: HealthDeps | undefined;
 
 /**
- * The health check's reads: the oracle's ETH on the rating chain, and the node's publisher
- * wallets' ETH and TRAC on Base Sepolia, where the node publishes, locally too.
+ * The health check's reads: the DKG node's open status, the oracle's ETH on the rating chain,
+ * and the node's publisher wallets' ETH and TRAC on Base Sepolia, where the node publishes,
+ * locally too.
  */
 function getHealthDeps(): HealthDeps {
   if (healthDeps) return healthDeps;
@@ -236,7 +237,16 @@ function getHealthDeps(): HealthDeps {
     transport: http(env.CHAIN_RPC_URL, { timeout: ORACLE_SETTINGS.rpcTimeoutMs, retryCount: 0 }),
   });
   const trac = ORIGINTRAIL_CONTRACTS[baseSepolia.id]?.trac;
+  const dkg = createDkgClient({
+    url: env.DKG_URL,
+    token: env.DKG_TOKEN,
+    contextGraphId: env.DKG_CONTEXT_GRAPH,
+    timeoutMs: HEALTH_SETTINGS.nodeTimeoutMs,
+  });
   healthDeps = {
+    node: env.DKG_URL,
+    graph: env.DKG_CONTEXT_GRAPH,
+    readNodeStatus: () => dkg.readStatus(),
     oracle: chain.account,
     publishers: env.PUBLISHER_ADDRESSES,
     contracts,
@@ -262,7 +272,7 @@ function getHealthDeps(): HealthDeps {
   return healthDeps;
 }
 
-/** Checks wallet balances and old pending requests every hour (ADR 0038). */
+/** Checks the DKG node, wallet balances and old pending requests every hour (ADR 0038). */
 export const healthCheck = createHealthCheck(inngest, getHealthDeps, alertMaintainer);
 
 /**
