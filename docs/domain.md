@@ -158,7 +158,8 @@ edge`, testnet), Base Sepolia.
   graph, so whoever holds it can write every environment's graph ([ADR 0005](adr/0005-staging-and-production-are-isolated.md)).
   On 10.0.22 the file starts with a comment line; the token is its second line.
 - **`/api/status` answers without the admin token** (10.0.22, 2026-10-17); every other route
-  needs it. The node server's Caddy leaves it open as the health check
+  needs it. Its answer is the same with or without the token (same fields, same size). The
+  node server's Caddy leaves it open as the health check and forwards it with no token
   ([ADR 0039](adr/0039-one-credential-per-environment.md)).
 - **Every context graph must be listed** under `contextGraphs` in the node's
   `~/.dkg/config.json`, or the node stops serving it after a restart.
@@ -222,13 +223,13 @@ edge`, testnet), Base Sepolia.
 - **Public Base Sepolia endpoints' log limits** (2026-10-09): `sepolia.base.org` answers
   `eth_getLogs` over at most 200 blocks; `base-sepolia-rpc.publicnode.com` over 2,000, but
   keeps history from block 46,500,000 only ("pruned history unavailable").
-- **The daemon reads the chain constantly** (previous host, DKG 10.0.16, two graphs,
-  2026-09 to 2026-10): it re-resolves each graph's authority from chain history again and
-  again. With every call except log reads sent to Alchemy RPC first and no limit, Alchemy RPC's
-  free tier was used up after a few weeks; from about 2026-10-05 the chain head froze and every
-  write failed, while `/api/status` still answered. The proxy now keeps Alchemy RPC last,
-  within a daily budget (`infra/rpc-proxy`). Unverified: whether a later release reads
-  less.
+- **The daemon reads the chain constantly** (the prototype's node, on the node server, DKG
+  10.0.16, two graphs, 2026-09 to 2026-10): it re-resolves each graph's authority from chain
+  history again and again. With every call except log reads sent to Alchemy RPC first and no
+  limit, Alchemy RPC's free tier was used up after a few weeks; from about 2026-10-05 the
+  chain head froze and every write failed, while `/api/status` still answered. The proxy now
+  keeps Alchemy RPC last, within a daily budget (`infra/rpc-proxy`). Unverified: whether a
+  later release reads less.
 
 ## The node server
 
@@ -249,6 +250,16 @@ Observed on the Oracle Cloud VM that runs the node (`docs/node-host.md`), 2026-1
   variable missing from the environment becomes an empty string: the credential check guards
   against it (`"{$NAME}" != ""`), so an empty credential opens nothing. `header_up
   -Authorization` drops the header before GROBID.
+- **Ubuntu's `caddy.service` starts Caddy with `--environ`** (2.6.2), which writes every
+  environment variable, the `EnvironmentFile`'s secrets included, to the journal at each start.
+  The node server's drop-in starts it with its config alone; the credentials logged until then
+  were replaced on 2026-10-17.
+- **Caddy's `path` matcher compares a cleaned-up path** (lower-cased, `..` resolved, escapes
+  decoded), while `reverse_proxy` forwards the path as the client sent it: a route opened by a
+  path matcher can receive other raw paths.
+- **Caddy keeps its loaded config, `{$NAME}` values filled in,** behind its admin endpoint
+  (`localhost:2019`, open to any process on the server) and in `autosave.json`
+  (`/var/lib/caddy/.config/caddy/`, the `caddy` user's, mode 600).
 - **The DuckDNS update sets a name to the caller's address** when `ip=` is empty: the cron job
   on the server keeps both names on the server's address.
 
@@ -432,9 +443,9 @@ Observed on Base Sepolia (chain id 84532) with Alchemy RPC and the Alchemy Notif
   whether Alchemy RPC's pending nonce (`eth_getTransactionCount(…, "pending")`) shows a
   transaction not yet included is to verify ([ADR 0019](adr/0019-oracle-transactions-are-serialized.md)).
 - **Anvil, for local rating runs** (Foundry 1.8.4, 2026-10-11,
-  [ADR 0036](adr/0036-local-rating-runs-use-anvil.md)): its default port 8545 is the one the
-  DKG node's RPC proxy holds, and a call to `127.0.0.1:8545` then answers as Base Sepolia
-  (chain id 84532), so Anvil runs on 8546. `forge script … --broadcast --unlocked --sender
+  [ADR 0036](adr/0036-local-rating-runs-use-anvil.md)): its default port 8545 is the DKG node's
+  RPC proxy's, and on a computer running the proxy a call to `127.0.0.1:8545` answers as Base
+  Sepolia (chain id 84532), so Anvil runs on 8546. `forge script … --broadcast --unlocked --sender
   <Anvil's first account>` deploys with no key passed, since Anvil signs for its built-in
   accounts; the first deploy on a fresh chain lands at
   `0x5FbDB2315678afecb367f032d93F642f64180aa3`. The base fee starts at 1 gwei; viem's

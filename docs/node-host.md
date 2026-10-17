@@ -90,12 +90,32 @@ dig +short verisci-dkg.duckdns.org verisci-grobid.duckdns.org
 # 89.168.60.126, twice
 ```
 
+### On a new server
+
+The DuckDNS job comes first on a new server: Caddy gets its certificates only once both
+names point at it. The token is on the DuckDNS website, signed in with the account that owns
+both names, and is typed on the server alone:
+
+```bash
+mkdir -p ~/duckdns
+read -rs -p 'DuckDNS token: ' T && printf '%s\n' '#!/bin/bash' \
+  "echo url=\"https://www.duckdns.org/update?domains=verisci-dkg,verisci-grobid&token=$T&ip=\" | curl -s -o ~/duckdns/duck.log -K -" \
+  > ~/duckdns/duck.sh; unset T; chmod 700 ~/duckdns/duck.sh
+(crontab -l 2>/dev/null; echo '*/5 * * * * /home/ubuntu/duckdns/duck.sh >/dev/null 2>&1') | crontab -
+~/duckdns/duck.sh && cat ~/duckdns/duck.log
+# OK
+```
+
+An empty `ip=` sets both names to the address the call comes from
+([domain](domain.md) → The node server).
+
 ## The credentials
 
 Each environment has its own credential, a random 64-character hex string
 ([ADR 0039](adr/0039-one-credential-per-environment.md)). It opens both sites. Caddy checks it,
-then calls the daemon with the daemon's admin token, which stays on the server; GROBID gets
-the call without any credential. `/api/status`, the health check, answers without one.
+then calls the daemon with the daemon's admin token, which no environment holds; GROBID gets
+the call without any credential. `/api/status`, the health check, answers without one, and
+Caddy passes it on with no token.
 
 | Credential, on the server | Used by | Set there as |
 | --- | --- | --- |
@@ -106,16 +126,19 @@ the call without any credential. `/api/status`, the health check, answers withou
 They live in `/etc/caddy/verisci.env` (root, mode 600), with the admin token as
 `DKG_ADMIN_TOKEN` ([`infra/node-server/README.md`](../infra/node-server/README.md)).
 
-Show the three credentials, to copy one into an environment's settings (the admin token
-stays hidden):
+Show one credential, to copy it into its environment's settings (here the local one; the
+others are `VERISCI_STAGING_TOKEN` and `VERISCI_PRODUCTION_TOKEN`):
 
 ```bash
-ssh -i ~/.ssh/id_ed25519_bz ubuntu@89.168.60.126 'sudo grep ^VERISCI_ /etc/caddy/verisci.env'
+ssh -i ~/.ssh/id_ed25519_bz ubuntu@89.168.60.126 'sudo sed -n "s/^VERISCI_LOCAL_TOKEN=//p" /etc/caddy/verisci.env'
 ```
+
+[The developer's computer](#the-developers-computer) writes the local one into `.env.local`
+without showing it.
 
 Revoke or rotate one environment's credential: give it a new value and reload Caddy. The
 other environments keep working; the environment whose credential changed needs the new
-value in its settings.
+value in its settings. Caddy refuses to start or reload with a secret left empty.
 
 ```bash
 sudo sed -i "s/^VERISCI_STAGING_TOKEN=.*/VERISCI_STAGING_TOKEN=$(openssl rand -hex 32)/" /etc/caddy/verisci.env
@@ -141,13 +164,18 @@ Nothing below is ever committed or pasted into a chat.
 | Secret | Where |
 | --- | --- |
 | Alchemy RPC URL (key included) | Server: `/home/ubuntu/rpc-proxy/env`, mode 600 |
-| Node keys and wallets | Server: `~/.dkg` (`agent-key.bin`, `agent-keystore.json`, `wallets.json`, `wallets.key`) |
-| The daemon's admin token | Server: `~/.dkg/auth.token`, and a copy in `/etc/caddy/verisci.env` |
-| The environments' credentials | Server: `/etc/caddy/verisci.env`; each environment's own settings (`.env.local`, Vercel's scopes) |
+| Node keys and wallets | Server: `~/.dkg` (`agent-key.bin`, `agent-keystore.json`, `wallets.json`, `wallets.key`); the encrypted backups |
+| The daemon's admin token | Server: `~/.dkg/auth.token`, `/etc/caddy/verisci.env`, and Caddy's loaded config (behind its admin endpoint, `localhost:2019`, and in `/var/lib/caddy/.config/caddy/autosave.json`); the encrypted key backups |
+| The environments' credentials | Server: `/etc/caddy/verisci.env` and Caddy's loaded config; each environment's own settings (`.env.local`, Vercel's scopes) |
 | DuckDNS token | Server: `~/duckdns/duck.sh`, mode 700 |
 | SSH key | Developer's computer: `~/.ssh/id_ed25519_bz` |
-| Backup passphrase | The developer's password manager |
-| Encrypted backups of `~/.dkg`'s keys | `verisci-dkg-keys-<date>.tar.gz.gpg`, on the developer's computer and a USB key |
+| Backup passphrase | Kept by the maintainer, apart from the backups |
+| Encrypted backups | Developer's computer and a USB key: `verisci-dkg-keys-<date>.tar.gz.gpg` (the six files that make the node), `verisci-dkg-moved-2026-10-17.tar.gz.gpg` (its whole folder as it left the developer's computer, graph store included), `verisci-dkg-old-2026-09.tar.gz.gpg` (the node before 2026-10-09) and `verisci-prototype-node-2026-10-17.tar.gz.gpg` (the prototype's node) |
+
+Caddy's journal also holds the admin token and the credentials of the time, written at each
+start until 2026-10-17, when the drop-in stopped it; those credentials were replaced that
+day. On the server, `ubuntu` reads every secret: it has passwordless `sudo`, and Caddy's admin
+endpoint answers any local process.
 
 ## Day to day
 
@@ -166,6 +194,7 @@ ssh -i ~/.ssh/id_ed25519_bz ubuntu@89.168.60.126
 | Caddy's log | `journalctl -u caddy -f` |
 | GROBID's log | `docker logs -f grobid` |
 | Restart one program | `sudo systemctl restart dkg` (or `rpc-proxy`, `caddy`); `docker restart grobid` |
+| Stop the daemon | `sudo systemctl stop dkg`; systemd starts it again after a `dkg stop` |
 
 Everything starts by itself when the server boots, the proxy before the daemon. A reboot
 (`sudo systemctl reboot`) takes about 25 seconds; the graphs are back at `finalized-chain`
@@ -178,7 +207,7 @@ stack. It ran the earlier prototype, `desci-rating-dapp`, from 2026-09; VeriSci 
 on 2026-10-17, and the prototype's node was set aside (below).
 
 The Oracle account that owns the VM is locked: its console cannot be reached (lost password,
-no reset email, support contacted; plan 012). The VM keeps running and is managed over SSH
+no reset email, support contacted). The VM keeps running and is managed over SSH
 alone. So its firewall rules, its public address and the instance itself cannot be changed,
 and a VM Oracle stops cannot be started again. The encrypted backup is the way out: a lost
 server means restoring the node on another machine ([If the server is lost](#if-the-server-is-lost)).
@@ -189,11 +218,12 @@ through the testnet relay.
 
 ## Setting up the server
 
-The steps followed on 2026-10-17. To set up another machine, follow them in order, starting
-from an Ubuntu 24.04 server with SSH, `sudo`, Docker and Caddy installed, and the two names
-pointing at it.
+The steps followed on 2026-10-17, on a server the prototype had set up. Another machine
+starts from Ubuntu 24.04 with SSH, `sudo`, Docker and Caddy (Ubuntu's package) installed, and
+the DuckDNS job set up ([On a new server](#on-a-new-server)), then follows them in order,
+skipping those marked `this server only` and `one time`.
 
-### 1. Set the previous node aside (one time)
+### 1. Set the previous node aside (this server only)
 
 The prototype's node (DKG 10.0.16) ran here with its own keys, wallets and graphs, none of
 which VeriSci uses. It was stopped and kept:
@@ -223,7 +253,9 @@ prints `disabled`.
 ### 2. Node.js and the DKG CLI
 
 Node 24.21.0, the repo's version (`.nvmrc`), from NodeSource's `node_24.x` repository, held
-at that version so upgrades are deliberate:
+at that version so upgrades are deliberate. A new server adds that repository first with
+`curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -`; this one had the
+prototype's `node_22.x` repository, switched by the first line:
 
 ```bash
 sudo sed -i 's#node_22.x#node_24.x#' /etc/apt/sources.list.d/nodesource.sources
@@ -269,9 +301,17 @@ tar -C ~ --exclude=.dkg/oxigraph --exclude=.dkg/oxigraph-data/dkg-oxigraph-owner
   | ssh -i ~/.ssh/id_ed25519_bz ubuntu@89.168.60.126 'test ! -e ~/.dkg && tar -C ~ -xzf - && chmod 700 ~/.dkg'
 ```
 
-On the old machine, rename the folder so the node cannot start there by mistake:
-`mv ~/.dkg ~/.dkg.moved-<date>`. The graph store written on an x86 computer opens on the ARM
-server as it is.
+On the old machine, rename the folder so the node cannot start there by mistake, then keep
+it only encrypted, with the backups' passphrase ([step 10](#10-back-up-the-nodes-keys)):
+
+```bash
+mv ~/.dkg ~/.dkg.moved-2026-10-17
+tar -C ~ -czf - .dkg.moved-2026-10-17 | gpg --symmetric --cipher-algo AES256 -o ~/verisci-dkg-moved-2026-10-17.tar.gz.gpg
+gpg -d ~/verisci-dkg-moved-2026-10-17.tar.gz.gpg | tar -tzf - | wc -l   # the folder's entry count
+rm -rf ~/.dkg.moved-2026-10-17
+```
+
+The graph store written on an x86 computer opens on the ARM server as it is.
 
 Check, once the daemon runs (step 5): the same counts as before the move.
 
@@ -358,12 +398,20 @@ curl -s -F input=@paper.pdf -H 'Accept: application/xml' 127.0.0.1:8070/api/proc
 ### 7. Caddy and the credentials
 
 Copy [`infra/node-server/Caddyfile`](../infra/node-server/Caddyfile) and
-[`caddy-env.conf`](../infra/node-server/caddy-env.conf) to `/tmp`. On the server, keep the
-previous Caddyfile, write the secrets file with three new credentials and the daemon's admin
-token (the second line of `~/.dkg/auth.token`), then install both files:
+[`caddy-env.conf`](../infra/node-server/caddy-env.conf) to `/tmp`. On the server, write the
+secrets file with three new credentials and the daemon's admin token (the second line of
+`~/.dkg/auth.token`), then install both files. The drop-in starts Caddy with its config
+alone, since Ubuntu's unit adds `--environ`, which writes every secret to the journal, and
+stops a start or reload when a secret is empty. This server kept the prototype's Caddyfile
+first (`this server only`):
 
 ```bash
 sudo install -m 600 -o ubuntu -g ubuntu /etc/caddy/Caddyfile ~/prototype-2026-10-17/Caddyfile
+```
+
+Then, on any server:
+
+```bash
 sudo install -m 600 -o root -g root /dev/null /etc/caddy/verisci.env
 printf "VERISCI_LOCAL_TOKEN=%s\nVERISCI_STAGING_TOKEN=%s\nVERISCI_PRODUCTION_TOKEN=%s\nDKG_ADMIN_TOKEN=%s\n" \
   "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" "$(sed -n 2p ~/.dkg/auth.token)" \
@@ -379,9 +427,13 @@ sudo systemctl daemon-reload && sudo systemctl restart caddy
 for both names, or gets them from Let's Encrypt on its first request.
 
 Check: the four commands in [The credentials](#the-credentials), each environment's credential
-reading the papers count, and a PDF parsed through GROBID with a credential.
+reading the papers count, a PDF parsed through GROBID with a credential, and no secret in
+Caddy's journal: `sudo journalctl -u caddy -b | grep -c TOKEN=` prints `0`.
 
-### 8. The production graph
+### 8. The production graph (one time)
+
+A rebuilt server skips this step: the graph stays registered on chain, and the key backup's
+`config.json` lists it.
 
 Created and registered like `verisci-staging` (step 8 of [Building a new
 node](#building-a-new-node)): open access and open publishing, a 100 TRAC deposit from the
@@ -415,8 +467,8 @@ and the checks in [The credentials](#the-credentials) pass.
 ### 10. Back up the node's keys
 
 After any change to `~/.dkg/config.json` (a graph added) or to the keys, back up the six
-files that make the node, off the server, encrypted with the passphrase kept in the password
-manager. From the developer's computer:
+files that make the node, off the server, encrypted with the passphrase the maintainer
+keeps. From the developer's computer:
 
 ```bash
 ssh -i ~/.ssh/id_ed25519_bz ubuntu@89.168.60.126 \
@@ -437,8 +489,11 @@ gpg -d ~/verisci-dkg-keys-YYYY-MM-DD.tar.gz.gpg 2>/dev/null | tar -tzf - | wc -l
 
 - **The RPC proxy**, after a change merged in `infra/rpc-proxy`: copy its `src` again (step 4)
   and `sudo systemctl restart rpc-proxy`.
-- **Caddy's configuration**, after a change in `infra/node-server`: copy the file again
-  (step 7), `caddy validate`, then `sudo systemctl reload caddy`.
+- **The Caddyfile**, after a change in `infra/node-server`: copy it again (step 7),
+  `caddy validate`, then `sudo systemctl reload caddy`.
+- **Caddy's drop-in or the daemon's unit**, after a change in `infra/node-server`: copy it
+  again (step 7 or 5), `sudo systemctl daemon-reload`, then `sudo systemctl restart caddy`
+  (or `dkg`).
 - **The DKG daemon**: the version is pinned and auto-update is off. An upgrade is deliberate:
   `sudo npm install -g … @origintrail-official/dkg@<version>`, `sudo systemctl restart dkg`,
   and the new version recorded here and in `docs/domain.md`.
@@ -452,15 +507,19 @@ The node lives in its keys: its agent address is part of every UAL it minted and
 graph ids ([ADR 0006](adr/0006-dkg-node-runs-on-a-dedicated-host.md)). Another Ubuntu server
 takes over:
 
-1. Point both DuckDNS names at the new server's address (its DuckDNS cron job, or the DuckDNS
-   website).
-2. Follow [Setting up the server](#setting-up-the-server) from step 2, with the latest key
-   backup in place of step 3: decrypt it into `~/.dkg` on the new server.
+1. Stop the old server's daemon and DuckDNS job if it can still be reached
+   (`sudo systemctl disable --now dkg`, `crontab -r`): two daemons with the same keys share
+   one peer identity and the publisher wallets' nonces, and two DuckDNS jobs move the names
+   back and forth. If it cannot be reached, regenerate the token on the DuckDNS website, so
+   its job stops moving the names.
+2. Set up the DuckDNS job on the new server ([On a new server](#on-a-new-server)).
+3. Follow [Setting up the server](#setting-up-the-server) from step 2, without step 8, with the
+   latest key backup in place of step 3: decrypt it into `~/.dkg` on the new server.
    ```bash
    mkdir -m 700 ~/.dkg
    gpg -d verisci-dkg-keys-YYYY-MM-DD.tar.gz.gpg | tar -C ~/.dkg -xzf -
    ```
-3. The new credentials go into every environment's settings.
+4. The new credentials go into every environment's settings.
 
 `to check`: how much of the graphs' content a node restored from its keys alone syncs back
 from the network. The papers and ratings are minted on chain and shared with peers, but the
@@ -468,8 +527,8 @@ papers list reads the node's own store.
 
 ## The developer's computer
 
-The node no longer runs on a developer's computer: the local pages, publish runs and
-rating runs use the server, with the `local` credential in `.env.local`:
+The node runs on the server alone: the local pages, publish runs and rating runs use it,
+with the `local` credential in `.env.local`:
 
 ```bash
 DKG_URL=https://verisci-dkg.duckdns.org
@@ -477,10 +536,19 @@ DKG_TOKEN=<VERISCI_LOCAL_TOKEN>
 GROBID_URL=https://verisci-grobid.duckdns.org
 ```
 
+To write the current `local` credential into `.env.local` without showing it, from the
+repo's root, then restart `pnpm dev`, which reads `.env.local` when it starts:
+
+```bash
+T=$(ssh -i ~/.ssh/id_ed25519_bz ubuntu@89.168.60.126 'sudo sed -n "s/^VERISCI_LOCAL_TOKEN=//p" /etc/caddy/verisci.env') \
+  && [ ${#T} -eq 64 ] && sed -i "s/^DKG_TOKEN=.*/DKG_TOKEN=$T/" .env.local; unset T
+```
+
 GROBID can also run locally in Docker (step 6, without `--restart`), with
-`GROBID_URL=http://127.0.0.1:8070`; it ignores the credential. On the computer that ran the
-node until 2026-10-17, its folder is kept as `~/.dkg.moved-2026-10-17`; never start a node
-from it again.
+`GROBID_URL=http://127.0.0.1:8070` ([ADR 0006](adr/0006-dkg-node-runs-on-a-dedicated-host.md));
+it ignores the credential. The computer that ran the node until 2026-10-17 keeps its folder
+only encrypted, as `verisci-dkg-moved-2026-10-17.tar.gz.gpg` (step 3); a node is never
+started from it again.
 
 ## Building a new node
 
@@ -571,7 +639,7 @@ used:
 | Backup RPC URLs | `none` | Public endpoints called directly would bypass the proxy's limits and caches |
 | Hub contract address | default (`0xC056e67Da4F51377Ad1B01f50F655fFdcCD809F6`) | OriginTrail's testnet Hub on Base Sepolia |
 | Chain ID | default (`base:84532`) | Base Sepolia |
-| Enable API authentication | `y` | Every API call needs the admin token, `~/.dkg/auth.token` |
+| Enable API authentication | `y` | Every API call but `/api/status` needs the admin token, `~/.dkg/auth.token` |
 
 `init` then creates four operational wallets (`~/.dkg/wallets.json`, encrypted with
 `wallets.key`) and asks OriginTrail's testnet faucet to fund them. On 2026-10-09 each got
@@ -616,8 +684,8 @@ tar -C ~/.dkg -czf - agent-key.bin agent-keystore.json auth.token config.json wa
   | gpg --symmetric --cipher-algo AES256 -o ~/verisci-dkg-keys-$(date +%F).tar.gz.gpg
 ```
 
-`gpg` asks for a passphrase, kept in the developer's password manager, never next to the
-file. Copy the `.gpg` file off the computer (on 2026-10-09: a USB key).
+`gpg` asks for a passphrase, kept by the maintainer, never next to the file. Copy the `.gpg`
+file off the computer (on 2026-10-09: a USB key).
 
 Check:
 
