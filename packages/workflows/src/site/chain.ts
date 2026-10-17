@@ -3,14 +3,18 @@ import { type Chain, createPublicClient, http } from "viem";
 /**
  * How the site's pages read the chain. Alchemy RPC's free tier serves 500 compute units a
  * second, about 19 `eth_call`s (`docs/domain.md` → Chain), and a page of papers reads each
- * paper of every contract at once, so the reads made together go out as one Multicall3 call.
+ * paper of every contract at once, so the contract reads made together go out as one
+ * Multicall3 call.
  */
 export const SITE_CHAIN_SETTINGS = {
   /** How long one call gets. */
   timeoutMs: 5_000,
   /** Tries after the first, for a call refused (429) or failed: one, so a page waits little. */
   retryCount: 1,
-  /** The wait before the retry: a refused burst is served again within the next second. */
+  /**
+   * The wait before the retry: a refused burst is served again within the next second. A 429
+   * carrying `Retry-After` is waited out for that long instead (viem's rule).
+   */
   retryDelayMs: 1_000,
   /**
    * The calldata one Multicall3 call carries, past which viem starts another (its default is
@@ -20,10 +24,11 @@ export const SITE_CHAIN_SETTINGS = {
 } as const;
 
 /**
- * The site's chain client for `chain` at `url`: reads made in the same tick share one
+ * The site's chain client for `chain` at `url`: contract reads made in the same tick share one
  * Multicall3 `aggregate3` call (on a chain without Multicall3, such as Anvil, each is its own
  * call), each call gets `timeoutMs`, and a failed one is asked once more after `retryDelayMs`.
- * `fetchFn` stands in for `fetch` in tests.
+ * A call with no contract address, such as a smart wallet's signature check (ERC-6492), is
+ * sent on its own. `fetchFn` stands in for `fetch` in tests.
  */
 export function createSiteChainClient(chain: Chain, url: string, fetchFn?: typeof fetch) {
   const { timeoutMs, retryCount, retryDelayMs, multicallBytes } = SITE_CHAIN_SETTINGS;

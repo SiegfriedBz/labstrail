@@ -19,8 +19,10 @@ import { createSiteChainClient } from "./chain.ts";
 import { queryProblem } from "./papers.ts";
 
 /**
- * How long the chain gets for one paper's ratings in the papers list: three reads one after the
- * other, each shared with the page's other papers (`createSiteChainClient`), and one retry.
+ * How long the chain gets for one paper's ratings in the papers list: three rounds of reads one
+ * after the other (the counts, the ids, the requests), each round shared with the page's other
+ * papers (`createSiteChainClient`), and one quick retry, such as after a 429. A first try that
+ * runs out its 5 s leaves no time for the retry, and the paper is `unknown`.
  */
 const SUMMARY_TIMEOUT_MS = 6_000;
 /** How long the DKG node gets for one read of a page. */

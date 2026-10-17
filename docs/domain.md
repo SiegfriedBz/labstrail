@@ -426,9 +426,13 @@ Observed on Base Sepolia (chain id 84532) with Alchemy RPC and the Alchemy Notif
   which it answers 429. On 2026-10-17 the papers list, reading 10 papers on staging's 3
   contracts at once (about 30 `eth_call`s, each its own request, tried once), showed a rated
   paper as "Not checked" after a redeploy and on hard refreshes, and its score on a later load,
-  which fits that limit. The site's pages now send reads made together as one Multicall3 call
-  (`0xcA11bde05977b3631167028862bE2a173976CA11` on Base Sepolia, in viem's chain definition),
-  one `eth_call` for the whole page, and ask a failed call once more a second later.
+  which fits that limit. The site's pages now send the contract reads made together as one
+  Multicall3 call (`0xcA11bde05977b3631167028862bE2a173976CA11` on Base Sepolia, in viem's
+  chain definition), one `eth_call` per round of reads, three for the papers list (the counts,
+  the ids, the requests), and ask a failed call once more a second later. A smart wallet's
+  signature check is a deployless `eth_call` with no contract address (ERC-6492), which
+  Multicall3 cannot carry, so each is its own call; a wallet's plain signature is checked
+  without the chain.
 - **The Alchemy Notify webhook delivers a log to every rule matching its contract:** keep exactly one
   rule per contract, or one request reaches two oracles.
 - **Each Alchemy Notify webhook signs with its own key:** `X-Alchemy-Signature` is the hex

@@ -2,8 +2,8 @@ import { RATINGS_TITLE, READINESS_INTRO, READINESS_TITLE } from "./labels.ts";
 
 /**
  * The ratings section's shape while the chain answers: its real headings, the score and the
- * button pulsing. It holds the section's `#rating` anchor, so the papers list's Rate link lands
- * here before the section streams in.
+ * button pulsing. It carries the section's `#rating` id; the section itself scrolls into view
+ * once it streams in (`ScrollToRating`), since the browser looks for the hash before then.
  */
 export function RatingsSkeleton() {
   return (
