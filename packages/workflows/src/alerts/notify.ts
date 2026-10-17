@@ -14,7 +14,7 @@ export interface Notice {
 
 /** What {@link createNotify} needs: the chat, and the IO it sends and logs with. */
 export interface NotifyOptions {
-  /** The environment, which prefixes every message: one chat serves them all. */
+  /** The environment, named in every message: one chat serves them all. */
   readonly appEnv: string;
   /** The bot's token. Secret: never logged. Without it, or the chat, messages are only logged. */
   readonly botToken: string | undefined;

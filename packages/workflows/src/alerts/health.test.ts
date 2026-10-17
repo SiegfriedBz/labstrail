@@ -234,26 +234,29 @@ describe("runHealthCheck: the DKG node", () => {
   it.each<[string, Awaited<ReturnType<HealthDeps["readNodeStatus"]>>, string]>([
     ["does not answer", { ok: false, reason: "unreachable" }, "unreachable"],
     ["answers with an error", { ok: false, reason: "unexpected", status: 502 }, "unexpected (502)"],
+    [
+      "refuses the status read",
+      { ok: false, reason: "unauthorized", status: 401 },
+      "unauthorized (401)",
+    ],
   ])("alerts when the node %s", async (_, status, reason) => {
     const { problems } = await check(deps({}, { readNodeStatus: async () => status }));
 
-    expect(problems).toEqual([`DKG node ${NODE} did not answer: ${reason}`]);
+    expect(problems).toEqual([`DKG node ${NODE}: status check failed, ${reason}`]);
   });
 
-  it("alerts when the environment's graph is not finalized on chain", async () => {
+  it.each([
+    ["accepted", "chain-pending"],
+    ["authority-resolution-failed", "finalized-chain"],
+  ])("alerts when the environment's graph is %s from %s", async (authorityState, policySource) => {
     const { problems } = await check(
       deps(
         {},
-        {
-          readNodeStatus: async () => ({
-            ok: true,
-            graph: { authorityState: "accepted", policySource: "chain-pending" },
-          }),
-        },
+        { readNodeStatus: async () => ({ ok: true, graph: { authorityState, policySource } }) },
       ),
     );
 
-    expect(problems).toEqual([`DKG node: ${GRAPH} is accepted/chain-pending`]);
+    expect(problems).toEqual([`DKG node: ${GRAPH} is ${authorityState}/${policySource}`]);
   });
 
   it("alerts when the node does not list the environment's graph", async () => {
@@ -275,7 +278,7 @@ describe("runHealthCheck: the DKG node", () => {
     );
 
     expect(alert).toHaveBeenCalledExactlyOnceWith(
-      `DKG node ${NODE} did not answer: unreachable
+      `DKG node ${NODE}: status check failed, unreachable
 oracle ${ORACLE} holds 0.004999999999999999 ETH, under 0.005`,
     );
   });

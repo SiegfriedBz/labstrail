@@ -117,7 +117,7 @@ async function nodeProblems(deps: HealthDeps): Promise<string[]> {
   if (!status.ok) {
     const reason =
       status.status === undefined ? status.reason : `${status.reason} (${status.status})`;
-    return [`DKG node ${deps.node} did not answer: ${reason}`];
+    return [`DKG node ${deps.node}: status check failed, ${reason}`];
   }
   if (status.graph === undefined) return [`DKG node: ${deps.graph} is not listed`];
   const { authorityState, policySource } = status.graph;

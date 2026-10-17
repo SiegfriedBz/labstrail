@@ -477,8 +477,9 @@ describe("readStatus", () => {
   });
 
   it("reads this graph's authority with no credential, the address in any case", async () => {
+    const other = { ...accepted(`${AGENT}/verisci-prod`), policySource: "chain-pending" };
     const { client, calls } = fakeNode({
-      [STATUS]: [catalog(accepted(`${AGENT}/verisci-prod`), accepted(GRAPH.toLowerCase()))],
+      [STATUS]: [catalog(other, accepted(GRAPH.toLowerCase()))],
     });
 
     expect(await client.readStatus()).toEqual({
@@ -496,6 +497,7 @@ describe("readStatus", () => {
 
   it.each<[string, Reply, unknown]>([
     ["a gateway error", { status: 502 }, { ok: false, reason: "unexpected", status: 502 }],
+    ["a refusal", { status: 401 }, { ok: false, reason: "unauthorized", status: 401 }],
     [
       "a body with no catalog",
       { status: 200, body: { version: "10.0.22" } },

@@ -1,6 +1,7 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { describeFailure, type LimitAnswer, type SubmitLimiter } from "@verisci/workflows";
+import type { WebEnv } from "../web-env.ts";
 
 /** How much one visitor may ask for, per rolling day (ADR 0035). */
 export const UPLOAD_LIMITS = {
@@ -100,7 +101,7 @@ export interface UpstashSettings {
  */
 export function createLimits(
   upstash: UpstashSettings,
-  appEnv: string,
+  appEnv: WebEnv["APP_ENV"],
 ): { urls: Counter; submissions: Counter } {
   if (!upstash.url || !upstash.token) {
     return {

@@ -76,7 +76,8 @@ export interface DkgClient {
    * Reads the node's health check (`GET /api/status`), which is open, so it sends no
    * credential (ADR 0039): this client's graph as the node's catalog lists it (address in any
    * case), `undefined` when it is not listed, or a failure when the node does not answer
-   * (`unreachable`) or answers otherwise (`unexpected` with its status).
+   * (`unreachable`), refuses (`unauthorized`) or answers otherwise (`unexpected` with its
+   * status).
    */
   readStatus(): Promise<NodeStatus>;
 }

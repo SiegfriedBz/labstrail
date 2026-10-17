@@ -95,7 +95,7 @@ describe("createLimits", () => {
 
     /** The keys of every command the limits send to Upstash while `use` runs. */
     async function keysSent(
-      appEnv: string,
+      appEnv: "staging" | "production",
       use: (limits: ReturnType<typeof createLimits>) => Promise<unknown>,
     ) {
       const bodies: string[] = [];
@@ -107,7 +107,7 @@ describe("createLimits", () => {
       return bodies.join("\n");
     }
 
-    it.each(["staging", "production"])("names %s's counters after it", async (appEnv) => {
+    it.each(["staging", "production"] as const)("names %s's counters after it", async (appEnv) => {
       const sent = await keysSent(appEnv, async ({ urls, submissions }) => {
         await urls.take("203.0.113.7");
         await submissions.count("0xa");

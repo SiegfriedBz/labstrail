@@ -51,6 +51,20 @@ describe("createNotify", () => {
     );
   });
 
+  it("leaves the link line out of activity with no link", async () => {
+    const { notify, fetch } = setup();
+
+    await notify({
+      level: "activity",
+      text: "⚠️ Rating cancelled: can't be rated",
+      title: "A paper",
+    });
+
+    expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body)).text).toBe(
+      "<b>⚠️ Rating cancelled: can't be rated</b> · staging\n<b>A paper</b>",
+    );
+  });
+
   it("escapes what Telegram would read as HTML, in the text, the title and the link", async () => {
     const { notify, fetch } = setup();
 
