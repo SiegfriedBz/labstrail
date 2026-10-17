@@ -50,7 +50,7 @@ Built:
   before acting, so a retry never duplicates anything
   ([ADR 0007](docs/adr/0007-all-writes-converge.md)).
 - **Staging and production are kept apart**, with their own contracts, graphs,
-  oracle wallets and limit stores (production's graph and store come with its first app
+  oracle wallets and limit stores (production's limit store comes with its first app
   deployment); the DKG node, the Reown project, the pinning account and the alerts chat
   are shared ([ADR 0005](docs/adr/0005-staging-and-production-are-isolated.md)).
 - **A requested paper is rated.** A rating run reads the paper's text, has an LLM answer
@@ -78,7 +78,7 @@ Built:
   a failed run, wallets running low and requests pending too long
   ([ADR 0038](docs/adr/0038-alerts-go-to-one-telegram-chat.md)).
 
-Next: the DKG node on a server, then the first deploy, so the deployed app reaches them.
+Next: the first deploy, so the deployed app reaches them.
 
 Terms:
 
@@ -110,9 +110,8 @@ shows them in a browser.
 ### Environments and resources
 
 Each environment has its own context graph on the shared DKG node
-([ADR 0005](docs/adr/0005-staging-and-production-are-isolated.md)); staging's exists today,
-production's comes with production's first app deployment. Our node
-publishes the ratings of every contract of an environment to that environment's
+([ADR 0005](docs/adr/0005-staging-and-production-are-isolated.md)): `verisci-staging` and
+`verisci-prod`. Our node publishes the ratings of every contract of an environment to that environment's
 graph, so a redeployed contract keeps the graph of the one it replaces; the old
 contract is paused and drained ([ADR 0023](docs/adr/0023-a-fix-is-a-redeploy-owner-powers-fixed.md)).
 Each contract's R-KA names are its own, because the request id hashes the chain
@@ -292,8 +291,8 @@ TypeScript source, with no build step; Next.js compiles them through
 | [`packages/workflows`](packages/workflows/README.md) | Inngest workflows and the pages' calls | core, env, dkg, contracts |
 | [`infra/rpc-proxy`](infra/rpc-proxy/README.md) | JSON-RPC proxy run on the DKG node server | none |
 
-Also [`infra/node-server`](infra/node-server/README.md), not a workspace: the DKG node server's
-Caddy site and the daemon's systemd unit, copied to the server by hand
+Also [`infra/node-server`](infra/node-server/README.md): the DKG node server's Caddy site and
+systemd units, configuration copied to the server by hand
 ([`docs/node-host.md`](docs/node-host.md)).
 
 Each workspace may only import the workspaces it declares. pnpm does not

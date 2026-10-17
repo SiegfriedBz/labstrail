@@ -1,0 +1,1 @@
+An Oracle Cloud Always Free VM (VM.Standard.A1.Flex, ARM, 2 OCPUs, 12 GB, eu-paris-1) is the DKG node server: it runs the DKG daemon, its RPC proxy, GROBID and Caddy (docs/node-host.md, ADR 0006). The Oracle account that owns it is locked, so the VM is managed over SSH alone, and a lost server is rebuilt on another machine from the encrypted key backup.

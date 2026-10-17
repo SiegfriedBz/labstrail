@@ -3,7 +3,7 @@
 pnpm + Turborepo monorepo: a Next.js 16 app (`apps/web`), five internal packages
 (`packages/{env,core,dkg,contracts,workflows}`) and the DKG node server's RPC proxy
 (`infra/rpc-proxy`, run with plain Node, imported by nothing), plus the node server's config
-files (`infra/node-server`, not a workspace). TypeScript 6, strict.
+files (`infra/node-server`, copied there by hand). TypeScript 6, strict.
 Packages ship source (`exports` → `./src/index.ts`), no build step; Next compiles them via
 `transpilePackages`.
 
@@ -41,10 +41,10 @@ Toolchain: Node 24.21.0 (`.nvmrc`), pnpm 10.34.6 via Corepack, Foundry 1.8.4. If
   (`src/env.ts`, which may import its schema from a file next to it such as
   `src/dkg-env.ts`; `lib/web-env.ts` in `apps/web`) with `defineEnv` from `@verisci/env`,
   and adds it to `.env.example` in the same PR (a dev script in `scripts/` declares the
-  variables only it reads in the script). Programs that run on the DKG node server
-  (`infra/*`) read their own settings instead, listed in their README (ADR 0004). Forge's
-  deploy settings go in `.env.example`'s Foundry section instead; per-deploy choices such
-  as `DEPLOY_ENV` go on the deploy command (ADR 0004).
+  variables only it reads in the script). The repo's programs that run on the DKG node
+  server (`infra/rpc-proxy`) read their own settings instead, listed in their README
+  (ADR 0004). Forge's deploy settings go in `.env.example`'s Foundry section instead;
+  per-deploy choices such as `DEPLOY_ENV` go on the deploy command (ADR 0004).
 - Pin every dependency exactly (`pnpm add -E`). No ESLint or Prettier: Biome does both.
 - Coverage thresholds live in the root `vitest.config.ts` (path globs); Vitest 5 forbids
   coverage settings in project configs.

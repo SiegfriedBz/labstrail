@@ -288,8 +288,9 @@ after each paper. It never publishes, stores or rates anything.
 
 `score-papers --field [id…]` runs only the publish run's field check instead: it reads each
 cached PDF as the publish run does (GROBID's header and the start of the text, so it also
-needs `GROBID_URL`, and `DKG_TOKEN` for the node server's GROBID), asks `checkField`, and prints the expected and the found field with
-Gemini's reason. Each paper costs one Flash-Lite request, which has its own daily limit.
+needs `GROBID_URL`, and `DKG_TOKEN` for the node server's GROBID), asks `checkField`, and
+prints the expected and the found field with Gemini's reason. Each paper costs one
+Flash-Lite request, which has its own daily limit.
 
 A scoring run costs one `gemini-3.8-flash` request per paper, and the free tier allows 20 of
 those a day per Google project (`docs/domain.md` → Gemini): a full run uses 14 of them. To try a change within a day, run

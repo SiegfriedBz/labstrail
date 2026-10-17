@@ -6,9 +6,10 @@
 //
 //   pnpm --filter @verisci/workflows score-papers [--field] [id…]
 //
-// Reads GEMINI_API_KEY (and GROBID_URL with --field, with DKG_TOKEN as GROBID's credential on the
-// node server) from the root .env.local (packages/workflows README). Downloads each PDF once into node_modules/.cache/verisci-reference/, and writes each
-// run's answers there too, after each paper, so a run that stops keeps the answers it paid for.
+// Reads GEMINI_API_KEY (and GROBID_URL with --field, with DKG_TOKEN as GROBID's credential on
+// the node server) from the root .env.local (packages/workflows README). Downloads each PDF
+// once into node_modules/.cache/verisci-reference/, and writes each run's answers there too,
+// after each paper, so a run that stops keeps the answers it paid for.
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { setTimeout as sleep } from "node:timers/promises";
 import {

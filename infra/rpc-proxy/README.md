@@ -26,8 +26,8 @@ connect).
 
 Before it accepts a write, the daemon resolves each context graph's policy from chain
 history: long `eth_getLogs` ranges plus many `eth_call`s, again and again. Alchemy RPC's free
-tier caps `eth_getLogs` at 10 blocks, and public endpoints throttle bursts. On the previous
-host, the earlier proxy sent every call except log reads to Alchemy RPC first, with no limit,
+tier caps `eth_getLogs` at 10 blocks, and public endpoints throttle bursts. On this same
+server, the prototype's proxy sent every call except log reads to Alchemy RPC first, with no limit,
 and used up the free tier after a few weeks (`docs/domain.md` → DKG).
 
 ## What it does
