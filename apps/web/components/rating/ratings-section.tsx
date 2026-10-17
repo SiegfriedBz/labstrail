@@ -11,6 +11,7 @@ import { ratingChainConfig } from "../../lib/rating/chain.ts";
 import { createWebEnv } from "../../lib/web-env.ts";
 import { RATINGS_TITLE, READINESS_INTRO, READINESS_TITLE } from "./labels.ts";
 import { RateButton } from "./rate-button.tsx";
+import { ScrollToRating } from "./scroll-to-rating.tsx";
 
 /** The rating phases, as the home page's "How it works" names them: only the first runs. */
 const PHASES = [
@@ -23,10 +24,12 @@ const PHASES = [
  * A published paper's ratings, read from the environment's contracts on the server inside the
  * paper page's `Suspense`. Phase 1 leads: its latest score (the contract's, ADR 0014) with a
  * link to its checks, or the paper's state as the papers list words it (`summariseRatings`),
- * and the button that requests a new rating, left out for a paper that can't be rated. Every
+ * and the button that requests a new rating ("Rate again" under a score, ADR 0013), left out
+ * for a paper that can't be rated. Every
  * rating follows, newest first, then the three phases. Reads nothing where no contract takes
  * ratings (no deployment, or locally without the Anvil settings). The section is `#rating`,
- * the papers list's Rate link.
+ * the papers list's Rate link, and scrolls into view when the page was opened at it
+ * (`ScrollToRating`).
  */
 export async function RatingsSection({ ual, cid }: { ual: string; cid: string }) {
   const config = ratingChainConfig(createWebEnv());
@@ -67,8 +70,15 @@ export async function RatingsSection({ ual, cid }: { ual: string; cid: string })
           <Current summary={summary} ratings={list.ratings} cid={cid} />
           {summary.kind !== "cannot-rate" && (
             <div className="grid gap-2">
-              <RateButton ual={ual} cid={cid} config={config} />
+              <RateButton
+                ual={ual}
+                cid={cid}
+                config={config}
+                label={summary.kind === "scored" ? "Rate again" : "Rate this paper"}
+              />
               <p className="text-xs leading-relaxed text-muted">
+                {summary.kind === "scored" &&
+                  "A new rating adds its own score, and the latest one shows here. "}
                 {config.local
                   ? "Local mode: requests go to the Anvil chain on this computer."
                   : "Free on testnet: you pay only gas. A wallet can have 3 ratings waiting at a time."}
@@ -129,6 +139,7 @@ function Section({ children }: { children: React.ReactNode }) {
         {RATINGS_TITLE}
       </h2>
       {children}
+      <ScrollToRating />
     </section>
   );
 }

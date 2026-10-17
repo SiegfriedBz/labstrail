@@ -17,8 +17,16 @@ import { useWalletReady } from "../wallet/providers.tsx";
 /** How long the button waits for the request's transaction to be mined. */
 const RECEIPT_TIMEOUT_MS = 90_000;
 
-/** The "Rate this paper" button, or a note when the wallet window is not set up on this server. */
-export function RateButton(props: { ual: string; cid: string; config: RatingChainConfig }) {
+/**
+ * The button that requests a rating, labelled `label` ("Rate this paper" unless given), or a
+ * note when the wallet window is not set up on this server.
+ */
+export function RateButton(props: {
+  ual: string;
+  cid: string;
+  config: RatingChainConfig;
+  label?: string;
+}) {
   if (!useWalletReady()) {
     return (
       <p className="text-sm text-muted">
@@ -36,7 +44,17 @@ type Phase = "idle" | "sending" | "confirming";
  * which follows it. Names a revert it knows, and says when the request is on chain but its
  * receipt or, locally, its announce did not come.
  */
-function RateFlow({ ual, cid, config }: { ual: string; cid: string; config: RatingChainConfig }) {
+function RateFlow({
+  ual,
+  cid,
+  config,
+  label = "Rate this paper",
+}: {
+  ual: string;
+  cid: string;
+  config: RatingChainConfig;
+  label?: string;
+}) {
   const router = useRouter();
   const wagmi = useConfig();
   const { address, chainId } = useAccount();
@@ -101,7 +119,7 @@ function RateFlow({ ual, cid, config }: { ual: string; cid: string; config: Rati
           ? "Confirm in your wallet"
           : phase === "confirming"
             ? "Waiting for the transaction"
-            : "Rate this paper"}
+            : label}
       </button>
       {result && <ResultNote result={result} cid={cid} />}
     </div>

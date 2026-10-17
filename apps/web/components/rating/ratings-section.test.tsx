@@ -16,9 +16,9 @@ vi.mock("@verisci/workflows", async (importOriginal) => ({
 }));
 vi.mock("../../lib/web-env.ts", () => ({ createWebEnv: () => env }));
 vi.mock("./rate-button.tsx", () => ({
-  RateButton: ({ config }: { config: unknown }) => (
+  RateButton: ({ config, label }: { config: unknown; label?: string }) => (
     <button type="button" data-config={JSON.stringify(config)}>
-      Rate this paper
+      {label ?? "Rate this paper"}
     </button>
   ),
 }));
@@ -97,6 +97,30 @@ describe("RatingsSection", () => {
     expect(screen.getByRole("link", { name: "Follow it" }).getAttribute("href")).toBe(
       `/papers/${CID}/ratings/${id(1)}`,
     );
+  });
+
+  it("offers to rate a scored paper again, saying a new rating adds its own score", async () => {
+    listRatings.mockResolvedValue({
+      ok: true,
+      ratings: [
+        {
+          requestId: id(1),
+          contract: CONTRACT,
+          status: "fulfilled",
+          score: 54,
+          rKaUal: "x",
+          requestedAt: 1_791_900_000,
+        },
+      ],
+    });
+
+    await show();
+
+    expect(screen.getByRole("button", { name: "Rate again" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Rate this paper" })).toBeNull();
+    expect(
+      screen.getByText(/A new rating adds its own score, and the latest one shows here\./),
+    ).toBeTruthy();
   });
 
   it("says a paper never rated is not rated yet, what a rating does, and shows the button", async () => {

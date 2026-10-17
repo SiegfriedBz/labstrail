@@ -32,7 +32,7 @@ points the optional `@x402/*` packages, reached through wagmi's connectors, at
 | `/` | Home: what VeriSci does, with a demo that publishes a paper and then rates it, the latest papers (the five newest, streamed in with a skeleton, linking to `/papers`), the DKG's two layers (the record off-chain, its ERC-721 token and merkle root on-chain, the UAL linking them), how publishing and rating work (phase 1 live, human review and replication to come), and an example paper asset |
 | `/publish` | Connect a wallet, drop a PDF, sign once; what publishing means and the limits ([ADR 0010](../../docs/adr/0010-pdf-to-target-ka-pipeline.md), [ADR 0034](../../docs/adr/0034-users-connect-a-wallet-anyone-may-publish.md)) |
 | `/papers?page=<n>` | Every paper this environment published, newest mint first, 20 to a page, each with its score (below) |
-| `/papers/<cid>?event=<id>` | Where a paper stands, then its record, abstract and how to verify it, and its Ratings section (`#rating`) once published (below), under "Papers / <title>" breadcrumbs. `?already=1` says a re-submitted PDF was already published |
+| `/papers/<cid>?event=<id>` | Where a paper stands, then its record, abstract and how to verify it, and its Ratings section (`#rating`, scrolled into view when the page opens at it, `components/rating/scroll-to-rating.tsx`) once published (below), under "Papers / <title>" breadcrumbs. `?already=1` says a re-submitted PDF was already published |
 | `/api/papers/<cid>?event=<id>` | The same as JSON (`PaperView`: the stage, and the record once published), never cached: a read, so a route rather than a server action |
 | `/papers/<cid>/ratings/<requestId>` | One rating: where it stands until it is scored, then its score and every check behind it, or why it was cancelled (below), under "Papers / <title> / Rating" breadcrumbs |
 | `/api/ratings/<requestId>` | The same as JSON (`RatingView`), never cached, for the rating page to poll; not-found for an id that is not `0x` + 64 hex digits, or where no contract takes ratings |
@@ -186,7 +186,9 @@ behind a skeleton with the real headings (`components/rating/ratings-section.tsx
   to its checks; "Rating in progress" with a link to follow it; "Can't be rated" when a request
   was cancelled as invalid; or "Not rated yet" with what a rating does. The words are the
   papers list's (`summariseRatings`).
-- **Rate this paper** (`components/rating/rate-button.tsx`, the flow in
+- **Rate this paper**, or **Rate again** under a score with a line saying a new rating adds its
+  own score ([ADR 0013](../../docs/adr/0013-several-ratings-per-paper.md))
+  (`components/rating/rate-button.tsx`, the flow in
   `lib/rating/request-flow.ts`): connects the wallet or switches it to the rating chain, sends
   `requestPhase1(ual)` to the environment's current contract
   ([ADR 0023](../../docs/adr/0023-a-fix-is-a-redeploy-owner-powers-fixed.md)), waits up to 90 s
