@@ -32,9 +32,9 @@ points the optional `@x402/*` packages, reached through wagmi's connectors, at
 | `/` | Home: what VeriSci does, with a demo that publishes a paper and then rates it, the latest papers (the five newest, streamed in with a skeleton, linking to `/papers`), the DKG's two layers (the record off-chain, its ERC-721 token and merkle root on-chain, the UAL linking them), how publishing and rating work (phase 1 live, human review and replication to come), and an example paper asset |
 | `/publish` | Connect a wallet, drop a PDF, sign once; what publishing means and the limits ([ADR 0010](../../docs/adr/0010-pdf-to-target-ka-pipeline.md), [ADR 0034](../../docs/adr/0034-users-connect-a-wallet-anyone-may-publish.md)) |
 | `/papers?page=<n>` | Every paper this environment published, newest mint first, 20 to a page, each with its score (below) |
-| `/papers/<cid>?event=<id>` | Where a paper stands, then its record, abstract and how to verify it, and its Ratings section (`#rating`) once published (below), under "Papers / <title>" breadcrumbs. `?already=1` says a re-submitted PDF was already published |
+| `/papers/<cid>?event=<id>` | Where a paper stands, then its record, abstract and how to verify it, and its Ratings section (`#rating`, scrolled into view when the page opens at it, `components/rating/scroll-to-rating.tsx`) once published (below), under "Papers / <title>" breadcrumbs. `?already=1` says a re-submitted PDF was already published |
 | `/api/papers/<cid>?event=<id>` | The same as JSON (`PaperView`: the stage, and the record once published), never cached: a read, so a route rather than a server action |
-| `/papers/<cid>/ratings/<requestId>` | One rating: where it stands until it is scored, then its score and every check behind it, or why it was cancelled (below), under "Papers / <title> / Rating" breadcrumbs |
+| `/papers/<cid>/ratings/<requestId>` | One rating: where it stands until it is scored, then its score and every check behind it, or why it was cancelled (below), under "Papers / <title> / Rating" breadcrumbs. `?new=1`, from the Rate button, follows a request the chain doesn't show yet for 2 minutes |
 | `/api/ratings/<requestId>` | The same as JSON (`RatingView`), never cached, for the rating page to poll; not-found for an id that is not `0x` + 64 hex digits, or where no contract takes ratings |
 | `/api/inngest` | Serves the Inngest functions: the publish function and the failure alerts, plus the rating, oracle, reconciler and health functions where the oracle key is set |
 | `POST /api/webhooks/alchemy` | The Alchemy Notify webhook's deliveries: hands the raw body and `X-Alchemy-Signature` to the workflows' intake (`getWebhookIntake`) and answers its status, with an empty body: 200, 401 (bad signature), 400 (not a delivery), 503 (Inngest refused, so Alchemy Notify delivers again), or 404 where `ALCHEMY_WEBHOOK_SIGNING_KEY` is unset (`packages/workflows` README → The Alchemy Notify webhook) |
@@ -93,7 +93,7 @@ shaped like the table (`components/papers/papers-table-skeleton.tsx`).
   in words, summed by `summariseRatings`, the rule the paper page
   shares: "Pending", "Can't be rated" (a request was cancelled as invalid), "Not rated" with a
   Rate link to the paper's Ratings section where a contract takes ratings, or "Not checked"
-  when the chain did not answer within 3 s, so a slow chain never holds the list
+  when the chain did not answer within 6 s, so a slow chain never holds the list
   (`lib/papers/ratings.ts` → `withRatings`).
 - A node that does not answer says the list can't be loaded, with a link to try again; an
   answer that can't be read (a refused query, or a page the total covers with no readable
@@ -186,12 +186,14 @@ behind a skeleton with the real headings (`components/rating/ratings-section.tsx
   to its checks; "Rating in progress" with a link to follow it; "Can't be rated" when a request
   was cancelled as invalid; or "Not rated yet" with what a rating does. The words are the
   papers list's (`summariseRatings`).
-- **Rate this paper** (`components/rating/rate-button.tsx`, the flow in
+- **Rate this paper**, or **Rate again** under a score with a line saying a new rating adds its
+  own score ([ADR 0013](../../docs/adr/0013-several-ratings-per-paper.md))
+  (`components/rating/rate-button.tsx`, the flow in
   `lib/rating/request-flow.ts`): connects the wallet or switches it to the rating chain, sends
   `requestPhase1(ual)` to the environment's current contract
   ([ADR 0023](../../docs/adr/0023-a-fix-is-a-redeploy-owner-powers-fixed.md)), waits up to 90 s
   for the receipt, reads the request id from its `Phase1Requested` log and opens the rating's
-  page. Locally, it first has the server announce the request (`announceLocalRating`), since no
+  page, marked `?new=1` as just requested (`lib/rating/stage.ts` → `newRatingPath`). Locally, it first has the server announce the request (`announceLocalRating`), since no
   Alchemy Notify webhook watches Anvil
   ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)); when that fails, it says the
   request is on chain but its rating didn't start, and that the `pnpm dev` terminal says why
@@ -242,7 +244,10 @@ stateDiagram-v2
   be rated (outside the field, a PDF whose text can't be read, not one of VeriSci's papers,
   or no usable answer from the scoring model), or the rating couldn't finish within a day.
 - A rating no contract holds, one of another paper, or any under a paper that isn't
-  published, is the not-found page. A chain that does not answer is asked again, and a rating
+  published, is the not-found page. Opened with `?new=1`, the page follows a request no
+  contract holds yet for 2 minutes (`FRESH_WAIT_MS`), headed "Checking on this rating", before
+  it reads "No rating here": the wallet's receipt can come back a few seconds before the site's
+  RPC shows the request (`whileFresh`). A chain that does not answer is asked again, and a rating
   it then shows of another paper reads "No rating here". A DKG node that does not answer leaves the rating showing,
   from the chain, under the paper's short address, with a note that the title and checks
   can't be shown ([ADR 0021](../../docs/adr/0021-server-reads-return-typed-results.md)).
@@ -322,7 +327,8 @@ The "Clinical" look: a clinical record with an on-chain proof, in Tailwind CSS v
   for the tab, in fixed colours that read on light and dark tabs) is a heartbeat whose last
   beat is a check, drawn from the record's blue into the proof's teal.
 - Keyboard users get a skip link and one accent focus ring; the header underlines the
-  current page's link in blue. On phones the wallet button is a wallet icon (with a dot
+  current section's link in blue: Publish on `/publish`, Papers on the list and on every paper
+  and rating page (`components/site/nav-link.tsx`). On phones the wallet button is a wallet icon (with a dot
   once connected) beside the theme button, so the header keeps one line; once connected it
   is named by the short address it shows, and AppKit's own window opens from it.
 - What the DKG node answers loads behind a skeleton shaped like what replaces it, streamed

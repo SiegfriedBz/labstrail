@@ -1,1 +1,1 @@
-The chain did not answer, or the node did not answer for a pending rating's stage: shown as such, and asked again on the next poll.
+The chain did not answer, or the node did not answer for a pending rating's stage, or, on a page opened right after the request (?new=1), no contract holds it yet (whileFresh, for FRESH_WAIT_MS, 2 minutes): headed "Checking on this rating", and asked again on the next poll.

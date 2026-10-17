@@ -8,24 +8,25 @@ import {
 import { parseRating, type RatingRecord, ratingQuery, rKaName } from "@verisci/core";
 import { createDkgClient, type DkgClient } from "@verisci/dkg";
 import { defineEnv, sharedEnv } from "@verisci/env";
-import { createPublicClient, type Hex, http } from "viem";
+import type { Hex } from "viem";
 import { anvil, baseSepolia } from "viem/chains";
 import { inngest } from "../inngest.ts";
 import { environmentContracts } from "../rating/contracts.ts";
 import { type ContractLog, ratingRequestedEvent } from "../rating/events.ts";
 import { localChainSchema } from "../rating-env.ts";
 import { createWorkflowsEnv } from "../workflows-env.ts";
+import { createSiteChainClient } from "./chain.ts";
 import { queryProblem } from "./papers.ts";
 
-/** How long the chain gets for one paper's ratings in the papers list. */
-const SUMMARY_TIMEOUT_MS = 3_000;
+/**
+ * How long the chain gets for one paper's ratings in the papers list: three rounds of reads one
+ * after the other (the counts, the ids, the requests), each round shared with the page's other
+ * papers (`createSiteChainClient`), and one quick retry, such as after a 429. A first try that
+ * runs out its 5 s leaves no time for the retry, and the paper is `unknown`.
+ */
+const SUMMARY_TIMEOUT_MS = 6_000;
 /** How long the DKG node gets for one read of a page. */
 const PAGE_TIMEOUT_MS = 15_000;
-/**
- * How long the chain gets for one call of a page, tried once: a page reads the environment's
- * contracts at once, so a chain that doesn't answer costs a page about this long.
- */
-const CHAIN_TIMEOUT_MS = 5_000;
 
 /** One rating request of a paper, as its contract holds it. */
 export interface RatingSummary {
@@ -53,7 +54,7 @@ export type RatingListResult =
  * A paper's rating, as the papers list and the paper page show it ({@link summariseRatings}):
  * the latest fulfilled score; `pending` when none is fulfilled and one is pending;
  * `cannot-rate` when a request was cancelled `invalid-target`; `unrated` otherwise; `unknown`
- * when the chain did not answer in 3 s.
+ * when the chain did not answer in 6 s.
  */
 export type PaperRatingSummary =
   | { readonly kind: "scored"; readonly score: number; readonly requestId: string }
@@ -94,7 +95,7 @@ export type AnnounceResult =
 export interface RatingService {
   /** Every rating of `targetUal` on this environment's contracts, oldest first. */
   listRatings(targetUal: string): Promise<RatingListResult>;
-  /** Each paper's rating summary, in the order of `targetUals`; never more than 3 s per paper. */
+  /** Each paper's rating summary, in the order of `targetUals`; never more than 6 s per paper. */
   paperRatingSummaries(targetUals: readonly string[]): Promise<readonly PaperRatingSummary[]>;
   /** One rating by its request id: its request, its stage while pending, its R-KA once fulfilled. */
   readRating(requestId: string): Promise<RatingView>;
@@ -307,13 +308,10 @@ export function getRatingService(): RatingService {
   const localChain = local
     ? defineEnv({ extends: [sharedEnv], server: localChainSchema, runtimeEnv: process.env })
     : undefined;
-  // One try per call, so a page waits at most `CHAIN_TIMEOUT_MS` per read: viem's default
-  // retries a timed-out call three times.
-  const transport = http(localChain ? localChain.LOCAL_CHAIN_RPC_URL : env.CHAIN_RPC_URL, {
-    timeout: CHAIN_TIMEOUT_MS,
-    retryCount: 0,
-  });
-  const client = createPublicClient({ chain: local ? anvil : baseSepolia, transport });
+  const client = createSiteChainClient(
+    local ? anvil : baseSepolia,
+    localChain ? localChain.LOCAL_CHAIN_RPC_URL : env.CHAIN_RPC_URL,
+  );
   const dkg = createDkgClient({
     url: env.DKG_URL,
     token: env.DKG_TOKEN,

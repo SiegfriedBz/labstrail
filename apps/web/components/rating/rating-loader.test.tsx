@@ -20,10 +20,18 @@ vi.mock("next/navigation", () => ({
   },
 }));
 vi.mock("./rating-progress.tsx", () => ({
-  RatingProgress: (props: { title: string; ual?: string; local: boolean; nodeDown?: boolean }) => (
+  RatingProgress: (props: {
+    title: string;
+    ual?: string;
+    local: boolean;
+    nodeDown?: boolean;
+    fresh?: boolean;
+    initial: RatingView;
+  }) => (
     <p>
       progress of {props.title}, local {String(props.local)}, node down{" "}
       {String(props.nodeDown ?? false)}, paper {props.ual ?? "unknown"}
+      {props.fresh ? `, fresh, ${props.initial.ok ? "found" : props.initial.reason}` : ""}
     </p>
   ),
 }));
@@ -95,6 +103,19 @@ describe("RatingLoader", () => {
     await expect(RatingLoader({ cid: CID, requestId: REQUEST_ID })).rejects.toThrow(
       "NEXT_NOT_FOUND",
     );
+  });
+
+  it("follows a request no contract holds yet when the page was opened right after it", async () => {
+    readRating.mockResolvedValue({ ok: false, reason: "not-found" });
+    readPaper.mockResolvedValue(PUBLISHED);
+
+    render(await RatingLoader({ cid: CID, requestId: REQUEST_ID, fresh: true }));
+
+    expect(
+      screen.getByText(
+        `progress of RNAi therapies, local false, node down false, paper ${UAL}, fresh, unavailable`,
+      ),
+    ).toBeTruthy();
   });
 
   it("still follows a rating the chain didn't answer for, with the paper's UAL to check it by", async () => {

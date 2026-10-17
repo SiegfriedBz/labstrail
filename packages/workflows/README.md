@@ -505,9 +505,16 @@ papers list:
 `getRatingService()` serves the rating parts of the pages: the paper's page, each rating's
 page and its `/api/ratings/<id>` route, and the papers list's Score column. It reads the
 environment's contracts, current and past, on Base Sepolia, or locally only the Anvil one
-([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)), and needs no oracle key. Each
-chain call is tried once and gets 5 s, and the contracts are read at once, so a chain that does
-not answer costs a page about 5 s ([ADR 0021](../../docs/adr/0021-server-reads-return-typed-results.md)).
+([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)), and needs no oracle key.
+Its chain client (`createSiteChainClient` in `src/site/chain.ts`) sends the contract reads a
+page makes together, every paper on every contract, as one Multicall3 call, since Alchemy
+RPC's free tier serves about 19 calls a second (`docs/domain.md` → Chain): the papers list
+makes three such calls one after the other (the counts, the ids, the requests). Each call
+gets 5 s and is asked once more a second after a failure or a 429 (longer when a 429 carries
+`Retry-After`, which viem waits out), so a chain that does not answer costs a page about 11 s
+([ADR 0021](../../docs/adr/0021-server-reads-return-typed-results.md)). On Anvil, which has no
+Multicall3, each read is its own call. The upload service's client is the same; a smart
+wallet's signature check, an `eth_call` with no contract address, is sent on its own.
 
 - **`listRatings(targetUal)`** gives every request for the paper on those contracts, oldest
   first (`readRequestIdsOf`, then each request), or `unavailable` when a contract does not
@@ -515,8 +522,9 @@ not answer costs a page about 5 s ([ADR 0021](../../docs/adr/0021-server-reads-r
   ([ADR 0014](../../docs/adr/0014-contract-owns-scores-dkg-owns-content.md)).
 - **`paperRatingSummaries(targetUals)`** sums each paper's requests with `summariseRatings`,
   for the papers list: the latest score, else `pending`, else `cannot-rate` when a request was
-  cancelled `invalid-target`, else `unrated`. A paper whose read takes more than 3 s is
-  `unknown`, so a slow chain never holds the list.
+  cancelled `invalid-target`, else `unrated`. A paper whose read takes more than 6 s is
+  `unknown`, so a slow chain never holds the list: the budget covers its three rounds of reads
+  and one quick retry, such as after a 429, but not a first try that runs out its 5 s.
 - **`readRating(requestId)`** finds the request on the contracts, current first: `not-found`
   when none holds it, `unavailable` when one did not answer and none holds it. A pending
   request carries its stage, read from its R-KA's state on the node (`scoring` with no asset

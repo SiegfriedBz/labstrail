@@ -4,7 +4,13 @@ import type { RatingView } from "@verisci/workflows";
 import { useEffect, useState } from "react";
 import { requestedAgo, takingLong } from "../../lib/rating/elapsed.ts";
 import { cancelMessage } from "../../lib/rating/messages.ts";
-import { isFinalRating, type RatingPageStage, ratingStage } from "../../lib/rating/stage.ts";
+import {
+  FRESH_WAIT_MS,
+  isFinalRating,
+  type RatingPageStage,
+  ratingStage,
+  whileFresh,
+} from "../../lib/rating/stage.ts";
 import { StepChain } from "../paper/progress-chain.tsx";
 import { Breadcrumbs } from "../site/breadcrumbs.tsx";
 import { RatingDetail } from "./rating-detail.tsx";
@@ -27,7 +33,9 @@ const SLOW_NOTE =
  * Follows a rating from its page, starting from the view the server read (`RatingLoader`):
  * unless that view is final, asks `/api/ratings/<id>` every 5 s until it is scored, cancelled
  * or gone, and keeps asking through a view that could not be read. A rating read this way that
- * rates another paper than `ual` is not found.
+ * rates another paper than `ual` is not found. On a page opened right after the request
+ * (`fresh`), a request no contract holds yet is asked about again for `FRESH_WAIT_MS`, then
+ * is not found.
  */
 export function RatingProgress({
   cid,
@@ -37,6 +45,7 @@ export function RatingProgress({
   initial,
   local,
   nodeDown = false,
+  fresh = false,
 }: {
   cid: string;
   /** The paper's title, for the breadcrumbs. */
@@ -49,6 +58,8 @@ export function RatingProgress({
   local: boolean;
   /** The DKG node did not answer the server's read: no title, and no checks to show. */
   nodeDown?: boolean;
+  /** The page was opened right after the request (`?new=1`): the chain may not show it yet. */
+  fresh?: boolean;
 }) {
   const [view, setView] = useState<RatingView>(initial);
   const stage = ratingStage(view);
@@ -63,6 +74,7 @@ export function RatingProgress({
 
   useEffect(() => {
     if (isFinalRating(ratingStage(initial))) return;
+    const openedAt = Date.now();
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const poll = async () => {
@@ -74,7 +86,7 @@ export function RatingProgress({
         // Asked again on the next poll.
       }
       if (stopped) return;
-      next = ofPaper(next, ual);
+      next = ofPaper(whileFresh(next, fresh && Date.now() - openedAt < FRESH_WAIT_MS), ual);
       setView(next);
       if (!isFinalRating(ratingStage(next))) timer = setTimeout(() => void poll(), POLL_MS);
     };
@@ -83,7 +95,7 @@ export function RatingProgress({
       stopped = true;
       clearTimeout(timer);
     };
-  }, [requestId, initial, ual]);
+  }, [requestId, initial, ual, fresh]);
 
   const pending = view.ok && view.rating.status === "pending";
   return (
