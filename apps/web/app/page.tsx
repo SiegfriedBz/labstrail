@@ -14,7 +14,12 @@ import { Suspense } from "react";
 import { ChainDemo } from "../components/home/chain-demo.tsx";
 import { LatestPapers } from "../components/home/latest-papers.tsx";
 import { PapersTableSkeleton } from "../components/papers/papers-table-skeleton.tsx";
+import { JsonLd } from "../components/site/json-ld.tsx";
 import { LATEST_PAPERS } from "../lib/papers/papers.ts";
+import { siteJsonLd } from "../lib/seo/json-ld.ts";
+import { siteUrl } from "../lib/seo/site-metadata.ts";
+import { SITE } from "../lib/site.ts";
+import { createWebEnv } from "../lib/web-env.ts";
 
 const HOW = [
   {
@@ -88,13 +93,15 @@ const RECORD = [
 ] as const;
 
 /**
- * Home: what VeriSci does, with a demo that publishes a paper and then rates it, the latest
- * published papers, and how publishing and rating work. The latest papers stream in, so the
- * hero never waits for the DKG node.
+ * Home: what VeriSci is, in one sentence, with a demo that publishes a paper and then rates
+ * it, the latest published papers, and how publishing and rating work. The latest papers
+ * stream in, so the hero never waits for the DKG node. Its structured data describes the
+ * website and the organization behind it (ADR 0040).
  */
 export default function Home() {
   return (
     <div className="grid gap-24 sm:gap-32">
+      <JsonLd data={siteJsonLd(siteUrl(createWebEnv()))} />
       {/* The first screen, below the header and the page's top padding, so no section is cut
           at the fold: text and panel side by side from md; below it, the text fills the first
           screen and the panel starts just under the fold. */}
@@ -104,10 +111,7 @@ export default function Home() {
             Publish your life-science paper as a record anyone can{" "}
             <span className="text-accent">verify</span>
           </h1>
-          <p className="max-w-[46ch] text-lg leading-relaxed text-muted">
-            For research in biology, medicine and health. Sign your PDF with your wallet to publish
-            it on the knowledge graph, then anyone can ask for its reproducibility rating.
-          </p>
+          <p className="max-w-[46ch] text-lg leading-relaxed text-muted">{SITE.definition}</p>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
             <Link
               href="/publish"
@@ -312,12 +316,12 @@ function Track({
   return (
     <div className="grid content-start gap-5">
       <div className="grid gap-2">
-        <h3 className="flex items-center gap-3 text-lg font-semibold">
-          {label}
-          <span className="rounded-md bg-surface-strong px-2 py-0.5 font-mono text-xs font-normal text-muted">
+        <div className="flex items-center gap-3">
+          <h3 className="text-lg font-semibold">{label}</h3>
+          <span className="rounded-md bg-surface-strong px-2 py-0.5 font-mono text-xs text-muted">
             {badge}
           </span>
-        </h3>
+        </div>
         <p className="max-w-[52ch] text-sm leading-relaxed text-muted">{intro}</p>
         {action}
       </div>

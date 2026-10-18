@@ -11,7 +11,7 @@ export const SITE = {
     "VeriSci publishes life-science and health papers on the OriginTrail DKG, signed by their submitter, and rates whether each gives what others need to reproduce it.",
   /** One sentence that defines VeriSci, which the home page and the share card open with. */
   definition:
-    "VeriSci is an open registry of life-science and health papers: each is signed by its submitter, anchored on Base through the OriginTrail DKG, and rated for how completely it reports what others need to repeat its work.",
+    "VeriSci is an open registry of life-science and health papers: each is signed by its submitter, anchored on Base, and rated for reproducibility.",
   repo: "https://github.com/SiegfriedBz/verisci",
   maintainer: {
     name: "Siegfried Bozza",
