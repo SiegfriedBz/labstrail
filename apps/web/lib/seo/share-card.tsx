@@ -98,7 +98,7 @@ export function ShareCard({ logo, paper }: { logo: string; paper?: PaperCard | u
           )}
         </div>
       ) : (
-        <div style={{ display: "flex", fontSize: 52, fontWeight: 600, lineHeight: 1.22 }}>
+        <div style={{ display: "flex", fontSize: 46, fontWeight: 600, lineHeight: 1.22 }}>
           {SITE.definition}
         </div>
       )}
@@ -113,7 +113,7 @@ export function ShareCard({ logo, paper }: { logo: string; paper?: PaperCard | u
         <div style={{ display: "flex", fontSize: 28, color: COLORS.muted }}>
           {paper
             ? "Published on the OriginTrail DKG, anchored on Base"
-            : "Life-science papers on the OriginTrail DKG, rated for reproducibility"}
+            : "A machine reproducibility score now, transparent human review next"}
         </div>
       )}
       <div

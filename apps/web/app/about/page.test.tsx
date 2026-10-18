@@ -18,6 +18,40 @@ describe("/about", () => {
     );
   });
 
+  it("says why VeriSci exists: results that can't be repeated, and agents that can't tell", () => {
+    render(<AboutPage />);
+
+    const why = screen.getByRole("region", { name: "Why VeriSci exists" });
+    expect(why.textContent).toMatch(/more than 70% had tried and failed to reproduce/);
+    expect(why.textContent).toMatch(/AI agents/);
+    expect(why.textContent).toMatch(/provenance/);
+    expect(why.textContent).toMatch(
+      /machine reproducibility score first, then transparent human review/,
+    );
+  });
+
+  it("explains the DKG's two layers and the PDF on IPFS", () => {
+    render(<AboutPage />);
+
+    const dkg = screen.getByRole("region", { name: "Built on the OriginTrail DKG" });
+    for (const layer of ["The graph, off-chain", "The proof, on-chain", "The paper, on IPFS"]) {
+      expect(screen.getByRole("heading", { level: 3, name: layer })).toBeTruthy();
+    }
+    expect(dkg.textContent).toMatch(/merkle root/);
+    expect(dkg.textContent).toMatch(/decentralized storage network/);
+    expect(dkg.textContent).toMatch(/CID, a hash of its content/);
+  });
+
+  it("says papers and ratings are both Knowledge Assets, minted and held by VeriSci's node", () => {
+    render(<AboutPage />);
+
+    const assets = screen.getByRole("region", { name: "Papers and ratings are Knowledge Assets" });
+    expect(screen.getByRole("heading", { level: 3, name: "A paper" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 3, name: "A rating" })).toBeTruthy();
+    expect(assets.textContent).toMatch(/signature of that CID/);
+    expect(assets.textContent).toMatch(/holds their tokens/);
+  });
+
   it("says the records live on testnets until mainnet", () => {
     render(<AboutPage />);
 

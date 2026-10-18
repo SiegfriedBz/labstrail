@@ -37,6 +37,13 @@ describe("/method", () => {
     expect(screen.getByText(/quote is found in the paper/)).toBeTruthy();
   });
 
+  it("says the rating reads the PDF from IPFS and is a Knowledge Asset anchored on Base", () => {
+    render(<MethodPage />);
+
+    expect(screen.getByText(/fetches the paper's PDF from IPFS by its CID/)).toBeTruthy();
+    expect(screen.getByText(/rating's own Knowledge Asset/).textContent).toMatch(/merkle/);
+  });
+
   it("names the three phases, only the first running", () => {
     render(<MethodPage />);
 

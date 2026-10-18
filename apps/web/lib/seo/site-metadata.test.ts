@@ -38,7 +38,7 @@ describe("siteMetadata", () => {
     const { title } = siteMetadata(production);
 
     expect(title).toEqual({ default: SITE.title, template: "%s · VeriSci" });
-    expect(SITE.title).toMatch(/^VeriSci: .*reproducibility/);
+    expect(SITE.title).toMatch(/^VeriSci: .*ratings/);
     expect(SITE.title.length).toBeLessThanOrEqual(60);
   });
 

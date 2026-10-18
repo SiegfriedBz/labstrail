@@ -75,7 +75,8 @@ const HOLDS = [
   },
   {
     term: "The PDF",
-    detail: "On IPFS, addressed by its CID, computed from its bytes.",
+    detail:
+      "Stored off-chain on IPFS, at an address computed from its bytes, so it can't be swapped.",
   },
 ] as const;
 
@@ -145,6 +146,44 @@ export default function Home() {
         <Suspense fallback={<PapersTableSkeleton rows={LATEST_PAPERS} />}>
           <LatestPapers />
         </Suspense>
+      </section>
+
+      <section
+        className="reveal grid gap-8 md:grid-cols-[1.6fr_1fr] md:items-center md:gap-16"
+        aria-labelledby="why-title"
+      >
+        <div className="grid max-w-[62ch] content-start gap-3">
+          <h2 id="why-title" className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            Why it exists
+          </h2>
+          <p className="leading-relaxed text-muted">
+            Many published results can't be repeated, yet trust in a paper still comes mostly from
+            the journal it appeared in, and the reviews behind that trust are rarely public. AI
+            agents now read and build on papers at a scale no person can, with no better way to tell
+            which ones give enough to be repeated.
+          </p>
+          <p className="leading-relaxed text-muted">
+            VeriSci records each paper, with who submitted it and which exact file, then rates its
+            quality in the open: a machine reproducibility score first, transparent human review
+            next. The paper and each rating are recorded off-chain and on-chain.
+          </p>
+          <Link href="/about" className="link w-fit text-sm">
+            Why VeriSci, in more detail
+          </Link>
+        </div>
+        <figure className="grid content-start gap-3 border-l-2 border-accent pl-5">
+          <span
+            aria-hidden
+            className="text-6xl font-semibold tracking-tight text-accent sm:text-7xl"
+          >
+            &gt;70%
+          </span>
+          <figcaption className="max-w-[34ch] text-sm leading-relaxed text-muted">
+            <span className="sr-only">More than 70% </span>
+            of more than 1,500 researchers had tried and failed to reproduce another scientist's
+            experiments (Baker, <cite>Nature</cite>, 2016).
+          </figcaption>
+        </figure>
       </section>
 
       <section className="reveal grid gap-8">

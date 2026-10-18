@@ -1,4 +1,11 @@
-import { ArrowSquareOut, GithubLogo, LinkedinLogo } from "@phosphor-icons/react/dist/ssr";
+import {
+  ArrowSquareOut,
+  Cube,
+  FilePdf,
+  GithubLogo,
+  Graph,
+  LinkedinLogo,
+} from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SITE } from "../../lib/site.ts";
@@ -6,14 +13,43 @@ import { SITE } from "../../lib/site.ts";
 export const metadata: Metadata = {
   title: "About",
   description:
-    "Who builds VeriSci, where its records live, and how it differs from the 2020 SciFact model of the same name.",
+    "Why VeriSci exists, how it records life-science papers and their quality ratings off-chain on the OriginTrail DKG and on-chain on Base, with each PDF on IPFS, and who builds it.",
   alternates: { canonical: "/about" },
 };
 
 /**
- * Who builds VeriSci and where its records live, with the code and the maintainer's profile,
- * so search engines and AI search can tell this VeriSci from AllenAI's 2020 SciFact model of
- * the same name (ADR 0040).
+ * OriginTrail's two layers, and IPFS beside them: where each part of a record lives. Blue marks
+ * off-chain records and teal on-chain ones, as everywhere on the site.
+ */
+const LAYERS = [
+  {
+    icon: Graph,
+    line: "border-accent",
+    tone: "text-accent",
+    title: "The graph, off-chain",
+    body: "DKG nodes store each asset's statements and replicate them across the nodes that follow its graph. People and AI agents read them by the asset's permanent address, its UAL, or query them with SPARQL.",
+  },
+  {
+    icon: Cube,
+    line: "border-accent-2",
+    tone: "text-accent-2",
+    title: "The proof, on-chain",
+    body: "Publishing mints the asset on Base as an ERC-721 token and anchors the merkle root of its statements, one hash computed from all of them. Anyone can check that the statements still match it, and only the token's holder can add a new version.",
+  },
+  {
+    icon: FilePdf,
+    line: "border-accent",
+    tone: "text-accent",
+    title: "The paper, on IPFS",
+    body: "IPFS is a decentralized storage network that addresses each file by its CID, a hash of its content. The paper's PDF is stored there, off-chain, and its asset links that CID. A changed file would get another CID, so the link always leads to the file the submitter signed, and no one can swap it unnoticed.",
+  },
+] as const;
+
+/**
+ * Why VeriSci exists, how it uses the OriginTrail DKG, Base and IPFS to record papers and
+ * their ratings as Knowledge Assets, and who builds it, with the code and the maintainer's
+ * profile, so search engines and AI search can tell this VeriSci from AllenAI's 2020 SciFact
+ * model of the same name (ADR 0040).
  */
 export default function AboutPage() {
   return (
@@ -25,6 +61,91 @@ export default function AboutPage() {
           How the score works
         </Link>
       </header>
+
+      <section aria-labelledby="why-title" className="grid max-w-[65ch] gap-4">
+        <h2 id="why-title" className="text-xl font-semibold tracking-tight">
+          Why VeriSci exists
+        </h2>
+        <p className="leading-relaxed text-muted">
+          Many published results can't be repeated. In a 2016 <cite>Nature</cite> survey of more
+          than 1,500 researchers, more than 70% had tried and failed to reproduce another
+          scientist's experiments (Baker, <cite>Nature</cite> 533, 452-454).
+        </p>
+        <p className="leading-relaxed text-muted">
+          Yet how far to trust a paper is still judged mostly by the journal it appeared in, and the
+          reviews behind that judgement are rarely public. The link to a paper's file can also
+          change or break after others have cited it.
+        </p>
+        <p className="leading-relaxed text-muted">
+          AI agents now read, cite and build on research at a scale no person can. They have no
+          better way to tell a paper that gives enough to be repeated from one that doesn't.
+        </p>
+        <p className="leading-relaxed text-ink">
+          VeriSci gives each paper a record whose provenance anyone can check, then rates its
+          quality in the open: a machine reproducibility score first, then transparent human review.
+          The paper and each of its ratings are recorded off-chain and on-chain, where people and
+          agents can read and check them.
+        </p>
+      </section>
+
+      <section aria-labelledby="dkg-title" className="grid gap-8">
+        <div className="grid max-w-[65ch] gap-3">
+          <h2 id="dkg-title" className="text-xl font-semibold tracking-tight">
+            Built on the OriginTrail DKG
+          </h2>
+          <p className="leading-relaxed text-muted">
+            OriginTrail's Decentralized Knowledge Graph (DKG) is an open network of nodes that store
+            knowledge as Knowledge Assets: sets of linked statements, each with a permanent address,
+            an owner and a proof on a blockchain. An asset lives in two layers that check each
+            other. The paper's content, its PDF, is stored off-chain on IPFS beside them.
+          </p>
+        </div>
+        <div className="grid gap-8 md:grid-cols-3 md:gap-10">
+          {LAYERS.map(({ icon: Icon, line, tone, title, body }) => (
+            <article key={title} className={`grid content-start gap-2 border-l-2 pl-5 ${line}`}>
+              <h3 className="flex items-center gap-2 font-semibold">
+                <Icon aria-hidden size={20} className={`shrink-0 ${tone}`} />
+                {title}
+              </h3>
+              <p className="max-w-[56ch] text-sm leading-relaxed text-muted">{body}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section aria-labelledby="assets-title" className="grid gap-6">
+        <h2 id="assets-title" className="text-xl font-semibold tracking-tight">
+          Papers and ratings are Knowledge Assets
+        </h2>
+        <div className="grid gap-8 md:grid-cols-2 md:gap-14">
+          <div className="grid content-start gap-3">
+            <h3 className="font-medium">A paper</h3>
+            <p className="max-w-[56ch] text-sm leading-relaxed text-muted">
+              Its asset gives the title, the authors and the PDF's CID, with the submitter's address
+              and their signature of that CID. Anyone can check who submitted which file without
+              trusting VeriSci.
+            </p>
+          </div>
+          <div className="grid content-start gap-3">
+            <h3 className="font-medium">A rating</h3>
+            <p className="max-w-[56ch] text-sm leading-relaxed text-muted">
+              Each rating is an asset of its own that points to the paper's, with every check,
+              answer and quote behind its score. VeriSci's RatingController contract on Base records
+              the score. A new rating or review adds its own score, and the paper's asset and
+              earlier scores stay as they were.
+            </p>
+          </div>
+        </div>
+        <p className="max-w-[65ch] text-sm leading-relaxed text-muted">
+          VeriSci's node mints both kinds of asset, holds their tokens and pays their fees, so only
+          VeriSci can add a version to them. The rating grows in three phases: a machine score for
+          reproducibility readiness now, transparent human review by reviewers drawn at random next,
+          wet-lab replication later.{" "}
+          <Link href="/method" className="link">
+            How the score works
+          </Link>
+        </p>
+      </section>
 
       <section aria-labelledby="who-title" className="grid gap-8 md:grid-cols-[1fr_1fr] md:gap-14">
         <div className="grid content-start gap-4">
@@ -62,12 +183,7 @@ export default function AboutPage() {
           </ul>
         </div>
         <div className="grid content-start gap-4">
-          <h2 className="text-xl font-semibold tracking-tight">Where the records live</h2>
-          <p className="max-w-[56ch] text-sm leading-relaxed text-muted">
-            Each paper is a Knowledge Asset on the OriginTrail DKG, minted on Base, with its PDF on
-            IPFS. Each rating's score is recorded by VeriSci's RatingController contract, and its
-            answers go in a Knowledge Asset of their own.
-          </p>
+          <h2 className="text-xl font-semibold tracking-tight">On testnets for now</h2>
           <p className="max-w-[56ch] text-sm leading-relaxed text-muted">
             Everything runs on Base Sepolia, a testnet, until a way to pay for mainnet is in place.
             VeriSci pays the publishing fees, and a rating request costs only gas.

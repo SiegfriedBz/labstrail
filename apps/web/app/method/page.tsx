@@ -16,8 +16,9 @@ const STEPS = [
     title: "The model reads the paper",
     body: (
       <>
-        <span className="font-mono text-ink">{RATING_SETTINGS.model}</span> reads the paper's text
-        and decides which kind of study it is.
+        The rating fetches the paper's PDF from IPFS by its CID, the one the submitter signed.{" "}
+        <span className="font-mono text-ink">{RATING_SETTINGS.model}</span> reads its text and
+        decides which kind of study it is.
       </>
     ),
   },
@@ -48,7 +49,7 @@ const PHASES = [
     icon: UsersThree,
     name: "Human review",
     status: "next",
-    body: "Reviewers drawn at random with Chainlink VRF, so anyone can check the draw, read the paper and score it.",
+    body: "Reviewers drawn at random with Chainlink VRF, so anyone can check the draw, read the paper and score it. Their scores join the rating's record, in the open.",
   },
   {
     icon: Flask,
@@ -150,8 +151,9 @@ export default function MethodPage() {
           <p className="max-w-[56ch] text-sm leading-relaxed text-muted">
             The score goes on Base, in VeriSci's RatingController contract. The answers and quotes
             go in the rating's own Knowledge Asset on the OriginTrail DKG, which points to the
-            paper. The paper's record never changes: a new rating adds its own score, and the
-            paper's page shows the latest.
+            paper's. Like the paper's, the rating's statements are anchored on Base by their merkle
+            root, so anyone can read them and check they haven't changed since. The paper's asset
+            never changes: a new rating adds its own score, and the paper's page shows the latest.
           </p>
         </div>
       </section>

@@ -26,6 +26,17 @@ describe("/", () => {
     expect(container.querySelector("section p")?.textContent).toBe(SITE.definition);
   });
 
+  it("says why VeriSci exists, with its source, and links to the full account", () => {
+    render(<Home />);
+
+    const why = screen.getByRole("region", { name: "Why it exists" });
+    expect(why.textContent).toMatch(/More than 70%/);
+    expect(why.querySelector("cite")?.textContent).toBe("Nature");
+    expect(
+      screen.getByRole("link", { name: "Why VeriSci, in more detail" }).getAttribute("href"),
+    ).toBe("/about");
+  });
+
   it("names its flows in their headings alone, their status beside them", () => {
     render(<Home />);
 

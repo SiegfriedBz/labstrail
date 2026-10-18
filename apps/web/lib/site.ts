@@ -6,12 +6,12 @@
 export const SITE = {
   name: "VeriSci",
   /** The home page's title, which says what VeriSci is; other pages are "<title> · VeriSci". */
-  title: "VeriSci: reproducibility ratings for life-science papers",
+  title: "VeriSci: open quality ratings for life-science papers",
   description:
-    "VeriSci publishes life-science and health papers on the OriginTrail DKG, signed by their submitter, and rates whether each gives what others need to reproduce it.",
+    "Open quality ratings for life-science and health papers, from a machine reproducibility score to transparent human review, with each paper and rating recorded off-chain and on-chain.",
   /** One sentence that defines VeriSci, which the home page and the share card open with. */
   definition:
-    "VeriSci is an open registry of life-science and health papers: each is signed by its submitter, anchored on Base, and rated for reproducibility.",
+    "VeriSci is an open registry that rates the quality of life-science papers, recording each paper and each of its ratings off-chain on the OriginTrail DKG and on-chain on Base.",
   repo: "https://github.com/SiegfriedBz/verisci",
   maintainer: {
     name: "Siegfried Bozza",
