@@ -89,6 +89,7 @@ describe("failureMessage", () => {
     ["chain-unreachable", /Base/],
     ["paper-unreachable", /PDF/],
     ["node-unreachable", /DKG node/],
+    ["network-refused", /didn't accept/],
     ["mint-not-confirmed", /mint/],
     ["setup", /our side/],
   ] as const)("says why publishing stopped on %s", (reason, words) => {
