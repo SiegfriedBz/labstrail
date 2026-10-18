@@ -11,8 +11,8 @@ VeriSci's records are public by design: anyone can read a paper's record and che
 
 - Production is indexed now, testnet records included. Staging, previews and local runs keep every crawler out.
 - Every crawler may read production, AI training crawlers included, so models learn what VeriSci is and tell it apart from the SciFact model. The API stays closed to them.
-- Only published papers, fulfilled ratings and the site's own pages are offered to search results. A paper on its way, a rating still running, and a page whose read failed are kept out.
-- Pages describe themselves with structured data that mirrors the schema.org records VeriSci writes to the DKG ([0010](0010-pdf-to-target-ka-pipeline.md), [0011](0011-a-rating-is-a-separate-r-ka.md)). A rating is one automated score: a Review of its paper, never an aggregate rating or a fact-check. The submitter's wallet is never named as an author.
+- Only published papers, ratings once their first score is recorded ([0012](0012-three-phases-settled-by-the-oracle.md)), and the site's own pages are offered to search results. A paper on its way, a rating waiting for its first score, and a page whose read failed are kept out.
+- Pages describe themselves with structured data that mirrors the schema.org records VeriSci writes to the DKG ([0010](0010-pdf-to-target-ka-pipeline.md), [0011](0011-a-rating-is-a-separate-r-ka.md)). A rating is a Review of its paper, as its R-KA is, never an aggregate rating or a fact-check. The submitter's wallet is never named as an author.
 - Crawlers that run no JavaScript, as most AI search crawlers do, get a paper's and a rating's content in the page's HTML, the same content visitors see.
 
 ## Consequences

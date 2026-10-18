@@ -135,8 +135,8 @@ export function paperJsonLd(
 
 /**
  * A fulfilled rating as a `Review` of its paper (`itemReviewed`, the paper's `@id`), written by
- * VeriSci, scored out of 100, with its rationale and its R-KA's UAL when given. One automated
- * score per rating: never an `aggregateRating`, never a `ClaimReview` (ADR 0040).
+ * VeriSci, scored out of 100, with its rationale and its R-KA's UAL when given. One `Review`
+ * per rating, as its R-KA is: never an `aggregateRating`, never a `ClaimReview` (ADR 0040).
  */
 export function reviewJsonLd(site: string, cid: string, rating: ReviewFacts): JsonLdNode {
   const url = ratingUrl(site, cid, rating.requestId);
