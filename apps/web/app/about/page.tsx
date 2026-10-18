@@ -46,8 +46,45 @@ const LAYERS = [
 ] as const;
 
 /**
+ * What comes next, in order, each with why it matters (ADR 0012's later phases, ADR 0015's
+ * payment plan before mainnet, ADR 0010's second copy of each PDF). No dates.
+ */
+const NEXT = [
+  {
+    name: "Transparent human review",
+    status: "next",
+    why: "A machine can check what a paper reports, not whether its content holds up. Reviewers drawn at random with Chainlink VRF will score each paper, and their scores will join its rating's record, off-chain and on-chain.",
+  },
+  {
+    name: "Payment, for people and AI agents",
+    status: "planned",
+    why: "VeriSci pays every fee today, with caps to hold spam back. Publishing and rating will carry a fee that a person or an AI agent can pay, so the costs are covered and reviewers can be paid for their work.",
+  },
+  {
+    name: "An API for AI agents",
+    status: "planned",
+    why: "Agents will read papers and ratings, and ask for a rating, without going through this website.",
+  },
+  {
+    name: "A lasting, decentralized copy of every paper",
+    status: "planned",
+    why: "One pinning service holds each PDF on IPFS today. Its hash proves the file is unchanged, but only more copies keep it available, so each paper will also be stored on a decentralized storage network.",
+  },
+  {
+    name: "Mainnet",
+    status: "planned",
+    why: "Once payment and lasting storage are in place, VeriSci moves off testnets.",
+  },
+  {
+    name: "Wet-lab replication",
+    status: "later",
+    why: "A lab repeats the experiments, and reviewers check its results before they are scored.",
+  },
+] as const;
+
+/**
  * Why VeriSci exists, how it uses the OriginTrail DKG, Base and IPFS to record papers and
- * their ratings as Knowledge Assets, and who builds it, with the code and the maintainer's
+ * their ratings as Knowledge Assets, what comes next, and who builds it, with the code and the maintainer's
  * profile, so search engines and AI search can tell this VeriSci from AllenAI's 2020 SciFact
  * model of the same name (ADR 0040).
  */
@@ -138,13 +175,38 @@ export default function AboutPage() {
         </div>
         <p className="max-w-[65ch] text-sm leading-relaxed text-muted">
           VeriSci's node mints both kinds of asset, holds their tokens and pays their fees, so only
-          VeriSci can add a version to them. The rating grows in three phases: a machine score for
-          reproducibility readiness now, transparent human review by reviewers drawn at random next,
-          wet-lab replication later.{" "}
+          VeriSci can add a version to them. The rating grows in three phases, from a machine score
+          for reproducibility readiness to wet-lab replication.{" "}
           <Link href="/method" className="link">
             How the score works
           </Link>
         </p>
+      </section>
+
+      <section aria-labelledby="next-title" className="grid gap-6">
+        <h2 id="next-title" className="text-xl font-semibold tracking-tight">
+          What comes next
+        </h2>
+        <ol className="grid">
+          {NEXT.map(({ name, status, why }) => (
+            <li
+              key={name}
+              className="grid gap-2 border-t border-line py-4 md:grid-cols-[minmax(0,20rem)_1fr] md:gap-10"
+            >
+              <div className="grid content-start gap-1.5">
+                <span
+                  className={`w-fit rounded-md bg-surface-strong px-2 py-0.5 font-mono text-xs ${
+                    status === "next" ? "text-accent" : "text-muted"
+                  }`}
+                >
+                  {status}
+                </span>
+                <h3 className="font-medium">{name}</h3>
+              </div>
+              <p className="max-w-[60ch] text-sm leading-relaxed text-muted">{why}</p>
+            </li>
+          ))}
+        </ol>
       </section>
 
       <section aria-labelledby="who-title" className="grid gap-8 md:grid-cols-[1fr_1fr] md:gap-14">

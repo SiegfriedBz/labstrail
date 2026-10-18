@@ -52,6 +52,27 @@ describe("/about", () => {
     expect(assets.textContent).toMatch(/holds their tokens/);
   });
 
+  it("lists what comes next, in order, each with its status and why", () => {
+    render(<AboutPage />);
+
+    const next = screen.getByRole("region", { name: "What comes next" });
+    const items = [...next.querySelectorAll("li")].map((item) => item.textContent ?? "");
+    const steps = [...next.querySelectorAll("li")].map((item) => [
+      item.querySelector("span")?.textContent,
+      item.querySelector("h3")?.textContent,
+    ]);
+    expect(steps).toEqual([
+      ["next", "Transparent human review"],
+      ["planned", "Payment, for people and AI agents"],
+      ["planned", "An API for AI agents"],
+      ["planned", "A lasting, decentralized copy of every paper"],
+      ["planned", "Mainnet"],
+      ["later", "Wet-lab replication"],
+    ]);
+    expect(items[0]).toMatch(/Chainlink VRF/);
+    expect(items[3]).toMatch(/only more copies keep it available/);
+  });
+
   it("says the records live on testnets until mainnet", () => {
     render(<AboutPage />);
 

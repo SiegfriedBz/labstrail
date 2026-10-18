@@ -12,12 +12,15 @@ How much to trust a paper is usually inferred from where it was published, and
 the reviews behind that judgement are rarely public. Yet many published results
 cannot be repeated: in a 2016 Nature survey of more than 1,500 researchers, more
 than 70% had tried and failed to reproduce another scientist's experiments
-(Baker, *Nature* 533, 452–454). VeriSci attaches the rating to the paper itself,
-in the open: each rating is a public record on the OriginTrail Decentralized
-Knowledge Graph (DKG), and its score is written on chain, so neither can be
-quietly changed. A rating starts as a machine score of how completely the paper
-reports what others need to reproduce its work, and is meant to grow stronger
-through human review and, later, wet-lab replication
+(Baker, *Nature* 533, 452–454). AI agents now read and build on papers at a scale
+no person can, with no better way to tell which ones give enough to be repeated.
+VeriSci rates the quality of a paper in the open and attaches the rating to the
+paper itself: each paper and each rating is a public record on the OriginTrail
+Decentralized Knowledge Graph (DKG), anchored on chain, with the paper's PDF on
+IPFS at an address hashed from its content, so none of them can be quietly
+changed. A rating starts as a machine score of how completely the paper reports
+what others need to reproduce its work, and grows through transparent human
+review and, later, wet-lab replication
 ([ADR 0012](docs/adr/0012-three-phases-settled-by-the-oracle.md)).
 
 Status: early. VeriSci is a rebuild of an earlier prototype,
@@ -97,6 +100,28 @@ Terms:
 - A **context graph** is the DKG graph a KA lives in; each environment has its own.
 - The **submitter** is the wallet that signed a paper's submission; the **oracle** is
   VeriSci's account that records rating results on the contract.
+
+## Roadmap
+
+In order, without dates. Where a step's decision is already taken, its ADR is linked.
+
+1. **Transparent human review (phase 2, next).** The machine score checks what a paper
+   reports, not whether its content holds up. Reviewers drawn at random with Chainlink VRF
+   score the paper; the oracle records their score on the contract and the node adds it to
+   the R-KA ([ADR 0012](docs/adr/0012-three-phases-settled-by-the-oracle.md)).
+2. **Payment, for people and AI agents.** VeriSci pays every fee today, bounded by a cap
+   and a throttle, until a payment plan replaces that before mainnet
+   ([ADR 0015](docs/adr/0015-rating-requests-are-free-on-testnet.md)). Publishing and
+   rating will each carry a fee that a person or an agent can pay, so the costs are
+   covered and reviewers can be paid for their work.
+3. **An API for AI agents**, to read papers and ratings and to request ratings without the
+   web app.
+4. **A lasting, decentralized copy of every PDF.** Pinata holds the only copy today
+   ([ADR 0010](docs/adr/0010-pdf-to-target-ka-pipeline.md)): the CID proves a file is
+   unchanged but does not keep it available.
+5. **Mainnet**, once payment and lasting storage are in place.
+6. **Wet-lab replication (phase 3).** A lab repeats the experiments, and a second round of
+   human review checks its results before the oracle scores them.
 
 ## Architecture
 
