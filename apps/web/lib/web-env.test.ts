@@ -36,6 +36,17 @@ describe("createWebEnv", () => {
     ).toEqual(["REOWN_PROJECT_ID", "UPSTASH_REDIS_REST_TOKEN", "UPSTASH_REDIS_REST_URL"]);
   });
 
+  it("reads the addresses Vercel gives a deployment, for the site's links", () => {
+    const env = createWebEnv({
+      ...settings,
+      VERCEL_PROJECT_PRODUCTION_URL: "verisci.vercel.app",
+      VERCEL_BRANCH_URL: "verisci-git-develop-siegfriedbzs-projects.vercel.app",
+    });
+
+    expect(env.VERCEL_PROJECT_PRODUCTION_URL).toBe("verisci.vercel.app");
+    expect(env.VERCEL_BRANCH_URL).toBe("verisci-git-develop-siegfriedbzs-projects.vercel.app");
+  });
+
   it("needs none locally", () => {
     expect(createWebEnv({ APP_ENV: "local" }).UPSTASH_REDIS_REST_URL).toBeUndefined();
   });

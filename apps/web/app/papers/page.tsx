@@ -4,19 +4,26 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { PapersResults } from "../../components/papers/papers-results.tsx";
 import { PapersTableSkeleton } from "../../components/papers/papers-table-skeleton.tsx";
-import { PAPERS_PER_PAGE, parsePageParam } from "../../lib/papers/papers.ts";
+import { PAPERS_PER_PAGE, pageHref, parsePageParam } from "../../lib/papers/papers.ts";
 
 type SearchParams = Promise<{ page?: string | string[] }>;
 
-/** "Papers · VeriSci", naming the page past the first. */
+/**
+ * "Papers", naming the page past the first (the layout's template adds "· VeriSci"), with its
+ * own canonical address, its page number kept, and a description of the list.
+ */
 export async function generateMetadata({
   searchParams,
 }: {
   searchParams: SearchParams;
 }): Promise<Metadata> {
   const page = parsePageParam((await searchParams).page);
+  const later = page !== undefined && page > 1;
   return {
-    title: page !== undefined && page > 1 ? `Papers, page ${page} · VeriSci` : "Papers · VeriSci",
+    title: later ? `Papers, page ${page}` : "Papers",
+    description:
+      "Every life-science and health paper published on VeriSci, newest first: each a signed record on the OriginTrail DKG, minted on Base, with its reproducibility readiness score.",
+    alternates: { canonical: pageHref(later ? page : 1) },
   };
 }
 

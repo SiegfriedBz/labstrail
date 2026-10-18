@@ -1,0 +1,1 @@
+Search engines, AI search and training crawlers, and link previews (external): production lets every one in but the API, and the ones that run no JavaScript get the paper and rating pages whole and blocking metadata (htmlLimitedBots, ADR 0040).

@@ -11,7 +11,8 @@ import { PapersTable } from "./papers-table.tsx";
  * `Suspense`: the count, the table with each paper's latest score from the chain, and the page
  * links, or why there is none. A page past
  * the last shows the not-found page; by then the response is streaming, so its status is
- * 200 with `noindex` (a malformed `?page=` is refused with a 404 before that).
+ * 200 with `noindex` (a malformed `?page=` is refused with a 404 before that). A list the
+ * node did not answer for, or answered unreadably, is kept out of search results too.
  */
 export async function PapersResults({ page }: { page: number }) {
   const view = papersView(
@@ -49,18 +50,24 @@ export async function PapersResults({ page }: { page: number }) {
       return notFound();
     case "unavailable":
       return (
-        <p role="alert" className="glass rounded-2xl p-5 leading-relaxed text-muted">
-          The list can't be loaded right now: the DKG node didn't answer.{" "}
-          <Link href={pageHref(page)} className="link">
-            Try again
-          </Link>
-        </p>
+        <>
+          <meta name="robots" content="noindex" />
+          <p role="alert" className="glass rounded-2xl p-5 leading-relaxed text-muted">
+            The list can't be loaded right now: the DKG node didn't answer.{" "}
+            <Link href={pageHref(page)} className="link">
+              Try again
+            </Link>
+          </p>
+        </>
       );
     case "unreadable":
       return (
-        <p role="alert" className="glass rounded-2xl p-5 leading-relaxed text-muted">
-          The DKG node answered, but the list couldn't be read. Try again later.
-        </p>
+        <>
+          <meta name="robots" content="noindex" />
+          <p role="alert" className="glass rounded-2xl p-5 leading-relaxed text-muted">
+            The DKG node answered, but the list couldn't be read. Try again later.
+          </p>
+        </>
       );
   }
 }

@@ -10,7 +10,8 @@ import { ThemeToggle } from "../components/site/theme-toggle.tsx";
 import { Providers } from "../components/wallet/providers.tsx";
 import { WalletButton } from "../components/wallet/wallet-button.tsx";
 import { ratingChainConfig } from "../lib/rating/chain.ts";
-import { SITE, siteMetadata } from "../lib/site.ts";
+import { siteMetadata } from "../lib/seo/site-metadata.ts";
+import { SITE } from "../lib/site.ts";
 import { THEME_SCRIPT } from "../lib/theme.ts";
 import { createWebEnv } from "../lib/web-env.ts";
 import "./globals.css";
@@ -18,7 +19,10 @@ import "./globals.css";
 const sans = Sora({ subsets: ["latin"], variable: "--font-sora" });
 const mono = Martian_Mono({ subsets: ["latin"], variable: "--font-martian" });
 
-export const metadata: Metadata = siteMetadata;
+/** The site's metadata, from this deployment's settings: its address, and whether crawlers may index it. */
+export function generateMetadata(): Metadata {
+  return siteMetadata(createWebEnv());
+}
 
 /**
  * The shell: header with the theme and wallet buttons, then the page. Rendered per request,

@@ -6,7 +6,9 @@ Status: the home page; the upload pages, where a visitor connects a wallet, publ
 follows it until its Target KA is minted and verifies its record; the list of published
 papers, with each paper's score; ratings, where a published paper's page lists its ratings
 and requests one from the wallet, and each rating's page follows it to its score and shows
-every check behind it; `/api/inngest`, which serves the workflows' Inngest functions
+every check behind it; the method and about pages; what search engines and AI search read
+(below: titles, canonical links, `robots.txt`, the sitemap, structured data and share
+images); `/api/inngest`, which serves the workflows' Inngest functions
 ([ADR 0003](../../docs/adr/0003-inngest-functions-live-in-workflows.md)); and
 `/api/webhooks/alchemy`, which takes the Alchemy Notify webhook's rating requests
 ([ADR 0017](../../docs/adr/0017-chain-events-are-ingested-at-least-once.md)).
@@ -29,13 +31,17 @@ points the optional `@x402/*` packages, reached through wagmi's connectors, at
 
 | Path | What it is |
 | --- | --- |
-| `/` | Home: what VeriSci does, with a demo that publishes a paper and then rates it, the latest papers (the five newest, streamed in with a skeleton, linking to `/papers`), the DKG's two layers (the record off-chain, its ERC-721 token and merkle root on-chain, the UAL linking them), how publishing and rating work (phase 1 live, human review and replication to come), and an example paper asset |
+| `/` | Home: what VeriSci is, in one sentence (`SITE.definition`), with a demo that publishes a paper and then rates it, the latest papers (the five newest, streamed in with a skeleton, linking to `/papers`), why VeriSci exists (the 2016 *Nature* reproducibility survey, and AI agents that build on papers they can't weigh, linking to `/about`), the DKG's two layers (the record off-chain, its ERC-721 token and merkle root on-chain, the UAL linking them), how publishing and rating work (phase 1 live, human review and replication to come), and an example paper asset |
 | `/publish` | Connect a wallet, drop a PDF, sign once; what publishing means and the limits ([ADR 0010](../../docs/adr/0010-pdf-to-target-ka-pipeline.md), [ADR 0034](../../docs/adr/0034-users-connect-a-wallet-anyone-may-publish.md)) |
 | `/papers?page=<n>` | Every paper this environment published, newest mint first, 20 to a page, each with its score (below) |
-| `/papers/<cid>?event=<id>` | Where a paper stands, then its record, abstract and how to verify it, and its Ratings section (`#rating`, scrolled into view when the page opens at it, `components/rating/scroll-to-rating.tsx`) once published (below), under "Papers / <title>" breadcrumbs. `?already=1` says a re-submitted PDF was already published |
+| `/papers/<cid>?event=<id>` | A 404 for an address that is no CID, before anything streams; otherwise where a paper stands, then its record, abstract and how to verify it, and its Ratings section (`#rating`, scrolled into view when the page opens at it, `components/rating/scroll-to-rating.tsx`) once published (below), under "Papers / <title>" breadcrumbs. `?already=1` says a re-submitted PDF was already published |
 | `/api/papers/<cid>?event=<id>` | The same as JSON (`PaperView`: the stage, and the record once published), never cached: a read, so a route rather than a server action |
 | `/papers/<cid>/ratings/<requestId>` | One rating: where it stands until it is scored, then its score and every check behind it, or why it was cancelled (below), under "Papers / <title> / Rating" breadcrumbs. `?new=1`, from the Rate button, follows a request the chain doesn't show yet for 2 minutes |
 | `/api/ratings/<requestId>` | The same as JSON (`RatingView`), never cached, for the rating page to poll; not-found for an id that is not `0x` + 64 hex digits, or where no contract takes ratings |
+| `/method` | How the reproducibility readiness score works: how a paper is scored, the checklist for each kind of study (`STUDY_TYPES` from `@verisci/core`, with each one's number of checks), the scorer's model (`RATING_SETTINGS.model`) and the PDF it reads from IPFS by its CID, what the score leaves out, where it is recorded (the score on Base, the answers in the rating's own Knowledge Asset), and the three phases |
+| `/about` | Why VeriSci exists (the reproducibility crisis, and AI agents that build on papers they can't weigh), the OriginTrail DKG's two layers, the paper's PDF stored off-chain on IPFS at an address hashed from its content, papers and ratings as Knowledge Assets that VeriSci's node mints and holds, what comes next (the root README's roadmap, each step with its status and why), who builds VeriSci (its maintainer, the code on GitHub, a LinkedIn profile, from `SITE`), testnets until mainnet, and how it differs from the 2020 SciFact model of the same name |
+| `/robots.txt`, `/sitemap.xml` | Production's crawling rules and every page and paper to index; elsewhere, every crawler kept out and an empty sitemap (below) |
+| `/opengraph-image`, `/papers/<cid>/opengraph-image`, `/papers/<cid>/ratings/<request id>/opengraph-image` | The 1200 × 630 images a shared link shows: the site's, a paper's, and a rating's, which is the site's (below) |
 | `/api/inngest` | Serves the Inngest functions: the publish function and the failure alerts, plus the rating, oracle, reconciler and health functions where the oracle key is set |
 | `POST /api/webhooks/alchemy` | The Alchemy Notify webhook's deliveries: hands the raw body and `X-Alchemy-Signature` to the workflows' intake (`getWebhookIntake`) and answers its status, with an empty body: 200, 401 (bad signature), 400 (not a delivery), 503 (Inngest refused, so Alchemy Notify delivers again), or 404 where `ALCHEMY_WEBHOOK_SIGNING_KEY` is unset (`packages/workflows` README → The Alchemy Notify webhook) |
 | any other path | `app/not-found.tsx`; a page that fails to render shows `app/error.tsx` with a retry |
@@ -80,8 +86,8 @@ shaped like the table (`components/papers/papers-table-skeleton.tsx`).
   (`papers-columns.tsx`), drawn with shadcn's table restyled with the app's tokens
   (`components/ui/table.tsx`). Below `md`, each row is one stacked cell.
 - Page links (`components/papers/pager.tsx`) are plain links to `/papers?page=N`, so each page
-  is a URL the server renders: the first, the last and the current page's neighbours past
-  seven pages.
+  is a URL the server renders, and its own canonical address (`generateMetadata`): the first,
+  the last and the current page's neighbours past seven pages.
 - A `?page=` that is not a positive whole number, or one so far out that page × 20 passes
   `Number.MAX_SAFE_INTEGER`, answers 404 before anything streams. A page past the last shows
   the not-found page, as a 200 with `noindex`, since the response is already streaming when
@@ -105,8 +111,8 @@ shaped like the table (`components/papers/papers-table-skeleton.tsx`).
 
 The server reads where the paper stands (`components/paper/paper-loader.tsx`, the same
 `readProgress` as `/api/papers/<cid>`) inside a `Suspense` boundary. Until the node answers,
-a skeleton shows the breadcrumbs, the side panel's real heading, groups and labels, and the
-PDF's CID, with only the values pulsing: the chain of steps and the publish panel's labels
+a skeleton shows the breadcrumbs, the side panel's real title, groups and labels (as
+paragraphs, so no heading comes before the paper's own `h1`), and the PDF's CID, with only the values pulsing: the chain of steps and the publish panel's labels
 when the address has `?event=`, a published paper's shape (abstract, one row of steps) and
 the verify panel's otherwise (`components/paper/labels.ts` holds the labels both use).
 `components/paper/paper-progress.tsx` then follows the paper from that first view: unless it
@@ -152,8 +158,7 @@ stateDiagram-v2
   its ULID, `eventTime`). The publish function is a singleton per CID, so another run holds
   this PDF; the page follows the paper on the node and gives up (`not-found`) after
   `FOLLOW_MS`, a run's whole 45-minute budget.
-- `not-found` also covers a page with no event to ask about and nothing on the node, and a
-  run still listed as running an hour after its event with nothing on the node
+- `not-found` also covers a run still listed as running an hour after its event with nothing on the node
   (`STALE_RUN_MS`: the run's budget, which counts from its start, plus a margin for a late
   start); Inngest has cancelled it by then.
 - `unavailable` (the node or Inngest not answering) is shown and asked again.
@@ -182,6 +187,10 @@ Under a published paper, the server reads its ratings inside their own `Suspense
 behind a skeleton with the real headings (`components/rating/ratings-section.tsx`, through
 `getRatingService().listRatings`,
 [`packages/workflows`](../../packages/workflows/README.md#the-pages-calls)):
+
+- A scored paper's section opens with one sentence that says its latest score ("<title>
+  scores 72/100 for reproducibility readiness on VeriSci.") with a link to `/method`, and
+  holds that rating as a `Review` for search engines (below).
 
 - Phase 1, reproducibility readiness, leads: the latest score recorded on chain with a link
   to its checks; "Rating in progress" with a link to follow it; "Can't be rated" when a request
@@ -257,6 +266,65 @@ stateDiagram-v2
 To rate a paper locally through these pages, against a contract on Anvil, see
 [`packages/workflows` → Running a rating locally](../../packages/workflows/README.md#running-a-rating-locally).
 
+## Search engines and AI search
+
+Production is open to every crawler, AI training crawlers included; staging, previews and
+local runs keep them all out
+([ADR 0040](../../docs/adr/0040-production-is-open-to-crawlers.md)). `lib/seo/` holds the
+rules, pure and unit-tested; the pages and route files call them.
+
+- **The site's address** is `siteUrl` (`lib/seo/site-metadata.ts`, from the workflows'
+  `siteUrlOf`): production's domain, the branch's URL on staging, `http://localhost:3000`
+  locally. The layout's metadata (`siteMetadata`) resolves every link against it, titles
+  pages "<title> · VeriSci" (the home page has its own title, `SITE.title`), gives each page
+  its own path as canonical (`"./"`, which drops the query), sets a large Twitter card, and
+  adds `noindex, nofollow` outside production. Each page sets its own description; the share
+  blocks set no title or description, so Next fills them from the page's own.
+- **`/robots.txt`** (`robotsFor`, `lib/seo/crawl.ts`): on production, every crawler may read
+  everything but `/api/`, and the sitemap is named; elsewhere, `Disallow: /`.
+  **`/sitemap.xml`** (`sitemapFor`): on production, the five site pages and every published
+  paper with its mint date, read from `listPapers` 50 at a time; a node that does not answer
+  leaves the site pages and logs `sitemap-papers-unavailable: <reason>` once. Elsewhere it
+  lists nothing. Both render on request, so a build reads no settings and asks no node
+  ([ADR 0004](../../docs/adr/0004-env-variables-per-workspace-one-root-file.md)).
+- **A paper's metadata** (`paperMetadata`, `lib/seo/page-metadata.ts`) comes from the read its
+  body shares (`readProgressOnce`, React's `cache`): once published, its own title, its
+  abstract cut to 155 characters (or its title and authors' count) as description, the canonical
+  `/papers/<canonical CID>` whatever the address's spelling and query, and an article share
+  block with its authors and mint date. With nothing on the node and no publish run followed
+  (no `?event=`, or a run given up), it calls `notFound()`: a 404 for crawlers that run no JavaScript, whose metadata blocks the response,
+  and the not-found page with `noindex` for browsers. Any other stage is kept out of search
+  results. **A rating's** (`ratingMetadata`) is titled by its score and its paper once
+  fulfilled, described by its rationale, canonical with its request id in lowercase, and kept
+  out of search results until then, or when it is another paper's.
+- **Structured data** (`lib/seo/json-ld.ts`, written by `components/site/json-ld.tsx` with every
+  `<` escaped, since a title comes from a PDF): the home page's `WebSite` and `Organization`
+  (the GitHub repo, and its founder with a LinkedIn profile); a published paper's
+  `ScholarlyArticle` (its DOI, DKG UAL and IPFS CID as identifiers, the PDF as its encoding,
+  each author a `Person`, never the submitter's wallet, and VeriSci as the publisher of this
+  record, dated by its mint, never of the paper: `sdPublisher`, `sdDatePublished`) and its
+  breadcrumb; every address in it uses the canonical CID and a lowercase request id; a
+  fulfilled rating's `Review` of its paper, scored out of 100, on the paper page and, with
+  its rationale and R-KA's UAL, on its own page with its breadcrumb. Never an
+  `aggregateRating`.
+- **Crawlers that run no JavaScript** (`isHtmlLimitedBot`, `lib/seo/bots.ts`: Next's own list
+  plus GPTBot, OAI-SearchBot, ChatGPT-User, ClaudeBot, Claude-SearchBot, Claude-User,
+  PerplexityBot and Perplexity-User, also set as `htmlLimitedBots` in `next.config.ts`) get the
+  paper and rating pages rendered in place, with no `Suspense` boundary, so the record, its
+  ratings and the score's sentence are in the HTML rather than in a hidden streamed `<div>`
+  (`docs/domain.md` → Next.js). Browsers keep the streamed page and its skeleton.
+- **Share images** (`lib/seo/share-card.tsx`, drawn by `next/og` in the dark theme's colours):
+  every page shares the site's card (`app/opengraph-image.tsx`: the mark, the name and
+  `SITE.definition`) but a paper's: a paper's link shares its own (`app/papers/[cid]/opengraph-image.tsx`, read by
+  `readPaperCard`: its title cut to 110 characters, its authors as "A, B and C" or "A, B et
+  al.", and its latest score), or the site's card when it is not published or the node or the
+  chain does not answer. A rating's link shares the site's card
+  (`app/papers/[cid]/ratings/[requestId]/opengraph-image.tsx`), since the paper's card shows
+  the paper's latest score, which need not be that rating's.
+  They draw with Sora from `assets/fonts` (TTF, SIL Open Font License, `OFL.txt`), which
+  `next/og` reads where it cannot read the site's WOFF2 fonts.
+- A papers list the node did not answer for, or answered unreadably, holds a `noindex`.
+
 ## Code layout
 
 - `app/`: the pages, the route handlers and the server actions.
@@ -264,16 +332,18 @@ To rate a paper locally through these pages, against a contract on Anvil, see
   flow's folder: `publish` (the upload, the publish form's steps, a paper's progress, the
   messages and the limits), `papers` (the list, its rating summaries and explorer links) and
   `rating` (the request flow, the rating chain, a rating's stage, its checks, the time since
-  the request and the messages). Only helpers several
-  areas share sit at its root: `web-env`, `server`, `site` (the name and description the
-  metadata, the footer and the wallet window read), `theme`, `shorten`, `utils` and
-  `empty-module`.
+  the request and the messages) and `seo` (the site's address and metadata, crawling rules,
+  page metadata, structured data, the bot list and the share cards). Only helpers several
+  areas share sit at its root: `web-env`, `server`, `site` (the name, title, description,
+  definition, repo and maintainer the metadata, structured data, footer and wallet window
+  read), `theme`, `shorten`, `utils` and `empty-module`.
 - `components/`, grouped by area: `site` (the shell every page shares: logo, header links,
-  theme button, footer, breadcrumbs), `wallet` (the wallet providers and button),
+  theme button, footer, breadcrumbs, the structured data's script), `wallet` (the wallet providers and button),
   `home` (the hero's demo and the latest papers), `papers` (the papers list), `paper` (one
   paper's page and its step chain, which the rating page and the demo reuse), `rating` (the
   Ratings section, the Rate button and the rating page), `publish`, and `ui`
   (shadcn primitives, restyled with the app's tokens). Tests sit next to their component.
+- `assets/fonts/`: Sora as TTF, for the share images.
 
 ## Design
 
@@ -326,8 +396,8 @@ The "Clinical" look: a clinical record with an on-chain proof, in Tailwind CSS v
   while the bar hides, so the page stays still as it scrolls; `app/viewport.test.ts` refuses
   `dvh` anywhere in `app/`. On-chain values show in
   short form with a copy button.
-- The product name is VeriSci, for life-science and health papers; its name and description
-  come from `lib/site.ts` (`SITE`). Its mark (`components/site/logo.tsx`, and `app/icon.svg`
+- The product name is VeriSci, for life-science and health papers; its name, title,
+  description and one-sentence definition come from `lib/site.ts` (`SITE`). Its mark (`components/site/logo.tsx`, and `app/icon.svg`
   for the tab, in fixed colours that read on light and dark tabs) is a heartbeat whose last
   beat is a check, drawn from the record's blue into the proof's teal.
 - Keyboard users get a skip link and one accent focus ring; the header underlines the
@@ -336,8 +406,10 @@ The "Clinical" look: a clinical record with an on-chain proof, in Tailwind CSS v
   once connected) beside the theme button, so the header keeps one line; once connected it
   is named by the short address it shows, and AppKit's own window opens from it.
 - What the DKG node answers loads behind a skeleton shaped like what replaces it, streamed
-  in a `Suspense` boundary; what is known already (labels, the CID) shows at once.
-- The footer (`components/site/site-footer.tsx`) lists the contracts on Base Sepolia, linked on
+  in a `Suspense` boundary; what is known already (labels, the CID) shows at once. Crawlers
+  that run no JavaScript get the paper and rating pages whole instead (above).
+- The footer (`components/site/site-footer.tsx`) links to publishing, `/method` and `/about`,
+  and lists the contracts on Base Sepolia, linked on
   Basescan: OriginTrail's `DKGKnowledgeAssets` and `KnowledgeAssetsLifecycle`
   (`ORIGINTRAIL_CONTRACTS` from `@verisci/core`), and the RatingController this
   environment's pages use (`lib/rating/chain.ts`): locally the Anvil one, unlinked.
@@ -357,6 +429,7 @@ unless `APP_ENV` is `local`:
 | --- | --- |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis's REST address and token, for the limits: one database shared by every environment, each counter named after its `APP_ENV` (`verisci:staging:upload-url`), since Upstash's free plan allows one ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)). The token is secret |
 | `REOWN_PROJECT_ID` | The Reown project id for the wallet window, from one project shared by every environment, read on the server and handed to the page, so nothing is inlined at build time. Without it the pages say the wallet is not set up |
+| `VERCEL_PROJECT_PRODUCTION_URL`, `VERCEL_BRANCH_URL` | Set by Vercel: production's domain and the branch's URL, the site's address for its canonical links, sitemap, structured data and share images (`siteUrl`); unset locally, where it is `http://localhost:3000` |
 | `LOCAL_CHAIN_RPC_URL`, `LOCAL_RATING_CONTRACT` | Optional, read only when `APP_ENV=local`: Anvil's URL and the RatingController deployed there. With both, the pages read and request ratings on that contract and the wallet window offers Anvil; without either, the paper and rating pages say ratings aren't set up, the papers list shows no Rate link, and the wallet window offers only Base Sepolia ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)) |
 
 The pages also need the workflows' settings (DKG, Pinata, chain, Gemini, Inngest;
@@ -390,7 +463,8 @@ preview, and `develop`'s, at its stable branch URL, is staging.
   the oracle key or the two Telegram settings
   ([ADR 0038](../../docs/adr/0038-alerts-go-to-one-telegram-chat.md)). Every other variable
   takes one value for both. System Environment Variables stay exposed: Inngest reads `VERCEL_GIT_COMMIT_REF`,
-  and the notifications' links `VERCEL_BRANCH_URL` and `VERCEL_PROJECT_PRODUCTION_URL`.
+  and the notifications' links and the site's own address `VERCEL_BRANCH_URL` and
+  `VERCEL_PROJECT_PRODUCTION_URL`.
 - **Inngest's `develop` branch environment** has auto-archive off
   ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)).
 - A deployed server checks its settings when it starts (above), so each variable is set

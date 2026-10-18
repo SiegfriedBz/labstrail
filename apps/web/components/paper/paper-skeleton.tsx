@@ -15,7 +15,8 @@ import { VerifyGroup } from "./verify-panel.tsx";
  * the side panel's heading, groups and labels, and the PDF's CID; only what the node answers
  * pulses. A visitor following a publish (`?event=`) sees the chain of steps and the publish
  * panel's labels; anyone else, a published paper's shape (abstract, one row of steps) and the
- * verify panel's, since a paper reached from the list is published.
+ * verify panel's, since a paper reached from the list is published. Its panel titles are
+ * paragraphs, so the page's first heading is the paper's own `h1` once it streams in.
  */
 export function PaperSkeleton({ cid: given, following }: { cid: string; following: boolean }) {
   const cid = canonicalCid(given) ?? given;
@@ -95,17 +96,17 @@ function VerifyPanelSkeleton({ cid }: { cid: string }) {
   return (
     <section className="glass grid gap-6 rounded-2xl p-5 sm:p-6">
       <div className="grid gap-1">
-        <h2 className="text-lg font-semibold">{VERIFY_TITLE}</h2>
+        <p className="text-lg font-semibold">{VERIFY_TITLE}</p>
         <p className="text-sm leading-relaxed text-muted">{VERIFY_INTRO}</p>
       </div>
       <Bar className="h-9 w-full rounded-xl" />
-      <VerifyGroup group="submission">
+      <VerifyGroup group="submission" heading={false}>
         <Field label={VERIFY_LABELS.submitter} />
         <Field label={VERIFY_LABELS.signature} />
         <Field label={VERIFY_LABELS.deadline} />
         <Field label={VERIFY_LABELS.contextGraph} />
       </VerifyGroup>
-      <VerifyGroup group="asset">
+      <VerifyGroup group="asset" heading={false}>
         <Field label={VERIFY_LABELS.publisher} />
         <Field label={VERIFY_LABELS.token} />
         <Field label={VERIFY_LABELS.ual} />
@@ -121,7 +122,7 @@ function PublishPanel({ cid }: { cid: string }) {
   return (
     <aside className="glass grid content-start gap-5 rounded-2xl p-5 sm:p-6">
       <div className="grid gap-2">
-        <h2 className="text-sm font-semibold">{PUBLISH_PANEL_TITLE}</h2>
+        <p className="text-sm font-semibold">{PUBLISH_PANEL_TITLE}</p>
         <Bar className="h-4 w-full" />
         <Bar className="h-4 w-2/3" />
       </div>

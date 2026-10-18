@@ -185,7 +185,14 @@ describe("createUploadService", () => {
 describe("readPaper on a minted paper", () => {
   const MINTED = "did:dkg:base:84532/0xd701ed157232ad5e14bc4134a8d10d64d86f13b3/6";
 
-  async function mintedNode(signer = privateKeyToAccount(generatePrivateKey())) {
+  /** How the node answers the query for the asset's mint time. */
+  const MINT_TIME = '"2026-10-17T08:42:01.123Z"^^<http://www.w3.org/2001/XMLSchema#dateTime>';
+
+  async function mintedNode(
+    signer = privateKeyToAccount(generatePrivateKey()),
+    mintTime: () => Response = () =>
+      Response.json({ result: { bindings: [{ ka: MINTED, minted: MINT_TIME }] } }),
+  ) {
     const deadline = 1_791_639_162n;
     const signature = await signer.signTypedData(
       submissionTypedData({ cid: CID, contextGraph: GRAPH, deadline }),
@@ -215,7 +222,9 @@ describe("readPaper on a minted paper", () => {
     const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input);
       if (url.includes("/api/query")) {
-        asked.push((JSON.parse(String(init?.body)) as { sparql: string }).sparql);
+        const { sparql } = JSON.parse(String(init?.body)) as { sparql: string };
+        asked.push(sparql);
+        if (sparql.startsWith("SELECT ?ka ?minted")) return mintTime();
         return Response.json({ result: { bindings } });
       }
       return Response.json({ state: "published", publishedUal: MINTED, reservedUal: MINTED });
@@ -229,7 +238,7 @@ describe("readPaper on a minted paper", () => {
 
     const { record } = await service.readPaper(CID);
 
-    expect(asked[0]).toContain(
+    expect(asked.find((sparql) => !sparql.startsWith("SELECT ?ka ?minted"))).toContain(
       `GRAPH <did:dkg:context-graph:${GRAPH}/_verifiable_memory/0xd701ed157232ad5e14bc4134a8d10d64d86f13b3/6>`,
     );
     expect(record).toMatchObject({
@@ -240,7 +249,23 @@ describe("readPaper on a minted paper", () => {
       deadline: "1791639162",
       signatureCheck: "valid",
       publisher: "0xd701ed157232ad5e14bc4134a8d10d64d86f13b3",
+      publishedAt: "2026-10-17T08:42:01.123Z",
     });
+  });
+
+  it("keeps the record without its mint time when the node does not give it", async () => {
+    for (const mintTime of [
+      () => new Response("down", { status: 503 }),
+      () => Response.json({ result: { bindings: [] } }),
+    ]) {
+      const { fetch } = await mintedNode(undefined, mintTime);
+      const service = createUploadService(env(), { ...io().uploadIo, fetch });
+
+      const { record } = await service.readPaper(CID);
+
+      expect(record).toMatchObject({ title: "Screening VP1", signatureCheck: "valid" });
+      expect(record).not.toHaveProperty("publishedAt");
+    }
   });
 
   it.each([503, 429])("says the record is unavailable when the query gets a %i", async (code) => {

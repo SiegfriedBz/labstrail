@@ -81,6 +81,7 @@ describe("PapersResults", () => {
     expect(screen.getByRole("link", { name: "Try again" }).getAttribute("href")).toBe(
       "/papers?page=2",
     );
+    expect(document.querySelector('meta[name="robots"]')?.getAttribute("content")).toBe("noindex");
   });
 
   it("says the list can't be read when the node's answer does not parse", async () => {
@@ -89,5 +90,6 @@ describe("PapersResults", () => {
     await show(1);
 
     expect(screen.getByRole("alert").textContent).toMatch(/couldn't be read/);
+    expect(document.querySelector('meta[name="robots"]')?.getAttribute("content")).toBe("noindex");
   });
 });

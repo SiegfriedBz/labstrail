@@ -33,6 +33,6 @@ describe("lib's layout", () => {
     ];
 
     expect(files.length).toBeGreaterThan(10);
-    expect(misplaced(files, root, ["publish", "papers", "rating"])).toEqual([]);
+    expect(misplaced(files, root, ["publish", "papers", "rating", "seo"])).toEqual([]);
   });
 });
