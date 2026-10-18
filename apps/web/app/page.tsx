@@ -98,8 +98,8 @@ export default function Home() {
       {/* The first screen, below the header and the page's top padding, so no section is cut
           at the fold: text and panel side by side from md; below it, the text fills the first
           screen and the panel starts just under the fold. */}
-      <section className="grid items-center gap-10 md:min-h-[calc(100dvh-8rem)] md:grid-cols-[1.3fr_1fr] md:content-center md:gap-14">
-        <div className="enter grid min-h-[calc(100dvh-6.5rem)] content-center gap-7 sm:min-h-[calc(100dvh-8rem)] md:min-h-0">
+      <section className="grid items-center gap-10 md:min-h-[calc(100svh-8rem)] md:grid-cols-[1.3fr_1fr] md:content-center md:gap-14">
+        <div className="enter grid min-h-[calc(100svh-6.5rem)] content-center gap-7 sm:min-h-[calc(100svh-8rem)] md:min-h-0">
           <h1 className="text-4xl font-semibold leading-[1.08] tracking-tight md:text-[2.75rem] lg:text-5xl">
             Publish your life-science paper as a record anyone can{" "}
             <span className="text-accent">verify</span>
