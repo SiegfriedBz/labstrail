@@ -9,9 +9,16 @@ graph LR
     paper -->|"announceLocalRating, locally"| server-actions
     paper -->|"Rate this paper or Rate again (?new=1), Read the checks, Follow it, Details"| rating["Rating Page\napp/papers/[cid]/ratings/[requestId]/page.tsx"]
     rating -->|"polls until scored or cancelled"| api-ratings["Rating Status\napp/api/ratings/[requestId]/route.ts"]
+    home -->|"footer: How the score works"| method["Method\napp/method/page.tsx"]
+    home -->|"footer: About VeriSci"| about["About\napp/about/page.tsx"]
+    paper -->|"the score's sentence: How the score works"| method
+    about -->|"How the score works"| method
+    crawlers["Crawlers\nexternal"] -->|"read the rules and the pages to index"| crawl["Robots and Sitemap\napp/robots.ts, app/sitemap.ts"]
+    crawl -->|"lists each published paper"| paper
+    crawlers -->|"fetch the image a shared link names"| share-images["Share Images\napp/opengraph-image.tsx, app/papers/[cid]/opengraph-image.tsx"]
     inngest["Inngest\nexternal"] -->|"calls the served functions"| inngest-route["Inngest Route\napp/api/inngest/route.ts"]
     alchemy-notify["Alchemy Notify\nexternal"] -->|"signed contract events, requests among them"| api-webhooks["Alchemy Webhook\napp/api/webhooks/alchemy/route.ts"]
     classDef entry fill:#89b4fa,stroke:#89b4fa,color:#1e1e2e
     classDef external fill:#585b70,stroke:#585b70,color:#cdd6f4
     class home,inngest-route,api-webhooks entry
-    class inngest,alchemy-notify external
+    class inngest,alchemy-notify,crawlers external

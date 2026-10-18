@@ -7,6 +7,7 @@ import {
   parsePaperAuthors,
   parsePaperCount,
   parsePaperListing,
+  parsePublishedAt,
   publishedPaperQuery,
 } from "./paper-list.ts";
 import type { QueryBinding } from "./paper-record.ts";
@@ -99,7 +100,7 @@ describe("publishedPaperQuery", () => {
 
   it("finds one UAL among the papers the page query picks, with the same patterns", () => {
     const query = publishedPaperQuery(GRAPH, UAL);
-    expect(query).toMatch(/^SELECT \?ka WHERE \{/);
+    expect(query).toMatch(/^SELECT \?ka \?minted WHERE \{/);
     expect(query).toContain(`VALUES ?ka { <${UAL}> }`);
     expect(query).toMatch(/LIMIT 1$/);
     expect(where(query).replace(`\n  VALUES ?ka { <${UAL}> }`, "")).toBe(
@@ -117,6 +118,23 @@ describe("publishedPaperQuery", () => {
 
   it("gives no query for a graph id that is not a full one", () => {
     expect(publishedPaperQuery("verisci-staging", UAL)).toBeUndefined();
+  });
+});
+
+describe("parsePublishedAt", () => {
+  const UAL = `did:dkg:base:84532/${AGENT_LOWER}/7`;
+  const MINTED = '"2026-10-10T15:14:13.222Z"^^<http://www.w3.org/2001/XMLSchema#dateTime>';
+
+  it("gives the mint time of publishedPaperQuery's row as an ISO date", () => {
+    expect(parsePublishedAt([{ ka: UAL, minted: MINTED }])).toBe("2026-10-10T15:14:13.222Z");
+  });
+
+  it.each([
+    ["no row", []],
+    ["a row without a mint time", [{ ka: UAL }]],
+    ["a mint time that does not parse", [{ ka: UAL, minted: '"yesterday"' }]],
+  ] satisfies [string, QueryBinding[]][])("gives no date for %s", (_, rows) => {
+    expect(parsePublishedAt(rows)).toBeUndefined();
   });
 });
 

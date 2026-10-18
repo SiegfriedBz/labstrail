@@ -59,6 +59,7 @@ describe("core's layout", () => {
       "parsePaperCount",
       "parsePaperListing",
       "parsePaperRecord",
+      "parsePublishedAt",
       "parseRating",
       "parseScorerAnswer",
       "parseTeiHeader",

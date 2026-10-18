@@ -1,0 +1,10 @@
+created: 2026-10-18T13:50:20.800Z
+updated: 2026-10-18T15:07:58.219Z
+update_count: 2
+last_field: description
+kind: nested-class
+title: seo
+children: []
+parentPath:
+  - web-app
+  - lib

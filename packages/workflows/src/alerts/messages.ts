@@ -8,8 +8,9 @@ export interface SiteEnv {
 }
 
 /**
- * The site's address, for the links in activity messages: production's domain, the `develop`
- * branch's URL on staging, `http://localhost:3000` locally; `undefined` when Vercel gave none.
+ * The site's address, for the links in activity messages and, through the web app, its
+ * canonical links, sitemap and structured data: production's domain, the `develop` branch's
+ * URL on staging, `http://localhost:3000` locally; `undefined` when Vercel gave none.
  */
 export function siteUrlOf(env: SiteEnv): string | undefined {
   if (env.APP_ENV === "local") return "http://localhost:3000";

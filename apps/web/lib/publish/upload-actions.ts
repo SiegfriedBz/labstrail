@@ -6,6 +6,7 @@ import type {
   SubmitResult,
   UploadService,
 } from "@verisci/workflows";
+import { cache } from "react";
 import type { Counter } from "./limits.ts";
 import { eventTime, type PaperStage, paperProgress } from "./progress.ts";
 
@@ -77,6 +78,12 @@ export async function readProgress(
   // A run's mint can show before the node does: its record is not readable yet.
   return { ...stage, recordProblem: status.recordProblem ?? "unavailable" };
 }
+
+/**
+ * {@link readProgress} once per request: the paper page's metadata and its body share one read
+ * of the node (React's `cache`).
+ */
+export const readProgressOnce = cache(readProgress);
 
 /** The visitor's address as the host forwards it (Vercel sets both headers). */
 export function clientIp(headers: Headers): string {

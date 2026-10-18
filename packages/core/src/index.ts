@@ -32,6 +32,7 @@ export {
   parsePaperAuthors,
   parsePaperCount,
   parsePaperListing,
+  parsePublishedAt,
   publishedPaperQuery,
 } from "./papers/paper-list.ts";
 export {

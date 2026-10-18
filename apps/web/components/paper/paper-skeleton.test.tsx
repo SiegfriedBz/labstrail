@@ -25,7 +25,7 @@ describe("PaperSkeleton", () => {
   it("shows the verify panel's heading, groups and labels, with only the values to come", () => {
     render(<PaperSkeleton cid={CID} following={false} />);
 
-    expect(screen.getByRole("heading", { name: "Verify it yourself" })).toBeTruthy();
+    expect(screen.getByText("Verify it yourself")).toBeTruthy();
     const terms = (group: string) =>
       within(screen.getByRole("group", { name: group }))
         .getAllByRole("term")
@@ -48,8 +48,8 @@ describe("PaperSkeleton", () => {
   it("shows the publish panel's labels while a publish is followed", () => {
     render(<PaperSkeleton cid={CID} following />);
 
-    expect(screen.queryByRole("heading", { name: "Verify it yourself" })).toBeNull();
-    expect(screen.getByRole("heading", { name: "What's happening now" })).toBeTruthy();
+    expect(screen.queryByText("Verify it yourself")).toBeNull();
+    expect(screen.getByText("What's happening now")).toBeTruthy();
     expect(screen.getAllByRole("term").map((term) => term.textContent)).toEqual([
       "PDF (CID)",
       "IPFS link",
@@ -62,5 +62,14 @@ describe("PaperSkeleton", () => {
     );
 
     expect(screen.queryByText(/QmPZ9/)).toBeNull();
+  });
+
+  it("adds no heading before the paper's own h1 arrives", () => {
+    for (const following of [false, true]) {
+      const { container } = render(<PaperSkeleton cid={CID} following={following} />);
+
+      expect(container.querySelectorAll("h1, h2, h3")).toHaveLength(0);
+      cleanup();
+    }
   });
 });

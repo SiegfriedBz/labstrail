@@ -3,7 +3,9 @@ import {
   type PaperRecord,
   paperRecordQuery,
   parsePaperRecord,
+  parsePublishedAt,
   parseUal,
+  publishedPaperQuery,
   targetKaName,
 } from "@verisci/core";
 import { type AssetResult, createDkgClient } from "@verisci/dkg";
@@ -61,6 +63,8 @@ export interface PublishedRecord extends Omit<PaperRecord, "deadline"> {
   readonly signatureCheck: SignatureCheck;
   /** The UAL's author, which the asset's token is minted to: our DKG node's agent address. */
   readonly publisher: string | undefined;
+  /** When the node minted it, as an ISO date-time; absent when the node did not give it. */
+  readonly publishedAt?: string;
 }
 
 /** What the DKG and Inngest say about a paper, for the page to show as one stage. */
@@ -132,7 +136,15 @@ export function createUploadService(env: WorkflowsEnv, io: UploadIo): UploadServ
     timeoutMs: PAGE_TIMEOUT_MS,
   };
 
-  /** The record of a minted paper and its signature check, or why it cannot be shown. */
+  /** When the node minted `ual`, or `undefined` when it does not say: the record stands without it. */
+  async function readPublishedAt(ual: string): Promise<string | undefined> {
+    const sparql = publishedPaperQuery(env.DKG_CONTEXT_GRAPH, ual);
+    if (!sparql) return undefined;
+    const answer = await dkg.query(sparql);
+    return answer.ok ? parsePublishedAt(answer.bindings) : undefined;
+  }
+
+  /** The record of a minted paper, its mint time and signature check, or why it cannot be shown. */
   async function readRecord(
     cid: string,
     ual: string,
@@ -142,7 +154,7 @@ export function createUploadService(env: WorkflowsEnv, io: UploadIo): UploadServ
   > {
     const sparql = paperRecordQuery(cid, env.DKG_CONTEXT_GRAPH, ual);
     if (!sparql) return { ok: false, reason: "unreadable" };
-    const answer = await dkg.query(sparql);
+    const [answer, publishedAt] = await Promise.all([dkg.query(sparql), readPublishedAt(ual)]);
     if (!answer.ok) return { ok: false, reason: queryProblem(answer) };
     const record = parsePaperRecord(cid, answer.bindings);
     if (!record) return { ok: false, reason: "unreadable" };
@@ -158,6 +170,7 @@ export function createUploadService(env: WorkflowsEnv, io: UploadIo): UploadServ
         deadline: record.deadline.toString(),
         signatureCheck: check,
         publisher: parsed.ok ? parsed.ual.address : undefined,
+        ...(publishedAt === undefined ? {} : { publishedAt }),
       },
     };
   }

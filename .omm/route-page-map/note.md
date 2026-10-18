@@ -1,1 +1,1 @@
-app/error.tsx and app/not-found.tsx render failures and unknown routes; the layout (app/layout.tsx) holds the site's metadata (siteMetadata from lib/site.ts), the header, the footer with the contracts behind every record, and the theme script.
+app/error.tsx and app/not-found.tsx render failures and unknown routes; the layout (app/layout.tsx) holds the site's metadata (siteMetadata from lib/seo/site-metadata.ts), the header, the footer with links to the method and about pages and the contracts behind every record, and the theme script.

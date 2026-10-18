@@ -8,7 +8,11 @@ import {
 import Link from "next/link";
 import { formatPublished } from "../../lib/papers/papers.ts";
 import { ratingChainConfig } from "../../lib/rating/chain.ts";
+import { reviewJsonLd } from "../../lib/seo/json-ld.ts";
+import { siteUrl } from "../../lib/seo/site-metadata.ts";
+import { SITE } from "../../lib/site.ts";
 import { createWebEnv } from "../../lib/web-env.ts";
+import { JsonLd } from "../site/json-ld.tsx";
 import { RATINGS_TITLE, READINESS_INTRO, READINESS_TITLE } from "./labels.ts";
 import { RateButton } from "./rate-button.tsx";
 import { ScrollToRating } from "./scroll-to-rating.tsx";
@@ -26,13 +30,24 @@ const PHASES = [
  * link to its checks, or the paper's state as the papers list words it (`summariseRatings`),
  * and the button that requests a new rating ("Rate again" under a score, ADR 0013), left out
  * for a paper that can't be rated. Every
- * rating follows, newest first, then the three phases. Reads nothing where no contract takes
- * ratings (no deployment, or locally without the Anvil settings). The section is `#rating`,
- * the papers list's Rate link, and scrolls into view when the page was opened at it
- * (`ScrollToRating`).
+ * rating follows, newest first, then the three phases. A scored paper's section opens with one
+ * sentence that says its latest score, by its `title`, and holds that rating as a `Review` for
+ * search engines (ADR 0040). Reads nothing where no contract takes ratings (no deployment, or
+ * locally without the Anvil settings). The section is `#rating`, the papers list's Rate link,
+ * and scrolls into view when the page was opened at it (`ScrollToRating`).
  */
-export async function RatingsSection({ ual, cid }: { ual: string; cid: string }) {
-  const config = ratingChainConfig(createWebEnv());
+export async function RatingsSection({
+  ual,
+  cid,
+  title,
+}: {
+  ual: string;
+  cid: string;
+  /** The paper's title, for the score's sentence; without it, the sentence is left out. */
+  title?: string | undefined;
+}) {
+  const env = createWebEnv();
+  const config = ratingChainConfig(env);
   if (!config) {
     return (
       <Section>
@@ -57,8 +72,31 @@ export async function RatingsSection({ ual, cid }: { ual: string; cid: string })
   }
   const summary = summariseRatings(list.ratings);
   const newestFirst = [...list.ratings].reverse();
+  const latest =
+    summary.kind === "scored"
+      ? list.ratings.find((rating) => rating.requestId === summary.requestId)
+      : undefined;
   return (
     <Section>
+      {summary.kind === "scored" && (
+        <>
+          <JsonLd
+            data={reviewJsonLd(siteUrl(env), cid, {
+              requestId: summary.requestId,
+              score: summary.score,
+              ...(latest?.rKaUal ? { rKaUal: latest.rKaUal } : {}),
+            })}
+          />
+          {title && (
+            <p data-testid="score-sentence" className="max-w-[65ch] text-sm leading-relaxed">
+              {title} scores {summary.score}/100 for reproducibility readiness on {SITE.name}.{" "}
+              <Link href="/method" className="link">
+                How the score works
+              </Link>
+            </p>
+          )}
+        </>
+      )}
       <div
         className={`grid gap-8 ${newestFirst.length > 0 ? "md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] md:gap-10" : ""}`}
       >

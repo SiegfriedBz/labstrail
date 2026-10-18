@@ -19,7 +19,8 @@ interface ContractRow {
 }
 
 /**
- * The site's footer: what VeriSci is and runs on, and the contracts behind every record, each
+ * The site's footer: what VeriSci is and runs on, links to publishing, the method and the about
+ * page, and the contracts behind every record, each
  * linked on Basescan: OriginTrail's, which hold and publish every asset, and the
  * RatingController this environment's pages use, when it has one; locally that is the Anvil
  * one, shown unlinked.
@@ -72,15 +73,23 @@ export function SiteFooter({
           <p className="w-fit rounded-md border border-line px-2.5 py-1 font-mono text-xs text-muted">
             Base Sepolia testnet · chain {CHAIN_ID}
           </p>
-          <Link href="/publish" className="link w-fit text-sm">
-            Publish a paper
-          </Link>
+          <nav aria-label="About VeriSci" className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+            <Link href="/publish" className="link w-fit">
+              Publish a paper
+            </Link>
+            <Link href="/method" className="link w-fit">
+              How the score works
+            </Link>
+            <Link href="/about" className="link w-fit">
+              About VeriSci
+            </Link>
+          </nav>
         </div>
 
         <section aria-labelledby="contracts-title" className="grid content-start gap-3">
-          <h2 id="contracts-title" className="text-sm font-semibold">
+          <p id="contracts-title" className="text-sm font-semibold">
             Contracts behind every record
-          </h2>
+          </p>
           <ul className="glass divide-y divide-line overflow-hidden rounded-2xl">
             {rows.map((row) => (
               <li

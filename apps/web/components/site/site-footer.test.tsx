@@ -39,4 +39,20 @@ describe("SiteFooter", () => {
 
     expect(screen.queryByText("RatingController")).toBeNull();
   });
+
+  it("links how the score works and who builds VeriSci", () => {
+    render(<SiteFooter ratingController={undefined} />);
+
+    expect(screen.getByRole("link", { name: "How the score works" }).getAttribute("href")).toBe(
+      "/method",
+    );
+    expect(screen.getByRole("link", { name: "About VeriSci" }).getAttribute("href")).toBe("/about");
+  });
+
+  it("adds no heading to the page's outline", () => {
+    const { container } = render(<SiteFooter ratingController={undefined} />);
+
+    expect(container.querySelectorAll("h1, h2, h3")).toHaveLength(0);
+    expect(screen.getByText("Contracts behind every record")).toBeTruthy();
+  });
 });

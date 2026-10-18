@@ -53,6 +53,7 @@ describe("workflows' layout", () => {
       "reconcileRatings",
       "servedFunctions",
       "servesRating",
+      "siteUrlOf",
       "summariseRatings",
       "workflowsName",
     ]);

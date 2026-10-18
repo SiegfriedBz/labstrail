@@ -138,22 +138,27 @@ const GROUP_EDGE = { submission: "border-accent/50", asset: "border-accent-2/50"
 
 /**
  * One of `VerifyPanel`'s groups: its heading, then its fields as a list of terms. The
- * skeleton (`PaperSkeleton`) uses it too, so both show the same groups.
+ * skeleton (`PaperSkeleton`) uses it too, so both show the same groups; there its title is a
+ * paragraph (`heading={false}`), so no heading comes before the paper's `h1`.
  */
 export function VerifyGroup({
   group,
+  heading = true,
   children,
 }: {
   group: keyof typeof VERIFY_GROUPS;
+  /** Title the group with an `h3`, or a paragraph. */
+  heading?: boolean;
   children: ReactNode;
 }) {
   const id = `verify-${group}`;
+  const Title = heading ? "h3" : "p";
   return (
     // biome-ignore lint/a11y/useSemanticElements: read-only values, not form controls; a fieldset's legend sits outside its grid
     <div role="group" aria-labelledby={id} className="grid gap-4">
-      <h3 id={id} className="text-sm font-semibold">
+      <Title id={id} className="text-sm font-semibold">
         {VERIFY_GROUPS[group]}
-      </h3>
+      </Title>
       <dl className={`grid gap-5 border-l-2 pl-4 ${GROUP_EDGE[group]}`}>{children}</dl>
     </div>
   );
