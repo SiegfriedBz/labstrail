@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   breadcrumbJsonLd,
   paperJsonLd,
+  ratingPageJsonLd,
   reviewJsonLd,
   serializeJsonLd,
   siteJsonLd,
@@ -181,6 +182,40 @@ describe("reviewJsonLd", () => {
 
     expect(text).not.toContain("aggregateRating");
     expect(text).not.toContain("ClaimReview");
+  });
+});
+
+describe("ratingPageJsonLd", () => {
+  it("holds the rating's Review and its breadcrumb, through its paper", () => {
+    const data = ratingPageJsonLd(
+      SITE,
+      CID,
+      { requestId: REQUEST, score: 72, rationale: "It names its strains." },
+      record.title,
+    );
+
+    expect(data["@context"]).toBe("https://schema.org");
+    expect(data["@graph"]).toEqual([
+      expect.objectContaining({
+        "@type": "Review",
+        reviewBody: "It names its strains.",
+        itemReviewed: { "@id": `${PAPER}#paper` },
+      }),
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Papers", item: `${SITE}/papers` },
+          { "@type": "ListItem", position: 2, name: record.title, item: PAPER },
+          {
+            "@type": "ListItem",
+            position: 3,
+            name: "Rating",
+            item: `${PAPER}/ratings/${REQUEST}`,
+          },
+        ],
+      },
+    ]);
+    expect(data["@graph"][0]).not.toHaveProperty("@context");
   });
 });
 

@@ -1,4 +1,5 @@
-import type { RatingView } from "@verisci/workflows";
+import type { RatingService, RatingView } from "@verisci/workflows";
+import { cache } from "react";
 
 /**
  * What a rating's page shows: a pending rating's step (scored, saved, minted, then recorded on
@@ -53,3 +54,12 @@ export function whileFresh(view: RatingView, waiting: boolean): RatingView {
     ? { ok: false, reason: "unavailable" }
     : view;
 }
+
+/**
+ * `service.readRating(requestId)` once per request: the rating page's metadata and its body
+ * share one read of the chain and the node (React's `cache`).
+ */
+export const readRatingOnce = cache(
+  (requestId: string, service: Pick<RatingService, "readRating">): Promise<RatingView> =>
+    service.readRating(requestId),
+);

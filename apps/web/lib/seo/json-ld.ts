@@ -146,6 +146,31 @@ export function reviewJsonLd(site: string, cid: string, rating: ReviewFacts): Js
   };
 }
 
+/**
+ * A fulfilled rating's page: its `Review` ({@link reviewJsonLd}) and its breadcrumb, through
+ * its paper (Papers, the paper's title, Rating).
+ */
+export function ratingPageJsonLd(
+  site: string,
+  cid: string,
+  rating: ReviewFacts,
+  paperTitle: string,
+): JsonLdGraph {
+  const { "@context": _context, ...review } = reviewJsonLd(site, cid, rating);
+  const paper = paperUrl(site, cid);
+  return {
+    "@context": CONTEXT,
+    "@graph": [
+      review,
+      breadcrumbJsonLd([
+        { name: "Papers", url: `${site}/papers` },
+        { name: paperTitle, url: paper },
+        { name: "Rating", url: `${paper}/ratings/${rating.requestId}` },
+      ]),
+    ],
+  };
+}
+
 /** A `BreadcrumbList` of `crumbs`, numbered from 1. */
 export function breadcrumbJsonLd(crumbs: readonly Crumb[]): JsonLdNode & {
   readonly itemListElement: JsonLdNode[];

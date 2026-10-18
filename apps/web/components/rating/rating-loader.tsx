@@ -1,10 +1,13 @@
 import { getRatingService, getUploadService } from "@verisci/workflows";
 import { notFound } from "next/navigation";
-import { readProgress } from "../../lib/publish/upload-actions.ts";
+import { readProgressOnce } from "../../lib/publish/upload-actions.ts";
 import { ratingChainConfig } from "../../lib/rating/chain.ts";
-import { whileFresh } from "../../lib/rating/stage.ts";
+import { readRatingOnce, whileFresh } from "../../lib/rating/stage.ts";
+import { ratingPageJsonLd } from "../../lib/seo/json-ld.ts";
+import { siteUrl } from "../../lib/seo/site-metadata.ts";
 import { shorten } from "../../lib/shorten.ts";
 import { createWebEnv } from "../../lib/web-env.ts";
+import { JsonLd } from "../site/json-ld.tsx";
 import { RatingProgress } from "./rating-progress.tsx";
 
 /**
@@ -15,7 +18,9 @@ import { RatingProgress } from "./rating-progress.tsx";
  * rating's paper then. On a page opened right after the request (`fresh`), a rating no
  * contract holds yet is followed too, as the chain may not show it for a few seconds. When the DKG node does not answer, the rating still shows, from
  * the chain, under the paper's short address, and the page says why (ADR 0021). Where no
- * contract takes ratings, the page says so and reads nothing.
+ * contract takes ratings, the page says so and reads nothing. A fulfilled rating holds its
+ * `Review` and breadcrumb for search engines (ADR 0040). The reads are the ones the page's
+ * metadata made (`readRatingOnce`, `readProgressOnce`).
  */
 export async function RatingLoader({
   cid,
@@ -27,7 +32,8 @@ export async function RatingLoader({
   /** The page was opened right after the request (`?new=1`). */
   fresh?: boolean;
 }) {
-  const config = ratingChainConfig(createWebEnv());
+  const env = createWebEnv();
+  const config = ratingChainConfig(env);
   if (!config) {
     return (
       <p className="text-muted">
@@ -36,8 +42,8 @@ export async function RatingLoader({
     );
   }
   const [read, paper] = await Promise.all([
-    getRatingService().readRating(requestId),
-    readProgress(cid, undefined, getUploadService()),
+    readRatingOnce(requestId, getRatingService()),
+    readProgressOnce(cid, undefined, getUploadService()),
   ]);
   const view = whileFresh(read, fresh);
   if (!view.ok && view.reason === "not-found") notFound();
@@ -46,16 +52,34 @@ export async function RatingLoader({
   if (!nodeDown && ual === undefined) notFound();
   if (!nodeDown && view.ok && view.rating.targetUal !== ual) notFound();
   const title = paper.stage === "published" && paper.record ? paper.record.title : shorten(cid);
+  const fulfilled = view.ok && view.rating.status === "fulfilled" ? view : undefined;
   return (
-    <RatingProgress
-      cid={cid}
-      title={title}
-      ual={ual}
-      requestId={requestId.toLowerCase()}
-      initial={view}
-      local={config.local}
-      nodeDown={nodeDown}
-      fresh={fresh}
-    />
+    <>
+      {fulfilled?.rating.score !== undefined && (
+        <JsonLd
+          data={ratingPageJsonLd(
+            siteUrl(env),
+            cid,
+            {
+              requestId: requestId.toLowerCase(),
+              score: fulfilled.rating.score,
+              ...(fulfilled.record ? { rationale: fulfilled.record.rationale } : {}),
+              ...(fulfilled.rating.rKaUal ? { rKaUal: fulfilled.rating.rKaUal } : {}),
+            },
+            title,
+          )}
+        />
+      )}
+      <RatingProgress
+        cid={cid}
+        title={title}
+        ual={ual}
+        requestId={requestId.toLowerCase()}
+        initial={view}
+        local={config.local}
+        nodeDown={nodeDown}
+        fresh={fresh}
+      />
+    </>
   );
 }

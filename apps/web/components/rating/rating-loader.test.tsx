@@ -8,7 +8,8 @@ const UAL = "did:dkg:base:84532/0xd701ed157232ad5e14bc4134a8d10d64d86f13b3/7";
 const readRating = vi.fn<(id: string) => Promise<RatingView>>();
 const readPaper = vi.fn<(cid: string) => Promise<PaperStatus>>();
 
-vi.mock("@verisci/workflows", () => ({
+vi.mock("@verisci/workflows", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@verisci/workflows")>()),
   getRatingService: () => ({ readRating }),
   getUploadService: () => ({ readPaper }),
 }));
@@ -82,6 +83,54 @@ describe("RatingLoader", () => {
     expect(
       screen.getByText(`progress of RNAi therapies, local false, node down false, paper ${UAL}`),
     ).toBeTruthy();
+  });
+
+  it("describes a fulfilled rating as a Review of its paper, with its breadcrumb", async () => {
+    readRating.mockResolvedValue({
+      ok: true,
+      rating: {
+        requestId: REQUEST_ID,
+        contract: "0xa",
+        status: "fulfilled",
+        score: 72,
+        rKaUal: `${UAL}9`,
+        requestedAt: 1,
+        targetUal: UAL,
+      },
+      record: {
+        requestId: REQUEST_ID,
+        targetUal: UAL,
+        score: 72,
+        rationale: "It names its strains.",
+        checks: [],
+        model: "gemini-3.8-flash",
+        promptVersion: "2",
+      },
+    });
+    readPaper.mockResolvedValue(PUBLISHED);
+
+    render(await RatingLoader({ cid: CID, requestId: REQUEST_ID }));
+
+    const [data] = [...document.querySelectorAll('script[type="application/ld+json"]')].map(
+      (script) => JSON.parse(script.textContent ?? ""),
+    );
+    expect(data["@graph"].map((node: { "@type": string }) => node["@type"])).toEqual([
+      "Review",
+      "BreadcrumbList",
+    ]);
+    expect(data["@graph"][0]).toMatchObject({
+      reviewBody: "It names its strains.",
+      reviewRating: { ratingValue: 72 },
+    });
+  });
+
+  it("gives search engines nothing to describe while the rating runs", async () => {
+    readRating.mockResolvedValue(PENDING);
+    readPaper.mockResolvedValue(PUBLISHED);
+
+    render(await RatingLoader({ cid: CID, requestId: REQUEST_ID }));
+
+    expect(document.querySelectorAll('script[type="application/ld+json"]')).toHaveLength(0);
   });
 
   it("is not found when the rating is of another paper", async () => {

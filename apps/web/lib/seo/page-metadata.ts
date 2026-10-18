@@ -1,5 +1,5 @@
 import { canonicalCid } from "@verisci/core";
-import type { PublishedRecord } from "@verisci/workflows";
+import type { PublishedRecord, RatingView } from "@verisci/workflows";
 import type { Metadata } from "next";
 import type { PaperView } from "../publish/upload-actions.ts";
 import { SITE } from "../site.ts";
@@ -56,4 +56,38 @@ function summaryOf(record: PublishedRecord): string {
   const count = record.authors.length;
   const by = count === 0 ? "" : `, by ${count} ${count === 1 ? "author" : "authors"}`;
   return `${record.title}${by}, published on the OriginTrail DKG and rated for reproducibility readiness on ${SITE.name}.`;
+}
+
+/**
+ * A rating page's metadata (ADR 0040), canonical at `/papers/<canonical CID>/ratings/<request
+ * id in lowercase>`. A fulfilled rating of this published paper is titled by its score and the
+ * paper's title, and described by its rationale (or, when its R-KA could not be read, by its
+ * score in a sentence). Any other rating, one of another paper, or one whose paper the node did
+ * not answer for, is kept out of search results.
+ */
+export function ratingMetadata(
+  cid: string,
+  requestId: string,
+  rating: RatingView,
+  paper: PaperView,
+): Metadata {
+  const canonical = `/papers/${canonicalCid(cid) ?? cid}/ratings/${requestId.toLowerCase()}`;
+  const record = paper.stage === "published" ? paper.record : undefined;
+  const score = rating.ok && rating.rating.status === "fulfilled" ? rating.rating.score : undefined;
+  if (
+    !rating.ok ||
+    score === undefined ||
+    !record ||
+    paper.stage !== "published" ||
+    rating.rating.targetUal !== paper.ual
+  ) {
+    return { title: "Rating", alternates: { canonical }, robots: { index: false } };
+  }
+  return {
+    title: `${score}/100 reproducibility readiness: ${record.title}`,
+    description: rating.record
+      ? clip(rating.record.rationale)
+      : clip(`${record.title} scores ${score}/100 for reproducibility readiness on ${SITE.name}.`),
+    alternates: { canonical },
+  };
 }
