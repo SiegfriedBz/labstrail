@@ -34,6 +34,10 @@ describe("completeTitle", () => {
     expect(completeTitle(CUT, stored)).toBe(CUT);
   });
 
+  it("takes words stored before GROBID's whole title with it, as the rule reads", () => {
+    expect(completeTitle(FULL, `Cell Genomics - ${FULL}`)).toBe(`Cell Genomics - ${FULL}`);
+  });
+
   it("keeps GROBID's when the stored title is over 300 characters", () => {
     const long = `${"A study of ".repeat(30)}${CUT}`;
 

@@ -81,12 +81,23 @@ describe("readPaperText", () => {
     ["stores no title", {}],
     ["stores a blank one", { title: "  " }],
     ["holds metadata that does not parse", { xmp: "<x:xmpmeta><rdf:RDF><dc:title>" }],
+    [
+      "holds its XMP title in two languages, which pdf.js would join",
+      { xmp: xmpOf(TITLE, [["fr", "Citicoline apres un AVC ischemique aigu"]]) },
+    ],
   ])("still gives the text, with no stored title, for a PDF that %s", async (_, metadata) => {
     const answer = await paperTextOf(pdfOf(LINES, metadata), 150_000);
 
     expect(answer.ok).toBe(true);
     expect(answer).not.toHaveProperty("storedTitle");
     expect(answer.ok && answer.paper.text).toContain(SENTENCE);
+  });
+
+  it("gives the rating run the text alone, without the title the PDF stores", async () => {
+    const answer = await read(pdfOf(LINES, { title: TITLE })).result;
+
+    expect(answer.ok).toBe(true);
+    expect(Object.keys(answer)).toEqual(["ok", "paper"]);
   });
 
   it("is too-large for a file over maxBytes", async () => {

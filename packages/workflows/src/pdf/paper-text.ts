@@ -15,8 +15,9 @@ export type ReadPaperTextResult =
       readonly paper: PaperText;
       /**
        * The title the PDF stores in its own metadata, when it holds one: its info dictionary's
-       * `Title`, else its XMP `dc:title`. The publish run completes GROBID's title with it
-       * (`completeTitle`); the rating run reads only `paper`.
+       * `Title`, else its XMP `dc:title` when that holds one version. The publish run completes
+       * GROBID's title with it (`completeTitle`); {@link readPaperText}, the rating run's
+       * reader, gives `paper` alone.
        */
       readonly storedTitle?: string;
     }
@@ -37,8 +38,9 @@ export interface ReadPaperTextOptions extends FetchPdfOptions {
 /**
  * Reads a published paper's text for the scorer (ADR 0018): fetches its PDF by CID through
  * the gateway, extracts each page's text with unpdf, and prepares it with `preparePaperText`,
- * so the PDF's bytes stay inside this function and the step that calls it (ADR 0010).
- * Never throws.
+ * so the PDF's bytes stay inside this function and the step that calls it (ADR 0010). It
+ * gives the text alone: a stored title can be of any length, and the step's output stays
+ * the text's size. Never throws.
  */
 export async function readPaperText(
   cid: string,
@@ -49,7 +51,8 @@ export async function readPaperText(
     if (pdf.reason === "unreachable") return pdf;
     return { ok: false, reason: pdf.reason === "not-a-pdf" ? "unreadable" : pdf.reason };
   }
-  return paperTextOf(pdf.bytes, options.maxChars);
+  const text = await paperTextOf(pdf.bytes, options.maxChars);
+  return text.ok ? { ok: true, paper: text.paper } : text;
 }
 
 /**
@@ -77,8 +80,12 @@ export async function paperTextOf(
   return storedTitle === undefined ? prepared : { ...prepared, storedTitle };
 }
 
+/** The versions an XMP `dc:title` holds, one `rdf:li` each. */
+const XMP_TITLE = /<dc:title\b[^>]*>([\s\S]*?)<\/dc:title>/;
+
 /**
- * The title `document` stores: its info dictionary's `Title`, else its XMP `dc:title`, or
+ * The title `document` stores: its info dictionary's `Title`, else its XMP `dc:title` when that
+ * holds one version (pdf.js joins several, one per language, with nothing between them), or
  * `undefined` when it holds neither, a blank one, or metadata that does not parse.
  */
 async function storedTitleOf(
@@ -86,7 +93,10 @@ async function storedTitleOf(
 ): Promise<string | undefined> {
   try {
     const { info, metadata } = await document.getMetadata();
-    const titles = [(info as { Title?: unknown }).Title, metadata?.get("dc:title")];
+    const raw = String(metadata?.getRaw() ?? "");
+    const versions = XMP_TITLE.exec(raw)?.[1]?.match(/<rdf:li\b/g)?.length;
+    const xmpTitle = versions === 1 ? metadata?.get("dc:title") : undefined;
+    const titles = [(info as { Title?: unknown }).Title, xmpTitle];
     return titles.find(
       (title): title is string => typeof title === "string" && title.trim() !== "",
     );

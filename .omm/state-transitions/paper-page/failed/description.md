@@ -1,1 +1,1 @@
-The run stopped after its retries (chain, gateway or node unreachable, mint not confirmed, or a setup problem on our side); the page reads the reason from the run's error and suggests publishing the same PDF again, which picks up where it stopped.
+The run stopped after its retries (chain, gateway or node unreachable, the network refusing the mint, mint not confirmed, or a setup problem on our side); the page reads the reason from the run's error and suggests publishing the same PDF again, which picks up where it stopped.

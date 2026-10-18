@@ -12,8 +12,9 @@ function comparable(title: string): string {
  * can drop a title's first words (`docs/domain.md` → GROBID). Takes `stored`, its whitespace
  * collapsed, only when it is longer than GROBID's, at most 300 characters, and ends with
  * GROBID's title at a word's start, case, whitespace and a final full stop aside; otherwise
- * GROBID's, as is. So a file name, a journal's name or another paper's title stored there never
- * replaces it.
+ * GROBID's, as is. A file name, a journal's name or another paper's title stored on its own
+ * leaves GROBID's; words stored before GROBID's whole title ("Cell Genomics - <title>") are kept
+ * with it.
  */
 export function completeTitle(grobid: string, stored: string | undefined): string {
   if (stored === undefined) return grobid;

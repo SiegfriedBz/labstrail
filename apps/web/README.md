@@ -321,7 +321,10 @@ The "Clinical" look: a clinical record with an on-chain proof, in Tailwind CSS v
 - Every page works from 360 px wide, one column on phones, and the page clips any overflow
   (`overflow-x: clip`, which keeps the sticky header working). The home hero fills the
   first screen, so the next section starts below the fold; below `md`, the hero's text
-  fills the first screen and its panel starts just under the fold. On-chain values show in
+  fills the first screen and its panel starts just under the fold. The hero and the `body`
+  size with `svh`, the screen's height with a phone's address bar shown, which stays the same
+  while the bar hides, so the page stays still as it scrolls; `app/viewport.test.ts` refuses
+  `dvh` anywhere in `app/`. On-chain values show in
   short form with a copy button.
 - The product name is VeriSci, for life-science and health papers; its name and description
   come from `lib/site.ts` (`SITE`). Its mark (`components/site/logo.tsx`, and `app/icon.svg`

@@ -34,7 +34,7 @@ server (`APP_ENV` other than `local`) checks them when it starts, through
 | --- | --- |
 | `GROBID_URL` | GROBID's base URL: `https://verisci-grobid.duckdns.org`, on the node server, which takes the environment's `DKG_TOKEN` as its credential ([ADR 0039](../../docs/adr/0039-one-credential-per-environment.md)); or `http://127.0.0.1:8070` for a GROBID run locally in Docker ([`docs/node-host.md`](../../docs/node-host.md) → The developer's computer) |
 | `PINATA_GATEWAY_URL` | The Pinata account's dedicated gateway, `https://<name>.mypinata.cloud`, through which the publish and rating runs read PDFs; one account serves every environment ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)) |
-| `CHAIN_RPC_URL` | A Base Sepolia RPC URL, to check smart-contract wallets' signatures and, on staging and production, for the rating functions to read and write the rating contracts and the pages to read their ratings |
+| `CHAIN_RPC_URL` | A Base Sepolia RPC URL, to check smart-contract wallets' signatures and, on staging and production, for the rating functions to read and write the rating contracts and the pages to read their ratings. Deployed, the Alchemy RPC URL: Base's public endpoint refused the pages' bursts (`docs/domain.md` → Chain) |
 | `PINATA_JWT` | A Pinata API key (JWT) allowed to upload, list and delete files; the `publish-pdf` dev script reads it too. Secret |
 | `GEMINI_API_KEY` | A Gemini API key from Google AI Studio, for the field check both runs make ([ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)) and the rating functions' scorer ([ADR 0018](../../docs/adr/0018-phase-1-scorer-output-contract.md)); the `score-papers` dev script reads it too. Every deployment checks it at start, previews included. Secret |
 | `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY` | Inngest's keys, required unless `APP_ENV` is `local`: the SDK reads them itself, and the signing key also reads runs for the upload page. Secret |
@@ -120,7 +120,7 @@ starts nothing. Its steps:
    so every published paper can be rated. GROBID's 401 and 403 fail the run; 408 and 429 are
    retried. A DOI is kept only if it looks like one. The title is GROBID's, completed from the
    title the PDF stores in its own metadata (its info dictionary's `Title`, else its XMP
-   `dc:title`) when GROBID dropped its first words: core's `completeTitle` takes the stored one
+   `dc:title` when that holds one version) when GROBID dropped its first words: core's `completeTitle` takes the stored one
    only when it ends with GROBID's (`packages/core` → Target KAs).
 4. **check-field**: asks `gemini-3.5-flash-lite` (`fieldModel`, free tier) whether the paper
    is in VeriSci's field, from its title, abstract and opening (`checkField`, with core's

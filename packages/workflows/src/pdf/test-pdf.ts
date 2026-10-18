@@ -35,15 +35,21 @@ export function pdfOf(lines: readonly string[], metadata: TestPdfMetadata = {}):
   return new TextEncoder().encode(pdf);
 }
 
-/** An XMP packet holding `title` as its `dc:title`, as publishers write it. */
-export function xmpOf(title: string): string {
+/**
+ * An XMP packet holding `title` as its `dc:title`, as publishers write it, with `others` as
+ * further versions (`[lang, title]`).
+ */
+export function xmpOf(title: string, others: readonly (readonly [string, string])[] = []): string {
+  const versions = others
+    .map(([lang, other]) => `\n          <rdf:li xml:lang="${lang}">${other}</rdf:li>`)
+    .join("");
   return `<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
 <x:xmpmeta xmlns:x="adobe:ns:meta/">
   <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
     <rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/">
       <dc:title>
         <rdf:Alt>
-          <rdf:li xml:lang="x-default">${title}</rdf:li>
+          <rdf:li xml:lang="x-default">${title}</rdf:li>${versions}
         </rdf:Alt>
       </dc:title>
     </rdf:Description>
