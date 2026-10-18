@@ -6,9 +6,10 @@
 //
 //   pnpm --filter @verisci/workflows score-papers [--field] [id…]
 //
-// Reads GEMINI_API_KEY (and GROBID_URL with --field) from the root .env.local (packages/workflows
-// README). Downloads each PDF once into node_modules/.cache/verisci-reference/, and writes each
-// run's answers there too, after each paper, so a run that stops keeps the answers it paid for.
+// Reads GEMINI_API_KEY (and GROBID_URL with --field, with DKG_TOKEN as GROBID's credential on
+// the node server) from the root .env.local (packages/workflows README). Downloads each PDF
+// once into node_modules/.cache/verisci-reference/, and writes each run's answers there too,
+// after each paper, so a run that stops keeps the answers it paid for.
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { setTimeout as sleep } from "node:timers/promises";
 import {
@@ -48,7 +49,11 @@ const args = process.argv.slice(2);
 const fieldOnly = args.includes("--field");
 const env = defineEnv({
   extends: [shared],
-  server: { ...geminiSchema, GROBID_URL: fieldOnly ? z.url() : z.string().optional() },
+  server: {
+    ...geminiSchema,
+    GROBID_URL: fieldOnly ? z.url() : z.string().optional(),
+    DKG_TOKEN: z.string().optional(),
+  },
   runtimeEnv: process.env,
 });
 const gemini = {
@@ -178,6 +183,7 @@ async function checkOne(paper: ReferencePaper): Promise<FieldFound> {
   const read = await readPaper("cached", {
     gatewayUrl,
     grobidUrl: String(env.GROBID_URL),
+    token: env.DKG_TOKEN,
     fetch: async (input: string | URL | Request, init?: RequestInit) =>
       String(input).startsWith(gatewayUrl)
         ? new Response(bytes.slice() as Uint8Array<ArrayBuffer>)

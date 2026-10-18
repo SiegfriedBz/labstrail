@@ -1,2 +1,1 @@
-- Alchemy webhooks for Phase1Requested (ADR 0017) and an alert channel (an open question in docs/adr/README.md).
-- A second pin of each PDF; the DKG node, GROBID and the RPC proxy on a server.
+- A second pin of each PDF.

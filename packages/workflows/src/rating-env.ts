@@ -13,17 +13,32 @@ export const localChainSchema = {
 };
 
 /**
- * The rating functions' own variables for `appEnv`: the oracle's key (ADR 0019), and locally
- * Anvil's URL and the contract deployed there (ADR 0036), which other environments never read.
+ * The rating functions' own variables for `appEnv`: the oracle's key (ADR 0019), the node's
+ * publisher wallets for the health check (required outside `local`), and locally Anvil's URL
+ * and the contract deployed there (ADR 0036), which other environments never read.
  * The Gemini key is among the workflows' settings (`workflowsSchema`). Messages never include a
  * value.
  */
 export function ratingSchema(appEnv: SharedEnv["APP_ENV"]) {
   const local = appEnv === "local";
+  const publishers = z
+    .string()
+    .regex(
+      /^\s*0x[0-9a-fA-F]{40}(\s*,\s*0x[0-9a-fA-F]{40})*\s*$/,
+      "must be 0x addresses separated by commas",
+    );
   return {
     ORACLE_PRIVATE_KEY: z.string().regex(/^0x[0-9a-fA-F]{64}$/, "must be 0x and 64 hex digits"),
     LOCAL_CHAIN_RPC_URL: local ? localChainSchema.LOCAL_CHAIN_RPC_URL : z.string().optional(),
     LOCAL_RATING_CONTRACT: local ? localChainSchema.LOCAL_RATING_CONTRACT : z.string().optional(),
+    /**
+     * The DKG node's publisher wallets, whose ETH and TRAC the health check watches (ADRs 0006,
+     * 0015, 0038), comma-separated: required outside `local`, so a deployment that would watch
+     * none refuses to start; locally optional, none watched when unset.
+     */
+    PUBLISHER_ADDRESSES: (local ? publishers.optional() : publishers).transform((list) =>
+      list ? list.split(",").map((address) => address.trim().toLowerCase()) : [],
+    ),
   };
 }
 

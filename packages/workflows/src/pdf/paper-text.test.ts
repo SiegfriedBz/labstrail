@@ -46,7 +46,11 @@ describe("readPaperText", () => {
   });
 
   it("is unreachable when the gateway does not answer with the file", async () => {
-    expect(await read("busy", 503).result).toEqual({ ok: false, reason: "unreachable" });
+    expect(await read("busy", 503).result).toEqual({
+      ok: false,
+      reason: "unreachable",
+      detail: "HTTP 503",
+    });
   });
 
   it.each([

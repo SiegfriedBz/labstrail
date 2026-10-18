@@ -21,9 +21,11 @@ const workflows = {
   INNGEST_EVENT_KEY: "secret-event-key",
   INNGEST_SIGNING_KEY: "signkey-test-0123",
 };
-const rating = { ...workflows, ORACLE_PRIVATE_KEY: ORACLE_KEY };
+const PUBLISHER = "0xD701ed157232ad5E14BC4134a8D10D64D86f13B3";
+const rating = { ...workflows, ORACLE_PRIVATE_KEY: ORACLE_KEY, PUBLISHER_ADDRESSES: PUBLISHER };
 const local = {
   ...rating,
+  PUBLISHER_ADDRESSES: undefined,
   APP_ENV: "local",
   LOCAL_CHAIN_RPC_URL: "http://127.0.0.1:8546",
   LOCAL_RATING_CONTRACT: "0x5FbDB2315678afecb367f032d93F642f64180aa3",
@@ -67,6 +69,39 @@ describe("createRatingEnv", () => {
         .map((issue) => issue.variable)
         .sort(),
     ).toEqual(["LOCAL_CHAIN_RPC_URL", "LOCAL_RATING_CONTRACT"]);
+  });
+
+  it("requires the node's publisher wallets outside local, so a deployment that would watch none refuses to start (ADRs 0006, 0015)", () => {
+    for (const appEnv of ["staging", "production"]) {
+      expect(
+        issues({
+          ...rating,
+          APP_ENV: appEnv,
+          DKG_CONTEXT_GRAPH: rating.DKG_CONTEXT_GRAPH.replace(
+            "staging",
+            appEnv === "production" ? "prod" : "staging",
+          ),
+          PUBLISHER_ADDRESSES: undefined,
+        }).map((issue) => issue.variable),
+      ).toEqual(["PUBLISHER_ADDRESSES"]);
+    }
+    expect(createRatingEnv(local).PUBLISHER_ADDRESSES).toEqual([]);
+  });
+
+  it("takes the node's publisher wallets as a comma-separated list, lowercase", () => {
+    expect(
+      createRatingEnv({
+        ...rating,
+        PUBLISHER_ADDRESSES:
+          "0xD701ed157232ad5E14BC4134a8D10D64D86f13B3, 0x9a17ec95e96f8a7c40b7ac1411e8a844c7bf9111",
+      }).PUBLISHER_ADDRESSES,
+    ).toEqual([
+      "0xd701ed157232ad5e14bc4134a8d10d64d86f13b3",
+      "0x9a17ec95e96f8a7c40b7ac1411e8a844c7bf9111",
+    ]);
+    expect(() => createRatingEnv({ ...rating, PUBLISHER_ADDRESSES: "0x12,nope" })).toThrow(
+      /PUBLISHER_ADDRESSES/,
+    );
   });
 
   it("names every bad setting, the workflows' included, in one error", () => {

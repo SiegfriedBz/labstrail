@@ -1,6 +1,14 @@
 import { normalizeUal } from "@verisci/core";
 import { type Connection, field, isSuccess, type Reply, send, toFailure } from "./http.ts";
-import type { AssetResult, DkgFailure, MintResult, Quad, QueryResult } from "./types.ts";
+import type {
+  AssetResult,
+  DkgFailure,
+  GraphStatus,
+  MintResult,
+  NodeStatus,
+  Quad,
+  QueryResult,
+} from "./types.ts";
 
 /** How long a read, store or share waits for the node by default before reporting it unreachable. */
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -11,9 +19,12 @@ const QUORUM_CODES = ["storage_ack_insufficient", "CORE_TEMPORARILY_UNAVAILABLE"
 
 /** Where the client sends its calls. */
 export interface DkgClientConfig {
-  /** The node's base URL, e.g. `http://127.0.0.1:9200`. */
+  /** The node's base URL, e.g. `https://verisci-dkg.duckdns.org`. */
   readonly url: string;
-  /** Bearer token: the node's admin token locally, the environment's credential on the server. */
+  /**
+   * Bearer token: the environment's credential for the node server, which Caddy checks
+   * before it forwards the call with the node's admin token (ADR 0039).
+   */
   readonly token: string;
   /** The full context graph id, `<agent address>/<name>` (`docs/domain.md` → DKG). */
   readonly contextGraphId: string;
@@ -61,6 +72,14 @@ export interface DkgClient {
    * "nothing there". Asked each time, never remembered: a node restart can drop the graph.
    */
   checkGraph(): Promise<{ readonly ok: true } | DkgFailure>;
+  /**
+   * Reads the node's health check (`GET /api/status`), which is open, so it sends no
+   * credential (ADR 0039): this client's graph as the node's catalog lists it (address in any
+   * case), `undefined` when it is not listed, or a failure when the node does not answer
+   * (`unreachable`), refuses (`unauthorized`) or answers otherwise (`unexpected` with its
+   * status).
+   */
+  readStatus(): Promise<NodeStatus>;
 }
 
 /** Builds a client for one context graph on one DKG node. Every UAL it returns is normalized (ADR 0031). */
@@ -177,6 +196,17 @@ export function createDkgClient(config: DkgClientConfig): DkgClient {
     return { ok: false, reason: "unexpected", status: reply.status };
   }
 
+  async function readStatus(): Promise<NodeStatus> {
+    const reply = await send(connection, "GET", "/api/status", { timeoutMs, open: true });
+    if (reply.kind !== "answer" || !isSuccess(reply)) return toFailure(reply);
+    const graphs = field(field(reply.body, "rfc64Catalog"), "contextGraphs");
+    if (!Array.isArray(graphs)) return { ok: false, reason: "unexpected", status: reply.status };
+    const entry = graphs.find((graph) =>
+      sameGraphId(String(field(graph, "contextGraphId")), config.contextGraphId),
+    );
+    return { ok: true, graph: entry === undefined ? undefined : toGraphStatus(entry) };
+  }
+
   async function query(sparql: string): Promise<QueryResult> {
     const reply = await send(connection, "POST", "/api/query", {
       body: { sparql, ...graph },
@@ -188,7 +218,15 @@ export function createDkgClient(config: DkgClientConfig): DkgClient {
     return { ok: true, bindings: rows.filter(isStringRow) };
   }
 
-  return { readAsset, storeAsset, startMint, query, checkGraph };
+  return { readAsset, storeAsset, startMint, query, checkGraph, readStatus };
+}
+
+/** A catalog entry's authority, as the node spells it. */
+function toGraphStatus(entry: unknown): GraphStatus {
+  return {
+    authorityState: String(field(entry, "authorityState")),
+    policySource: String(field(entry, "policySource")),
+  };
 }
 
 /** Same graph: the agent address in any case, the graph name exactly. */

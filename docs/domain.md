@@ -157,12 +157,29 @@ edge`, testnet), Base Sepolia.
   with the agent key), valid for every graph on the node; there are no tokens scoped per
   graph, so whoever holds it can write every environment's graph ([ADR 0005](adr/0005-staging-and-production-are-isolated.md)).
   On 10.0.22 the file starts with a comment line; the token is its second line.
+- **`/api/status` answers without the admin token** (10.0.22, 2026-10-17); every other route
+  needs it. Its answer is the same with or without the token (same fields, same size). The
+  node server's Caddy leaves it open as the health check and forwards it with no token
+  ([ADR 0039](adr/0039-one-credential-per-environment.md)).
 - **Every context graph must be listed** under `contextGraphs` in the node's
   `~/.dkg/config.json`, or the node stops serving it after a restart.
+- **A node's folder moves between machines and architectures** (10.0.22, 2026-10-17): the
+  whole `~/.dkg`, copied from an x86_64 computer to an ARM (`aarch64`) server, started with
+  the same agent address, peers and graphs, and its Oxigraph store listed the same papers,
+  ratings and other assets. Left out of the copy: `oxigraph/`, the Oxigraph program built for
+  the old machine, which the daemon downloads again for the new one (`oxigraph-v0.5.8`, an
+  arm64 build), and the runtime files (`oxigraph-data/LOCK`,
+  `oxigraph-data/dkg-oxigraph-owner.json` with the old PIDs and program path, `daemon.pid`,
+  `api.port`, `daemon.log`). Two daemons with the same keys would share one peer identity and
+  the publisher wallets' nonces, so the old one stays stopped (`docs/node-host.md`).
+- **DKG 10.0.22 runs on ARM** (Ubuntu 24.04 `aarch64`, Node 24.21.0, 2026-10-17):
+  `better-sqlite3` builds from source during the global npm install, which needs
+  `build-essential`.
 - **A new graph reports `authority-resolution-failed` for up to about 20 minutes** (10.0.16).
   That is a slow chain read, not a bad registration: wait before re-registering. On
   10.0.22 (2026-10-09), `verisci-staging` reached `finalized-chain` right after
-  registering, and about a minute after a restart.
+  registering, and about a minute after a restart; on 2026-10-17, `verisci-prod` 10 s after
+  registering.
 - **Registering a context graph takes a 100 TRAC deposit** from the agent's wallet, plus
   gas (10.0.22, 2026-10-09). The CLI approves the deposit after decoding the contract's
   revert data, so an RPC path that drops a JSON-RPC error's `data` breaks registering.
@@ -187,7 +204,9 @@ edge`, testnet), Base Sepolia.
   `DKGKnowledgeAssets` (symbol DKA, ERC-721) `0x2b2e1bcb7c52a1587264e01f6b53782d791e6fa0`, whose
   `Transfer` minted the token to the node's agent address; `KnowledgeAssetsLifecycle`
   `0x835f921a0fc8d6365c34a0bb9b37d10c98c1b8c3`, the contract the node's transaction calls; and
-  the fee token "V9 Test TRAC" `0x2a58bdd13176d85906d804cdbffa0d9119282dc8`. A V10 UAL's token
+  the fee token "V9 Test TRAC" `0x2a58bdd13176d85906d804cdbffa0d9119282dc8` (symbol `v9TRAC`, 18
+  decimals; OriginTrail's contract list names it as the V10 testnet's TRAC, and the agent wallet
+  held 900 of it on 2026-10-16), whose balance the health check watches. A V10 UAL's token
   id is the author's address shifted left 96 bits, OR the asset number (asset 8's id equals the
   `batchId` the daemon logs). Basescan shows a token at `/nft/<contract>/<token id>`. Recorded
   in `@verisci/core` as `ORIGINTRAIL_CONTRACTS`; re-check after an OriginTrail upgrade.
@@ -204,13 +223,45 @@ edge`, testnet), Base Sepolia.
 - **Public Base Sepolia endpoints' log limits** (2026-10-09): `sepolia.base.org` answers
   `eth_getLogs` over at most 200 blocks; `base-sepolia-rpc.publicnode.com` over 2,000, but
   keeps history from block 46,500,000 only ("pruned history unavailable").
-- **The daemon reads the chain constantly** (previous host, DKG 10.0.16, two graphs,
-  2026-09 to 2026-10): it re-resolves each graph's authority from chain history again and
-  again. With every call except log reads sent to Alchemy first and no limit, Alchemy's free
-  tier was used up after a few weeks; from about 2026-10-05 the chain head froze and every
-  write failed, while `/api/status` still answered. The proxy now keeps Alchemy last,
-  within a daily budget (`infra/rpc-proxy`). Unverified: whether a later release reads
-  less.
+- **The daemon reads the chain constantly** (the prototype's node, on the node server, DKG
+  10.0.16, two graphs, 2026-09 to 2026-10): it re-resolves each graph's authority from chain
+  history again and again. With every call except log reads sent to Alchemy RPC first and no
+  limit, Alchemy RPC's free tier was used up after a few weeks; from about 2026-10-05 the
+  chain head froze and every write failed, while `/api/status` still answered. The proxy now
+  keeps Alchemy RPC last, within a daily budget (`infra/rpc-proxy`). Unverified: whether a
+  later release reads less.
+
+## The node server
+
+Observed on the Oracle Cloud VM that runs the node (`docs/node-host.md`), 2026-10-17.
+
+- **The stack fits the Always Free ARM shape** (`VM.Standard.A1.Flex`, 2 OCPUs, 12 GB): with
+  the daemon, its RPC proxy, GROBID and Caddy running, 4.8 GB of the 11 GB the system sees
+  were in use (GROBID 3.5 GB, the daemon about 0.7 GB).
+- **A VM keeps running while its Oracle account is locked,** and is reachable over SSH, but
+  nothing about it can be changed from Oracle's side: firewall rules, its public address, a
+  stop or a start. A reboot from inside the VM works: on 2026-10-17 it came back in 24 s, on
+  the kernel unattended upgrades had installed (6.17 → 7.0).
+- **Oracle's Ubuntu image filters inbound traffic in `iptables`** besides Oracle's own rules;
+  the VM accepts 22, 80 and 443, and the DKG daemon's peer-to-peer port is closed from
+  outside. An `edge` node works behind it through the testnet relay.
+- **Caddy 2.6.2 reads `{$NAME}` placeholders from its environment when it loads the
+  Caddyfile,** so systemd's `EnvironmentFile` is read again on each `systemctl reload caddy`. A
+  variable missing from the environment becomes an empty string: the credential check guards
+  against it (`"{$NAME}" != ""`), so an empty credential opens nothing. `header_up
+  -Authorization` drops the header before GROBID.
+- **Ubuntu's `caddy.service` starts Caddy with `--environ`** (2.6.2), which writes every
+  environment variable, the `EnvironmentFile`'s secrets included, to the journal at each start.
+  The node server's drop-in starts it with its config alone; the credentials logged until then
+  were replaced on 2026-10-17.
+- **Caddy's `path` matcher compares a cleaned-up path** (lower-cased, `..` resolved, escapes
+  decoded), while `reverse_proxy` forwards the path as the client sent it: a route opened by a
+  path matcher can receive other raw paths.
+- **Caddy keeps its loaded config, `{$NAME}` values filled in,** behind its admin endpoint
+  (`localhost:2019`, open to any process on the server) and in `autosave.json`
+  (`/var/lib/caddy/.config/caddy/`, the `caddy` user's, mode 600).
+- **The DuckDNS update sets a name to the caller's address** when `ip=` is empty: the cron job
+  on the server keeps both names on the server's address.
 
 ## IPFS
 
@@ -261,6 +312,10 @@ docs, current at 2026-10-07; Pinata's from its v3 API docs, current at 2026-10-0
 ## GROBID
 
 Observed on `lfoppiano/grobid:0.9.1-crf`, 2026-10-09, except where a fact cites its docs.
+
+- **The CRF image runs on ARM** (`arm64`, the node server, 2026-10-17): ready about 25 s
+  after `docker run`, using about 3.5 GB of memory; it parsed arXiv 1706.03762's header like
+  the x86 build.
 
 - **`POST /api/processHeaderDocument`** takes the PDF as the multipart field `input` and,
   with `Accept: application/xml`, returns the header as TEI: the title under
@@ -359,25 +414,54 @@ score the same day (plan 021).
 
 ## Chain
 
-Observed on Base Sepolia (chain id 84532) with Alchemy.
+Observed on Base Sepolia (chain id 84532) with Alchemy RPC and the Alchemy Notify webhook.
 
 - **Base produces a block every 2 seconds; a block is final only once its batch is final on
   L1,** minutes later. Reorgs before that are rare but possible (Base docs), which is why
   request ids are bound to their content ([ADR 0016](adr/0016-asset-names-derive-from-request-id.md)).
 - **The free RPC tier caps `eth_getLogs` at 10 blocks,** so nothing may depend on scanning
   history; read current contract state instead ([ADR 0020](adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
-- **Alchemy delivers a log to every webhook rule matching its contract:** keep exactly one
+- **Alchemy RPC's free tier serves 500 compute units a second, and an `eth_call` costs 26**
+  (Alchemy's pricing and compute-unit pages, read 2026-10-17): about 19 calls a second, past
+  which it answers 429. On 2026-10-17 the papers list, reading 10 papers on staging's 3
+  contracts at once (about 30 `eth_call`s, each its own request, tried once), showed a rated
+  paper as "Not checked" after a redeploy and on hard refreshes, and its score on a later load,
+  which fits that limit. The site's pages now send the contract reads made together as one
+  Multicall3 call (`0xcA11bde05977b3631167028862bE2a173976CA11` on Base Sepolia, in viem's
+  chain definition), one `eth_call` per round of reads, three for the papers list (the counts,
+  the ids, the requests), and ask a failed call once more a second later. A smart wallet's
+  signature check is a deployless `eth_call` with no contract address (ERC-6492), which
+  Multicall3 cannot carry, so each is its own call; a wallet's plain signature is checked
+  without the chain.
+- **The Alchemy Notify webhook delivers a log to every rule matching its contract:** keep exactly one
   rule per contract, or one request reaches two oracles.
-- **Each Alchemy webhook signs with its own secret:** a route checking another
-  environment's secret answers 401, so repeated 401s mean a secret swapped between
-  environments ([ADR 0017](adr/0017-chain-events-are-ingested-at-least-once.md)).
+- **Each Alchemy Notify webhook signs with its own key:** `X-Alchemy-Signature` is the hex
+  HMAC-SHA256 of the raw body under the webhook's signing key (Alchemy's webhook docs), so the
+  body must be checked as received, before any parse; a route checking another environment's
+  key answers 401, so repeated 401s mean a key swapped between environments
+  ([ADR 0017](adr/0017-chain-events-are-ingested-at-least-once.md)). A Custom Webhook's
+  delivery carries the fields its GraphQL query asks for (`packages/workflows` README → The
+  Alchemy Notify webhook).
+- **A Custom Webhook delivers every block its query runs on, matching or not,** unless it is
+  created with `skip_empty_messages` (the API's `graphql_query: { query, skip_empty_messages:
+  true }`); on Base, a delivery every 2 seconds. In its log filter, an empty `topics` list
+  matches every event of the listed addresses, and an empty address list every address
+  (Alchemy's Custom Webhooks docs). The dashboard's form has the same choice as an "Include
+  empty messages" box, unchecked by default (2026-10-17).
+- **The staging webhook reached `develop` through the protection bypass** (2026-10-17): a
+  request from the wallet started a rating run on the deployed app, which settled, minted its
+  R-KA and posted to Telegram.
+- **After a reorg, the Alchemy Notify webhook delivers the new block** (Alchemy's Custom
+  Webhooks FAQ): the same block number with a new hash means the earlier delivery's logs
+  left the chain. Its GraphQL logs carry no per-log `removed` mark, so a run reads the
+  request on chain before acting ([ADR 0017](adr/0017-chain-events-are-ingested-at-least-once.md)).
 - **Base has no public mempool:** the RPC forwards transactions to the sequencer, so
-  whether Alchemy's pending nonce (`eth_getTransactionCount(…, "pending")`) shows a
+  whether Alchemy RPC's pending nonce (`eth_getTransactionCount(…, "pending")`) shows a
   transaction not yet included is to verify ([ADR 0019](adr/0019-oracle-transactions-are-serialized.md)).
 - **Anvil, for local rating runs** (Foundry 1.8.4, 2026-10-11,
-  [ADR 0036](adr/0036-local-rating-runs-use-anvil.md)): its default port 8545 is the one the
-  DKG node's RPC proxy holds, and a call to `127.0.0.1:8545` then answers as Base Sepolia
-  (chain id 84532), so Anvil runs on 8546. `forge script … --broadcast --unlocked --sender
+  [ADR 0036](adr/0036-local-rating-runs-use-anvil.md)): its default port 8545 is the DKG node's
+  RPC proxy's, and on a computer running the proxy a call to `127.0.0.1:8545` answers as Base
+  Sepolia (chain id 84532), so Anvil runs on 8546. `forge script … --broadcast --unlocked --sender
   <Anvil's first account>` deploys with no key passed, since Anvil signs for its built-in
   accounts; the first deploy on a fresh chain lands at
   `0x5FbDB2315678afecb367f032d93F642f64180aa3`. The base fee starts at 1 gwei; viem's
@@ -407,13 +491,34 @@ Observed on Vercel Hobby with Inngest Cloud, except where a fact cites the vendo
 - **Preview deployments need Vercel's deployment-protection bypass** configured, or Inngest
   cannot reach `/api/inngest`. The stable `develop` deployment is a preview too, so the
   staging webhook needs the same bypass; a caller that cannot set headers passes it as the
-  `x-vercel-protection-bypass` query parameter (Vercel docs, to verify on our plan).
+  `x-vercel-protection-bypass` query parameter. On Hobby (2026-10-17), "Protection Bypass for
+  Automation" gives the secret; Inngest's Vercel integration takes it in its settings and
+  synced `develop`'s app, under the `develop` branch environment.
+- **The Inngest Vercel integration sets the keys itself** (2026-10-17): `INNGEST_EVENT_KEY`
+  and `INNGEST_SIGNING_KEY` for Production and for Preview, and it syncs the app on each deploy.
+- **Vercel's import offers a multi-service project for this repo** (2026-10-17), since it
+  detects more than one app, with a suggested `vercel.json`; one project with Root Directory
+  `apps/web` builds the site with neither.
+- **Turborepo warns on Vercel that the project's variables are missing from `turbo.json`
+  and "WILL NOT be available"** (2026-10-17): that holds for the build alone, which needs only
+  `APP_ENV` (`globalEnv`); the functions read every variable from Vercel when they run.
+- **MetaMask warns on a new `*.vercel.app` domain** (2026-10-17): "This site shows signs of
+  phishing or wallet-draining activity", on `develop`'s branch URL, before connecting.
+  MetaMask's `eth-phishing-detect` list takes false-positive reports.
+- **Upstash's free plan allows one database** (2026-10-17), so staging and production share
+  it, each counter named after its environment ([ADR 0005](adr/0005-staging-and-production-are-isolated.md)).
+- **A run past its time budget is cancelled, not failed** (Inngest docs, system events): Inngest
+  sends `inngest/function.cancelled` for it, as for a run cancelled by hand or through the API,
+  with the function and run ids (the docs add an error "function cancelled"; inngest 4.22.0's
+  types carry only the ids), and
+  `inngest/function.failed` only for a run that failed after its retries. An alert on failures
+  alone misses a run that ran out of time ([ADR 0038](adr/0038-alerts-go-to-one-telegram-chat.md)).
 - **Inngest archives a branch environment 3 days after its latest deploy** (Inngest docs),
   unless auto-archive is disabled for it in the dashboard. Archiving stops its functions
   from triggering, so staging stops after three quiet days on `develop` ([ADR 0005](adr/0005-staging-and-production-are-isolated.md)).
 - **Unverified: cron functions in a branch environment.** Inngest's docs do not say
   whether a branch environment runs scheduled functions; staging's reconciler relies on
-  it, so the rating plan checks it on `develop` ([ADR 0020](adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
+  it, so the first deploy checks it on `develop` ([ADR 0020](adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
 - **Only production and the stable `develop` deployment receive webhooks:** feature
   previews have no stable URL to register.
 - **Inngest concurrency limits count running steps, not runs:** a run that is sleeping or
@@ -421,6 +526,14 @@ Observed on Vercel Hobby with Inngest Cloud, except where a fact cites the vendo
   the same request ([ADR 0020](adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
 - **Inngest `singleton` (mode `skip`) locks a whole run, sleeps included:** while a run for
   a key is active, new runs for that key are skipped (Inngest docs) ([ADR 0020](adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
+- **Unverified: whether runs the throttle holds count as active for `singleton`.** Inngest's
+  docs describe each alone (2026-10-16): the throttle queues runs, the singleton skips new ones
+  while one is active. If queued runs do not count, every restart event for a request would
+  queue another run; the reconciler's event id carries a 4-hour window, so it sends one restart
+  per request per window either way ([ADR 0020](adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
+- **Unverified: whether the local dev server runs cron functions on their schedule.** Inngest's
+  docs say crons trigger functions, not how the dev server fires them (2026-10-16); the local
+  reconciler relies on it (`packages/workflows` README → Running a rating locally).
 - **Inngest deduplicates event ids for 24 hours only:** an event re-sent later with the
   same id starts a new run ([ADR 0017](adr/0017-chain-events-are-ingested-at-least-once.md)).
   Within the 24 hours the dev server still logs "initializing fn" but starts no run, and

@@ -9,22 +9,24 @@ A DKG node is a long-lived peer-to-peer daemon, and GROBID (PDF parsing) is a lo
 
 ## Decision
 
-- The DKG daemon, GROBID and a JSON-RPC proxy for the daemon run on their own host (a VM) by the time a deployed environment calls the node, their APIs bound to `127.0.0.1`.
-- Caddy is the only public HTTP entry: it terminates TLS and requires authentication on every route except `/api/status`, the health check.
-- One host serves both environments ([0005](0005-staging-and-production-are-isolated.md)).
-- Until a deployed environment calls the node, it runs on a developer's computer, started by hand. It moves to the host from its backup, with the same agent address, before the first deployed environment calls it.
+- The DKG daemon, GROBID and a JSON-RPC proxy for the daemon run on their own host (a VM), their APIs bound to `127.0.0.1`.
+- Caddy is the only public HTTP entry: it terminates TLS and requires authentication on every route except `/api/status`, the health check, with one credential per environment ([0039](0039-one-credential-per-environment.md)).
+- One host serves every environment, developers' computers included ([0005](0005-staging-and-production-are-isolated.md)); a developer may also run GROBID on their own computer, since it keeps no state.
 - The node's keys and config (`~/.dkg`) are backed up off the host, encrypted: the node's agent address is part of every UAL it mints and of both context graph ids, so losing its keys orphans both graphs.
 
 ## Consequences
 
 - Nothing long-running lives on Vercel.
-- The host is infrastructure to run, patch and monitor, and a single point of failure for both environments. Its publisher wallets pay every publish, and each is alerted on.
-- A lost host is rebuilt from the backup, with the same agent address.
-- Its setup must be documented, since no code deploys it.
-- Meanwhile, the node is reachable only from that computer, while it runs; previews reach it only once it is on the host.
+- The host is infrastructure to run, patch and monitor, and a single point of failure for every environment. Its publisher wallets pay every publish, and each is alerted on.
+- A lost host is rebuilt from the backup, with the same agent address ([`docs/node-host.md`](../node-host.md)).
+- Its setup is documented in [`docs/node-host.md`](../node-host.md), with its configuration files in `infra/node-server`, since no code deploys it.
+- Developers work against the same node as the deployed environments, through their own credential, and run no node of their own.
+- The RPC proxy sends the daemon's chain reads to free public endpoints first and to the deployments' Alchemy RPC account last, within a daily budget ([0005](0005-staging-and-production-are-isolated.md)): the daemon, unbudgeted, once used up Alchemy RPC's free tier ([domain](../domain.md)).
 
 ## History
 
 - 2026-10-09: the node runs on a developer's computer until a deployed environment calls it, since no host is available yet; it moves to the host from its backup, and previews reach the node only once it is on the host.
 - 2026-10-09: a new node replaced the previous one, with a new agent address, so that the node is built only from the documented steps; the previous node's graphs are no longer used ([0005](0005-staging-and-production-are-isolated.md)).
 - 2026-10-09: corrected: the node pays publishes from several publisher wallets, not one; each is funded and alerted on (DKG spike, [domain](../domain.md)).
+- 2026-10-17: the node moved from the developer's computer to its host, with the same agent address; developers' computers now reach it like the deployed environments, through Caddy with a credential of their own; a developer may still run GROBID locally (node server).
+- 2026-10-17: the RPC proxy falls back to the deployments' Alchemy RPC account, within a daily budget, so the daemon cannot use up the quota they share ([0005](0005-staging-and-production-are-isolated.md)) (ADR sweep).

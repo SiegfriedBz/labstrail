@@ -3,9 +3,9 @@
 Adapter between `core` and the DKG: reads and writes Knowledge Assets.
 
 The DKG node it calls runs on the DKG node server
-([ADR 0006](../../docs/adr/0006-dkg-node-runs-on-a-dedicated-host.md)): on a developer's
-computer at `http://127.0.0.1:9200` for now, and once on a host, over HTTPS through Caddy
-with a credential. The node reads the chain through
+([ADR 0006](../../docs/adr/0006-dkg-node-runs-on-a-dedicated-host.md)), at
+`https://verisci-dkg.duckdns.org`, behind Caddy, which checks each environment's credential
+([ADR 0039](../../docs/adr/0039-one-credential-per-environment.md)). The node reads the chain through
 [`infra/rpc-proxy`](../../infra/rpc-proxy/README.md)
 ([`docs/node-host.md`](../../docs/node-host.md) → How the parts connect); a publish that fails
 with `authority-resolution-failed` is often a chain-read problem there, not in this
@@ -15,7 +15,8 @@ Status: a client to read an asset's state, store it, start its mint, and run a S
 query (`query`), which reads a published paper's record back, lists the published papers
 (a page, the count and the page's first authors), and reads a paper's PDF link (a rating
 run) and a rating back (a rating run, and the rating pages, which also read an R-KA's state);
-and `checkGraph`, whether the node serves the graph.
+`checkGraph`, whether the node serves the graph; and `readStatus`, the node's open health
+check, which the hourly health check reads.
 
 Architecture views: [`.omm/overall-architecture/dkg-client/`](../../.omm/overall-architecture/dkg-client/), [`.omm/state-transitions/asset-state/`](../../.omm/state-transitions/asset-state/) (`pnpm exec omm view --port 4000` shows them; root README → Architecture).
 
@@ -32,8 +33,8 @@ the client's types never needs them.
 
 | Variable | Value |
 | --- | --- |
-| `DKG_URL` | The node's base URL: `http://127.0.0.1:9200` locally |
-| `DKG_TOKEN` | Bearer token: the node's admin token (`~/.dkg/auth.token`) locally; the environment's credential once the node is on its server |
+| `DKG_URL` | The node's base URL: `https://verisci-dkg.duckdns.org` in every environment ([`docs/node-host.md`](../../docs/node-host.md) → The two names) |
+| `DKG_TOKEN` | Bearer token: the environment's credential for the node server (`local`, `staging` or `production`, [`docs/node-host.md`](../../docs/node-host.md) → The credentials), which also opens GROBID. Secret |
 | `DKG_CONTEXT_GRAPH` | The full context graph id, `<agent address>/<graph name>`, with the address in EIP-55 checksum case as the node lists it, such as `0xD701…13B3/verisci-staging` |
 
 `DKG_CONTEXT_GRAPH` is refused when it is a bare name or its address is in another case
@@ -53,9 +54,10 @@ the `publish-pdf` script build on the same rule.
 | `client.storeAsset(name, quads)` | Stores and shares the asset, doing only what is left, and returns `stored` or `minted`; a stored or minted asset keeps its first content |
 | `client.startMint(name, { listenMs? })` | Starts the mint of a stored asset; returns `minted` with its UAL, or `minting` when no reply came within `listenMs` (10 s by default) or a mint may be in flight |
 | `client.query(sparql)` | Runs a SPARQL `SELECT` on the graph (`POST /api/query`, with the full graph id) and returns its rows; terms come as the node writes them, IRIs bare and literals quoted |
+| `client.readStatus()` | Reads the node's open health check (`GET /api/status`, sent with no credential, [ADR 0039](../../docs/adr/0039-one-credential-per-environment.md)): `{ ok: true, graph }`, the graph's `authorityState` and `policySource` as the node's catalog lists it (`undefined` when not listed), or `unreachable`, `unauthorized` or `unexpected` with its status; the health check alerts on it |
 | `client.checkGraph()` | `ok` when the node lists the graph as subscribed, `graph-not-served` when it does not, or a failure when the list cannot be read; the node answers a query on a graph it does not hold with no rows (`docs/domain.md` → DKG), so check this before reading an empty answer as "nothing there" |
 | `DkgClient`, `DkgClientConfig` | The client's calls and its settings |
-| `Quad`, `AssetState`, `AssetResult`, `MintResult`, `QueryResult`, `DkgFailure` | The client's input and result types |
+| `Quad`, `AssetState`, `AssetResult`, `MintResult`, `QueryResult`, `NodeStatus`, `GraphStatus`, `DkgFailure` | The client's input and result types |
 | `env` (from `@verisci/dkg/env`) | The settings, validated from `process.env` on import |
 | `dkgSchema(isProduction)` | The three variables' rules, for a workspace that validates them with its own in one pass |
 | `contextGraphSchema(isProduction)` | The rule for `DKG_CONTEXT_GRAPH` (full id, address in EIP-55 case, `-prod` guard), for a script that reads only that variable |

@@ -1,9 +1,12 @@
 // Dev only: requests a phase-1 rating on the RatingController deployed on a local Anvil chain
 // (ADR 0036), from a throwaway requester, and sends `verisci/rating.requested` to the local
-// Inngest dev server. On staging and production, Alchemy's webhook sends the event instead.
+// Inngest dev server. On staging and production, the Alchemy Notify webhook sends the event
+// instead.
 //
-//   pnpm --filter @verisci/workflows rate-paper <target UAL> [--raw]
+//   pnpm --filter @verisci/workflows rate-paper <target UAL> [--raw] [--no-event]
 //
+// --no-event requests without sending the event, to start the run another way: `post-webhook`
+// with the printed transaction, or the reconciler once the request is old enough.
 // Reads LOCAL_CHAIN_RPC_URL and LOCAL_RATING_CONTRACT from the root .env.local (packages/workflows
 // README). The UAL is normalized first, as the app does (ADR 0031); --raw sends it as typed, to
 // see the oracle cancel an invalid target.
@@ -26,9 +29,12 @@ import { localChainSchema } from "../src/rating-env.ts";
 
 const args = process.argv.slice(2);
 const raw = args.includes("--raw");
-const input = args.find((arg) => arg !== "--raw");
+const noEvent = args.includes("--no-event");
+const input = args.find((arg) => !arg.startsWith("--"));
 if (!input) {
-  console.error("usage: pnpm --filter @verisci/workflows rate-paper <target UAL> [--raw]");
+  console.error(
+    "usage: pnpm --filter @verisci/workflows rate-paper <target UAL> [--raw] [--no-event]",
+  );
   process.exit(1);
 }
 
@@ -78,10 +84,11 @@ if (!event) {
   console.error(`No Phase1Requested log in ${hash}`);
   process.exit(1);
 }
-await inngest.send(event);
+if (!noEvent) await inngest.send(event);
 
 console.log(`Target        ${target}`);
 console.log(`Requester     ${requester.address} (throwaway key)`);
 console.log(`Request id    ${event.data.requestId}`);
-console.log(`Event sent    ${event.id}`);
+console.log(`Transaction   ${hash}`);
+console.log(noEvent ? "Event         not sent (--no-event)" : `Event sent    ${event.id}`);
 console.log("Watch the run at http://localhost:8288");

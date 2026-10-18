@@ -9,7 +9,7 @@ Internal packages are consumed only inside this monorepo. A build step per packa
 
 ## Decision
 
-Internal packages export `src/*.ts` with no build step. Next.js compiles them via `transpilePackages`; a script or command-line tool in the repo runs them with plain Node's type stripping, with no TypeScript runner. Programs that run on the DKG node server (`infra/*`) also ship their `.ts` source, run the same way; the app imports none of them. So every package and program uses only syntax Node can strip. Relative imports keep the `.ts` extension (`allowImportingTsExtensions` in `tsconfig.base.json`, safe because nothing emits).
+Internal packages export `src/*.ts` with no build step. Next.js compiles them via `transpilePackages`; a script or command-line tool in the repo runs them with plain Node's type stripping, with no TypeScript runner. The repo's own programs that run on the DKG node server, such as its RPC proxy (`infra/rpc-proxy`), also ship their `.ts` source, run the same way; the app imports none of them. So every package and program uses only syntax Node can strip. Relative imports keep the `.ts` extension (`allowImportingTsExtensions` in `tsconfig.base.json`, safe because nothing emits).
 
 ## Consequences
 
@@ -23,3 +23,4 @@ Internal packages export `src/*.ts` with no build step. Next.js compiles them vi
 - 2026-10-09: changed to cover the programs on the DKG node server (`infra/*`), which also ship `.ts` source and run under plain Node's type stripping, and to limit `transpilePackages` to the packages the app imports.
 - 2026-10-10: scripts and command-line tools run packages' source with plain Node's type stripping instead of a TypeScript runner, as the contracts tools and the agents' `publish-pdf` already do, so every package uses only syntax Node can strip.
 - 2026-10-10: corrected: the list of syntax Node cannot strip moved to `docs/domain.md`, a fact rather than the decision (ADR sweep).
+- 2026-10-17: scoped to the repo's own programs on the DKG node server: `infra/node-server` holds the configuration of the programs installed there, Caddy and the DKG daemon (node server, user's choice).

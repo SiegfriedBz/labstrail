@@ -1,1 +1,1 @@
-A request whose run fails stays pending until a later run picks it up; until the reconciler exists (ADR 0020), nothing restarts it on its own, and past 24 hours it can only be cancelled expired.
+A request whose run fails stays pending until a later run picks it up: the reconciler sends its event again once it is 4 hours old, once each 4-hour window (ADR 0020), and past 24 hours the run can only fulfil a minted R-KA or cancel it expired.

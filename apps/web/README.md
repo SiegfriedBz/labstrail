@@ -6,8 +6,10 @@ Status: the home page; the upload pages, where a visitor connects a wallet, publ
 follows it until its Target KA is minted and verifies its record; the list of published
 papers, with each paper's score; ratings, where a published paper's page lists its ratings
 and requests one from the wallet, and each rating's page follows it to its score and shows
-every check behind it; and `/api/inngest`, which serves the workflows' Inngest functions
-([ADR 0003](../../docs/adr/0003-inngest-functions-live-in-workflows.md)).
+every check behind it; `/api/inngest`, which serves the workflows' Inngest functions
+([ADR 0003](../../docs/adr/0003-inngest-functions-live-in-workflows.md)); and
+`/api/webhooks/alchemy`, which takes the Alchemy Notify webhook's rating requests
+([ADR 0017](../../docs/adr/0017-chain-events-are-ingested-at-least-once.md)).
 
 Architecture views: [`.omm/overall-architecture/web-app/`](../../.omm/overall-architecture/web-app/), [`.omm/route-page-map/`](../../.omm/route-page-map/), [`.omm/state-transitions/paper-page/`](../../.omm/state-transitions/paper-page/), [`.omm/state-transitions/rating-page/`](../../.omm/state-transitions/rating-page/) (`pnpm exec omm view --port 4000` shows them; root README → Architecture).
 
@@ -30,11 +32,12 @@ points the optional `@x402/*` packages, reached through wagmi's connectors, at
 | `/` | Home: what VeriSci does, with a demo that publishes a paper and then rates it, the latest papers (the five newest, streamed in with a skeleton, linking to `/papers`), the DKG's two layers (the record off-chain, its ERC-721 token and merkle root on-chain, the UAL linking them), how publishing and rating work (phase 1 live, human review and replication to come), and an example paper asset |
 | `/publish` | Connect a wallet, drop a PDF, sign once; what publishing means and the limits ([ADR 0010](../../docs/adr/0010-pdf-to-target-ka-pipeline.md), [ADR 0034](../../docs/adr/0034-users-connect-a-wallet-anyone-may-publish.md)) |
 | `/papers?page=<n>` | Every paper this environment published, newest mint first, 20 to a page, each with its score (below) |
-| `/papers/<cid>?event=<id>` | Where a paper stands, then its record, abstract and how to verify it, and its Ratings section (`#rating`) once published (below), under "Papers / <title>" breadcrumbs. `?already=1` says a re-submitted PDF was already published |
+| `/papers/<cid>?event=<id>` | Where a paper stands, then its record, abstract and how to verify it, and its Ratings section (`#rating`, scrolled into view when the page opens at it, `components/rating/scroll-to-rating.tsx`) once published (below), under "Papers / <title>" breadcrumbs. `?already=1` says a re-submitted PDF was already published |
 | `/api/papers/<cid>?event=<id>` | The same as JSON (`PaperView`: the stage, and the record once published), never cached: a read, so a route rather than a server action |
-| `/papers/<cid>/ratings/<requestId>` | One rating: where it stands until it is scored, then its score and every check behind it, or why it was cancelled (below), under "Papers / <title> / Rating" breadcrumbs |
+| `/papers/<cid>/ratings/<requestId>` | One rating: where it stands until it is scored, then its score and every check behind it, or why it was cancelled (below), under "Papers / <title> / Rating" breadcrumbs. `?new=1`, from the Rate button, follows a request the chain doesn't show yet for 2 minutes |
 | `/api/ratings/<requestId>` | The same as JSON (`RatingView`), never cached, for the rating page to poll; not-found for an id that is not `0x` + 64 hex digits, or where no contract takes ratings |
-| `/api/inngest` | Serves the Inngest functions: the publish function, plus the rating and oracle functions where the oracle key is set |
+| `/api/inngest` | Serves the Inngest functions: the publish function and the failure alerts, plus the rating, oracle, reconciler and health functions where the oracle key is set |
+| `POST /api/webhooks/alchemy` | The Alchemy Notify webhook's deliveries: hands the raw body and `X-Alchemy-Signature` to the workflows' intake (`getWebhookIntake`) and answers its status, with an empty body: 200, 401 (bad signature), 400 (not a delivery), 503 (Inngest refused, so Alchemy Notify delivers again), or 404 where `ALCHEMY_WEBHOOK_SIGNING_KEY` is unset (`packages/workflows` README → The Alchemy Notify webhook) |
 | any other path | `app/not-found.tsx`; a page that fails to render shows `app/error.tsx` with a retry |
 
 `app/actions.ts` holds three server actions. Locally, `announceLocalRating(txHash)` has the
@@ -90,7 +93,7 @@ shaped like the table (`components/papers/papers-table-skeleton.tsx`).
   in words, summed by `summariseRatings`, the rule the paper page
   shares: "Pending", "Can't be rated" (a request was cancelled as invalid), "Not rated" with a
   Rate link to the paper's Ratings section where a contract takes ratings, or "Not checked"
-  when the chain did not answer within 3 s, so a slow chain never holds the list
+  when the chain did not answer within 6 s, so a slow chain never holds the list
   (`lib/papers/ratings.ts` → `withRatings`).
 - A node that does not answer says the list can't be loaded, with a link to try again; an
   answer that can't be read (a refused query, or a page the total covers with no readable
@@ -183,12 +186,14 @@ behind a skeleton with the real headings (`components/rating/ratings-section.tsx
   to its checks; "Rating in progress" with a link to follow it; "Can't be rated" when a request
   was cancelled as invalid; or "Not rated yet" with what a rating does. The words are the
   papers list's (`summariseRatings`).
-- **Rate this paper** (`components/rating/rate-button.tsx`, the flow in
+- **Rate this paper**, or **Rate again** under a score with a line saying a new rating adds its
+  own score ([ADR 0013](../../docs/adr/0013-several-ratings-per-paper.md))
+  (`components/rating/rate-button.tsx`, the flow in
   `lib/rating/request-flow.ts`): connects the wallet or switches it to the rating chain, sends
   `requestPhase1(ual)` to the environment's current contract
   ([ADR 0023](../../docs/adr/0023-a-fix-is-a-redeploy-owner-powers-fixed.md)), waits up to 90 s
   for the receipt, reads the request id from its `Phase1Requested` log and opens the rating's
-  page. Locally, it first has the server announce the request (`announceLocalRating`), since no
+  page, marked `?new=1` as just requested (`lib/rating/stage.ts` → `newRatingPath`). Locally, it first has the server announce the request (`announceLocalRating`), since no
   Alchemy Notify webhook watches Anvil
   ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)); when that fails, it says the
   request is on chain but its rating didn't start, and that the `pnpm dev` terminal says why
@@ -236,10 +241,13 @@ stateDiagram-v2
   whether the paper's text was shortened; the model and prompt version; and links to the R-KA
   and the contract (unlinked on Anvil).
 - Cancelled: why, in plain words (`lib/rating/messages.ts` → `cancelMessage`): the paper can't
-  be rated (outside the field, a PDF whose text can't be read, or not one of VeriSci's
-  papers), or the rating couldn't finish within a day.
+  be rated (outside the field, a PDF whose text can't be read, not one of VeriSci's papers,
+  or no usable answer from the scoring model), or the rating couldn't finish within a day.
 - A rating no contract holds, one of another paper, or any under a paper that isn't
-  published, is the not-found page. A chain that does not answer is asked again, and a rating
+  published, is the not-found page. Opened with `?new=1`, the page follows a request no
+  contract holds yet for 2 minutes (`FRESH_WAIT_MS`), headed "Checking on this rating", before
+  it reads "No rating here": the wallet's receipt can come back a few seconds before the site's
+  RPC shows the request (`whileFresh`). A chain that does not answer is asked again, and a rating
   it then shows of another paper reads "No rating here". A DKG node that does not answer leaves the rating showing,
   from the chain, under the paper's short address, with a note that the title and checks
   can't be shown ([ADR 0021](../../docs/adr/0021-server-reads-return-typed-results.md)).
@@ -319,7 +327,8 @@ The "Clinical" look: a clinical record with an on-chain proof, in Tailwind CSS v
   for the tab, in fixed colours that read on light and dark tabs) is a heartbeat whose last
   beat is a check, drawn from the record's blue into the proof's teal.
 - Keyboard users get a skip link and one accent focus ring; the header underlines the
-  current page's link in blue. On phones the wallet button is a wallet icon (with a dot
+  current section's link in blue: Publish on `/publish`, Papers on the list and on every paper
+  and rating page (`components/site/nav-link.tsx`). On phones the wallet button is a wallet icon (with a dot
   once connected) beside the theme button, so the header keeps one line; once connected it
   is named by the short address it shows, and AppKit's own window opens from it.
 - What the DKG node answers loads behind a skeleton shaped like what replaces it, streamed
@@ -342,7 +351,7 @@ unless `APP_ENV` is `local`:
 
 | Variable | Value |
 | --- | --- |
-| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis's REST address and token, for the limits: one database per environment, previews using staging's ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)). The token is secret |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis's REST address and token, for the limits: one database shared by every environment, each counter named after its `APP_ENV` (`verisci:staging:upload-url`), since Upstash's free plan allows one ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)). The token is secret |
 | `REOWN_PROJECT_ID` | The Reown project id for the wallet window, from one project shared by every environment, read on the server and handed to the page, so nothing is inlined at build time. Without it the pages say the wallet is not set up |
 | `LOCAL_CHAIN_RPC_URL`, `LOCAL_RATING_CONTRACT` | Optional, read only when `APP_ENV=local`: Anvil's URL and the RatingController deployed there. With both, the pages read and request ratings on that contract and the wallet window offers Anvil; without either, the paper and rating pages say ratings aren't set up, the papers list shows no Rate link, and the wallet window offers only Base Sepolia ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)) |
 
@@ -357,6 +366,29 @@ refuses to start without its oracle key, and on staging when the key is set
 not run during `next build`. On Vercel, a server starts on a request after the deploy is
 live, so a missing setting makes every route fail: set them in each Vercel environment
 before its first deploy, and allow each deployed domain in the Reown project.
+
+## Deploying
+
+Vercel builds the site from one project (`verisci`, Hobby): Root Directory `apps/web`, the
+Next.js preset, the install and build commands it detects (pnpm from `packageManager`, Node
+24.x from `engines`), and no `vercel.json`. Production tracks `main`; every other branch is a
+preview, and `develop`'s, at its stable branch URL, is staging.
+
+- **Deployment Protection** keeps previews private. Its Protection Bypass for Automation
+  secret goes into Inngest's Vercel integration, which also sets `INNGEST_EVENT_KEY` and
+  `INNGEST_SIGNING_KEY` and syncs the app on each deploy, and at the end of the staging
+  webhook's URL ([`packages/workflows`](../../packages/workflows/README.md#the-alchemy-notify-webhook)).
+- **Variables** (Settings → Environment Variables): `APP_ENV` (`production`, or `staging` for
+  Preview), `DKG_CONTEXT_GRAPH` and `DKG_TOKEN` take one value per environment;
+  `ORACLE_PRIVATE_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` and
+  `ALCHEMY_WEBHOOK_SIGNING_KEY` go on Production and on Preview limited to the branch
+  `develop`, so feature previews never rate or post; every other variable takes one value
+  for both. System Environment Variables stay exposed: Inngest reads `VERCEL_GIT_COMMIT_REF`,
+  and the notifications' links `VERCEL_BRANCH_URL` and `VERCEL_PROJECT_PRODUCTION_URL`.
+- **Inngest's `develop` branch environment** has auto-archive off
+  ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)).
+- A deployed server checks its settings when it starts (above), so each variable is set
+  before the environment's first deploy.
 
 ## Scripts
 

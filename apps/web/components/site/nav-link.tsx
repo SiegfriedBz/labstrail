@@ -4,9 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
-/** A header link that shows when its page is the one open: brighter, underlined in blue. */
+/**
+ * A header link that shows when its section is the one open (its page or one under it, so
+ * Papers on a paper's and a rating's page): brighter, underlined in blue.
+ */
 export function NavLink({ href, children }: { href: string; children: ReactNode }) {
-  const current = usePathname() === href;
+  const path = usePathname();
+  const current = path === href || path.startsWith(`${href}/`);
   return (
     <Link
       href={href}

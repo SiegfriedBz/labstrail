@@ -115,7 +115,8 @@ function oracle(input: OracleInput, script: Script) {
   const { step, log, now } = fakeSteps();
   const chain = fakeChain(script, now);
   const logger = { error: vi.fn() };
-  return { run: runOracle(input, step, chain, logger), chain, log, logger };
+  const alert = vi.fn(async (_message: string) => {});
+  return { run: runOracle(input, step, chain, logger, alert), chain, log, logger, alert };
 }
 
 describe("runOracle", () => {
@@ -301,8 +302,8 @@ describe("runOracle", () => {
     expect(chain.send).toHaveBeenCalledTimes(2);
   });
 
-  it("sends no raise past the fee cap, logs it once and keeps checking", async () => {
-    const { run, chain, logger } = oracle(FULFIL, {
+  it("sends no raise past the fee cap, logs it and alerts on it once, and keeps checking", async () => {
+    const { run, chain, logger, alert, log } = oracle(FULFIL, {
       fees: { maxFeePerGas: CAP, maxPriorityFeePerGas: GWEI },
       receipts: { "0xa1": [...Array.from({ length: 20 }, () => "none" as const), "success"] },
     });
@@ -311,6 +312,8 @@ describe("runOracle", () => {
     expect(chain.send).toHaveBeenCalledOnce();
     expect(logger.error).toHaveBeenCalledOnce();
     expect(logger.error).toHaveBeenCalledWith(expect.stringMatching(/^oracle-at-fee-cap: /));
+    expect(alert).toHaveBeenCalledExactlyOnceWith(expect.stringMatching(/^oracle-at-fee-cap: /));
+    expect(log.filter((id) => id === "alert-fee-cap")).toHaveLength(1);
   });
 
   it("reads the request again after a reverted receipt, and converges", async () => {
@@ -354,9 +357,11 @@ describe("runOracle", () => {
     expect(chain.send).toHaveBeenCalledTimes(2);
   });
 
-  it("logs an oracle without funds and tries again", async () => {
-    const { run, logger } = oracle(FULFIL, {
+  it("logs an oracle without funds, alerts on it once, and tries again", async () => {
+    const { run, logger, alert, log } = oracle(FULFIL, {
       sends: [
+        { ok: false, reason: "no-funds" },
+        { ok: false, reason: "no-funds" },
         { ok: false, reason: "no-funds" },
         { ok: true, hash: "0xa1" },
       ],
@@ -364,6 +369,8 @@ describe("runOracle", () => {
 
     expect(await run).toEqual({ state: "fulfilled", score: 72, rKaUal: R_KA });
     expect(logger.error).toHaveBeenCalledWith(expect.stringMatching(/^oracle-no-funds: /));
+    expect(alert).toHaveBeenCalledExactlyOnceWith(expect.stringMatching(/^oracle-no-funds: /));
+    expect(log.filter((id) => id === "alert-no-funds")).toHaveLength(1);
   });
 
   it("retries a chain that does not answer every 15 s, then fails oracle-stuck", async () => {
@@ -392,9 +399,13 @@ describe("parseOracleInput", () => {
 });
 
 describe("createOracleTransaction", () => {
-  const fn = createOracleTransaction(new Inngest({ id: "verisci-test" }), () => {
-    throw new Error("unused");
-  });
+  const fn = createOracleTransaction(
+    new Inngest({ id: "verisci-test" }),
+    () => {
+      throw new Error("unused");
+    },
+    async () => {},
+  );
 
   it("runs one step at a time, only when a rating run invokes it", () => {
     expect(fn.opts.id).toBe("oracle-transaction");

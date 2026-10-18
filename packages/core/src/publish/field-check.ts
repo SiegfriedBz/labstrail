@@ -1,7 +1,10 @@
 import { z } from "zod";
 import { clip, FIELD_RULE, FIELDS, type Field, parseJson } from "../rating/scorer.ts";
 
-/** What the publish run's field check reads of a new paper (ADRs 0010, 0037). */
+/**
+ * What the field check reads of a paper (ADRs 0010, 0037): the publish run's of a new paper,
+ * and the rating run's before it scores one.
+ */
 export interface FieldCheckInput {
   readonly title: string;
   /** Absent when GROBID found none. */

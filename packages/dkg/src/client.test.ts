@@ -463,3 +463,56 @@ describe("query", () => {
     expect(await client.query(QUERY)).toEqual(expected);
   });
 });
+
+describe("readStatus", () => {
+  const STATUS = "GET /api/status";
+  const catalog = (...graphs: unknown[]): Reply => ({
+    status: 200,
+    body: { version: "10.0.22", rfc64Catalog: { contextGraphs: graphs } },
+  });
+  const accepted = (id: string) => ({
+    contextGraphId: id,
+    authorityState: "accepted",
+    policySource: "finalized-chain",
+  });
+
+  it("reads this graph's authority with no credential, the address in any case", async () => {
+    const other = { ...accepted(`${AGENT}/verisci-prod`), policySource: "chain-pending" };
+    const { client, calls } = fakeNode({
+      [STATUS]: [catalog(other, accepted(GRAPH.toLowerCase()))],
+    });
+
+    expect(await client.readStatus()).toEqual({
+      ok: true,
+      graph: { authorityState: "accepted", policySource: "finalized-chain" },
+    });
+    expect(calls[0]?.headers.get("authorization")).toBeNull();
+  });
+
+  it("answers no graph when the node does not list this one", async () => {
+    const { client } = fakeNode({ [STATUS]: [catalog(accepted(`${AGENT}/verisci-prod`))] });
+
+    expect(await client.readStatus()).toEqual({ ok: true, graph: undefined });
+  });
+
+  it.each<[string, Reply, unknown]>([
+    ["a gateway error", { status: 502 }, { ok: false, reason: "unexpected", status: 502 }],
+    ["a refusal", { status: 401 }, { ok: false, reason: "unauthorized", status: 401 }],
+    [
+      "a body with no catalog",
+      { status: 200, body: { version: "10.0.22" } },
+      { ok: false, reason: "unexpected", status: 200 },
+    ],
+    ["no answer", "network-error", { ok: false, reason: "unreachable" }],
+  ])("reports %s", async (_, reply, expected) => {
+    const { client } = fakeNode({ [STATUS]: [reply] });
+
+    expect(await client.readStatus()).toEqual(expected);
+  });
+
+  it("reports a node that does not answer in time as unreachable", async () => {
+    const { client } = fakeNode({ [STATUS]: ["hang"] }, { timeoutMs: 20 });
+
+    expect(await client.readStatus()).toEqual({ ok: false, reason: "unreachable" });
+  });
+});

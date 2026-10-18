@@ -67,7 +67,10 @@ describe("checkServerSettings", () => {
 });
 
 describe("checkRatingSettings", () => {
-  const rating = { ORACLE_PRIVATE_KEY: `0x${"59c6".repeat(16)}` };
+  const rating = {
+    ORACLE_PRIVATE_KEY: `0x${"59c6".repeat(16)}`,
+    PUBLISHER_ADDRESSES: "0xD701ed157232ad5E14BC4134a8D10D64D86f13B3",
+  };
   const production = {
     APP_ENV: "production",
     ...settings,
@@ -83,6 +86,12 @@ describe("checkRatingSettings", () => {
 
   it("starts production with its rating settings", () => {
     expect(() => checkServerSettings({ ...production, ...rating })).not.toThrow();
+  });
+
+  it("refuses to start production without the publisher wallets the health check watches (ADR 0015)", () => {
+    expect(() =>
+      checkServerSettings({ ...production, ...rating, PUBLISHER_ADDRESSES: undefined }),
+    ).toThrow(/PUBLISHER_ADDRESSES/);
   });
 
   it("checks staging's rating settings only when it holds the oracle key", () => {

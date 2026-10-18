@@ -1,10 +1,11 @@
 created: 2026-10-12T05:42:03.295Z
-updated: 2026-10-15T13:07:41.357Z
-update_count: 8
+updated: 2026-10-16T12:29:51.259Z
+update_count: 11
 last_field: diagram
 kind: nested-class
 title: workflows
 children:
+  - alerts
   - gemini
   - pdf
   - publish
@@ -13,16 +14,20 @@ children:
   - site
   - wiring
 parentPath: []
-prev_diagram: >
+prev_diagram: >-
   graph LR
       wiring["Wiring\nsrc/functions.ts, inngest.ts, *-env.ts"] -->|"builds adapters for"| publish["Publish\nsrc/publish/"]
       wiring -->|"builds adapters for"| rating["Rating\nsrc/rating/"]
-      site["Site Service\nsrc/site/"] -->|"checks and sends submissions with"| publish
+      wiring -->|"builds the notifier, failure alerts and health check from"| alerts["Alerts\nsrc/alerts/"]
+      site["Site Services\nsrc/site/"] -->|"checks and sends submissions with"| publish
+      site -->|"reads ratings, announces local requests, takes webhook deliveries with"| rating
       publish -->|"fetches the pinned PDF and reads its opening with"| pdf["PDF Reader\nsrc/pdf/"]
       rating -->|"fetches the PDF and reads its text with"| pdf
       publish -->|"checks a new paper's field with"| gemini["Gemini Call\nsrc/gemini/"]
-      rating -->|"scores the paper with"| gemini
-      scripts["Dev Scripts\nscripts/"] -->|"request and score ratings locally with"| rating
+      rating -->|"checks the field and scores the paper with"| gemini
+      publish -->|"announces a minted paper with"| alerts
+      rating -->|"announces settled ratings and alerts with"| alerts
+      scripts["Dev Scripts\nscripts/"] -->|"request and score ratings, fund a wallet, post a webhook delivery, with"| rating
       scripts -->|"publish a PDF, and run the field check on the reference set, with"| publish
       classDef entry fill:#89b4fa,stroke:#89b4fa,color:#1e1e2e
       class wiring,site entry

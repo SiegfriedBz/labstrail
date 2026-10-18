@@ -2,16 +2,16 @@
 export const DEFAULT_PORT = 8545;
 
 /**
- * Alchemy calls allowed per UTC day. Alchemy's free plan gives a monthly allowance of
+ * Alchemy RPC calls allowed per UTC day. Alchemy RPC's free plan gives a monthly allowance of
  * compute units (about 30 million, so about 1 million a day), and the calls this proxy
  * sends there cost up to 75 units each (`eth_getLogs`): 10,000 calls use at most 750,000.
- * Check Alchemy's current pricing before raising it.
+ * Check Alchemy RPC's current pricing before raising it.
  */
 export const DEFAULT_ALCHEMY_DAILY_LIMIT = 10_000;
 
 /** What the proxy reads from its environment. */
 export interface ProxyConfig {
-  /** Alchemy's Base Sepolia URL, key included. */
+  /** Alchemy RPC's Base Sepolia URL, key included. */
   readonly upstreamRpc: string;
   readonly port: number;
   readonly alchemyDailyLimit: number;

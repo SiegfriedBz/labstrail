@@ -49,6 +49,7 @@ describe("core's layout", () => {
       "normalizeUal",
       "paperAuthorsQuery",
       "paperCountQuery",
+      "paperHeadOf",
       "paperListQuery",
       "paperPdfQuery",
       "paperRecordQuery",

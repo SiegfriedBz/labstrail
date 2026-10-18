@@ -15,11 +15,14 @@ other services can target it.
 | `main` | Production | testnets, until a payment plan allows mainnet | release PRs from `develop` |
 
 Each environment has its own contract, context graph, webhook, oracle wallet, Inngest
-environment and Upstash store; the Reown project and the pinning account are shared. The
-DKG node is shared: its publisher wallets and one admin token serve both graphs, so the dkg
-package's env module refuses the production graph outside production and requires it in
-production
-([ADR 0005](docs/adr/0005-staging-and-production-are-isolated.md)). Mainnet
+environment and upload-limit counters; the Vercel project, the Reown project, the pinning
+account, the Upstash database, the Alchemy RPC account, the Gemini key and the alerts chat
+are shared. The DKG node is shared: its publisher wallets and one admin token serve both
+graphs, so the dkg package's env module refuses the production graph outside production and
+requires it in production
+([ADR 0005](docs/adr/0005-staging-and-production-are-isolated.md)). Each environment,
+developers' computers included, reaches the node through its own credential
+([ADR 0039](docs/adr/0039-one-credential-per-environment.md)). Mainnet
 waits on a payment plan
 ([ADR 0015](docs/adr/0015-rating-requests-are-free-on-testnet.md)). Both
 branches are protected: PRs only, CI green, never deleted.

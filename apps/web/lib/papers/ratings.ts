@@ -13,7 +13,7 @@ export type PaperRow = PaperSummary & {
 
 /**
  * The list's papers with their rating summaries, read for the whole page at once by
- * `summaries` (`paperRatingSummaries`), which never waits more than 3 s a paper. With no
+ * `summaries` (`paperRatingSummaries`), which never waits more than 6 s a paper. With no
  * `summaries` (no contract takes ratings here) every paper is unrated and can't be rated; a
  * read that throws leaves every paper unknown, so the list still renders.
  */

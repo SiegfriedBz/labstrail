@@ -30,7 +30,7 @@ published paper is listed at `/papers`, newest first, read a page at a time from
 Ratings work end to end locally, against a contract on Anvil: a published paper's page
 requests one from the visitor's wallet, each rating has a page that follows it to its score
 and then shows every check and quote behind it, and the papers list shows each paper's
-score. What starts a rating on staging, and what restarts a stuck one, come next. The repo, its packages and the EIP-712 domain keep the lowercase name `verisci`.
+score. Deployed, a webhook starts each rating and a cron restarts a stuck one. The repo, its packages and the EIP-712 domain keep the lowercase name `verisci`.
 Everything runs on testnets.
 
 ## How it works
@@ -49,9 +49,9 @@ Built:
   before acting, so a retry never duplicates anything
   ([ADR 0007](docs/adr/0007-all-writes-converge.md)).
 - **Staging and production are kept apart**, with their own contracts, graphs,
-  oracle wallets and limit stores (production's graph and store come with its first app
-  deployment); the DKG node, the Reown project and the pinning account are shared
-  ([ADR 0005](docs/adr/0005-staging-and-production-are-isolated.md)).
+  oracle wallets and upload-limit counters; the DKG node, the Reown project, the pinning
+  account, the Upstash database, the Alchemy RPC account, the Gemini key and the alerts chat
+  are shared ([ADR 0005](docs/adr/0005-staging-and-production-are-isolated.md)).
 - **A requested paper is rated.** A rating run reads the paper's text, has an LLM answer
   the reporting checklist of its kind of study (a trial, an animal study, a review…) with
   quotes, and computes the score from those answers, once: it measures whether the paper
@@ -68,14 +68,17 @@ Built:
   ([ADR 0014](docs/adr/0014-contract-owns-scores-dkg-owns-content.md)). Locally, the page
   announces its own request, since no webhook watches Anvil
   ([ADR 0017](docs/adr/0017-chain-events-are-ingested-at-least-once.md)).
-
-Next (requests and the rating run are built; nothing starts a run on staging yet):
-
-- **An Alchemy Notify webhook turns each request on chain into a rating run**
-  ([ADR 0017](docs/adr/0017-chain-events-are-ingested-at-least-once.md)).
-- **A cron job restarts stuck rating requests**, from the contract's own list of
-  pending requests, and that request's run finishes or cancels it
+- **Deployed, an Alchemy Notify webhook turns each request on chain into a rating run**
+  ([ADR 0017](docs/adr/0017-chain-events-are-ingested-at-least-once.md)), and a cron
+  reconciler restarts a request whose run stopped, from the contract's own list of pending
+  requests; that request's run finishes or cancels it
   ([ADR 0020](docs/adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
+- **The maintainer hears of it on Telegram:** every paper published, every rating settled,
+  a failed run, the DKG node down, wallets running low and requests pending too long
+  ([ADR 0038](docs/adr/0038-alerts-go-to-one-telegram-chat.md)).
+
+Deployed on Vercel ([`apps/web` → Deploying](apps/web/README.md#deploying)): staging from
+`develop`, production from `main`.
 
 Terms:
 
@@ -107,24 +110,26 @@ shows them in a browser.
 ### Environments and resources
 
 Each environment has its own context graph on the shared DKG node
-([ADR 0005](docs/adr/0005-staging-and-production-are-isolated.md)); staging's exists today,
-production's comes with production's first app deployment. Our node
-publishes the ratings of every contract of an environment to that environment's
+([ADR 0005](docs/adr/0005-staging-and-production-are-isolated.md)): `verisci-staging` and
+`verisci-prod`. Our node publishes the ratings of every contract of an environment to that environment's
 graph, so a redeployed contract keeps the graph of the one it replaces; the old
 contract is paused and drained ([ADR 0023](docs/adr/0023-a-fix-is-a-redeploy-owner-powers-fixed.md)).
 Each contract's R-KA names are its own, because the request id hashes the chain
 id, the contract's address and its deploy time
 ([ADR 0016](docs/adr/0016-asset-names-derive-from-request-id.md)).
 
-The DKG node runs with GROBID and an RPC proxy, on its own server once a deployed
-environment calls it; until then on a developer's computer, started by hand
-([ADR 0006](docs/adr/0006-dkg-node-runs-on-a-dedicated-host.md)). The node reads
+The DKG node runs with GROBID and an RPC proxy on its own server, a free Oracle Cloud VM,
+reached at `https://verisci-dkg.duckdns.org` and `https://verisci-grobid.duckdns.org`
+([ADR 0006](docs/adr/0006-dkg-node-runs-on-a-dedicated-host.md)). Caddy is its only public
+entry, and each environment, developers' computers included, reaches it with its own
+credential ([ADR 0039](docs/adr/0039-one-credential-per-environment.md)). The node reads
 Base Sepolia only through that proxy, [`infra/rpc-proxy`](infra/rpc-proxy/README.md),
-which asks free public endpoints first and keeps Alchemy within a daily budget.
-[`docs/node-host.md`](docs/node-host.md) is how to build the node and back it up; it
-also shows how the parts connect: on a server, Caddy is the only public entry.
-Each environment also has its own oracle wallet, Alchemy webhook, Inngest
-environment and Upstash store. Only `develop` holds staging's oracle key and runs
+which asks free public endpoints first and keeps Alchemy RPC within a daily budget.
+[`docs/node-host.md`](docs/node-host.md) describes the server, how to operate it and how to
+rebuild it from the node's backup; its configuration files are in
+[`infra/node-server`](infra/node-server/README.md).
+Each environment also has its own oracle wallet, Alchemy Notify webhook, Inngest
+environment and upload-limit counters, in one shared Upstash database. Only `develop` holds staging's oracle key and runs
 its ratings; previews share staging's contract and graph, and local development shares
 staging's graph but rates, pages included, on a contract on a local Anvil chain with its
 oracle key ([ADR 0019](docs/adr/0019-oracle-transactions-are-serialized.md),
@@ -137,7 +142,7 @@ flowchart TB
     sa["App server<br/>upload page, Upstash limits"]
     sp["Publish runs<br/>Inngest environment"]
     sc["RatingController (staging)<br/>Base Sepolia<br/>+ past contracts, paused"]
-    sr["Rating runs<br/>oracle wallet, Alchemy webhook (next),<br/>same Inngest environment"]
+    sr["Rating runs<br/>oracle wallet, Alchemy Notify webhook,<br/>same Inngest environment"]
     sg["Staging graph<br/>on the shared DKG node host"]
     sa -->|"paper.submitted"| sp -->|"stores and mints Target KAs"| sg
     sc --> sr -->|"stores and mints R-KAs"| sg
@@ -147,7 +152,7 @@ flowchart TB
     pa["App server<br/>upload page, Upstash limits"]
     pp["Publish runs<br/>Inngest environment"]
     pc["RatingController (production)<br/>Base Sepolia<br/>+ past contracts, paused"]
-    pr["Rating runs<br/>oracle wallet, Alchemy webhook (next),<br/>same Inngest environment"]
+    pr["Rating runs<br/>oracle wallet, Alchemy Notify webhook,<br/>same Inngest environment"]
     pg["Production graph<br/>on the shared DKG node host"]
     pa -->|"paper.submitted"| pp -->|"stores and mints Target KAs"| pg
     pc --> pr -->|"stores and mints R-KAs"| pg
@@ -212,7 +217,7 @@ sequenceDiagram
   participant N as DKG node
   participant O as Oracle function
   U->>C: requestPhase1(targetUal)
-  C-->>W: Phase1Requested(requestId, …) via Alchemy
+  C-->>W: Phase1Requested(requestId, …) via the Alchemy Notify webhook
   W->>R: event keyed on requestId
   R->>C: read the request and the contract's oracle
   Note over R: Stop if settled, or if the oracle is not this deployment's key.
@@ -229,8 +234,9 @@ sequenceDiagram
     else otherwise
       opt nothing stored
         R->>N: find the PDF the target links
-        R->>R: read its text, then one Gemini request gives its field, study type and checks, with quotes
-        Note over R,O: Outside the life sciences and health, or no readable text:<br/>cancel(requestId, invalid target), and stop.
+        R->>R: read its text, then Flash-Lite checks its field
+        R->>R: one Gemini request gives its field, study type and checks, with quotes
+        Note over R,O: Outside the life sciences and health, no readable text,<br/>or two answers the check refuses: cancel(requestId, invalid target), and stop.
         R->>R: check the quotes against the paper, compute the score
         R->>N: store the R-KA
       end
@@ -243,7 +249,7 @@ sequenceDiagram
     end
   end
   Note over C,O: The oracle function re-reads the request and sends nothing if it is already settled.
-  Note over C,R: A cron reconciler pages through pendingRequestIds(offset, limit)<br/>on every contract of the environment, past ones included,<br/>and restarts the run of any stuck request.
+  Note over C,R: Every 30 minutes, a cron reconciler pages through pendingRequestIds(offset, limit)<br/>on every contract of the environment, past ones included,<br/>and restarts the run of any request pending over 4 hours.
 ```
 
 Every run reads the request on chain and its R-KA on the node, then does what
@@ -285,6 +291,10 @@ TypeScript source, with no build step; Next.js compiles them through
 | [`packages/workflows`](packages/workflows/README.md) | Inngest workflows and the pages' calls | core, env, dkg, contracts |
 | [`infra/rpc-proxy`](infra/rpc-proxy/README.md) | JSON-RPC proxy run on the DKG node server | none |
 
+Also [`infra/node-server`](infra/node-server/README.md): the DKG node server's Caddy site and
+systemd units, configuration copied to the server by hand
+([`docs/node-host.md`](docs/node-host.md)).
+
 Each workspace may only import the workspaces it declares. pnpm does not
 hoist undeclared workspace packages, so breaking this rule fails `pnpm
 typecheck`.
@@ -307,8 +317,8 @@ pnpm install
 pnpm dev         # starts apps/web on http://localhost:3000
 ```
 
-To publish a PDF locally (the RPC proxy, the DKG node, GROBID and the Inngest dev server),
-follow [`packages/workflows` → Running a publish locally](packages/workflows/README.md#running-a-publish-locally),
+To publish a PDF locally (the Inngest dev server, with the node server's URLs and your
+credential in `.env.local`), follow [`packages/workflows` → Running a publish locally](packages/workflows/README.md#running-a-publish-locally),
 then open http://localhost:3000/publish (it needs the workflows' settings and
 `REOWN_PROJECT_ID`; see [`apps/web`](apps/web/README.md#environment)). To rate a paper
 locally, from its page or from a script, against a contract on Anvil, follow

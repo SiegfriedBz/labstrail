@@ -1,2 +1,2 @@
 - On Gemini's free tier, Google may use prompts and answers to improve its products; the field check sends a paper's title, abstract and opening, and the scorer its text, both already public on IPFS.
-- PDFs uploaded but never published stay pinned until the unpin cron of the intake and recovery plan exists.
+- PDFs uploaded but never submitted stay pinned, and so do refused PDFs: a refused file is unpinned only if it is not a PDF, so one environment never unpins another's paper (ADRs 0005, 0010).

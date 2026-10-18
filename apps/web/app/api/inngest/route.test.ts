@@ -6,14 +6,16 @@ function route() {
   return import("./route.ts");
 }
 
-describe("/api/inngest", () => {
+// The first import compiles the whole workflows package, which can take over Vitest's default
+// 5 s while every workspace tests at once.
+describe("/api/inngest", { timeout: 30_000 }, () => {
   it("answers Inngest's GET, POST and PUT", async () => {
     const { GET, POST, PUT } = await route();
 
     expect([GET, POST, PUT].every((handler) => typeof handler === "function")).toBe(true);
   });
 
-  it("describes the workflows' functions to the dev server", async () => {
+  it("describes the workflows' functions to the dev server: publish and the failure alerts, with no oracle key", async () => {
     const { GET } = await route();
 
     const response = await GET(
@@ -23,6 +25,6 @@ describe("/api/inngest", () => {
     const body = (await response.json()) as { function_count?: number };
 
     expect(response.status).toBe(200);
-    expect(body.function_count).toBe(1);
+    expect(body.function_count).toBe(2);
   });
 });

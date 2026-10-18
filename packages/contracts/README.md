@@ -41,7 +41,9 @@ pending on it
   ([ADR 0011](../../docs/adr/0011-a-rating-is-a-separate-r-ka.md)), or whose paper
   is outside the life sciences and health
   ([ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)), or
-  whose PDF cannot be read for its text, such as a scan or a file over the size limit
+  whose PDF link is not an IPFS CID, whose PDF cannot be read for its text, such as a scan,
+  a file over the size limit or one that read 4 times as no PDF, or for which the scorer gave
+  two answers its check refused
   ([ADR 0011](../../docs/adr/0011-a-rating-is-a-separate-r-ka.md)).
 - **Fulfil.** The oracle calls `fulfilPhase1(requestId, score, rKaUal)` with a
   score from 0 to 100 and the R-KA's UAL. The record holds the phase-1 score;
@@ -208,7 +210,7 @@ forge script script/DeployRatingController.s.sol --rpc-url http://127.0.0.1:8546
 `LOCAL_RATING_CONTRACT` in the root `.env.local` to the address the script prints, and
 `ORACLE_PRIVATE_KEY` to the second account's key
 ([`packages/workflows` → Running a rating locally](../workflows/README.md#running-a-rating-locally)).
-Anvil listens on 8546 because the DKG node's RPC proxy holds 8545, Anvil's default, and
+Anvil listens on 8546: its default, 8545, is the port of the DKG node's RPC proxy, which
 answers as Base Sepolia. Anvil forgets everything when it stops: deploy again after a restart.
 The new contract lands at the same address with a later deploy time, so its request ids never
 repeat those of the one before.
@@ -264,8 +266,10 @@ accepted.
 | `readRatingRequest(client, contract, requestId)` | The request's `RatingRequestState` (status `none`, `pending`, `fulfilled` or `cancelled`, cancel reason, lowercase requester, `requestedAt` in seconds, score, target and R-KA UALs), or `unreachable` when the RPC fails or the reply does not decode |
 | `readRequestIdsOf(client, contract, targetUal)` | Every request id the contract holds for a target UAL, oldest first, read in pages of 50 (`requestCountOf`, then `requestIdsOf`), or `unreachable` when the RPC fails or a reply does not decode; the pages list a paper's ratings with it |
 | `readOracleAgent(client, contract)` | The contract's oracle address in lowercase, or `unreachable` |
+| `readPendingCount(client, contract)` | How many requests the contract holds pending (`pendingCount`), or `unreachable` |
+| `readPendingRequestIds(client, contract, offset, limit)` | One page of pending request ids in lowercase (`pendingRequestIds`), or `unreachable`; a fulfil or cancel reorders the set, so the reconciler reads one page a tick, in turns, and reads each request it lists before acting ([ADR 0020](../../docs/adr/0020-stuck-requests-recovered-only-oracle-cancels.md)) |
 | `fulfilCalldata(requestId, score, rKaUal)`, `cancelCalldata(requestId, reason)` | The calldata of `fulfilPhase1` and of `cancelRequest` (`expired` or `invalid-target`), which the oracle signs and sends |
-| `ContractReader`, `RequestStatus`, `CancelReason`, `ReadRequestResult`, `ReadRequestIdsResult`, `ReadOracleResult` | What the reads take from a viem public client, and their types |
+| `ContractReader`, `RequestStatus`, `CancelReason`, `ReadRequestResult`, `ReadRequestIdsResult`, `ReadPendingCountResult`, `ReadOracleResult` | What the reads take from a viem public client, and their types |
 | `contractsName` | The package name, imported by the web app's package test |
 
 Each `Deployment` records the contract `address`, the deployment `txHash` and

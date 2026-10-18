@@ -1,1 +1,1 @@
-The run's outcome { state: "minted", ual }: the paper's Target KA is on the DKG, its token on Base Sepolia, and the paper's page shows it with the proof anyone can check (signature, token, UAL, CID).
+The run's outcome { state: "minted", ual }: the paper's Target KA is on the DKG, its token on Base Sepolia, and the paper's page shows it with the proof anyone can check (signature, token, UAL, CID). A paper this run minted, not an earlier one, is announced once on Telegram from a notify step, by its title or CID, with its page (ADR 0038).

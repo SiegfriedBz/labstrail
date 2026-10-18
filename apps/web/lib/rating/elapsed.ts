@@ -1,6 +1,7 @@
 /**
- * How long a pending rating counts as on time: the run's own five tries, 2 minutes apart,
- * take about 10 minutes when the scoring model is busy (ADR 0009), plus a margin.
+ * How long a pending rating counts as on time: a run that scores at once finishes within a few
+ * minutes, and its first two retries, 2 then 5 minutes apart, about 10 when the scoring model
+ * is busy (ADR 0009); past 15 minutes it is waiting out an outage, 15, 30 then 60 minutes apart.
  */
 export const SLOW_AFTER_MS = 15 * 60_000;
 

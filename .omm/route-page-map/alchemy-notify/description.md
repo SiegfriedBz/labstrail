@@ -1,0 +1,1 @@
+Alchemy Notify, outside the app: posts every event of the environment's current RatingController, signed with the webhook's key, of which the route's intake keeps the Phase1Requested logs (external-integrations → alchemy-notify).

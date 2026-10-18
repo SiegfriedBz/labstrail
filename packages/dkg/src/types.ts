@@ -53,6 +53,24 @@ export type QueryResult =
   | { readonly ok: true; readonly bindings: readonly Readonly<Record<string, string>>[] }
   | DkgFailure;
 
+/**
+ * Where a context graph stands on the node, from `/api/status`: `authorityState` (`accepted`
+ * once its policy is read) and `policySource` (`finalized-chain` once read from finalized
+ * blocks), as the node names them (`docs/domain.md` → DKG).
+ */
+export interface GraphStatus {
+  readonly authorityState: string;
+  readonly policySource: string;
+}
+
+/**
+ * The result of `readStatus`: the node answered, with this client's graph as it lists it
+ * (`undefined` when it lists it not), or why it did not.
+ */
+export type NodeStatus =
+  | { readonly ok: true; readonly graph: GraphStatus | undefined }
+  | DkgFailure;
+
 /** The result of `startMint`: minted with its UAL, a mint in flight to poll, or why it failed. */
 export type MintResult =
   | { readonly ok: true; readonly state: "minted"; readonly ual: string }

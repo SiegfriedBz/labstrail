@@ -3,4 +3,4 @@ graph LR
     in-progress -->|"the oracle cancelled it"| cancelled["Cancelled\ninvalid target, or past a day"]
     in-progress -->|"the chain or the node did not answer"| unavailable["Unavailable\nasked again on the next poll"]
     unavailable -->|"next poll answers"| in-progress
-    unavailable -->|"next poll answers with another paper's rating"| not-found["Not Found\nno contract holds it, another paper's, or the paper isn't published"]
+    unavailable -->|"next poll answers with another paper's rating, or a just-made request still unseen after 2 min"| not-found["Not Found\nno contract holds it, another paper's, or the paper isn't published"]
