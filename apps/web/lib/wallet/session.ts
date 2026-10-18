@@ -7,12 +7,13 @@ export const APPKIT_CONNECTION_STATUS_KEY = "@appkit/connection_status";
 
 /**
  * Whether this browser remembers a connected wallet, so the page loads the wallet once idle
- * and shows the visitor's address. False when the storage can't be read (a private window,
- * blocked storage).
+ * and shows the visitor's address. Reads `storage`, or the page's `localStorage` when given
+ * none. False when the storage can't be read (a private window, blocked site data, where
+ * reaching `window.localStorage` itself throws).
  */
-export function hasStoredWalletSession(storage: Pick<Storage, "getItem">): boolean {
+export function hasStoredWalletSession(storage?: Pick<Storage, "getItem">): boolean {
   try {
-    return storage.getItem(APPKIT_CONNECTION_STATUS_KEY) === "connected";
+    return (storage ?? window.localStorage).getItem(APPKIT_CONNECTION_STATUS_KEY) === "connected";
   } catch {
     return false;
   }

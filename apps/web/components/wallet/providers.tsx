@@ -22,7 +22,7 @@ const loader = createWalletLoader((settings: WalletSettings) =>
   import("./wallet-runtime.ts").then(({ createWalletRuntime }) => createWalletRuntime(settings)),
 );
 
-/** How long to wait for an idle moment where the browser has no `requestIdleCallback`. */
+/** The longest wait for an idle moment, and the wait where the browser has no `requestIdleCallback`. */
 const IDLE_FALLBACK_MS = 2_000;
 
 const Ready = createContext(false);
@@ -59,10 +59,13 @@ export function useWallet(): Wallet {
   };
 }
 
-/** Runs `task` once the browser is idle, or after {@link IDLE_FALLBACK_MS} where it can't say. */
+/** Runs `task` once the browser is idle, at the latest after {@link IDLE_FALLBACK_MS}. */
 function whenIdle(task: () => void): void {
-  if (typeof window.requestIdleCallback === "function") window.requestIdleCallback(task);
-  else window.setTimeout(task, IDLE_FALLBACK_MS);
+  if (typeof window.requestIdleCallback === "function") {
+    window.requestIdleCallback(task, { timeout: IDLE_FALLBACK_MS });
+  } else {
+    window.setTimeout(task, IDLE_FALLBACK_MS);
+  }
 }
 
 /**
@@ -95,12 +98,14 @@ export function WalletProvider({
   const theme = useTheme();
 
   useEffect(() => {
-    if (store && hasStoredWalletSession(window.localStorage)) store.restore(whenIdle);
+    if (store && hasStoredWalletSession()) store.restore(whenIdle);
+    // Reads the store itself, which the restore just set, so the mark stays until it settles.
+    const unmarkUnlessRestoring = () => {
+      if (store?.getState().status !== "restoring") delete document.documentElement.dataset.wallet;
+    };
+    unmarkUnlessRestoring();
+    return store?.subscribe(unmarkUnlessRestoring);
   }, [store]);
-
-  useEffect(() => {
-    if (state.status !== "restoring") delete document.documentElement.dataset.wallet;
-  }, [state.status]);
 
   useEffect(() => {
     state.runtime?.setThemeMode(theme);

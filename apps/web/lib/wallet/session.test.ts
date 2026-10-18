@@ -16,6 +16,22 @@ const blocked: Pick<Storage, "getItem"> = {
   },
 };
 
+/** Runs `check` where even reading `window.localStorage` throws, as with blocked site data. */
+function withBlockedLocalStorage(check: () => void) {
+  const original = Object.getOwnPropertyDescriptor(window, "localStorage");
+  Object.defineProperty(window, "localStorage", {
+    configurable: true,
+    get: () => {
+      throw new DOMException("The operation is insecure.", "SecurityError");
+    },
+  });
+  try {
+    check();
+  } finally {
+    if (original) Object.defineProperty(window, "localStorage", original);
+  }
+}
+
 describe("hasStoredWalletSession", () => {
   it("is true when AppKit stored a connected status", () => {
     expect(hasStoredWalletSession(storage("connected"))).toBe(true);
@@ -28,6 +44,16 @@ describe("hasStoredWalletSession", () => {
 
   it("is false when the storage can't be read (a private window, blocked storage)", () => {
     expect(hasStoredWalletSession(blocked)).toBe(false);
+  });
+
+  it("reads the page's storage when given none, and is false when even reaching it throws", () => {
+    localStorage.setItem(APPKIT_CONNECTION_STATUS_KEY, "connected");
+    expect(hasStoredWalletSession()).toBe(true);
+    localStorage.clear();
+
+    withBlockedLocalStorage(() => {
+      expect(hasStoredWalletSession()).toBe(false);
+    });
   });
 });
 
@@ -52,18 +78,9 @@ describe("WALLET_SESSION_SCRIPT", () => {
   });
 
   it("marks nothing, and throws nothing, when the storage can't be read", () => {
-    const original = Object.getOwnPropertyDescriptor(window, "localStorage");
-    Object.defineProperty(window, "localStorage", {
-      configurable: true,
-      get: () => {
-        throw new DOMException("The operation is insecure.", "SecurityError");
-      },
-    });
-    try {
+    withBlockedLocalStorage(() => {
       expect(() => new Function(WALLET_SESSION_SCRIPT)()).not.toThrow();
       expect(document.documentElement.dataset.wallet).toBeUndefined();
-    } finally {
-      if (original) Object.defineProperty(window, "localStorage", original);
-    }
+    });
   });
 });

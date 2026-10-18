@@ -100,8 +100,42 @@ describe("WalletProvider", () => {
     await show("test-project");
     await act(async () => {});
 
-    expect(requestIdleCallback).toHaveBeenCalledOnce();
+    expect(requestIdleCallback).toHaveBeenCalledExactlyOnceWith(expect.any(Function), {
+      timeout: 2_000,
+    });
     expect(createWalletRuntime).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the restoring mark until the restore settles, and clears it when the restore fails", async () => {
+    localStorage.setItem(APPKIT_CONNECTION_STATUS_KEY, "connected");
+    document.documentElement.dataset.wallet = "restoring";
+    createWalletRuntime.mockRejectedValueOnce(new Error("Loading chunk failed"));
+    await show("test-project");
+
+    expect(document.documentElement.dataset.wallet).toBe("restoring");
+    await idleLater();
+
+    expect(screen.getByText(/ready idle/)).toBeTruthy();
+    expect(document.documentElement.dataset.wallet).toBeUndefined();
+  });
+
+  it("renders the page, idle, when the browser blocks site data", async () => {
+    const original = Object.getOwnPropertyDescriptor(window, "localStorage");
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      get: () => {
+        throw new DOMException("The operation is insecure.", "SecurityError");
+      },
+    });
+    try {
+      await show("test-project");
+      await idleLater();
+    } finally {
+      if (original) Object.defineProperty(window, "localStorage", original);
+    }
+
+    expect(screen.getByText(/ready idle/)).toBeTruthy();
+    expect(createWalletRuntime).not.toHaveBeenCalled();
   });
 
   it("keeps the loaded wallet across re-renders, as a client-side navigation does", async () => {

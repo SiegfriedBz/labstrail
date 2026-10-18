@@ -36,9 +36,15 @@ export interface WalletStore<R> {
   subscribe(listener: () => void): () => void;
   /** A wallet action (Connect, publish, Rate): loads the wallet, or gives the loaded one. */
   load(): Promise<R>;
-  /** The pointer or focus reached a wallet button: loads quietly, idle again if it fails. */
+  /**
+   * The pointer or focus reached a wallet button: loads quietly, idle again if it fails (or
+   * still `failed`, when a wallet action failed first).
+   */
   preload(): void;
-  /** A stored session: `restoring` at once, loaded when `defer` runs its task, idle if it fails. */
+  /**
+   * A stored session: `restoring` at once, loaded when `defer` runs its task, idle if it fails
+   * (or still `failed`, when a wallet action failed meanwhile).
+   */
   restore(defer: (task: () => void) => void): void;
 }
 
@@ -70,8 +76,9 @@ export function createWalletStore<R extends AccountSource>(load: () => Promise<R
     set(settled(runtime));
     return runtime;
   };
+  /** A quiet load failed: idle again, keeping a failed wallet action's state for its retry. */
   const backToIdle = () => {
-    if (!state.runtime) set({ status: "idle" });
+    if (!state.runtime && state.status !== "failed") set({ status: "idle" });
   };
 
   return {

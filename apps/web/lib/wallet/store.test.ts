@@ -107,6 +107,21 @@ describe("createWalletStore", () => {
     await vi.waitFor(() => expect(store.getState()).toEqual({ status: "idle" }));
   });
 
+  it("stays failed when a quiet load fails after a wallet action failed", async () => {
+    const store = createWalletStore(() => Promise.reject(new Error("offline")));
+    let idle: () => void = () => {};
+    store.restore((task) => {
+      idle = task;
+    });
+
+    await expect(store.load()).rejects.toThrow("offline");
+    idle();
+    store.preload();
+    await new Promise((settled) => setTimeout(settled, 0));
+
+    expect(store.getState()).toEqual({ status: "failed" });
+  });
+
   it("stays restoring when a wallet action comes while a session is being restored", async () => {
     const runtime = fakeRuntime();
     const { load, resolve } = pendingLoad<typeof runtime>();
