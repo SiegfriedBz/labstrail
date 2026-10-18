@@ -1,14 +1,17 @@
 "use client";
 
 import { FilePdf, UploadSimple, Warning } from "@phosphor-icons/react";
-import { useAppKit } from "@reown/appkit/react";
 import { type DragEvent, useId, useState } from "react";
 import { BaseError, UserRejectedRequestError } from "viem";
-import { useAccount, useSignTypedData, useSwitchChain } from "wagmi";
 import { requestUpload, submitPaper } from "../../app/actions.ts";
-import { type PublishProblem, publishProblemMessage } from "../../lib/publish/messages.ts";
+import {
+  type PublishProblem,
+  publishProblemMessage,
+  WALLET_UNAVAILABLE,
+} from "../../lib/publish/messages.ts";
 import { type Phase, publishFile, uploadToSignedUrl } from "../../lib/publish/publish-flow.ts";
-import { useWalletReady } from "../wallet/providers.tsx";
+import { useWallet, useWalletReady } from "../wallet/providers.tsx";
+import type { WalletRuntime } from "../wallet/wallet-runtime.ts";
 
 const BASE_SEPOLIA = 84532;
 
@@ -25,8 +28,14 @@ const PHASE_TEXT: Record<Phase, string> = {
   submitting: "Checking your submission",
 };
 
-/** The publish form, or a note when the wallet window is not set up on this server. */
+/**
+ * The publish form, or a note when the wallet window is not set up on this server. Before the
+ * wallet loads it asks to connect, starting the download when the pointer or focus reaches
+ * Connect; while a stored session comes back it shows a skeleton of the drop zone; once
+ * connected, the drop zone.
+ */
 export function PublishForm(settings: PublishSettings) {
+  const wallet = useWallet();
   if (!useWalletReady()) {
     return (
       <p className="glass rounded-2xl p-5 text-sm text-muted">
@@ -34,15 +43,58 @@ export function PublishForm(settings: PublishSettings) {
       </p>
     );
   }
-  return <PublishFlow {...settings} />;
+  if (wallet.status === "restoring") {
+    return (
+      <div
+        role="status"
+        aria-label="Loading your wallet"
+        className="glass min-h-72 animate-pulse rounded-2xl"
+      />
+    );
+  }
+  if (wallet.status === "connected" && wallet.runtime) {
+    return <PublishFlow {...settings} runtime={wallet.runtime} />;
+  }
+
+  const loading = wallet.status === "loading";
+  return (
+    <div data-wallet-connect="panel" className="glass grid gap-4 rounded-2xl p-6 sm:p-8">
+      <p className="text-muted">Connect a wallet to publish.</p>
+      <button
+        type="button"
+        onClick={() => {
+          void wallet.load().then(
+            (runtime) => runtime.open(),
+            () => {},
+          );
+        }}
+        onPointerEnter={wallet.preload}
+        onFocus={wallet.preload}
+        onTouchStart={wallet.preload}
+        disabled={loading}
+        aria-busy={loading}
+        className="signal-gradient w-fit rounded-xl px-5 py-2.5 font-semibold text-accent-ink transition hover:brightness-110 active:scale-[0.98] disabled:cursor-wait disabled:opacity-70"
+      >
+        Connect wallet
+      </button>
+      {wallet.status === "failed" && (
+        <p role="alert" className="flex items-start gap-2 text-sm text-danger">
+          <Warning size={18} className="mt-px shrink-0" />
+          {WALLET_UNAVAILABLE}
+        </p>
+      )}
+    </div>
+  );
 }
 
-function PublishFlow({ contextGraph, maxBytes, signatureLifetimeS }: PublishSettings) {
+/** The drop zone, once a wallet is connected: uploads, has the wallet sign, then submits. */
+function PublishFlow({
+  contextGraph,
+  maxBytes,
+  signatureLifetimeS,
+  runtime,
+}: PublishSettings & { runtime: WalletRuntime }) {
   const inputId = useId();
-  const { address, chainId, isConnected } = useAccount();
-  const { open } = useAppKit();
-  const { switchChainAsync } = useSwitchChain();
-  const { signTypedDataAsync } = useSignTypedData();
   const [phase, setPhase] = useState<Phase | undefined>();
   const [problem, setProblem] = useState<PublishProblem | undefined>();
   const [file, setFile] = useState<File | undefined>();
@@ -60,11 +112,12 @@ function PublishFlow({ contextGraph, maxBytes, signatureLifetimeS }: PublishSett
       requestUpload: () => requestUpload(),
       upload: (url, pdf) => uploadToSignedUrl(url, pdf),
       sign: async (typedData) => {
-        if (!address) return { ok: false };
+        const account = runtime.account();
+        if (!account) return { ok: false };
         try {
-          if (chainId !== BASE_SEPOLIA) await switchChainAsync({ chainId: BASE_SEPOLIA });
-          const signature = await signTypedDataAsync({ ...typedData, account: address });
-          return { ok: true, address, signature };
+          if (account.chainId !== BASE_SEPOLIA) await runtime.switchChain(BASE_SEPOLIA);
+          const signature = await runtime.signTypedData({ ...typedData, account: account.address });
+          return { ok: true, address: account.address, signature };
         } catch (error) {
           if (
             error instanceof BaseError &&
@@ -100,21 +153,6 @@ function PublishFlow({ contextGraph, maxBytes, signatureLifetimeS }: PublishSett
     setDragging(false);
     choose(event.dataTransfer.files[0]);
   };
-
-  if (!isConnected) {
-    return (
-      <div className="glass grid gap-4 rounded-2xl p-6 sm:p-8">
-        <p className="text-muted">Connect a wallet to publish.</p>
-        <button
-          type="button"
-          onClick={() => void open()}
-          className="signal-gradient w-fit rounded-xl px-5 py-2.5 font-semibold text-accent-ink transition hover:brightness-110 active:scale-[0.98]"
-        >
-          Connect wallet
-        </button>
-      </div>
-    );
-  }
 
   return (
     <div className="grid gap-4">

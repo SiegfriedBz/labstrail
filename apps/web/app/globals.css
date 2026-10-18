@@ -210,6 +210,21 @@ li {
   }
 }
 
+/* While a stored wallet session comes back (WALLET_SESSION_SCRIPT, before the first paint),
+   what offers to connect keeps its size but shows nothing, so a returning visitor never sees
+   "Connect" before their address. */
+html[data-wallet="restoring"] [data-wallet-connect] {
+  pointer-events: none;
+}
+
+html[data-wallet="restoring"] [data-wallet-connect] > * {
+  visibility: hidden;
+}
+
+html[data-wallet="restoring"] [data-wallet-connect="panel"] {
+  min-height: 18rem;
+}
+
 @media (prefers-reduced-transparency: reduce) {
   .glass {
     background: var(--glass-solid);

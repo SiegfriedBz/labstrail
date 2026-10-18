@@ -6,6 +6,9 @@ import type { UploadUrlAnswer } from "./upload-actions.ts";
 /** The largest PDF verisci publishes, in MB, as the messages name it. */
 const MAX_PDF_MB = MAX_PDF_BYTES / 1024 / 1024;
 
+/** What the publish form says when the wallet's code couldn't download, after a click on Connect. */
+export const WALLET_UNAVAILABLE = "The wallet couldn't load. Check your connection and try again.";
+
 /** Why the publish form stopped, from the browser's own checks to the server's answers. */
 export type PublishProblem =
   | Extract<UploadUrlAnswer, { ok: false }>["reason"]

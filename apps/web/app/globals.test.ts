@@ -70,3 +70,9 @@ describe("globals.css's palette", () => {
     expect(contrast("#000000", "#ffffff")).toBeCloseTo(21, 5);
   });
 });
+
+describe("globals.css's wallet look before the first paint", () => {
+  it("dims what offers to connect while a stored wallet session is being restored", () => {
+    expect(css).toMatch(/html\[data-wallet="restoring"\] \[data-wallet-connect\]/);
+  });
+});
