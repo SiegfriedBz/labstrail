@@ -1,6 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { loadEnvConfig } from "@next/env";
 import type { NextConfig } from "next";
+import { HTML_LIMITED_BOTS } from "./lib/seo/bots.ts";
 
 // The repo keeps its env files at the root (.env.local and friends), but Next.js
 // only looks in apps/web. Reload from the root instead: forceReload because Next
@@ -27,6 +28,8 @@ const OPTIONAL_PEERS = [
 ];
 
 const nextConfig: NextConfig = {
+  // Crawlers that run no JavaScript get the metadata in the <head>, AI crawlers included.
+  htmlLimitedBots: new RegExp(HTML_LIMITED_BOTS, "i"),
   turbopack: {
     resolveAlias: Object.fromEntries(OPTIONAL_PEERS.map((name) => [name, "./lib/empty-module.ts"])),
   },
