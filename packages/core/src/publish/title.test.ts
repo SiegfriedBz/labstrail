@@ -39,10 +39,23 @@ describe("completeTitle", () => {
     ["a spaced en dash", `Cell Genomics – ${FULL}`],
     ["a spaced em dash", `Cell Genomics — ${FULL}`],
     ["a bar", `Cell Genomics | ${FULL}`],
+    ["an unspaced en dash", `Cell Genomics–${FULL}`],
+    ["an unspaced em dash", `Cell Genomics—${FULL}`],
   ])(
     "keeps GROBID's when the stored words before it end with %s, as a journal's name does",
     (_, stored) => {
       expect(completeTitle(FULL, stored)).toBe(FULL);
+    },
+  );
+
+  it.each([
+    ["a spaced hyphen", `Cell Genomics - ${FULL}`],
+    ["a spaced en dash", `Cell Genomics – ${FULL}`],
+    ["a bar", `Cell Genomics | ${FULL}`],
+  ])(
+    "keeps GROBID's cut title when the stored words before it hold a journal's name and %s",
+    (_, stored) => {
+      expect(completeTitle(CUT, stored)).toBe(CUT);
     },
   );
 
@@ -53,6 +66,15 @@ describe("completeTitle", () => {
     expect(completeTitle("term outcomes of stroke", "Long-term outcomes of stroke")).toBe(
       "Long-term outcomes of stroke",
     );
+  });
+
+  it("completes a title whose dropped words hold a full stop or an en dash between two words", () => {
+    expect(completeTitle("coli toxins in the gut", "E. coli toxins in the gut")).toBe(
+      "E. coli toxins in the gut",
+    );
+    expect(
+      completeTitle("relationship of citicoline", "Dose–response relationship of citicoline"),
+    ).toBe("Dose–response relationship of citicoline");
   });
 
   it("keeps GROBID's when the stored title is over 300 characters", () => {
