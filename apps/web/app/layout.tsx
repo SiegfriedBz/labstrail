@@ -5,6 +5,7 @@ import { connection } from "next/server";
 import type { ReactNode } from "react";
 import { HeaderNav } from "../components/site/header-nav.tsx";
 import { Logo } from "../components/site/logo.tsx";
+import { SiteAnalytics } from "../components/site/site-analytics.tsx";
 import { SiteFooter } from "../components/site/site-footer.tsx";
 import { ThemeToggle } from "../components/site/theme-toggle.tsx";
 import { WalletProvider } from "../components/wallet/providers.tsx";
@@ -31,7 +32,8 @@ export function generateMetadata(): Metadata {
  * The shell: header with the theme and wallet buttons, then the page. Rendered per request,
  * so the Reown project id is read from the server's settings, never inlined at build time.
  * The theme, and whether a stored wallet session is coming back, are set in `<head>` before
- * the first paint (`THEME_SCRIPT`, `WALLET_SESSION_SCRIPT`).
+ * the first paint (`THEME_SCRIPT`, `WALLET_SESSION_SCRIPT`). Production counts visits with
+ * Vercel Web Analytics (ADR 0041).
  */
 export default async function RootLayout({ children }: { children: ReactNode }) {
   await connection();
@@ -80,6 +82,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             ratingController={rating && { address: rating.contract, local: rating.local }}
           />
         </WalletProvider>
+        <SiteAnalytics appEnv={env.APP_ENV} />
       </body>
     </html>
   );

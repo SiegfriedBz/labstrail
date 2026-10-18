@@ -266,6 +266,9 @@ export default function AboutPage() {
             VeriSci moves to mainnet. Until then a requester pays only their gas, and VeriSci pays
             to publish and to rate.
           </p>
+          <p className="max-w-[56ch] text-sm leading-relaxed text-muted">
+            Visits are counted with Vercel Web Analytics, which sets no cookies.
+          </p>
         </div>
       </section>
 
