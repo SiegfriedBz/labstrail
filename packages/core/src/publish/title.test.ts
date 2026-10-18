@@ -34,8 +34,25 @@ describe("completeTitle", () => {
     expect(completeTitle(CUT, stored)).toBe(CUT);
   });
 
-  it("takes words stored before GROBID's whole title with it, as the rule reads", () => {
-    expect(completeTitle(FULL, `Cell Genomics - ${FULL}`)).toBe(`Cell Genomics - ${FULL}`);
+  it.each([
+    ["a spaced hyphen", `Cell Genomics - ${FULL}`],
+    ["a spaced en dash", `Cell Genomics – ${FULL}`],
+    ["a spaced em dash", `Cell Genomics — ${FULL}`],
+    ["a bar", `Cell Genomics | ${FULL}`],
+  ])(
+    "keeps GROBID's when the stored words before it end with %s, as a journal's name does",
+    (_, stored) => {
+      expect(completeTitle(FULL, stored)).toBe(FULL);
+    },
+  );
+
+  it("completes a title cut after a colon or inside a hyphenated word", () => {
+    const trial = "a randomised trial of citicoline after acute stroke";
+
+    expect(completeTitle(trial, `Neuroprotection: ${trial}`)).toBe(`Neuroprotection: ${trial}`);
+    expect(completeTitle("term outcomes of stroke", "Long-term outcomes of stroke")).toBe(
+      "Long-term outcomes of stroke",
+    );
   });
 
   it("keeps GROBID's when the stored title is over 300 characters", () => {

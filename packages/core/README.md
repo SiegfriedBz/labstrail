@@ -138,9 +138,10 @@ A Target KA describes a paper and who submitted it
   own metadata, since GROBID's header model can drop a title's first words (`docs/domain.md` →
   GROBID): the stored title, its whitespace collapsed, replaces GROBID's only when it is
   longer, at most 300 characters, and ends with GROBID's title at a word's start, ignoring
-  case, whitespace and a final full stop. A file name, a journal's name or another paper's
-  title stored on its own leaves GROBID's; words stored before GROBID's whole title
-  (`Cell Genomics - <title>`) are kept with it.
+  case, whitespace and a final full stop. Words before it that end in a spaced dash or a bar
+  (`Cell Genomics - <title>`) are a journal's or a site's name and leave GROBID's, as does a
+  file name, a journal's name or another paper's title stored on its own; a colon or a hyphen
+  inside a word (`Stroke: <title>`, `Long-term …`) still completes it.
 - **Triples:** the subject is `urn:verisci:paper:<cid>`, typed `schema:ScholarlyArticle`,
   with `schema:name`, `schema:url` (`ipfs://<cid>`), `schema:abstract`, `schema:sameAs`
   (`https://doi.org/<doi>`), and one `schema:author` node per author,
