@@ -82,6 +82,7 @@ upload page reads runs there, with no keys.
 | `PUBLISH_SETTINGS` | The publish run's limits (below) |
 | `PublishOutcome`, `PaperRefusal`, `SubmissionRefusal` | How a run ends: `minted` with its UAL, or `refused` with why |
 | `PublishFailure`, `publishFailureReason(output)` | Why a run stopped instead (`chain-unreachable`, `paper-unreachable`, `node-unreachable`, `network-refused`, `mint-not-confirmed`, `setup`): each error it throws starts `publish-failed:<reason>:`, and the reader finds it in a failed run's output however Inngest nests it |
+| `siteUrlOf(env)`, `SiteEnv` | The site's address: production's domain, the branch's URL on staging, `http://localhost:3000` locally; notifications link to it, and the web app's metadata, sitemap and structured data use it |
 | `getUploadService()` | The pages' calls, built on first use from the settings: `contextGraph`, `createUploadUrl()`, `submitPaper(input, limiter)`, `readPaper(cid, eventId?)`, `listPapers({ page, pageSize })` (below) |
 | `UploadService`, `PaperStatus`, `PublishedRecord`, `UPLOAD_SETTINGS` | Their type, what `readPaper` returns (the Target KA's state and the run), and the upload URL's and signature's lifetimes |
 | `SubmitResult`, `SubmitRefusal`, `SubmitLimiter`, `LimitAnswer` | What `submitPaper` returns, why it refuses, the per-submitter limit the web app passes it, and the limit's answer (`unavailable` carries what the store threw) |
@@ -484,9 +485,11 @@ papers list:
 - **`readPaper(cid, eventId?)`** reads the Target KA's state on the node and, given the
   event id, the run Inngest started for it (REST, from the dev server locally). Once the KA
   is minted, it also reads the record back from the asset's own graph (SPARQL through the
-  node: title, authors, DOI, PDF link, submitter, signature, deadline), checks the signature
-  against the submitter as the run does, without the deadline rule (`unknown` when the
-  chain does not answer within 3 s), and gives the agent address the asset is minted to
+  node: title, authors, DOI, PDF link, submitter, signature, deadline) and, alongside it,
+  when the node minted it (`publishedAt`, from the graph's `_meta` with `publishedPaperQuery`;
+  left out when the node does not give it, the record standing without it), checks the
+  signature against the submitter as the run does, without the deadline rule (`unknown` when
+  the chain does not answer within 3 s), and gives the agent address the asset is minted to
   (`publisher`: the UAL's author, our node). A failed run's status carries `failure`, the
   reason its error names; a minted paper whose record cannot be shown carries
   `recordProblem`: `unavailable` when the node did not answer the query, asked to retry, or
