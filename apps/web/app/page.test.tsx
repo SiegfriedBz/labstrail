@@ -37,6 +37,19 @@ describe("/", () => {
     ).toBe("/about");
   });
 
+  it("shows Publish and Rate as two panels, each live step in the accent and each to come in grey", () => {
+    render(<Home />);
+
+    const publish = screen.getByRole("article", { name: "Publish" });
+    const rate = screen.getByRole("article", { name: "Rate" });
+    const icons = (flow: HTMLElement) =>
+      [...flow.querySelectorAll("li > span:not([aria-hidden])")].map((icon) =>
+        icon.className.includes("text-accent") ? "live" : "to come",
+      );
+    expect(icons(publish)).toEqual(["live", "live", "live"]);
+    expect(icons(rate)).toEqual(["live", "to come", "to come"]);
+  });
+
   it("names its flows in their headings alone, their status beside them", () => {
     render(<Home />);
 

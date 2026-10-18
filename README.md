@@ -106,9 +106,13 @@ Terms:
 In order, without dates. Where a step's decision is already taken, its ADR is linked.
 
 1. **Transparent human review (phase 2, next).** The machine score checks what a paper
-   reports, not whether its content holds up. Reviewers drawn at random with Chainlink VRF
-   score the paper; the oracle records their score on the contract and the node adds it to
-   the R-KA ([ADR 0012](docs/adr/0012-three-phases-settled-by-the-oracle.md)).
+   reports, not whether its content holds up, and in traditional peer review the choice of
+   reviewers is opaque. Reviewers are drawn at random with Chainlink VRF, whose proof is
+   checked on chain, so no one can steer the draw and anyone can audit it. They score the
+   paper; the oracle records their score on the contract and the node adds it to the R-KA
+   ([ADR 0012](docs/adr/0012-three-phases-settled-by-the-oracle.md)). Reviewers will stake
+   to join the pool, be paid for their reviews and lose part of their stake for reviews in
+   bad faith; those rules are still to be set.
 2. **Payment, for people and AI agents.** VeriSci pays every fee today, bounded by a cap
    and a throttle, until a payment plan replaces that before mainnet
    ([ADR 0015](docs/adr/0015-rating-requests-are-free-on-testnet.md)). Publishing and

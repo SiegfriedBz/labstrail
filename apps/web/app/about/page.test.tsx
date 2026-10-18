@@ -34,7 +34,11 @@ describe("/about", () => {
     render(<AboutPage />);
 
     const dkg = screen.getByRole("region", { name: "Built on the OriginTrail DKG" });
-    for (const layer of ["The graph, off-chain", "The proof, on-chain", "The paper, on IPFS"]) {
+    for (const layer of [
+      "The graph, off-chain",
+      "The proof, on-chain",
+      "The paper itself, on IPFS",
+    ]) {
       expect(screen.getByRole("heading", { level: 3, name: layer })).toBeTruthy();
     }
     expect(dkg.textContent).toMatch(/merkle root/);
@@ -66,10 +70,12 @@ describe("/about", () => {
       ["planned", "Payment, for people and AI agents"],
       ["planned", "An API for AI agents"],
       ["planned", "A lasting, decentralized copy of every paper"],
-      ["planned", "Mainnet"],
       ["later", "Wet-lab replication"],
     ]);
     expect(items[0]).toMatch(/Chainlink VRF/);
+    expect(items[0]).toMatch(/no one, VeriSci included, can steer who is picked/);
+    expect(items[0]).toMatch(/stake to join the pool, be paid for their reviews/);
+    expect(items[0]).toMatch(/still to be set/);
     expect(items[3]).toMatch(/only more copies keep it available/);
   });
 

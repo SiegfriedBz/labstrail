@@ -18,8 +18,8 @@ export const metadata: Metadata = {
 };
 
 /**
- * OriginTrail's two layers, and IPFS beside them: where each part of a record lives. Blue marks
- * off-chain records and teal on-chain ones, as everywhere on the site.
+ * OriginTrail's two layers: where each part of a Knowledge Asset lives. Blue marks off-chain
+ * records and teal on-chain ones, as everywhere on the site.
  */
 const LAYERS = [
   {
@@ -36,29 +36,18 @@ const LAYERS = [
     title: "The proof, on-chain",
     body: "Publishing mints the asset on Base as an ERC-721 token and anchors the merkle root of its statements, one hash computed from all of them. Anyone can check that the statements still match it, and only the token's holder can add a new version.",
   },
-  {
-    icon: FilePdf,
-    line: "border-accent",
-    tone: "text-accent",
-    title: "The paper, on IPFS",
-    body: "IPFS is a decentralized storage network that addresses each file by its CID, a hash of its content. The paper's PDF is stored there, off-chain, and its asset links that CID. A changed file would get another CID, so the link always leads to the file the submitter signed, and no one can swap it unnoticed.",
-  },
 ] as const;
 
 /**
- * What comes next, in order, each with why it matters (ADR 0012's later phases, ADR 0015's
- * payment plan before mainnet, ADR 0010's second copy of each PDF). No dates.
+ * What comes after transparent human review, the next step, in order, each with why it matters
+ * (ADR 0015's payment plan before mainnet, ADR 0010's second copy of each PDF, ADR 0012's third
+ * phase). No dates.
  */
 const NEXT = [
   {
-    name: "Transparent human review",
-    status: "next",
-    why: "A machine can check what a paper reports, not whether its content holds up. Reviewers drawn at random with Chainlink VRF will score each paper, and their scores will join its rating's record, off-chain and on-chain.",
-  },
-  {
     name: "Payment, for people and AI agents",
     status: "planned",
-    why: "VeriSci pays every fee today, with caps to hold spam back. Publishing and rating will carry a fee that a person or an AI agent can pay, so the costs are covered and reviewers can be paid for their work.",
+    why: "VeriSci pays every fee today, with caps to hold spam back. Publishing and rating will carry a fee that a person or an AI agent can pay, covering the costs and the reviewers' pay.",
   },
   {
     name: "An API for AI agents",
@@ -69,11 +58,6 @@ const NEXT = [
     name: "A lasting, decentralized copy of every paper",
     status: "planned",
     why: "One pinning service holds each PDF on IPFS today. Its hash proves the file is unchanged, but only more copies keep it available, so each paper will also be stored on a decentralized storage network.",
-  },
-  {
-    name: "Mainnet",
-    status: "planned",
-    why: "Once payment and lasting storage are in place, VeriSci moves off testnets.",
   },
   {
     name: "Wet-lab replication",
@@ -134,10 +118,10 @@ export default function AboutPage() {
             OriginTrail's Decentralized Knowledge Graph (DKG) is an open network of nodes that store
             knowledge as Knowledge Assets: sets of linked statements, each with a permanent address,
             an owner and a proof on a blockchain. An asset lives in two layers that check each
-            other. The paper's content, its PDF, is stored off-chain on IPFS beside them.
+            other.
           </p>
         </div>
-        <div className="grid gap-8 md:grid-cols-3 md:gap-10">
+        <div className="grid gap-8 md:grid-cols-2 md:gap-14">
           {LAYERS.map(({ icon: Icon, line, tone, title, body }) => (
             <article key={title} className={`grid content-start gap-2 border-l-2 pl-5 ${line}`}>
               <h3 className="flex items-center gap-2 font-semibold">
@@ -147,6 +131,20 @@ export default function AboutPage() {
               <p className="max-w-[56ch] text-sm leading-relaxed text-muted">{body}</p>
             </article>
           ))}
+        </div>
+        <div className="grid gap-4 rounded-2xl border border-line p-5 sm:grid-cols-[auto_1fr] sm:gap-5 sm:p-6">
+          <span className="grid size-10 place-items-center rounded-full border border-accent/40 bg-accent-soft text-accent">
+            <FilePdf aria-hidden size={20} />
+          </span>
+          <div className="grid gap-2">
+            <h3 className="font-semibold">The paper itself, on IPFS</h3>
+            <p className="max-w-[75ch] text-sm leading-relaxed text-muted">
+              IPFS is a decentralized storage network that addresses each file by its CID, a hash of
+              its content. The paper's PDF is stored there, off-chain, and its asset links that CID.
+              A changed file would get another CID, so the link always leads to the file the
+              submitter signed, and no one can swap it unnoticed.
+            </p>
+          </div>
         </div>
       </section>
 
@@ -176,10 +174,7 @@ export default function AboutPage() {
         <p className="max-w-[65ch] text-sm leading-relaxed text-muted">
           VeriSci's node mints both kinds of asset, holds their tokens and pays their fees, so only
           VeriSci can add a version to them. The rating grows in three phases, from a machine score
-          for reproducibility readiness to wet-lab replication.{" "}
-          <Link href="/method" className="link">
-            How the score works
-          </Link>
+          for reproducibility readiness to wet-lab replication.
         </p>
       </section>
 
@@ -187,22 +182,42 @@ export default function AboutPage() {
         <h2 id="next-title" className="text-xl font-semibold tracking-tight">
           What comes next
         </h2>
-        <ol className="grid">
+        <ol className="grid gap-x-12 gap-y-8 sm:grid-cols-2">
+          <li className="glass grid gap-6 rounded-2xl p-6 sm:col-span-2 sm:p-8 lg:grid-cols-[16rem_1fr] lg:gap-12">
+            <div className="grid content-start gap-1.5">
+              <span className="w-fit rounded-md bg-surface-strong px-2 py-0.5 font-mono text-xs text-accent">
+                next
+              </span>
+              <h3 className="text-lg font-semibold">Transparent human review</h3>
+            </div>
+            <div className="grid max-w-[65ch] gap-3 text-sm leading-relaxed text-muted">
+              <p>
+                A machine can check what a paper reports, not whether its content holds up. That
+                takes people, and in traditional peer review, who reviews a paper is decided behind
+                closed doors.
+              </p>
+              <p>
+                VeriSci will draw reviewers at random with Chainlink VRF, which delivers each random
+                number with a proof checked on-chain, so no one, VeriSci included, can steer who is
+                picked, and anyone can check the draw. The reviewers' scores join the paper's rating
+                record, off-chain and on-chain.
+              </p>
+              <p>
+                Reviewers will stake to join the pool, be paid for their reviews, and lose part of
+                their stake if they review in bad faith. Those rules are still to be set.
+              </p>
+            </div>
+          </li>
           {NEXT.map(({ name, status, why }) => (
-            <li
-              key={name}
-              className="grid gap-2 border-t border-line py-4 md:grid-cols-[minmax(0,20rem)_1fr] md:gap-10"
-            >
-              <div className="grid content-start gap-1.5">
-                <span
-                  className={`w-fit rounded-md bg-surface-strong px-2 py-0.5 font-mono text-xs ${
-                    status === "next" ? "text-accent" : "text-muted"
-                  }`}
-                >
-                  {status}
-                </span>
-                <h3 className="font-medium">{name}</h3>
-              </div>
+            <li key={name} className="grid content-start gap-1.5">
+              <span
+                className={`w-fit rounded-md bg-surface-strong px-2 py-0.5 font-mono text-xs ${
+                  status === "later" ? "text-muted" : "text-ink"
+                }`}
+              >
+                {status}
+              </span>
+              <h3 className="font-medium">{name}</h3>
               <p className="max-w-[60ch] text-sm leading-relaxed text-muted">{why}</p>
             </li>
           ))}
@@ -247,8 +262,9 @@ export default function AboutPage() {
         <div className="grid content-start gap-4">
           <h2 className="text-xl font-semibold tracking-tight">On testnets for now</h2>
           <p className="max-w-[56ch] text-sm leading-relaxed text-muted">
-            Everything runs on Base Sepolia, a testnet, until a way to pay for mainnet is in place.
-            VeriSci pays the publishing fees, and a rating request costs only gas.
+            Everything runs on Base Sepolia, a testnet, until payment and a lasting copy of every
+            paper are in place; then VeriSci moves to mainnet. Until then VeriSci pays the
+            publishing fees, and a rating request costs only gas.
           </p>
         </div>
       </section>

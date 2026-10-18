@@ -21,41 +21,55 @@ import { siteUrl } from "../lib/seo/site-metadata.ts";
 import { SITE } from "../lib/site.ts";
 import { createWebEnv } from "../lib/web-env.ts";
 
-const HOW = [
+/** One step of a "How it works" flow; a live step draws in the accent, one to come in grey. */
+interface Step {
+  readonly icon: typeof Wallet;
+  readonly title: string;
+  readonly body: string;
+  readonly live: boolean;
+}
+
+const HOW: readonly Step[] = [
   {
     icon: Wallet,
     title: "Connect your wallet",
+    live: true,
     body: "Your address becomes the submitter on the record.",
   },
   {
     icon: FilePdf,
     title: "Drop your PDF",
+    live: true,
     body: "It's stored on IPFS. We read its title, authors and abstract, and check it's a life-science or health paper.",
   },
   {
     icon: PenNib,
     title: "Sign once",
+    live: true,
     body: "Signing is free and sends no transaction. We mint the record and pay its fees.",
   },
-] as const;
+];
 
-const RATE = [
+const RATE: readonly Step[] = [
   {
     icon: Robot,
     title: "Reproducibility readiness",
-    body: "An AI model reads the whole paper and checks, against the checklist for its kind of study, whether it gives what others need to check and reproduce the work. The score, from 0 to 100, goes on-chain, the answers and quotes into the rating's asset. It doesn't say whether the results hold, and it can't catch a made-up paper that states every right thing.",
+    live: true,
+    body: "An AI model checks the whole paper against the checklist for its kind of study: does it give what others need to reproduce the work? The score, from 0 to 100, goes on-chain. It doesn't say whether the results hold.",
   },
   {
     icon: UsersThree,
     title: "Human review",
-    body: "Reviewers, drawn at random with Chainlink VRF so anyone can check the draw was fair, read the paper and score it. Their score is recorded next to the first one, which stays as it was.",
+    live: false,
+    body: "Reviewers drawn at random with Chainlink VRF, so anyone can check the draw was fair, read the paper and score it. Their score is recorded next to the first one.",
   },
   {
     icon: Flask,
     title: "Wet-lab replication",
+    live: false,
     body: "A lab repeats the experiments, then reviewers check its results. That verdict is recorded as a third score, next to the first two.",
   },
-] as const;
+];
 
 /** The example UAL of the "What a paper asset holds" card, split into what each part names. */
 const UAL_PARTS = [
@@ -269,19 +283,23 @@ export default function Home() {
         </figure>
       </section>
 
-      <section className="reveal grid gap-10">
-        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">How it works</h2>
-        <div className="grid gap-16">
+      <section className="reveal grid gap-8" aria-labelledby="how-title">
+        <h2 id="how-title" className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          How it works
+        </h2>
+        <div className="grid gap-6">
           <Track
+            id="publish"
             label="Publish"
-            badge={<span className="text-accent">live</span>}
+            badge="live"
             intro="Three steps and one signature. No gas."
             steps={HOW}
           />
           <Track
+            id="rate"
             label="Rate"
-            badge={<span className="text-accent">phase 1 live</span>}
-            intro="Anyone with a wallet can ask for a rating of a published paper, from its page. The first score measures reproducibility readiness, not whether the work is right. Human review and replication come next, each with its own score on-chain, so earlier scores stay as they were."
+            badge="phase 1 live"
+            intro="Anyone with a wallet can ask for a rating of a published paper, from its page. Each phase adds its own score on-chain, and earlier scores stay as they were."
             action={
               <Link href="/papers" className="link inline-flex w-fit items-center gap-1.5 text-sm">
                 Pick a paper to rate
@@ -289,7 +307,6 @@ export default function Home() {
               </Link>
             }
             steps={RATE}
-            muted
           />
         </div>
       </section>
@@ -333,31 +350,38 @@ export default function Home() {
 }
 
 /**
- * One flow of "How it works": its name, a status, a line of context and its steps, as a
- * row joined by a line from `md` up and a vertical timeline below.
+ * One flow of "How it works", in its own panel: its name, a status, a line of context and an
+ * optional link, beside its steps from `lg` and above them below. The steps are a row joined
+ * by a line from `md` up and a vertical timeline below; a live step and the line into it draw
+ * in the accent, a step to come in grey.
  */
 function Track({
+  id,
   label,
   badge,
   intro,
   action,
   steps,
-  muted = false,
 }: {
+  id: string;
   label: string;
-  badge: React.ReactNode;
+  badge: string;
   intro: string;
   /** A link below the intro. */
   action?: React.ReactNode;
-  steps: typeof HOW | typeof RATE;
-  muted?: boolean;
+  steps: readonly Step[];
 }) {
   return (
-    <div className="grid content-start gap-5">
-      <div className="grid gap-2">
+    <article
+      aria-labelledby={`${id}-title`}
+      className="glass grid gap-8 rounded-2xl p-6 sm:p-8 lg:grid-cols-[16rem_1fr] lg:gap-12"
+    >
+      <div className="grid content-start gap-3">
         <div className="flex items-center gap-3">
-          <h3 className="text-lg font-semibold">{label}</h3>
-          <span className="rounded-md bg-surface-strong px-2 py-0.5 font-mono text-xs text-muted">
+          <h3 id={`${id}-title`} className="text-xl font-semibold">
+            {label}
+          </h3>
+          <span className="rounded-md bg-surface-strong px-2 py-0.5 font-mono text-xs text-accent">
             {badge}
           </span>
         </div>
@@ -365,35 +389,35 @@ function Track({
         {action}
       </div>
       <ol className="grid gap-7 md:grid-cols-3 md:gap-8">
-        {steps.map(({ icon: Icon, title, body }, index) => (
+        {steps.map(({ icon: Icon, title, body, live }, index) => (
           <li
             key={title}
-            className="relative grid grid-cols-[2.5rem_1fr] items-start gap-4 md:grid-cols-1"
+            className="relative grid grid-cols-[2.5rem_1fr] content-start items-start gap-4 md:grid-cols-1"
           >
             {index < steps.length - 1 && (
               <span
                 aria-hidden
-                className={`absolute top-10 bottom-[-1.75rem] left-[19px] w-px md:top-5 md:right-[-1.5rem] md:bottom-auto md:left-12 md:h-px md:w-auto ${
-                  muted ? "bg-line-strong" : "bg-accent/40"
+                className={`absolute top-10 -bottom-7 left-4.75 w-px md:top-5 md:-right-6 md:bottom-auto md:left-12 md:h-px md:w-auto ${
+                  steps[index + 1]?.live ? "bg-accent/40" : "bg-line-strong"
                 }`}
               />
             )}
             <span
               className={`relative grid size-10 place-items-center rounded-full border ${
-                muted
-                  ? "border-line-strong bg-page text-muted"
-                  : "border-accent/40 bg-accent-soft text-accent"
+                live
+                  ? "border-accent/40 bg-accent-soft text-accent"
+                  : "border-line-strong bg-page text-muted"
               }`}
             >
               <Icon size={18} />
             </span>
             <div className="pt-1.5 md:pt-0">
-              <h4 className={`font-medium ${muted ? "text-ink/80" : ""}`}>{title}</h4>
+              <h4 className={`font-medium ${live ? "" : "text-ink/80"}`}>{title}</h4>
               <p className="mt-1 max-w-[52ch] text-sm leading-relaxed text-muted">{body}</p>
             </div>
           </li>
         ))}
       </ol>
-    </div>
+    </article>
   );
 }
