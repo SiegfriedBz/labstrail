@@ -41,7 +41,7 @@ points the optional `@x402/*` packages, reached through wagmi's connectors, at
 | `/method` | How the reproducibility readiness score works: how a paper is scored, the checklist for each kind of study (`STUDY_TYPES` from `@verisci/core`, with each one's number of checks), the scorer's model (`RATING_SETTINGS.model`) and the PDF it reads from IPFS by its CID, what the score leaves out, where it is recorded (the score on Base, the answers in the rating's own Knowledge Asset), and the three phases |
 | `/about` | Why VeriSci exists (the reproducibility crisis, and AI agents that build on papers they can't weigh), the OriginTrail DKG's two layers, the paper's PDF stored off-chain on IPFS at an address hashed from its content, papers and ratings as Knowledge Assets that VeriSci's node mints and holds, what comes next (the root README's roadmap, each step with its status and why), who builds VeriSci (its maintainer, the code on GitHub, a LinkedIn profile, from `SITE`), testnets until mainnet, and how it differs from the 2020 SciFact model of the same name |
 | `/robots.txt`, `/sitemap.xml` | Production's crawling rules and every page and paper to index; elsewhere, every crawler kept out and an empty sitemap (below) |
-| `/opengraph-image`, `/papers/<cid>/opengraph-image` | The 1200 × 630 images a shared link shows: the site's, and a paper's (below) |
+| `/opengraph-image`, `/papers/<cid>/opengraph-image`, `/papers/<cid>/ratings/<request id>/opengraph-image` | The 1200 × 630 images a shared link shows: the site's, a paper's, and a rating's, which is the site's (below) |
 | `/api/inngest` | Serves the Inngest functions: the publish function and the failure alerts, plus the rating, oracle, reconciler and health functions where the oracle key is set |
 | `POST /api/webhooks/alchemy` | The Alchemy Notify webhook's deliveries: hands the raw body and `X-Alchemy-Signature` to the workflows' intake (`getWebhookIntake`) and answers its status, with an empty body: 200, 401 (bad signature), 400 (not a delivery), 503 (Inngest refused, so Alchemy Notify delivers again), or 404 where `ALCHEMY_WEBHOOK_SIGNING_KEY` is unset (`packages/workflows` README → The Alchemy Notify webhook) |
 | any other path | `app/not-found.tsx`; a page that fails to render shows `app/error.tsx` with a retry |
@@ -283,15 +283,16 @@ rules, pure and unit-tested; the pages and route files call them.
 - **`/robots.txt`** (`robotsFor`, `lib/seo/crawl.ts`): on production, every crawler may read
   everything but `/api/`, and the sitemap is named; elsewhere, `Disallow: /`.
   **`/sitemap.xml`** (`sitemapFor`): on production, the five site pages and every published
-  paper with its mint date, read from `listPapers` 50 at a time and kept for an hour; a node
-  that does not answer leaves the site pages and logs `sitemap-papers-unavailable: <reason>`
-  once. Elsewhere it lists nothing.
+  paper with its mint date, read from `listPapers` 50 at a time; a node that does not answer
+  leaves the site pages and logs `sitemap-papers-unavailable: <reason>` once. Elsewhere it
+  lists nothing. Both render on request, so a build reads no settings and asks no node
+  ([ADR 0004](../../docs/adr/0004-env-variables-per-workspace-one-root-file.md)).
 - **A paper's metadata** (`paperMetadata`, `lib/seo/page-metadata.ts`) comes from the read its
   body shares (`readProgressOnce`, React's `cache`): once published, its own title, its
   abstract cut to 155 characters (or its title and authors' count) as description, the canonical
   `/papers/<canonical CID>` whatever the address's spelling and query, and an article share
-  block with its authors and mint date. With nothing on the node and no `?event=`, it calls
-  `notFound()`: a 404 for crawlers that run no JavaScript, whose metadata blocks the response,
+  block with its authors and mint date. With nothing on the node and no publish run followed
+  (no `?event=`, or a run given up), it calls `notFound()`: a 404 for crawlers that run no JavaScript, whose metadata blocks the response,
   and the not-found page with `noindex` for browsers. Any other stage is kept out of search
   results. **A rating's** (`ratingMetadata`) is titled by its score and its paper once
   fulfilled, described by its rationale, canonical with its request id in lowercase, and kept
@@ -300,7 +301,9 @@ rules, pure and unit-tested; the pages and route files call them.
   `<` escaped, since a title comes from a PDF): the home page's `WebSite` and `Organization`
   (the GitHub repo, and its founder with a LinkedIn profile); a published paper's
   `ScholarlyArticle` (its DOI, DKG UAL and IPFS CID as identifiers, the PDF as its encoding,
-  its mint date, each author a `Person`, never the submitter's wallet) and its breadcrumb; a
+  each author a `Person`, never the submitter's wallet, and VeriSci as the publisher of this
+  record, dated by its mint, never of the paper: `sdPublisher`, `sdDatePublished`) and its
+  breadcrumb; every address in it uses the canonical CID and a lowercase request id; a
   fulfilled rating's `Review` of its paper, scored out of 100, on the paper page and, with
   its rationale and R-KA's UAL, on its own page with its breadcrumb. Never an
   `aggregateRating`.
@@ -312,9 +315,12 @@ rules, pure and unit-tested; the pages and route files call them.
   (`docs/domain.md` → Next.js). Browsers keep the streamed page and its skeleton.
 - **Share images** (`lib/seo/share-card.tsx`, drawn by `next/og` in the dark theme's colours):
   every page shares the site's card (`app/opengraph-image.tsx`: the mark, the name and
-  `SITE.definition`); a paper's link shares its own (`app/papers/[cid]/opengraph-image.tsx`:
-  its title cut to 110 characters, its authors as "A, B and C" or "A, B et al.", and its latest
-  score), or the site's card when it is not published or the node or the chain does not answer.
+  `SITE.definition`) but a paper's: a paper's link shares its own (`app/papers/[cid]/opengraph-image.tsx`, read by
+  `readPaperCard`: its title cut to 110 characters, its authors as "A, B and C" or "A, B et
+  al.", and its latest score), or the site's card when it is not published or the node or the
+  chain does not answer. A rating's link shares the site's card
+  (`app/papers/[cid]/ratings/[requestId]/opengraph-image.tsx`), since the paper's card shows
+  the paper's latest score, which need not be that rating's.
   They draw with Sora from `assets/fonts` (TTF, SIL Open Font License, `OFL.txt`), which
   `next/og` reads where it cannot read the site's WOFF2 fonts.
 - A papers list the node did not answer for, or answered unreadably, holds a `noindex`.

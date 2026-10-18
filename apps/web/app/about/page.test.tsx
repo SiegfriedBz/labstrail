@@ -74,16 +74,23 @@ describe("/about", () => {
     ]);
     expect(items[0]).toMatch(/Chainlink VRF/);
     expect(items[0]).toMatch(/no one, VeriSci included, can steer who is picked/);
-    expect(items[0]).toMatch(/stake to join the pool, be paid for their reviews/);
-    expect(items[0]).toMatch(/still to be set/);
+    expect(items[0]).toMatch(/not decided yet: reviewers stake to join the pool, are paid/);
+    expect(items[1]).toMatch(/a requester pays only their gas/);
+    expect(items[1]).toMatch(/The plan, not decided yet/);
     expect(items[3]).toMatch(/only more copies keep it available/);
   });
 
   it("says the records live on testnets until mainnet", () => {
     render(<AboutPage />);
 
-    expect(screen.getByText(/Base Sepolia/)).toBeTruthy();
-    expect(screen.getByText(/mainnet/)).toBeTruthy();
+    expect(
+      screen.getByText(
+        /Base Sepolia, a testnet, until a payment plan is in place; then VeriSci moves to mainnet/,
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/a requester pays only their gas, and VeriSci pays to publish and to rate/),
+    ).toBeTruthy();
   });
 
   it("tells VeriSci apart from the 2020 SciFact model of the same name", () => {

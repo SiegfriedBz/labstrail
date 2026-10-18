@@ -3,8 +3,11 @@ import type { MetadataRoute } from "next";
 import { sitemapFor } from "../lib/seo/crawl.ts";
 import { createWebEnv } from "../lib/web-env.ts";
 
-/** Read again at most hourly, so a crawl does not ask the node and the chain each time. */
-export const revalidate = 3600;
+/**
+ * Rendered on request, so a build reads no settings and asks no node (ADR 0004); crawlers
+ * fetch a sitemap seldom.
+ */
+export const dynamic = "force-dynamic";
 
 /** `/sitemap.xml`: the site's pages and every published paper on production (`sitemapFor`). */
 export default function sitemap(): Promise<MetadataRoute.Sitemap> {

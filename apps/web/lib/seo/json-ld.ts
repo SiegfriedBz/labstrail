@@ -1,3 +1,4 @@
+import { canonicalCid } from "@verisci/core";
 import type { PublishedRecord } from "@verisci/workflows";
 import { ipfsUrl } from "../papers/explorer.ts";
 import { SITE } from "../site.ts";
@@ -31,7 +32,12 @@ const CONTEXT = "https://schema.org";
 const HEADLINE_LENGTH = 110;
 
 const orgOf = (site: string) => ({ "@id": `${site}/#org` });
-const paperUrl = (site: string, cid: string) => `${site}/papers/${cid}`;
+/** A CID in the one spelling the paper's canonical address uses, whatever the link's. */
+const canonical = (cid: string) => canonicalCid(cid) ?? cid;
+const paperUrl = (site: string, cid: string) => `${site}/papers/${canonical(cid)}`;
+/** A rating's address, as its canonical link writes it: its request id in lowercase. */
+const ratingUrl = (site: string, cid: string, requestId: string) =>
+  `${paperUrl(site, cid)}/ratings/${requestId.toLowerCase()}`;
 const property = (propertyID: string, value: string) => ({
   "@type": "PropertyValue",
   propertyID,
@@ -75,9 +81,11 @@ export function siteJsonLd(site: string): JsonLdGraph {
 
 /**
  * A published paper's structured data: a `ScholarlyArticle` mirroring the Target KA's
- * schema.org record (ADR 0010), with its DOI, DKG UAL and IPFS CID as identifiers and the PDF
- * as its encoding, then its breadcrumb. Fields the record lacks are left out, never empty;
- * the submitter's wallet is never an author (ADR 0040).
+ * schema.org record (ADR 0010), with its DOI, DKG UAL and IPFS CID (in its canonical
+ * spelling) as identifiers and the PDF as its encoding, then its breadcrumb. VeriSci is named
+ * as the publisher of this record (`sdPublisher`, dated by its mint, `sdDatePublished`), never
+ * of the paper, whose journal and date the record does not hold. Fields the record lacks are
+ * left out, never empty; the submitter's wallet is never an author (ADR 0040).
  */
 export function paperJsonLd(
   site: string,
@@ -86,6 +94,7 @@ export function paperJsonLd(
   record: PublishedRecord,
 ): JsonLdGraph {
   const url = paperUrl(site, cid);
+  const id = canonical(cid);
   const article: JsonLdNode = {
     "@type": "ScholarlyArticle",
     "@id": `${url}#paper`,
@@ -97,20 +106,20 @@ export function paperJsonLd(
     ...(record.authors.length > 0
       ? { author: record.authors.map((name) => ({ "@type": "Person", name })) }
       : {}),
-    ...(record.publishedAt ? { datePublished: record.publishedAt } : {}),
+    ...(record.publishedAt ? { sdDatePublished: record.publishedAt } : {}),
     ...(record.doi ? { sameAs: `https://doi.org/${record.doi}` } : {}),
     identifier: [
       ...(record.doi ? [property("DOI", record.doi)] : []),
       property("DKG UAL", ual),
-      property("IPFS CID", cid),
+      property("IPFS CID", id),
     ],
     encoding: {
       "@type": "MediaObject",
-      contentUrl: ipfsUrl(cid),
+      contentUrl: ipfsUrl(id),
       encodingFormat: "application/pdf",
     },
     isAccessibleForFree: true,
-    publisher: orgOf(site),
+    sdPublisher: orgOf(site),
   };
   return {
     "@context": CONTEXT,
@@ -130,7 +139,7 @@ export function paperJsonLd(
  * score per rating: never an `aggregateRating`, never a `ClaimReview` (ADR 0040).
  */
 export function reviewJsonLd(site: string, cid: string, rating: ReviewFacts): JsonLdNode {
-  const url = `${paperUrl(site, cid)}/ratings/${rating.requestId}`;
+  const url = ratingUrl(site, cid, rating.requestId);
   return {
     "@context": CONTEXT,
     "@type": "Review",
@@ -165,7 +174,7 @@ export function ratingPageJsonLd(
       breadcrumbJsonLd([
         { name: "Papers", url: `${site}/papers` },
         { name: paperTitle, url: paper },
-        { name: "Rating", url: `${paper}/ratings/${rating.requestId}` },
+        { name: "Rating", url: ratingUrl(site, cid, rating.requestId) },
       ]),
     ],
   };

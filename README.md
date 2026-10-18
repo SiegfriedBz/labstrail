@@ -35,8 +35,8 @@ requests one from the visitor's wallet, each rating has a page that follows it t
 and then shows every check and quote behind it, and the papers list shows each paper's
 score. Deployed, a webhook starts each rating and a cron restarts a stuck one. The repo, its packages and the EIP-712 domain keep the lowercase name `verisci`.
 Everything runs on testnets. Production is open to search engines and AI search: each paper
-and rating has its own title, structured data and share image, and `/method` explains the
-score ([`apps/web` → Search engines and AI search](apps/web/README.md#search-engines-and-ai-search),
+and rating has its own title and structured data, each paper its own share image, and
+`/method` explains the score ([`apps/web` → Search engines and AI search](apps/web/README.md#search-engines-and-ai-search),
 [ADR 0040](docs/adr/0040-production-is-open-to-crawlers.md)).
 
 ## How it works
@@ -103,27 +103,29 @@ Terms:
 
 ## Roadmap
 
-In order, without dates. Where a step's decision is already taken, its ADR is linked.
+In order, without dates. An ADR link marks what is decided; the rest is planned, and each
+plan records its decisions in an ADR.
 
 1. **Transparent human review (phase 2, next).** The machine score checks what a paper
    reports, not whether its content holds up, and in traditional peer review the choice of
    reviewers is opaque. Reviewers are drawn at random with Chainlink VRF, whose proof is
    checked on chain, so no one can steer the draw and anyone can audit it. They score the
-   paper; the oracle records their score on the contract and the node adds it to the R-KA
-   ([ADR 0012](docs/adr/0012-three-phases-settled-by-the-oracle.md)). Reviewers will stake
-   to join the pool, be paid for their reviews and lose part of their stake for reviews in
-   bad faith; those rules are still to be set.
-2. **Payment, for people and AI agents.** VeriSci pays every fee today, bounded by a cap
-   and a throttle, until a payment plan replaces that before mainnet
-   ([ADR 0015](docs/adr/0015-rating-requests-are-free-on-testnet.md)). Publishing and
-   rating will each carry a fee that a person or an agent can pay, so the costs are
-   covered and reviewers can be paid for their work.
+   paper; our DKG node writes their score into the R-KA, then the oracle records it on the
+   contract ([ADR 0012](docs/adr/0012-three-phases-settled-by-the-oracle.md)). Planned, not
+   decided yet: reviewers stake to join the pool, are paid for their reviews and lose part
+   of their stake for reviews in bad faith.
+2. **Payment, for people and AI agents.** Today a requester pays only their gas and VeriSci
+   pays the rest, bounded by a cap and a throttle; a payment plan replaces that before
+   mainnet ([ADR 0015](docs/adr/0015-rating-requests-are-free-on-testnet.md)). Planned, not
+   decided yet: publishing and rating each carry a fee that a person or an agent can pay,
+   covering the costs and the reviewers' pay.
 3. **An API for AI agents**, to read papers and ratings and to request ratings without the
    web app.
 4. **A lasting, decentralized copy of every PDF.** Pinata holds the only copy today
    ([ADR 0010](docs/adr/0010-pdf-to-target-ka-pipeline.md)): the CID proves a file is
-   unchanged but does not keep it available.
-5. **Mainnet**, once payment and lasting storage are in place.
+   unchanged but does not keep it available. Planned before mainnet.
+5. **Mainnet**, after the payment plan
+   ([ADR 0015](docs/adr/0015-rating-requests-are-free-on-testnet.md)).
 6. **Wet-lab replication (phase 3).** A lab repeats the experiments, and a second round of
    human review checks its results before the oracle scores them.
 

@@ -23,7 +23,7 @@ const STAGE_TITLES: Record<Exclude<PaperView["stage"], "not-found">, string> = {
  * address's spelling and query. A published paper with its record is titled after itself,
  * described by its abstract (or, without one, its title and authors' count), and shared as an
  * article with its authors and mint date. `not-found` when the node has no such paper and no
- * run is followed, for the page to answer 404. Any other stage, or a record the node did not
+ * publish run is followed (none given, or one given up), for the page to answer 404. Any other stage, or a record the node did not
  * answer for, is kept out of search results.
  */
 export function paperMetadata(cid: string, view: PaperView): Metadata | "not-found" {

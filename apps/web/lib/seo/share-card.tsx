@@ -1,4 +1,9 @@
-import { type PublishedRecord, type RatingListResult, summariseRatings } from "@verisci/workflows";
+import {
+  describeFailure,
+  type PublishedRecord,
+  type RatingListResult,
+  summariseRatings,
+} from "@verisci/workflows";
 import type { PaperView } from "../publish/upload-actions.ts";
 import { SITE } from "../site.ts";
 import { clip } from "./clip.ts";
@@ -40,7 +45,7 @@ export function paperCard(record: PublishedRecord, score: number | undefined): P
 }
 
 /**
- * The card a paper's link shares (ADR 0040): a published paper with its record, its score
+ * The card a paper's link shares: a published paper with its record, its score
  * from its latest fulfilled rating (none while unrated, or where no contract takes ratings:
  * `ratings` undefined). `undefined`, for the site's card, when the paper is not published,
  * its record was not given, or the chain did not answer for its ratings.
@@ -54,6 +59,34 @@ export function paperCardFor(
   if (!ratings.ok) return undefined;
   const summary = summariseRatings(ratings.ratings);
   return paperCard(view.record, summary.kind === "scored" ? summary.score : undefined);
+}
+
+/** What {@link readPaperCard} reads with. */
+export interface PaperCardReads {
+  /** The paper's stage and record (`readProgress`). */
+  readView(cid: string): Promise<PaperView>;
+  /** Its ratings, or `undefined` where no contract takes ratings. */
+  listRatings(ual: string): Promise<RatingListResult | undefined>;
+  logger: Pick<Console, "warn">;
+}
+
+/**
+ * A paper's card from the node and the chain ({@link paperCardFor}), or `undefined` for the
+ * site's card. A read that throws is logged (`share-card-unavailable: <reason>`), never shown:
+ * a shared link always gets an image.
+ */
+export async function readPaperCard(
+  cid: string,
+  reads: PaperCardReads,
+): Promise<PaperCard | undefined> {
+  try {
+    const view = await reads.readView(cid);
+    if (view.stage !== "published") return undefined;
+    return paperCardFor(view, await reads.listRatings(view.ual));
+  } catch (error) {
+    reads.logger.warn(`share-card-unavailable: ${describeFailure(error)}`);
+    return undefined;
+  }
 }
 
 /**

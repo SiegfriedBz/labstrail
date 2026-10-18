@@ -47,7 +47,7 @@ const NEXT = [
   {
     name: "Payment, for people and AI agents",
     status: "planned",
-    why: "VeriSci pays every fee today, with caps to hold spam back. Publishing and rating will carry a fee that a person or an AI agent can pay, covering the costs and the reviewers' pay.",
+    why: "Today a requester pays only their gas, VeriSci pays the rest, and caps hold spam back. The plan, not decided yet: a fee on publishing and on rating that a person or an AI agent can pay, covering the costs and the reviewers' pay.",
   },
   {
     name: "An API for AI agents",
@@ -57,7 +57,7 @@ const NEXT = [
   {
     name: "A lasting, decentralized copy of every paper",
     status: "planned",
-    why: "One pinning service holds each PDF on IPFS today. Its hash proves the file is unchanged, but only more copies keep it available, so each paper will also be stored on a decentralized storage network.",
+    why: "One pinning service holds each PDF on IPFS today. Its hash proves the file is unchanged, but only more copies keep it available, so the plan is to store each paper on a decentralized storage network too, before mainnet.",
   },
   {
     name: "Wet-lab replication",
@@ -203,8 +203,8 @@ export default function AboutPage() {
                 record, off-chain and on-chain.
               </p>
               <p>
-                Reviewers will stake to join the pool, be paid for their reviews, and lose part of
-                their stake if they review in bad faith. Those rules are still to be set.
+                The plan, not decided yet: reviewers stake to join the pool, are paid for their
+                reviews, and lose part of their stake if they review in bad faith.
               </p>
             </div>
           </li>
@@ -262,9 +262,9 @@ export default function AboutPage() {
         <div className="grid content-start gap-4">
           <h2 className="text-xl font-semibold tracking-tight">On testnets for now</h2>
           <p className="max-w-[56ch] text-sm leading-relaxed text-muted">
-            Everything runs on Base Sepolia, a testnet, until payment and a lasting copy of every
-            paper are in place; then VeriSci moves to mainnet. Until then VeriSci pays the
-            publishing fees, and a rating request costs only gas.
+            Everything runs on Base Sepolia, a testnet, until a payment plan is in place; then
+            VeriSci moves to mainnet. Until then a requester pays only their gas, and VeriSci pays
+            to publish and to rate.
           </p>
         </div>
       </section>

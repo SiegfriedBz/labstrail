@@ -1,3 +1,4 @@
+import { canonicalCid } from "@verisci/core";
 import type { PublishedRecord } from "@verisci/workflows";
 import { describe, expect, it } from "vitest";
 import {
@@ -82,7 +83,7 @@ describe("paperJsonLd", () => {
             { "@type": "Person", name: "Di Liu" },
             { "@type": "Person", name: "Yuting Xiao" },
           ],
-          datePublished: "2026-10-17T08:42:01.123Z",
+          sdDatePublished: "2026-10-17T08:42:01.123Z",
           sameAs: "https://doi.org/10.1016/j.xgen.2026.101332",
           identifier: [
             { "@type": "PropertyValue", propertyID: "DOI", value: "10.1016/j.xgen.2026.101332" },
@@ -95,7 +96,7 @@ describe("paperJsonLd", () => {
             encodingFormat: "application/pdf",
           },
           isAccessibleForFree: true,
-          publisher: { "@id": `${SITE}/#org` },
+          sdPublisher: { "@id": `${SITE}/#org` },
         },
         {
           "@type": "BreadcrumbList",
@@ -115,12 +116,35 @@ describe("paperJsonLd", () => {
 
     expect(article).not.toHaveProperty("abstract");
     expect(article).not.toHaveProperty("sameAs");
-    expect(article).not.toHaveProperty("datePublished");
+    expect(article).not.toHaveProperty("sdDatePublished");
     expect(article).not.toHaveProperty("author");
     expect(article?.identifier).toEqual([
       { "@type": "PropertyValue", propertyID: "DKG UAL", value: UAL },
       { "@type": "PropertyValue", propertyID: "IPFS CID", value: CID },
     ]);
+  });
+
+  it("names VeriSci as the publisher of this record, never of the paper", () => {
+    const [article] = paperJsonLd(SITE, CID, UAL, record)["@graph"];
+
+    expect(article).not.toHaveProperty("publisher");
+    expect(article).not.toHaveProperty("datePublished");
+    expect(article).toMatchObject({
+      sdPublisher: { "@id": `${SITE}/#org` },
+      sdDatePublished: record.publishedAt,
+    });
+  });
+
+  it("writes the paper's addresses with its canonical CID, whatever the link's spelling", () => {
+    const v0 = "QmeuWS7yCDk5yJEY1JC3zsp1WQeArgyU1Q4shjP7njFBcn";
+    const v1 = canonicalCid(v0);
+
+    const data = JSON.stringify(paperJsonLd(SITE, v0, UAL, record));
+
+    expect(v1).toMatch(/^bafy/);
+    expect(data).not.toContain(v0);
+    expect(data).toContain(`${SITE}/papers/${v1}#paper`);
+    expect(data).toContain(`"value":"${v1}"`);
   });
 
   it("never names the submitter's wallet as an author", () => {
@@ -156,6 +180,12 @@ describe("reviewJsonLd", () => {
         worstRating: 0,
       },
     });
+  });
+
+  it("writes the rating's address as its canonical link does, request id in lowercase", () => {
+    const review = reviewJsonLd(SITE, CID, { requestId: `0x${"AB".repeat(32)}`, score: 72 });
+
+    expect(review.url).toBe(`${PAPER}/ratings/${REQUEST}`);
   });
 
   it("adds the rationale and the R-KA's UAL when the rating page has them", () => {

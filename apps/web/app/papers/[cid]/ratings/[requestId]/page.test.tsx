@@ -11,6 +11,13 @@ let userAgent: string | null =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
 const readRatingOnce = vi.fn<(requestId: string) => Promise<RatingView>>();
 const readProgressOnce = vi.fn<(cid: string) => Promise<PaperView>>();
+const getRatingService = vi.fn(() => ({}));
+const LOCAL_CHAIN = {
+  chainId: 31337,
+  contract: "0x5fbdb2315678afecb367f032d93f642f64180aa3",
+  local: true,
+};
+let chain: typeof LOCAL_CHAIN | undefined = LOCAL_CHAIN;
 
 vi.mock("next/server", () => ({ connection: async () => {} }));
 vi.mock("next/headers", () => ({
@@ -22,9 +29,11 @@ vi.mock("next/navigation", () => ({
   },
 }));
 vi.mock("@verisci/workflows", () => ({
-  getRatingService: () => ({}),
+  getRatingService: () => getRatingService(),
   getUploadService: () => ({}),
 }));
+vi.mock("../../../../../lib/web-env.ts", () => ({ createWebEnv: () => ({ APP_ENV: "local" }) }));
+vi.mock("../../../../../lib/rating/chain.ts", () => ({ ratingChainConfig: () => chain }));
 vi.mock("../../../../../lib/rating/stage.ts", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../../../lib/rating/stage.ts")>()),
   readRatingOnce: (requestId: string) => readRatingOnce(requestId),
@@ -49,6 +58,8 @@ const page = (requestId = REQUEST_ID, search: Record<string, string> = {}) =>
 describe("/papers/[cid]/ratings/[requestId]", () => {
   afterEach(() => {
     cleanup();
+    chain = LOCAL_CHAIN;
+    getRatingService.mockClear();
     userAgent =
       "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
   });
@@ -144,6 +155,15 @@ describe("/papers/[cid]/ratings/[requestId] metadata", () => {
     expect(
       await generateMetadata({ params: Promise.resolve({ cid: CID, requestId: "7" }) }),
     ).toMatchObject({ robots: { index: false } });
+    expect(readRatingOnce).not.toHaveBeenCalled();
+  });
+
+  it("reads nothing for its metadata where no contract takes ratings, and stays out of search", async () => {
+    chain = undefined;
+    readRatingOnce.mockClear();
+
+    expect(await metadata()).toEqual({ title: "Rating", robots: { index: false } });
+    expect(getRatingService).not.toHaveBeenCalled();
     expect(readRatingOnce).not.toHaveBeenCalled();
   });
 });

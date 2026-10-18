@@ -1,9 +1,9 @@
 import { cleanup, render } from "@testing-library/react";
 import type { PublishedRecord, RatingListResult } from "@verisci/workflows";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PaperView } from "../publish/upload-actions.ts";
 import { SITE } from "../site.ts";
-import { paperCard, paperCardFor, SHARE_SIZE, ShareCard } from "./share-card.tsx";
+import { paperCard, paperCardFor, readPaperCard, SHARE_SIZE, ShareCard } from "./share-card.tsx";
 
 const CID = "bafybeias652m2pfpmuaeze4dxmtcjvfwvr7dsteumagdd2vwaqrbkjokxu";
 const UAL = "did:dkg:base:84532/0xd701ed157232ad5e14bc4134a8d10d64d86f13b3/6";
@@ -94,6 +94,57 @@ describe("paperCardFor", () => {
       expect(paperCardFor(view, ratings)).toBeUndefined();
     },
   );
+});
+
+describe("readPaperCard", () => {
+  const reads = (overrides: Partial<Parameters<typeof readPaperCard>[1]> = {}) => ({
+    readView: async () => published,
+    listRatings: async () => rated(72),
+    logger: { warn: vi.fn() },
+    ...overrides,
+  });
+
+  it("reads a published paper and its ratings into its card", async () => {
+    const listRatings = vi.fn(async () => rated(72));
+
+    expect(await readPaperCard(CID, reads({ listRatings }))).toMatchObject({ score: "72" });
+    expect(listRatings).toHaveBeenCalledWith(UAL);
+  });
+
+  it("draws the card without a score where no contract takes ratings", async () => {
+    expect(await readPaperCard(CID, reads({ listRatings: async () => undefined }))).toEqual(
+      paperCard(record, undefined),
+    );
+  });
+
+  it("leaves a paper on its way to the site's card, without asking the chain", async () => {
+    const listRatings = vi.fn(async () => rated(72));
+
+    expect(
+      await readPaperCard(
+        CID,
+        reads({ readView: async () => ({ stage: "minting" }), listRatings }),
+      ),
+    ).toBeUndefined();
+    expect(listRatings).not.toHaveBeenCalled();
+  });
+
+  it("logs a read that throws and leaves the link the site's card", async () => {
+    const logger = { warn: vi.fn() };
+
+    const card = await readPaperCard(
+      CID,
+      reads({
+        readView: async () => {
+          throw new Error("node down");
+        },
+        logger,
+      }),
+    );
+
+    expect(card).toBeUndefined();
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringMatching(/^share-card-unavailable: /));
+  });
 });
 
 describe("ShareCard", () => {
