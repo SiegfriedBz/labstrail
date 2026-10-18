@@ -17,7 +17,7 @@ Pure domain logic. See `README.md` here.
   `parseFieldAnswer`).
 - **Layout:** source sits in feature folders: `assets/` (UALs, asset and graph names, CIDs,
   chains, OriginTrail's contracts: what every feature addresses), `publish/` (the signed
-  submission, the TEI header, the Target KA, the field check), `papers/` (a published record and the list),
+  submission, the TEI header, the title's completion, the Target KA, the field check), `papers/` (a published record and the list),
   `rating/` (the paper's text, checklists, scorer, R-KA); `fixtures/` holds test data. Only
   `index.ts`, which exports everything, sits at the root. A feature may import from
   another's folder (papers and rating build on the Target KA's predicates in `publish/`,

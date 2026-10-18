@@ -51,6 +51,8 @@ export function failureMessage(reason: PublishFailure | undefined): string {
       return "We couldn't read your PDF: the IPFS gateway or our paper reader didn't answer, even after several tries. Publish the same PDF again in a few minutes.";
     case "node-unreachable":
       return "VeriSci's DKG node didn't answer, even after several tries. Publish the same PDF again in a few minutes: it picks up where it stopped.";
+    case "network-refused":
+      return "OriginTrail's network didn't accept the record yet, even after several tries. Publish the same PDF again later: it picks up where it stopped.";
     case "mint-not-confirmed":
       return "The mint on Base wasn't confirmed in time. Publish the same PDF again: if it was minted meanwhile, the page shows it.";
     case "setup":

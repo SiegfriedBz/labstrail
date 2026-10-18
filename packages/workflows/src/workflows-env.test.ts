@@ -116,6 +116,36 @@ describe("createWorkflowsEnv", () => {
     expect(String((caught as EnvError).message)).not.toContain("leaked token");
   });
 
+  it("requires the Telegram bot and chat on production, naming each (ADR 0038)", () => {
+    const production = {
+      ...runtimeEnv,
+      APP_ENV: "production",
+      DKG_CONTEXT_GRAPH: `${runtimeEnv.DKG_CONTEXT_GRAPH.split("/")[0]}/verisci-prod`,
+    };
+    let caught: unknown;
+    try {
+      createWorkflowsEnv(production);
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(EnvError);
+    expect((caught as EnvError).issues.map((issue) => issue.variable).sort()).toEqual([
+      "TELEGRAM_BOT_TOKEN",
+      "TELEGRAM_CHAT_ID",
+    ]);
+    expect(
+      createWorkflowsEnv({
+        ...production,
+        TELEGRAM_BOT_TOKEN: "123456:AAH-secret_token",
+        TELEGRAM_CHAT_ID: "-1001234567",
+      }).TELEGRAM_CHAT_ID,
+    ).toBe("-1001234567");
+    expect(
+      createWorkflowsEnv({ ...runtimeEnv, APP_ENV: "local" }).TELEGRAM_CHAT_ID,
+    ).toBeUndefined();
+  });
+
   it("requires the Pinata key", () => {
     expect(() => createWorkflowsEnv({ ...runtimeEnv, PINATA_JWT: "" })).toThrow(EnvError);
   });

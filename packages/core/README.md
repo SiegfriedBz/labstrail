@@ -47,6 +47,7 @@ so an import of another `@verisci/*` package fails to typecheck.
 | `MAX_PDF_BYTES` | The largest PDF verisci publishes and rates, 15 MB: read by the upload page, the publish run and the rating run |
 | `parseTeiHeader(xml)` | A paper's `PaperMetadata` (title, authors, abstract, DOI) from GROBID's TEI header, or `not-tei` or `no-title`; returns a result for every input |
 | `PaperMetadata`, `TeiResult` | The metadata read from a TEI header, and the result of `parseTeiHeader` |
+| `completeTitle(grobid, stored)` | GROBID's title, or the title the PDF stores in its metadata when that one completes it (below) |
 | `fieldCheckPrompt(paper)`, `FieldCheckInput`, `FIELD_OUTPUT_SCHEMA` | The field check, which the publish run makes for a new paper and the rating run before scoring: the system and user text for a paper's title, abstract and opening (an absent abstract or an empty opening leaves out its label), and the JSON Schema its answer must match |
 | `parseFieldAnswer(text)` | The field check's answer checked: a known field and a reason that is not empty, cut at a word to 300 characters, or `{ ok: false }` |
 | `FIELD_RULE` | The sentence that defines VeriSci's field ([ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)), in both the field check's and the scorer's prompt |
@@ -133,6 +134,16 @@ A Target KA describes a paper and who submitted it
   as GROBID gives them: papers also write `´` as an apostrophe or a prime (`Alzheimer´s`,
   `3´ UTR`). A header with no title is refused, and so is XML with any parse error
   (`not-tei`), without printing anything.
+- **The title** is GROBID's, completed by `completeTitle` from the title the PDF stores in its
+  own metadata, since GROBID's header model can drop a title's first words (`docs/domain.md` →
+  GROBID): the stored title, its whitespace collapsed, replaces GROBID's only when it is
+  longer, at most 300 characters, and ends with GROBID's title at a word's start, ignoring
+  case, whitespace and a final full stop. Words before it holding a spaced dash or a bar, or
+  ending in an en or em dash (`Cell Genomics - <title>`, `Cell Genomics—<title>`), are a
+  journal's or a site's name and leave GROBID's, cut or whole, as does a file name, a
+  journal's name or another paper's title stored on its own; a colon, a full stop or a dash
+  between two words still completes it (`Neuroprotection: <title>`, `E. coli …`,
+  `Dose–response …`, `Long-term …`).
 - **Triples:** the subject is `urn:verisci:paper:<cid>`, typed `schema:ScholarlyArticle`,
   with `schema:name`, `schema:url` (`ipfs://<cid>`), `schema:abstract`, `schema:sameAs`
   (`https://doi.org/<doi>`), and one `schema:author` node per author,

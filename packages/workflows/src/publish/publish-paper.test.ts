@@ -299,6 +299,35 @@ describe("runPublish", () => {
     expect(log.filter((entry) => entry.startsWith("sleep retry-"))).toHaveLength(4);
   });
 
+  it("fails network-refused when the network declines every attempt's mint", async () => {
+    const { run, dkg } = await publish({
+      reads: [stored],
+      mints: [{ ok: false, reason: "retry-later" }],
+    });
+
+    await expect(run).rejects.toThrow(/^publish-failed:network-refused: /);
+    expect(dkg.startMint).toHaveBeenCalledTimes(PUBLISH_SETTINGS.attempts);
+  });
+
+  it("still fails node-unreachable when the node never answers the mint", async () => {
+    const { run } = await publish({
+      reads: [stored],
+      mints: [{ ok: false, reason: "unreachable" }],
+    });
+
+    await expect(run).rejects.toThrow(/^publish-failed:node-unreachable: /);
+  });
+
+  it("fails with the last attempt's reason when the mint's failures change", async () => {
+    const declined: MintResult = { ok: false, reason: "retry-later" };
+    const { run } = await publish({
+      reads: [stored],
+      mints: [declined, declined, declined, declined, { ok: false, reason: "unreachable" }],
+    });
+
+    await expect(run).rejects.toThrow(/^publish-failed:node-unreachable: /);
+  });
+
   it.each(["malformed", "bad-cid", "wrong-graph", "expired", "bad-signature"] as const)(
     "ends refused on a %s submission, with nothing fetched or stored",
     async (reason) => {
@@ -564,6 +593,9 @@ describe("publishFailureReason", () => {
     expect(publishFailureReason({ error })).toBe("node-unreachable");
     expect(publishFailureReason(JSON.stringify([{ op: "StepFailed", error }]))).toBe(
       "node-unreachable",
+    );
+    expect(publishFailureReason({ message: "publish-failed:network-refused: x" })).toBe(
+      "network-refused",
     );
   });
 

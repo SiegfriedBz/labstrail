@@ -1,10 +1,10 @@
 import { type Chain, createPublicClient, http } from "viem";
 
 /**
- * How the site's pages read the chain. Alchemy RPC's free tier serves 500 compute units a
- * second, about 19 `eth_call`s (`docs/domain.md` → Chain), and a page of papers reads each
- * paper of every contract at once, so the contract reads made together go out as one
- * Multicall3 call.
+ * How the site's pages read the chain. A page of papers reads each paper of every contract at
+ * once, a burst RPC endpoints refuse (Base's public endpoint; Alchemy RPC's free tier, about
+ * 19 `eth_call`s a second, `docs/domain.md` → Chain), so the contract reads made together go
+ * out as one Multicall3 call.
  */
 export const SITE_CHAIN_SETTINGS = {
   /** How long one call gets. */

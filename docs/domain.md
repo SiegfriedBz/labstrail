@@ -151,7 +151,18 @@ edge`, testnet), Base Sepolia.
 - **Mint time varies from about 5 s to over 300 s** (13 to 17 s in the spike, 2026-10-09).
   A mint can also fail fast on quorum (`storage_ack_insufficient`,
   `CORE_TEMPORARILY_UNAVAILABLE`); retrying after a couple of minutes usually works
-  ([ADR 0009](adr/0009-retries-are-spaced-with-step-sleep.md)).
+  ([ADR 0009](adr/0009-retries-are-spaced-with-step-sleep.md)). The DKG client answers it
+  `retry-later`, and a publish run whose last attempt meets it stops `network-refused`.
+- **A new context graph waits for the cores' activation slots** (production's
+  `verisci-prod`, 2026-10-18): the cores declined the mint of every attempt of its first
+  publish run (`storage_ack_insufficient`, `CORE_TEMPORARILY_UNAVAILABLE … not active yet
+  (activationCap)`). Read in the daemon's source (10.0.22, `dkg-agent-lifecycle.js`,
+  `dkg-agent-vm-promotion.js`): a core activates at most 64 subscriptions to graphs it does
+  not host when it starts (`maxRehydratedContextGraphSubscriptions`), keeps the rest dormant,
+  and fills freed slots every 30 s; for 10 minutes after its first decline it answers
+  "temporarily unavailable" and asks its activator for a slot, then calls the subscription
+  dormant. Publishing the same PDF again later picks up where it stopped. Not yet known: how
+  long `verisci-prod` waits.
 - **The daemon has a single admin token:** one bearer token in `~/.dkg/auth.token`
   (written by `dkg init` on 10.0.16; on 10.0.22, 2026-10-09, by the first `dkg start`,
   with the agent key), valid for every graph on the node; there are no tokens scoped per
@@ -329,6 +340,14 @@ Observed on `lfoppiano/grobid:0.9.1-crf`, 2026-10-09, except where a fact cites 
   listed "Google Brain" and "Google Research" among the ten authors, and found no DOI
   (the arXiv PDF prints none). A Target KA carries what GROBID read
   ([ADR 0010](adr/0010-pdf-to-target-ka-pipeline.md)).
+- **The header model can drop a title's first words** (2026-10-17): it read "PUS7 mRNA
+  pseudouridylation is driven by RNA sequence, structure, and cell-type-specific features"
+  (Cell Genomics, 2026, whose first page prints the title on two lines) as "by RNA sequence,
+  structure, and cell-type-specific features". The publisher's PDF stores the whole title in
+  its own metadata, in its info dictionary's `Title` and its XMP `dc:title`, so the publish run
+  completes GROBID's title from it (`completeTitle`, `packages/core` → Target KAs). The paper
+  published on staging that day keeps the cut title
+  ([ADR 0010](adr/0010-pdf-to-target-ka-pipeline.md)).
 - **The header can give an accent apart from its letter** (2026-10-12): a cohort study's TEI
   listed "Montserrat Rodrı ´guez-Ayala" and "Bele ´n Moreno-Franco", the accent as a spacing
   `´` (U+00B4) after its letter, often after a space, and the `i` as a dotless `ı` (U+0131), the
@@ -421,12 +440,17 @@ Observed on Base Sepolia (chain id 84532) with Alchemy RPC and the Alchemy Notif
   request ids are bound to their content ([ADR 0016](adr/0016-asset-names-derive-from-request-id.md)).
 - **The free RPC tier caps `eth_getLogs` at 10 blocks,** so nothing may depend on scanning
   history; read current contract state instead ([ADR 0020](adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
+- **Vercel's `CHAIN_RPC_URL` was Base's public endpoint (`https://sepolia.base.org`) until
+  2026-10-18,** when the Alchemy RPC URL replaced it
+  ([ADR 0005](adr/0005-staging-and-production-are-isolated.md) names one Alchemy RPC URL).
+  Base calls its public endpoints rate-limited and not for production, and publishes no limit.
+  On 2026-10-17 the papers list, reading 10 papers on staging's 3 contracts at once (about 30
+  `eth_call`s, each its own request, tried once), showed a rated paper as "Not checked" after
+  a redeploy and on hard refreshes, and its score on a later load: the public endpoint
+  refusing the burst.
 - **Alchemy RPC's free tier serves 500 compute units a second, and an `eth_call` costs 26**
   (Alchemy's pricing and compute-unit pages, read 2026-10-17): about 19 calls a second, past
-  which it answers 429. On 2026-10-17 the papers list, reading 10 papers on staging's 3
-  contracts at once (about 30 `eth_call`s, each its own request, tried once), showed a rated
-  paper as "Not checked" after a redeploy and on hard refreshes, and its score on a later load,
-  which fits that limit. The site's pages now send the contract reads made together as one
+  which it answers 429, so the same burst would cross it too. The site's pages now send the contract reads made together as one
   Multicall3 call (`0xcA11bde05977b3631167028862bE2a173976CA11` on Base Sepolia, in viem's
   chain definition), one `eth_call` per round of reads, three for the papers list (the counts,
   the ids, the requests), and ask a failed call once more a second later. A smart wallet's
@@ -502,9 +526,13 @@ Observed on Vercel Hobby with Inngest Cloud, except where a fact cites the vendo
 - **Turborepo warns on Vercel that the project's variables are missing from `turbo.json`
   and "WILL NOT be available"** (2026-10-17): that holds for the build alone, which needs only
   `APP_ENV` (`globalEnv`); the functions read every variable from Vercel when they run.
-- **MetaMask warns on a new `*.vercel.app` domain** (2026-10-17): "This site shows signs of
-  phishing or wallet-draining activity", on `develop`'s branch URL, before connecting.
-  MetaMask's `eth-phishing-detect` list takes false-positive reports.
+- **MetaMask warns on a new `*.vercel.app` domain,** in two ways. On `develop`'s branch URL
+  (2026-10-17), a full page before connecting: "This site shows signs of phishing or
+  wallet-draining activity", from MetaMask's `eth-phishing-detect` blocklist, which takes
+  false-positive reports as GitHub issues. On production's `verisci.vercel.app` (2026-10-18),
+  a warning on every signature and transaction that the request may be a scam, from Blockaid's
+  security alerts, reported from the alert itself (See details → Report an issue). Reown's
+  allowed domains affect neither.
 - **Upstash's free plan allows one database** (2026-10-17), so staging and production share
   it, each counter named after its environment ([ADR 0005](adr/0005-staging-and-production-are-isolated.md)).
 - **A run past its time budget is cancelled, not failed** (Inngest docs, system events): Inngest

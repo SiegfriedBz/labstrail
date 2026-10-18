@@ -60,6 +60,7 @@ export {
   VERISCI_NS,
 } from "./publish/target-ka.ts";
 export { type PaperMetadata, parseTeiHeader, type TeiResult } from "./publish/tei.ts";
+export { completeTitle } from "./publish/title.ts";
 export {
   CHECKS,
   type Check,

@@ -20,6 +20,8 @@ const workflows = {
   GEMINI_API_KEY: "secret-gemini",
   INNGEST_EVENT_KEY: "secret-event-key",
   INNGEST_SIGNING_KEY: "signkey-test-0123",
+  TELEGRAM_BOT_TOKEN: "123456:AAH-secret_token",
+  TELEGRAM_CHAT_ID: "-1001234567",
 };
 const PUBLISHER = "0xD701ed157232ad5E14BC4134a8D10D64D86f13B3";
 const rating = { ...workflows, ORACLE_PRIVATE_KEY: ORACLE_KEY, PUBLISHER_ADDRESSES: PUBLISHER };
