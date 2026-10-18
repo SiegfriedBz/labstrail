@@ -340,6 +340,14 @@ Observed on `lfoppiano/grobid:0.9.1-crf`, 2026-10-09, except where a fact cites 
   listed "Google Brain" and "Google Research" among the ten authors, and found no DOI
   (the arXiv PDF prints none). A Target KA carries what GROBID read
   ([ADR 0010](adr/0010-pdf-to-target-ka-pipeline.md)).
+- **The header model can drop a title's first words** (2026-10-17): it read "PUS7 mRNA
+  pseudouridylation is driven by RNA sequence, structure, and cell-type-specific features"
+  (Cell Genomics, 2026, whose first page prints the title on two lines) as "by RNA sequence,
+  structure, and cell-type-specific features". The publisher's PDF stores the whole title in
+  its own metadata, in its info dictionary's `Title` and its XMP `dc:title`, so the publish run
+  completes GROBID's title from it (`completeTitle`, `packages/core` → Target KAs). The paper
+  published on staging that day keeps the cut title
+  ([ADR 0010](adr/0010-pdf-to-target-ka-pipeline.md)).
 - **The header can give an accent apart from its letter** (2026-10-12): a cohort study's TEI
   listed "Montserrat Rodrı ´guez-Ayala" and "Bele ´n Moreno-Franco", the accent as a spacing
   `´` (U+00B4) after its letter, often after a space, and the `i` as a dotless `ı` (U+0131), the
