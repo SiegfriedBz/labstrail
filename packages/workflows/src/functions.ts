@@ -34,11 +34,17 @@ let notify: Notify | undefined;
 
 /**
  * The maintainer's Telegram chat (ADR 0038), built on first use from the Telegram settings
- * alone, so an alert still goes out when another setting is bad; only logs without a bot.
+ * alone, so an alert still goes out when another setting is bad. They are optional here, even
+ * on production, where the start check requires them: without a bot, an alert is logged rather
+ * than lost.
  */
 function getNotify(): Notify {
   if (notify) return notify;
-  const env = defineEnv({ extends: [sharedEnv], server: telegramSchema, runtimeEnv: process.env });
+  const env = defineEnv({
+    extends: [sharedEnv],
+    server: telegramSchema(false),
+    runtimeEnv: process.env,
+  });
   notify = createNotify({
     appEnv: env.APP_ENV,
     botToken: env.TELEGRAM_BOT_TOKEN,

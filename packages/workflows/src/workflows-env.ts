@@ -14,19 +14,18 @@ export const geminiSchema = {
 };
 
 /**
- * The Telegram bot and chat every environment's notifications go to (ADR 0038), optional: without
- * them, `createNotify` only logs. The token is secret.
+ * The Telegram bot and chat every environment's notifications go to (ADR 0038): `required` on
+ * production, so it never runs without alerts; optional elsewhere, where without them
+ * `createNotify` only logs. The token is secret.
  */
-export const telegramSchema = {
-  TELEGRAM_BOT_TOKEN: z
-    .string()
-    .regex(/^\d+:[\w-]+$/, "must be a bot token, <bot id>:<secret>")
-    .optional(),
-  TELEGRAM_CHAT_ID: z
-    .string()
-    .regex(/^-?\d+$/, "must be a numeric chat id")
-    .optional(),
-};
+export function telegramSchema(required: boolean) {
+  const token = z.string().regex(/^\d+:[\w-]+$/, "must be a bot token, <bot id>:<secret>");
+  const chat = z.string().regex(/^-?\d+$/, "must be a numeric chat id");
+  return {
+    TELEGRAM_BOT_TOKEN: required ? token : token.optional(),
+    TELEGRAM_CHAT_ID: required ? chat : chat.optional(),
+  };
+}
 
 /**
  * The Alchemy Notify webhook's signing key (ADR 0017), optional: a deployment without it (a
@@ -56,7 +55,7 @@ export function webhookSchema(appEnv: SharedEnv["APP_ENV"]) {
 
 /**
  * Validates the workflows' settings from `runtimeEnv` (default `process.env`): GROBID, the
- * Pinata gateway and key, the Gemini key, a Base Sepolia RPC URL, the optional Telegram bot and chat,
+ * Pinata gateway and key, the Gemini key, a Base Sepolia RPC URL, the Telegram bot and chat (required on production),
  * the optional Alchemy Notify signing key, and Inngest's event and signing keys
  * outside `local` (the dev server needs none), plus the DKG node's (`dkgSchema`, in the
  * same pass, with the context graph's address in the node's checksum case) and the shared
@@ -86,7 +85,7 @@ export function workflowsSchema(appEnv: SharedEnv["APP_ENV"]) {
     ...geminiSchema,
     INNGEST_EVENT_KEY: inngestKey,
     INNGEST_SIGNING_KEY: inngestKey,
-    ...telegramSchema,
+    ...telegramSchema(appEnv === "production"),
     ...webhookKeySchema,
     /** Set by Vercel: the branch, which names a staging deployment's Inngest environment. */
     VERCEL_GIT_COMMIT_REF: z.string().optional(),
