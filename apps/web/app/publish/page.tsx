@@ -6,7 +6,7 @@ import { PublishForm } from "../../components/publish/publish-form.tsx";
 import { UPLOAD_LIMITS } from "../../lib/publish/limits.ts";
 
 export const metadata: Metadata = {
-  title: "Publish a paper · VeriSci",
+  title: "Publish a paper",
   description:
     "Drop the PDF of a life-science or health paper and sign with your wallet to publish it as a verifiable record.",
 };

@@ -2,7 +2,7 @@ import { ArrowRight } from "@phosphor-icons/react/dist/ssr";
 import type { Metadata } from "next";
 import Link from "next/link";
 
-export const metadata: Metadata = { title: "Page not found · VeriSci" };
+export const metadata: Metadata = { title: "Page not found" };
 
 /** Any address with no page: where to go instead. */
 export default function NotFound() {

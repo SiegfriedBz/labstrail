@@ -6,7 +6,7 @@ import { RatingLoader } from "../../../../../components/rating/rating-loader.tsx
 import { RatingPageSkeleton } from "../../../../../components/rating/rating-page-skeleton.tsx";
 import { isRequestId } from "../../../../../lib/rating/stage.ts";
 
-export const metadata: Metadata = { title: "Rating · VeriSci" };
+export const metadata: Metadata = { title: "Rating" };
 
 /**
  * One rating's page: its score with every check, answer and quote behind it, or where it stands

@@ -1,6 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { use } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { SITE } from "../../lib/site.ts";
 
 /** How the mocked list behaves: shown at once, or still waiting on the node. */
 let listArrives = true;
@@ -60,12 +61,22 @@ describe("/papers", () => {
 });
 
 describe("generateMetadata", () => {
-  it("titles the first page, and names later ones", async () => {
-    const title = async (page?: string) =>
-      (await generateMetadata({ searchParams: Promise.resolve(page ? { page } : {}) })).title;
+  const metadata = (page?: string) =>
+    generateMetadata({ searchParams: Promise.resolve(page ? { page } : {}) });
 
-    expect(await title()).toBe("Papers · VeriSci");
-    expect(await title("2")).toBe("Papers, page 2 · VeriSci");
-    expect(await title("abc")).toBe("Papers · VeriSci");
+  it("titles the first page, and names later ones, for the layout's template to finish", async () => {
+    expect((await metadata()).title).toBe("Papers");
+    expect((await metadata("2")).title).toBe("Papers, page 2");
+    expect((await metadata("abc")).title).toBe("Papers");
+  });
+
+  it("gives each page its own canonical address, the page number kept", async () => {
+    expect((await metadata()).alternates).toEqual({ canonical: "/papers" });
+    expect((await metadata("2")).alternates).toEqual({ canonical: "/papers?page=2" });
+  });
+
+  it("describes the list in its own words", async () => {
+    expect((await metadata()).description).toMatch(/^Every life-science and health paper/);
+    expect((await metadata()).description).not.toBe(SITE.description);
   });
 });

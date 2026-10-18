@@ -30,8 +30,17 @@ vi.mock("next/link", () => ({
 
 const { RatingsSection } = await import("./ratings-section.tsx");
 
+const TITLE = "Screening VP1 of deformed wing virus";
+
 async function show() {
-  render(await RatingsSection({ ual: UAL, cid: CID }));
+  render(await RatingsSection({ ual: UAL, cid: CID, title: TITLE }));
+}
+
+/** The structured data the section holds, parsed. */
+function structuredData(): unknown[] {
+  return [...document.querySelectorAll('script[type="application/ld+json"]')].map((script) =>
+    JSON.parse(script.textContent ?? ""),
+  );
 }
 
 describe("RatingsSection", () => {
@@ -83,6 +92,62 @@ describe("RatingsSection", () => {
     expect(
       history.getAllByRole("link", { name: /Details/ }).map((link) => link.getAttribute("href")),
     ).toEqual([3, 2, 1].map((n) => `/papers/${CID}/ratings/${id(n)}`));
+  });
+
+  it("says the latest score in one sentence, linked to how it works, and as a Review", async () => {
+    const rKaUal = "did:dkg:base:84532/0xd701ed157232ad5e14bc4134a8d10d64d86f13b3/9";
+    listRatings.mockResolvedValue({
+      ok: true,
+      ratings: [
+        {
+          requestId: id(1),
+          contract: CONTRACT,
+          status: "fulfilled",
+          score: 54,
+          rKaUal: "y",
+          requestedAt: 1_791_000_000,
+        },
+        {
+          requestId: id(2),
+          contract: CONTRACT,
+          status: "fulfilled",
+          score: 72,
+          rKaUal,
+          requestedAt: 1_791_900_000,
+        },
+      ],
+    });
+
+    await show();
+
+    expect(screen.getByTestId("score-sentence").textContent).toBe(
+      `${TITLE} scores 72/100 for reproducibility readiness on VeriSci. How the score works`,
+    );
+    expect(screen.getByRole("link", { name: "How the score works" }).getAttribute("href")).toBe(
+      "/method",
+    );
+    const paper = `http://localhost:3000/papers/${CID}`;
+    expect(structuredData()).toEqual([
+      expect.objectContaining({
+        "@type": "Review",
+        "@id": `${paper}/ratings/${id(2)}#review`,
+        itemReviewed: { "@id": `${paper}#paper` },
+        reviewRating: expect.objectContaining({ ratingValue: 72, bestRating: 100 }),
+        identifier: expect.objectContaining({ value: rKaUal }),
+      }),
+    ]);
+  });
+
+  it("says no score and holds no Review while no rating is fulfilled", async () => {
+    listRatings.mockResolvedValue({
+      ok: true,
+      ratings: [{ requestId: id(1), contract: CONTRACT, status: "pending", requestedAt: 1 }],
+    });
+
+    await show();
+
+    expect(screen.queryByTestId("score-sentence")).toBeNull();
+    expect(structuredData()).toEqual([]);
   });
 
   it("says a paper with only a pending rating is being rated, with a link to follow it", async () => {

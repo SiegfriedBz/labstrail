@@ -17,9 +17,11 @@ export function siteUrl(env: WebEnv): string {
 
 /**
  * The layout's metadata: the site's address as every link's base, the home page's title and
- * the template other pages' titles fill, each page's own path as its canonical (`"./"` drops
- * the query), the description, Open Graph and a large Twitter card (both show
- * `app/opengraph-image.tsx`). Crawlers may index production only (ADR 0040).
+ * the template other pages' titles fill, each page's own path as its canonical and share URL
+ * (`"./"` drops the query), the description, Open Graph and a large Twitter card. The share
+ * blocks set no title or description, so Next fills them from each page's own; their image
+ * is `app/opengraph-image.tsx`, or a segment's own. Crawlers may index production only
+ * (ADR 0040).
  */
 export function siteMetadata(env: WebEnv): Metadata {
   return {
@@ -27,13 +29,8 @@ export function siteMetadata(env: WebEnv): Metadata {
     title: { default: SITE.title, template: `%s · ${SITE.name}` },
     description: SITE.description,
     alternates: { canonical: "./" },
-    openGraph: {
-      title: SITE.title,
-      description: SITE.description,
-      siteName: SITE.name,
-      type: "website",
-    },
-    twitter: { card: "summary_large_image", title: SITE.title, description: SITE.description },
+    openGraph: { siteName: SITE.name, type: "website", url: "./" },
+    twitter: { card: "summary_large_image" },
     ...(env.APP_ENV === "production" ? {} : { robots: { index: false, follow: false } }),
   };
 }

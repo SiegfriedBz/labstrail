@@ -47,11 +47,14 @@ describe("siteMetadata", () => {
 
     expect(metadata.alternates).toEqual({ canonical: "./" });
     expect(metadata.description).toBe(SITE.description);
-    expect(metadata.openGraph).toMatchObject({
+    expect(metadata.twitter).toEqual({ card: "summary_large_image" });
+  });
+
+  it("lets each page's own title and description fill its share card", () => {
+    expect(siteMetadata(production).openGraph).toEqual({
       siteName: "VeriSci",
-      description: SITE.description,
       type: "website",
+      url: "./",
     });
-    expect(metadata.twitter).toMatchObject({ card: "summary_large_image" });
   });
 });
