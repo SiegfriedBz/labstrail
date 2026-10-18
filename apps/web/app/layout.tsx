@@ -42,7 +42,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: our own constant, which must run before the first paint */}
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
-      <body className="relative min-h-[100dvh] overflow-x-clip font-sans antialiased">
+      <body className="relative min-h-svh overflow-x-clip font-sans antialiased">
         <div aria-hidden className="bench pointer-events-none absolute inset-x-0 top-0 h-[900px]" />
         <a
           href="#main"

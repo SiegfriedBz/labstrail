@@ -34,13 +34,13 @@ server (`APP_ENV` other than `local`) checks them when it starts, through
 | --- | --- |
 | `GROBID_URL` | GROBID's base URL: `https://verisci-grobid.duckdns.org`, on the node server, which takes the environment's `DKG_TOKEN` as its credential ([ADR 0039](../../docs/adr/0039-one-credential-per-environment.md)); or `http://127.0.0.1:8070` for a GROBID run locally in Docker ([`docs/node-host.md`](../../docs/node-host.md) → The developer's computer) |
 | `PINATA_GATEWAY_URL` | The Pinata account's dedicated gateway, `https://<name>.mypinata.cloud`, through which the publish and rating runs read PDFs; one account serves every environment ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)) |
-| `CHAIN_RPC_URL` | A Base Sepolia RPC URL, to check smart-contract wallets' signatures and, on staging and production, for the rating functions to read and write the rating contracts and the pages to read their ratings |
+| `CHAIN_RPC_URL` | A Base Sepolia RPC URL, to check smart-contract wallets' signatures and, on staging and production, for the rating functions to read and write the rating contracts and the pages to read their ratings. Deployed, the Alchemy RPC URL: Base's public endpoint refused the pages' bursts (`docs/domain.md` → Chain) |
 | `PINATA_JWT` | A Pinata API key (JWT) allowed to upload, list and delete files; the `publish-pdf` dev script reads it too. Secret |
 | `GEMINI_API_KEY` | A Gemini API key from Google AI Studio, for the field check both runs make ([ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)) and the rating functions' scorer ([ADR 0018](../../docs/adr/0018-phase-1-scorer-output-contract.md)); the `score-papers` dev script reads it too. Every deployment checks it at start, previews included. Secret |
 | `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY` | Inngest's keys, required unless `APP_ENV` is `local`: the SDK reads them itself, and the signing key also reads runs for the upload page. Secret |
 | `VERCEL_GIT_COMMIT_REF` | Set by Vercel: on staging, the branch, which names the Inngest branch environment runs are read from |
 | `VERCEL_PROJECT_PRODUCTION_URL`, `VERCEL_BRANCH_URL` | Set by Vercel: production's domain and the branch's URL, which notifications link to (`siteUrlOf`); locally, `http://localhost:3000` |
-| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Optional: the bot's token (`<bot id>:<secret>`, from @BotFather) and the numeric id of the chat notifications go to, one for every environment ([ADR 0038](../../docs/adr/0038-alerts-go-to-one-telegram-chat.md)). Unset, as locally, notifications are only logged. On Vercel, set them on production and on `develop` only (scoped to that branch, like the oracle key), so a feature preview, whose messages would also read `staging`, only logs. The notifier reads only these and the shared settings, so an alert still goes out when another setting is bad. The token is secret |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | The bot's token (`<bot id>:<secret>`, from @BotFather) and the numeric id of the chat notifications go to, one for every environment ([ADR 0038](../../docs/adr/0038-alerts-go-to-one-telegram-chat.md)). Required on production, which refuses to start without them; optional elsewhere, where unset, as locally, notifications are only logged. On Vercel, set them on Production and on `develop` only (scoped to that branch, like the oracle key), so a feature preview, whose messages would also read `staging`, only logs. The notifier reads only these and the shared settings, as optional, so an alert still goes out (or is logged) when another setting is bad. The token is secret |
 | `ALCHEMY_WEBHOOK_SIGNING_KEY` | Optional: the signing key of this environment's Alchemy Notify webhook (`webhookKeySchema`), read by `getWebhookIntake` and checked at start with the settings above; without it the webhook route answers 404, as on feature previews. Locally, any value lets `post-webhook` check the route. Secret |
 
 The rating functions read four more, declared in `src/rating-env.ts`
@@ -81,7 +81,7 @@ upload page reads runs there, with no keys.
 | `PAPER_SUBMITTED` | The event's name, `verisci/paper.submitted` |
 | `PUBLISH_SETTINGS` | The publish run's limits (below) |
 | `PublishOutcome`, `PaperRefusal`, `SubmissionRefusal` | How a run ends: `minted` with its UAL, or `refused` with why |
-| `PublishFailure`, `publishFailureReason(output)` | Why a run stopped instead (`chain-unreachable`, `paper-unreachable`, `node-unreachable`, `mint-not-confirmed`, `setup`): each error it throws starts `publish-failed:<reason>:`, and the reader finds it in a failed run's output however Inngest nests it |
+| `PublishFailure`, `publishFailureReason(output)` | Why a run stopped instead (`chain-unreachable`, `paper-unreachable`, `node-unreachable`, `network-refused`, `mint-not-confirmed`, `setup`): each error it throws starts `publish-failed:<reason>:`, and the reader finds it in a failed run's output however Inngest nests it |
 | `getUploadService()` | The pages' calls, built on first use from the settings: `contextGraph`, `createUploadUrl()`, `submitPaper(input, limiter)`, `readPaper(cid, eventId?)`, `listPapers({ page, pageSize })` (below) |
 | `UploadService`, `PaperStatus`, `PublishedRecord`, `UPLOAD_SETTINGS` | Their type, what `readPaper` returns (the Target KA's state and the run), and the upload URL's and signature's lifetimes |
 | `SubmitResult`, `SubmitRefusal`, `SubmitLimiter`, `LimitAnswer` | What `submitPaper` returns, why it refuses, the per-submitter limit the web app passes it, and the limit's answer (`unavailable` carries what the store threw) |
@@ -118,7 +118,11 @@ starts nothing. Its steps:
    answer that is not well-formed TEI), that has no readable title, that the rating's reader
    cannot parse (`unreadable`) or that has no text layer (`no-text`) ends the run, refused,
    so every published paper can be rated. GROBID's 401 and 403 fail the run; 408 and 429 are
-   retried. A DOI is kept only if it looks like one.
+   retried. A DOI is kept only if it looks like one. The title is GROBID's, completed from the
+   title the PDF stores in its own metadata (its info dictionary's `Title`, else its XMP
+   `dc:title` when that holds one version) when GROBID dropped its first words: core's
+   `completeTitle` takes the stored one only when it ends with GROBID's, after words that are
+   not a journal's name (`packages/core` → Target KAs).
 4. **check-field**: asks `gemini-3.5-flash-lite` (`fieldModel`, free tier) whether the paper
    is in VeriSci's field, from its title, abstract and opening (`checkField`, with core's
    `fieldCheckPrompt`; [ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)).
@@ -146,7 +150,11 @@ Retries ([ADR 0009](../../docs/adr/0009-retries-are-spaced-with-step-sleep.md)):
   does not answer, or a draft gone before the store (`no-content`) waits 2 minutes and
   starts a new attempt from the read, which reads the paper again only when nothing is
   stored ([ADR 0010](../../docs/adr/0010-pdf-to-target-ka-pipeline.md)); a mint not seen
-  after 10 minutes starts a new attempt at once. Up to 5 attempts.
+  after 10 minutes starts a new attempt at once. Up to 5 attempts; the run then fails with
+  the last attempt's reason: `network-refused` for a quorum failure (the network's cores
+  declining the mint, as for a new graph waiting for their activation, `docs/domain.md` →
+  DKG), `node-unreachable` for the node, `paper-unreachable` for the gateway or GROBID,
+  `mint-not-confirmed` for a mint not seen.
 - **check-field:** one more ask after 30 s, not 2 minutes: free-tier Gemini calls that
   failed within seconds answered 30 s later (`docs/domain.md` → Gemini), and a paper is
   published anyway when the second ask fails, so a longer wait would only hold it back.
@@ -415,7 +423,7 @@ in one Telegram chat for every environment
 headline and the environment (`🚨 Alert · staging`, or activity's own headline, such as
 `⭐ Rated 91/100 · staging`), then the alert's text, or the paper's title in bold and a short
 link (`→ Open the rating`); every part is escaped. Without `TELEGRAM_BOT_TOKEN` and
-`TELEGRAM_CHAT_ID` it only logs the message, as one plain line (`[staging · alert] …`); a send that fails is
+`TELEGRAM_CHAT_ID` (anywhere but production, which requires them) it only logs the message, as one plain line (`[staging · alert] …`); a send that fails is
 logged `notify-unavailable: telegram: …` and never fails the run that sent it. Every send is a
 step of its own, so a replay never sends it twice.
 
@@ -507,8 +515,9 @@ page and its `/api/ratings/<id>` route, and the papers list's Score column. It r
 environment's contracts, current and past, on Base Sepolia, or locally only the Anvil one
 ([ADR 0036](../../docs/adr/0036-local-rating-runs-use-anvil.md)), and needs no oracle key.
 Its chain client (`createSiteChainClient` in `src/site/chain.ts`) sends the contract reads a
-page makes together, every paper on every contract, as one Multicall3 call, since Alchemy
-RPC's free tier serves about 19 calls a second (`docs/domain.md` → Chain): the papers list
+page makes together, every paper on every contract, as one Multicall3 call, since RPC
+endpoints refuse a burst of calls (Base's public endpoint; Alchemy RPC's free tier, about 19
+a second, `docs/domain.md` → Chain): the papers list
 makes three such calls one after the other (the counts, the ids, the requests). Each call
 gets 5 s and is asked once more a second after a failure or a 429 (longer when a 429 carries
 `Retry-After`, which viem waits out), so a chain that does not answer costs a page about 11 s

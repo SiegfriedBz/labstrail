@@ -4,7 +4,8 @@ import { readPaper } from "./read-paper.ts";
 
 const CID = "bafkreigh2akiscaildcqabsyg3dfr6chu3fgpregiymsck7e7aqa4s52zy";
 const SENTENCE = "Patients were randomly assigned to citicoline or placebo in a one to one ratio.";
-const PDF = pdfOf(Array.from({ length: 12 }, () => SENTENCE));
+const LINES = Array.from({ length: 12 }, () => SENTENCE);
+const PDF = pdfOf(LINES);
 const TEI = `<TEI xmlns="http://www.tei-c.org/ns/1.0"><teiHeader><fileDesc>
   <titleStmt><title>A Title</title></titleStmt></fileDesc></teiHeader></TEI>`;
 
@@ -41,6 +42,33 @@ describe("readPaper", () => {
 
     expect(result).toMatchObject({ ok: true, metadata: { title: "A Title", authors: [] } });
     expect(result.ok && result.opening).toContain(SENTENCE);
+  });
+
+  it("completes the title GROBID cut from the title the PDF stores, keeping the rest GROBID's", async () => {
+    const cut = "by RNA sequence, structure, and cell-type-specific features";
+    const full = `PUS7 mRNA pseudouridylation is driven ${cut}`;
+    const header = `<TEI xmlns="http://www.tei-c.org/ns/1.0"><teiHeader><fileDesc>
+      <titleStmt><title>${cut}</title></titleStmt>
+      <sourceDesc><biblStruct><analytic>
+        <author><persName><forename>Rebecca</forename><surname>Rodell</surname></persName></author>
+        <idno type="DOI">10.1016/j.xgen.2026.101332</idno>
+      </analytic></biblStruct></sourceDesc></fileDesc>
+      <profileDesc><abstract><p>Pseudouridine is a common mRNA modification.</p></abstract></profileDesc>
+    </teiHeader></TEI>`;
+    const { fetch } = fakeFetch(
+      () => pdfResponse(pdfOf(LINES, { title: full })),
+      () => new Response(header),
+    );
+
+    expect(await read(fetch)).toMatchObject({
+      ok: true,
+      metadata: {
+        title: full,
+        authors: ["Rebecca Rodell"],
+        abstract: "Pseudouridine is a common mRNA modification.",
+        doi: "10.1016/j.xgen.2026.101332",
+      },
+    });
   });
 
   it("keeps the first openingChars characters of the text as the rating prepares it", async () => {

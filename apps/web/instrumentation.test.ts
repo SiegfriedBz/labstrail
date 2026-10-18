@@ -61,6 +61,19 @@ describe("checkServerSettings", () => {
     ).toThrow(EnvError);
   });
 
+  it("refuses to start production without the Telegram bot and chat (ADR 0038)", () => {
+    const start = () =>
+      checkServerSettings({
+        APP_ENV: "production",
+        ...settings,
+        DKG_CONTEXT_GRAPH: `${settings.DKG_CONTEXT_GRAPH.split("/")[0]}/verisci-prod`,
+      });
+
+    expect(start).toThrow(EnvError);
+    expect(start).toThrow(/TELEGRAM_BOT_TOKEN/);
+    expect(start).toThrow(/TELEGRAM_CHAT_ID/);
+  });
+
   it("starts a deployed server whose settings are valid", () => {
     expect(() => checkServerSettings({ APP_ENV: "staging", ...settings })).not.toThrow();
   });
@@ -75,6 +88,8 @@ describe("checkRatingSettings", () => {
     APP_ENV: "production",
     ...settings,
     DKG_CONTEXT_GRAPH: `${settings.DKG_CONTEXT_GRAPH.split("/")[0]}/verisci-prod`,
+    TELEGRAM_BOT_TOKEN: "123456:AAH-secret_token",
+    TELEGRAM_CHAT_ID: "-1001234567",
   };
 
   it("refuses to start production without the oracle key (ADR 0019)", () => {

@@ -76,13 +76,16 @@ export type ReadPaperResult =
 /**
  * Why a publish run stopped without an outcome, carried in its error as
  * `publish-failed:<reason>: <detail>` so the paper's page can say it
- * ({@link publishFailureReason}). All but `setup` are worth publishing the same PDF again
- * later; `setup` is ours to fix.
+ * ({@link publishFailureReason}). `network-refused` is the network's cores declining the mint
+ * (the node's `retry-later`, such as a new graph waiting for the cores' activation,
+ * `docs/domain.md` → DKG). All but `setup` are worth publishing the same PDF again later;
+ * `setup` is ours to fix.
  */
 export type PublishFailure =
   | "chain-unreachable"
   | "paper-unreachable"
   | "node-unreachable"
+  | "network-refused"
   | "mint-not-confirmed"
   | "setup";
 
@@ -90,6 +93,7 @@ const PUBLISH_FAILURES: readonly PublishFailure[] = [
   "chain-unreachable",
   "paper-unreachable",
   "node-unreachable",
+  "network-refused",
   "mint-not-confirmed",
   "setup",
 ];
@@ -360,9 +364,11 @@ function minted(ual: string): Attempt {
 function failed(failure: DkgFailure): Attempt {
   const reason =
     failure.status === undefined ? failure.reason : `${failure.reason} (${failure.status})`;
-  return failure.reason === "unauthorized" || failure.reason === "graph-not-served"
-    ? { kind: "fatal", reason }
-    : { kind: "retry", reason, failure: "node-unreachable" };
+  if (failure.reason === "unauthorized" || failure.reason === "graph-not-served")
+    return { kind: "fatal", reason };
+  if (failure.reason === "retry-later")
+    return { kind: "retry", reason, failure: "network-refused" };
+  return { kind: "retry", reason, failure: "node-unreachable" };
 }
 
 /**

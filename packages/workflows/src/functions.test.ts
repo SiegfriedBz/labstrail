@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { paperReaderOptions } from "./functions.ts";
 
 describe("paperReaderOptions", () => {
@@ -14,5 +14,24 @@ describe("paperReaderOptions", () => {
       grobidUrl: "https://verisci-grobid.duckdns.org",
       token: "staging-credential",
     });
+  });
+});
+
+describe("alertMaintainer", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it("logs an alert on production when the Telegram settings are missing, never throwing", async () => {
+    vi.resetModules();
+    vi.stubEnv("APP_ENV", "production");
+    vi.stubEnv("TELEGRAM_BOT_TOKEN", undefined);
+    vi.stubEnv("TELEGRAM_CHAT_ID", undefined);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { alertMaintainer } = await import("./functions.ts");
+
+    await expect(alertMaintainer("verisci-publish-paper failed")).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("verisci-publish-paper failed"));
   });
 });

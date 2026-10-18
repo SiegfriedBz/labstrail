@@ -40,6 +40,7 @@ describe("core's layout", () => {
       "checklistOf",
       "checklistScore",
       "classifyTarget",
+      "completeTitle",
       "coreName",
       "fieldCheckPrompt",
       "formatUal",

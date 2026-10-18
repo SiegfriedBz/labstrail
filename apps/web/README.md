@@ -146,7 +146,8 @@ stateDiagram-v2
   as [ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md) names
   it), or a submission that failed its checks.
 - `failed` shows why the run stopped (`failureMessage`): Base, the PDF, the DKG node or
-  the mint not answering after every retry, or a problem on our side.
+  the mint not answering after every retry, OriginTrail's network not accepting the record
+  yet (`network-refused`), or a problem on our side.
 - `following`: the event started no run a minute after it was sent (its time is read from
   its ULID, `eventTime`). The publish function is a singleton per CID, so another run holds
   this PDF; the page follows the paper on the node and gives up (`not-found`) after
@@ -320,7 +321,10 @@ The "Clinical" look: a clinical record with an on-chain proof, in Tailwind CSS v
 - Every page works from 360 px wide, one column on phones, and the page clips any overflow
   (`overflow-x: clip`, which keeps the sticky header working). The home hero fills the
   first screen, so the next section starts below the fold; below `md`, the hero's text
-  fills the first screen and its panel starts just under the fold. On-chain values show in
+  fills the first screen and its panel starts just under the fold. The hero and the `body`
+  size with `svh`, the screen's height with a phone's address bar shown, which stays the same
+  while the bar hides, so the page stays still as it scrolls; `app/viewport.test.ts` refuses
+  `dvh` anywhere in `app/`. On-chain values show in
   short form with a copy button.
 - The product name is VeriSci, for life-science and health papers; its name and description
   come from `lib/site.ts` (`SITE`). Its mark (`components/site/logo.tsx`, and `app/icon.svg`
@@ -382,8 +386,10 @@ preview, and `develop`'s, at its stable branch URL, is staging.
   Preview), `DKG_CONTEXT_GRAPH` and `DKG_TOKEN` take one value per environment;
   `ORACLE_PRIVATE_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` and
   `ALCHEMY_WEBHOOK_SIGNING_KEY` go on Production and on Preview limited to the branch
-  `develop`, so feature previews never rate or post; every other variable takes one value
-  for both. System Environment Variables stay exposed: Inngest reads `VERCEL_GIT_COMMIT_REF`,
+  `develop`, so feature previews never rate or post; production refuses to start without
+  the oracle key or the two Telegram settings
+  ([ADR 0038](../../docs/adr/0038-alerts-go-to-one-telegram-chat.md)). Every other variable
+  takes one value for both. System Environment Variables stay exposed: Inngest reads `VERCEL_GIT_COMMIT_REF`,
   and the notifications' links `VERCEL_BRANCH_URL` and `VERCEL_PROJECT_PRODUCTION_URL`.
 - **Inngest's `develop` branch environment** has auto-archive off
   ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)).
