@@ -97,14 +97,23 @@ export function paperCountQuery(contextGraph: string): string | undefined {
 /**
  * The SPARQL query that finds `ual` among the papers {@link paperListQuery} lists, with the
  * same patterns but the authors: one row when it is a paper our node published in the graph
- * (a Target KA, so never an R-KA), none otherwise (ADR 0011). `undefined` for a UAL that is
- * not canonical (ADR 0031) or a graph id that is not a full one.
+ * (a Target KA, so never an R-KA), none otherwise (ADR 0011), with its mint time
+ * ({@link parsePublishedAt}). `undefined` for a UAL that is not canonical (ADR 0031) or a
+ * graph id that is not a full one.
  */
 export function publishedPaperQuery(contextGraph: string, ual: string): string | undefined {
   const normalized = normalizeUal(ual);
   if (!normalized.ok || normalized.ual !== ual) return undefined;
   const where = publishedPapers(contextGraph, false, ual);
-  return where && `SELECT ?ka ${where}\nLIMIT 1`;
+  return where && `SELECT ?ka ?minted ${where}\nLIMIT 1`;
+}
+
+/**
+ * When the node minted the paper {@link publishedPaperQuery} found, as an ISO date-time, from
+ * its row; `undefined` with no row, or a mint time missing or that does not parse.
+ */
+export function parsePublishedAt(bindings: readonly QueryBinding[]): string | undefined {
+  return isoDate(text(bindings[0]?.minted));
 }
 
 /**
