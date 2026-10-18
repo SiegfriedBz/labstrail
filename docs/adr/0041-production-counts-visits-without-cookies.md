@@ -5,13 +5,13 @@
 
 ## Context
 
-The maintainer wants to know which countries and pages VeriSci's visitors come from. The site has no accounts and no cookies, and its free hosting plan must stay free ([0005](0005-staging-and-production-are-isolated.md)). Google Analytics is free but sets cookies, which EU visitors must accept through a banner before it loads, and it adds a third-party script to every page.
+The maintainer wants to know which countries and pages VeriSci's visitors come from. The site has no accounts and no cookies, and it runs on free plans. Google Analytics is free but sets cookies, which EU visitors must accept through a banner before it loads, and it adds a third-party script to every page.
 
 ## Decision
 
 - Production counts page views with Vercel Web Analytics: each view's page, referrer, country, device and browser. Staging, previews and local runs count nothing.
 - It sets no cookies and identifies no visitor across days, so the site needs no consent banner.
-- No custom events and no other tracker.
+- No custom events and no other tracker. The wallet's libraries run with their own analytics off; once a visitor uses the wallet, AppKit still sends Reown the two events it always sends: its start-up, with the page's address, and each connection, with the wallet's address ([0034](0034-users-connect-a-wallet-anyone-may-publish.md)).
 
 ## Consequences
 

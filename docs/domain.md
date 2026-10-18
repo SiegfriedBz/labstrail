@@ -653,6 +653,17 @@ Observed on Next.js 16.3.8.
   awaited by `ready()`), and it keeps `@appkit/connection_status` in `localStorage` as
   `connected` or `disconnected`, which the web app reads to restore a returning visitor's
   wallet (`apps/web/lib/wallet/session.ts`).
+- **What loading the wallet calls** (AppKit 1.8.24, `@base-org/account` 2.4.0,
+  `@coinbase/wallet-sdk` 4.3.6, read in their source and seen in a headless browser,
+  2026-10-18): AppKit fetches its project settings from `api.web3modal.org`, and always sends
+  Reown (`pulse.walletconnect.org`) its `INITIALIZE`, `CONNECT_SUCCESS` and
+  `SOCIAL_LOGIN_SUCCESS` events, whatever `features.analytics` says. `ready()` awaits those
+  settings with no timeout. Coinbase's two SDKs load Coinbase's analytics
+  (`cca-lite.coinbase.com`) unless `preference.telemetry` is `false`; AppKit's own Base Account
+  and Coinbase Wallet connectors set no preference, so the web app configures both connectors
+  itself: AppKit skips its Base Account connector when one is configured, and
+  `enableCoinbase: false` leaves its Coinbase Wallet one out (it also makes Coinbase's mobile
+  link always open the Coinbase app, which a phone without the extension does anyway).
 
 ## Tooling
 

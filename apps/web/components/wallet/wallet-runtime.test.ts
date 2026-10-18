@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const ADDRESS = "0x9a17ec95e96f8a7c40b7ac1411e8a844c7bf9111";
 const wagmiConfig = { id: "wagmi-config" };
@@ -32,11 +32,21 @@ vi.mock("@reown/appkit/networks", () => ({
     rpcUrls: { default: { http: ["http://127.0.0.1:8545"] } },
   },
 }));
+const adapterOptions = vi.fn();
 vi.mock("@reown/appkit-adapter-wagmi", () => ({
   WagmiAdapter: class {
     wagmiConfig = wagmiConfig;
+    constructor(options: unknown) {
+      adapterOptions(options);
+    }
   },
 }));
+const baseAccount = vi.fn((parameters: unknown) => ({ connector: "baseAccount", parameters }));
+const coinbaseWallet = vi.fn((parameters: unknown) => ({
+  connector: "coinbaseWallet",
+  parameters,
+}));
+vi.mock("wagmi/connectors", () => ({ baseAccount, coinbaseWallet }));
 vi.mock("wagmi/actions", () => ({
   getAccount,
   watchAccount,
@@ -54,6 +64,10 @@ describe("createWalletRuntime", () => {
   beforeEach(() => {
     ready = Promise.resolve();
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("resolves only once AppKit is ready, its stored session restored", async () => {
@@ -75,6 +89,22 @@ describe("createWalletRuntime", () => {
     expect(resolved).toBe(true);
   });
 
+  it("goes on after 8 seconds when AppKit's set-up hangs, since its window can open", async () => {
+    vi.useFakeTimers();
+    ready = new Promise(() => {});
+    let resolved = false;
+
+    const runtime = createWalletRuntime(SETTINGS).then((value) => {
+      resolved = true;
+      return value;
+    });
+    await vi.advanceTimersByTimeAsync(7_999);
+    expect(resolved).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+
+    await expect(runtime).resolves.toBeDefined();
+  });
+
   it("still resolves when AppKit's set-up fails part-way, since its window can open", async () => {
     ready = Promise.reject(new Error("remote config unavailable"));
 
@@ -92,6 +122,21 @@ describe("createWalletRuntime", () => {
       defaultNetwork: { id: 84532 },
       networks: [{ id: 84532 }],
     });
+  });
+
+  it("offers Coinbase's two sign-ins with their SDKs' analytics off, and no copies of AppKit's", async () => {
+    await createWalletRuntime(SETTINGS);
+
+    expect(baseAccount).toHaveBeenCalledWith({ preference: { telemetry: false } });
+    expect(coinbaseWallet).toHaveBeenCalledWith({
+      preference: { options: "all", telemetry: false },
+    });
+    expect(adapterOptions).toHaveBeenCalledWith({
+      projectId: "test-project",
+      networks: [{ id: 84532 }],
+      connectors: [baseAccount.mock.results[0]?.value, coinbaseWallet.mock.results[0]?.value],
+    });
+    expect(createAppKit.mock.calls[0]?.[0]).toMatchObject({ enableCoinbase: false });
   });
 
   it("reads the connected account, and none when the wallet isn't connected", async () => {

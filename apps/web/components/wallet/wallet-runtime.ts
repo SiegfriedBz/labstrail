@@ -12,8 +12,15 @@ import {
   watchAccount,
   writeContract,
 } from "wagmi/actions";
+import { baseAccount, coinbaseWallet } from "wagmi/connectors";
 import { SITE } from "../../lib/site.ts";
 import type { WalletAccount } from "../../lib/wallet/store.ts";
+
+/**
+ * How long a wallet action waits for AppKit's start-up, which also fetches its settings from
+ * Reown's servers; past it the window opens anyway and the session comes back when it can.
+ */
+const READY_TIMEOUT_MS = 8_000;
 
 /** What the page hands the wallet: the Reown project id, Anvil's URL locally, and the theme. */
 export interface WalletSettings {
@@ -61,13 +68,23 @@ export function walletNetworks(
  * reaches this module only through `import()` (`providers.tsx`), so AppKit, WalletConnect and
  * Coinbase's SDK download only when a visitor uses the wallet or comes back connected. AppKit's
  * vanilla set-up needs no React provider: its window and wagmi's actions share the adapter's
- * config. Resolves once AppKit is ready, its stored session restored (or its set-up failed
- * part-way, which leaves the window usable).
+ * config. Coinbase's two sign-ins (Base Account and Coinbase Wallet) are this module's own
+ * connectors, with their SDKs' analytics off (ADR 0041); AppKit adds its Base Account connector
+ * only when none is configured, and `enableCoinbase: false` leaves its Coinbase Wallet one out.
+ * Resolves once AppKit is ready, its stored session restored, or after
+ * {@link READY_TIMEOUT_MS}, or when its set-up failed part-way: the window is usable in each case.
  */
 export async function createWalletRuntime(settings: WalletSettings): Promise<WalletRuntime> {
   const { projectId, localRpcUrl, theme } = settings;
   const networks = walletNetworks(localRpcUrl);
-  const adapter = new WagmiAdapter({ projectId, networks });
+  const adapter = new WagmiAdapter({
+    projectId,
+    networks,
+    connectors: [
+      baseAccount({ preference: { telemetry: false } }),
+      coinbaseWallet({ preference: { options: "all", telemetry: false } }),
+    ],
+  });
   const config = adapter.wagmiConfig;
   const appKit = createAppKit({
     adapters: [adapter],
@@ -81,6 +98,7 @@ export async function createWalletRuntime(settings: WalletSettings): Promise<Wal
       icons: [],
     },
     features: { analytics: false },
+    enableCoinbase: false,
     themeMode: theme,
     themeVariables: {
       // AppKit writes white text on its accent: the darker blue keeps the contrast.
@@ -89,7 +107,14 @@ export async function createWalletRuntime(settings: WalletSettings): Promise<Wal
       "--apkt-font-family": "var(--font-sora), ui-sans-serif, system-ui, sans-serif",
     },
   });
-  await appKit.ready().catch(() => undefined);
+  let deadline: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([
+    appKit.ready().catch(() => undefined),
+    new Promise<void>((resolve) => {
+      deadline = setTimeout(resolve, READY_TIMEOUT_MS);
+    }),
+  ]);
+  clearTimeout(deadline);
 
   return {
     account() {
