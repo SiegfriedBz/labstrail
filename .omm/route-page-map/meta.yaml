@@ -1,9 +1,9 @@
 created: 2026-10-12T05:49:40.626Z
-updated: 2026-10-17T17:07:04.100Z
-update_count: 18
-last_field: concern
-git_commit: 30e6d47
-git_branch: fix/034-site-fixes
+updated: 2026-10-18T13:50:29.183Z
+update_count: 22
+last_field: todo
+git_commit: 07d91d4
+git_branch: feat/036-seo
 prev_diagram: >-
   graph LR
       home["Home\napp/page.tsx"] -->|"Publish a paper"| publish["Publish\napp/publish/page.tsx"]
@@ -14,7 +14,7 @@ prev_diagram: >-
       publish -->|"after submitting, ?event=<id>"| paper
       paper -->|"polls while publishing"| api-papers["Paper Status\napp/api/papers/[cid]/route.ts"]
       paper -->|"announceLocalRating, locally"| server-actions
-      paper -->|"Rate this paper, Read the checks, Follow it, Details"| rating["Rating Page\napp/papers/[cid]/ratings/[requestId]/page.tsx"]
+      paper -->|"Rate this paper or Rate again (?new=1), Read the checks, Follow it, Details"| rating["Rating Page\napp/papers/[cid]/ratings/[requestId]/page.tsx"]
       rating -->|"polls until scored or cancelled"| api-ratings["Rating Status\napp/api/ratings/[requestId]/route.ts"]
       inngest["Inngest\nexternal"] -->|"calls the served functions"| inngest-route["Inngest Route\napp/api/inngest/route.ts"]
       alchemy-notify["Alchemy Notify\nexternal"] -->|"signed contract events, requests among them"| api-webhooks["Alchemy Webhook\napp/api/webhooks/alchemy/route.ts"]
@@ -23,15 +23,20 @@ prev_diagram: >-
       class home,inngest-route,api-webhooks entry
       class inngest,alchemy-notify external
 children:
+  - about
   - alchemy-notify
   - api-papers
   - api-ratings
   - api-webhooks
+  - crawl
+  - crawlers
   - home
   - inngest
   - inngest-route
+  - method
   - paper
   - papers
   - publish
   - rating
   - server-actions
+  - share-images

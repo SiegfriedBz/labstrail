@@ -1,0 +1,1 @@
+The images a shared link shows, 1200 by 630, drawn by next/og: app/opengraph-image.tsx, the site's card (the mark, the name and its definition), which every page shares; app/papers/[cid]/opengraph-image.tsx, a paper's card (its title, authors and latest score), or the site's when the paper is not published or the node or the chain does not answer.

@@ -1,0 +1,1 @@
+/robots.txt and /sitemap.xml (app/robots.ts, app/sitemap.ts, from lib/seo/crawl.ts): on production, every crawler may read everything but /api/, and the sitemap lists the site's five pages and every published paper with its mint date, read again hourly; elsewhere every crawler is kept out and the sitemap is empty (ADR 0040).

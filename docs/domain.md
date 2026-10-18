@@ -605,6 +605,28 @@ Observed on Next.js 16.3.8.
   boundary renders the not-found page as a 200 with `noindex`, a soft 404; a real 404 needs
   the check before any `await` that suspends or any `Suspense` boundary. Seen on `/papers`
   (2026-10-10): `?page=0` answered 404, a page past the last 200 with `noindex`.
+- **Metadata streams for browsers and blocks for HTML-limited bots** (16.3.8, 2026-10-18):
+  `notFound()` from `generateMetadata` gives a bot in `htmlLimitedBots` a real 404, and a
+  browser the not-found page with `noindex` and a 200, since its metadata streams after the
+  first chunk. Setting `htmlLimitedBots` replaces Next's own list
+  (`next/dist/shared/lib/router/utils/html-bots.js`), which leaves out the AI crawlers
+  (`apps/web/lib/seo/bots.ts` extends it).
+- **A streamed `Suspense` boundary's content arrives in a hidden `<div>`**, moved into place by
+  a script, whatever the user agent: a crawler that runs no JavaScript finds a paper's `h1`
+  only there. Rendering the page without the boundary for those bots puts it in place
+  (observed with `curl -A "OAI-SearchBot/1.0"`, 2026-10-18).
+- **React's `cache` shares one read between `generateMetadata` and the page** of one request
+  (one node read per request, counted on the dev server, 2026-10-18).
+- **`alternates.canonical: "./"` in the root layout resolves to each page's own path, without
+  its query**; a page whose query names a different page (`/papers?page=2`) sets its own.
+- **A page's `openGraph` replaces its parents' whole**, not field by field; Next fills its
+  title and description from the page's own when the block leaves them out, and a segment's
+  `opengraph-image` file wins over its parents'. The root layout's `title.template` does not
+  apply to `app/page.tsx`, which shares its segment.
+- **`next/og` reads TTF, OTF and WOFF fonts, not WOFF2,** and bundles only Geist Regular, so
+  the share images read Sora from `apps/web/assets/fonts`; Next traces files read with
+  `readFile(join(process.cwd(), …))` into the deployment (16.3.8, checked in the build's
+  `.nft.json`, 2026-10-18).
 - **Everything a `"use client"` file exports reaches a server component as a client
   reference**, not its value, so a string or constant the server needs lives in a plain
   module (`apps/web/components/paper/labels.ts`).

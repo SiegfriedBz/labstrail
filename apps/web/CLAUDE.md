@@ -17,16 +17,17 @@ Next.js 16 App Router app. See `README.md` here for scripts and status.
 - Inngest functions live in `@verisci/workflows`; `web` only serves them
   ([ADR 0003](../../docs/adr/0003-inngest-functions-live-in-workflows.md)).
 - Components are grouped by area: `components/site` (the shell every page shares: logo,
-  header links, theme button, footer, breadcrumbs), `wallet` (providers and button),
-  `home`, `papers` (the list), `paper` (one paper's page), `rating` (the Ratings section, the
-  Rate button and the rating page), `publish`, and `ui` (shadcn
+  header links, theme button, footer, breadcrumbs, the structured data's script), `wallet`
+  (providers and button), `home`, `papers` (the list), `paper` (one paper's page), `rating`
+  (the Ratings section, the Rate button and the rating page), `publish`, and `ui` (shadcn
   primitives, restyled with `globals.css`'s tokens). A component another area reuses stays
   in its own area; a test sits next to its component.
 - Playwright end-to-end tests come in a later plan; until then, cover logic in unit tests.
   Put a flow's logic in `lib/` with its IO passed in (`publishFile`, `paperProgress`,
   `requestUploadUrl`), and keep components and `app/actions.ts` thin.
-- `lib/` is grouped by flow like `components/`: `lib/publish/`, `lib/papers/` and
-  `lib/rating/`; only helpers several areas share (`web-env`, `server`, `site`, `theme`,
+- `lib/` is grouped by flow like `components/`: `lib/publish/`, `lib/papers/`,
+  `lib/rating/` and `lib/seo/` (metadata, crawling rules, structured data and share cards,
+  ADR 0040); only helpers several areas share (`web-env`, `server`, `site`, `theme`,
   `shorten`, `utils`, `empty-module`) sit at its root. `lib/layout.test.ts` fails on a `.ts` or `.tsx` file
   anywhere else, so a new flow adds its folder there.
 - Styling is Tailwind v4 with the tokens and classes in `app/globals.css` (`glass`,
@@ -48,7 +49,10 @@ Next.js 16 App Router app. See `README.md` here for scripts and status.
 - A page reads the node on the server, in an async component inside `Suspense` with a
   skeleton shaped like the result (`PapersResults`, `PaperLoader`); what is known already
   shows in the skeleton. Check a 404 before the boundary when you can: `notFound()` inside it
-  gives a 200 with `noindex`, since the response is already streaming.
+  gives a 200 with `noindex`, since the response is already streaming. A page search engines
+  index reads through React's `cache` (`readProgressOnce`) so its `generateMetadata` shares
+  the read, and renders without the boundary for `isHtmlLimitedBot` user agents, so crawlers
+  that run no JavaScript get its content in the HTML.
 - Tables are TanStack Table v9 over shadcn's table (`components/ui/table.tsx`): the server
   sorts and pages, columns and features are module constants (`papers-columns.tsx`), and
   rows arrive as props. Strings a server component needs from a client file go in a plain

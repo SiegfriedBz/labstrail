@@ -1,0 +1,1 @@
+/about (app/about/page.tsx): who builds VeriSci (its maintainer, the code on GitHub, a LinkedIn profile, from SITE), where the records live (Knowledge Assets on the DKG, minted on Base, testnets until mainnet), and how it differs from the 2020 SciFact model of the same name (ADR 0040).

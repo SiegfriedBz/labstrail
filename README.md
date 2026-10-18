@@ -31,7 +31,10 @@ Ratings work end to end locally, against a contract on Anvil: a published paper'
 requests one from the visitor's wallet, each rating has a page that follows it to its score
 and then shows every check and quote behind it, and the papers list shows each paper's
 score. Deployed, a webhook starts each rating and a cron restarts a stuck one. The repo, its packages and the EIP-712 domain keep the lowercase name `verisci`.
-Everything runs on testnets.
+Everything runs on testnets. Production is open to search engines and AI search: each paper
+and rating has its own title, structured data and share image, and `/method` explains the
+score ([`apps/web` → Search engines and AI search](apps/web/README.md#search-engines-and-ai-search),
+[ADR 0040](docs/adr/0040-production-is-open-to-crawlers.md)).
 
 ## How it works
 
