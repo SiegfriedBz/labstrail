@@ -71,6 +71,27 @@ describe("globals.css's palette", () => {
   });
 });
 
+/** The body of the first `@keyframes name { … }` block, its inner braces included. */
+function keyframes(name: string): string {
+  const start = css.indexOf(`@keyframes ${name} {`);
+  let depth = 0;
+  for (let at = css.indexOf("{", start); at < css.length; at += 1) {
+    if (css[at] === "{") depth += 1;
+    if (css[at] === "}") depth -= 1;
+    if (depth === 0) return css.slice(start, at + 1);
+  }
+  return "";
+}
+
+describe("globals.css's motion", () => {
+  it("moves the hero up as it enters without fading it, so its heading can be the largest paint", () => {
+    const enter = keyframes("enter");
+
+    expect(enter).toContain("transform");
+    expect(enter).not.toContain("opacity");
+  });
+});
+
 describe("globals.css's wallet look before the first paint", () => {
   it("dims what offers to connect while a stored wallet session is being restored", () => {
     expect(css).toMatch(/html\[data-wallet="restoring"\] \[data-wallet-connect\]/);

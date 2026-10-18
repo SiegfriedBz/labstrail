@@ -242,13 +242,13 @@ html[data-wallet="restoring"] [data-wallet-connect="panel"] {
   }
 }
 
+/* A rise without a fade: an element at opacity 0 is no paint, and the hero's heading must be
+   the home page's largest one. */
 @keyframes enter {
   from {
-    opacity: 0;
     transform: translateY(10px);
   }
   to {
-    opacity: 1;
     transform: none;
   }
 }

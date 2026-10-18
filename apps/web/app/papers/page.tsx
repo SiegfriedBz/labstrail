@@ -48,17 +48,21 @@ export default async function PapersPage({ searchParams }: { searchParams: Searc
           Open one to read its record and check who submitted it.
         </p>
       </header>
-      <Suspense
-        key={page}
-        fallback={
-          <div className="grid gap-6">
-            <div className="h-5 w-40 animate-pulse rounded-md bg-surface-strong" />
-            <PapersTableSkeleton rows={Math.min(PAPERS_PER_PAGE, 8)} />
-          </div>
-        }
-      >
-        <PapersResults page={page} />
-      </Suspense>
+      {/* Held at a minimum height, so the footer stays put when the skeleton gives way to a
+          short list or the empty panel. */}
+      <div data-results className="min-h-[75svh]">
+        <Suspense
+          key={page}
+          fallback={
+            <div className="grid gap-6">
+              <div className="h-5 w-40 animate-pulse rounded-md bg-surface-strong" />
+              <PapersTableSkeleton rows={Math.min(PAPERS_PER_PAGE, 8)} />
+            </div>
+          }
+        >
+          <PapersResults page={page} />
+        </Suspense>
+      </div>
     </div>
   );
 }

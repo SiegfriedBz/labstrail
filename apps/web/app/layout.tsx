@@ -17,7 +17,9 @@ import { WALLET_SESSION_SCRIPT } from "../lib/wallet/session.ts";
 import { createWebEnv } from "../lib/web-env.ts";
 import "./globals.css";
 
-const sans = Sora({ subsets: ["latin"], variable: "--font-sora" });
+// "optional": the size-adjusted fallback uses Arial, which Android lacks, so a late swap would
+// shift the page; a visitor whose font isn't there in time keeps the fallback for that view.
+const sans = Sora({ subsets: ["latin"], variable: "--font-sora", display: "optional" });
 const mono = Martian_Mono({ subsets: ["latin"], variable: "--font-martian" });
 
 /** The site's metadata, from this deployment's settings: its address, and whether crawlers may index it. */
