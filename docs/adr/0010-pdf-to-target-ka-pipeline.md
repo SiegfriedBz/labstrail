@@ -23,7 +23,7 @@ Papers enter verisci as PDFs and must become Target KAs. Parsing and the DKG wri
 - Publishing needs a connected wallet and one signature, but no gas.
 - Publishing makes one free-tier Gemini request per new paper, and a second when the first gets no answer; what the answer decides is [0037](0037-verisci-rates-life-science-and-health-papers.md)'s.
 - A signature proves an address, not a person. Every publish costs money (pinning, parsing, node funds), so issuing upload URLs is still rate-limited.
-- Pinata and GROBID (current choices, not part of the decision) must both be up to publish. A paper GROBID reads badly gets a poor KA; an LLM cleanup step can be added then. Pinata holds the only copy of each PDF until a second pin is added.
+- Pinata (the current pinning service, not part of the decision) and GROBID must both be up to publish. A paper GROBID reads badly gets a poor KA; an LLM cleanup step can be added then. Pinata holds the only copy of each PDF until a second pin is added.
 
 ## History
 
@@ -38,3 +38,4 @@ Papers enter verisci as PDFs and must become Target KAs. Parsing and the DKG wri
 - 2026-10-12: the field check's outcomes are left to ADR 0037, which states them all, rather than said here as "refused" (ADR sweep, user's choice).
 - 2026-10-12: publishing asks Gemini a second time when the first request gets no answer (ADR 0037), so a new paper uses one or two free-tier requests, not one (branch review, user's choice).
 - 2026-10-18: the title is GROBID's, completed from the title the PDF stores in its own metadata when that one ends with GROBID's, since GROBID cut a paper's title; still read by code, so the same PDF still gives the same KA, and a paper published before keeps its record (publish fixes, user's choice).
+- 2026-10-18: corrected: GROBID is part of the decision, as the Decision here and [0006](0006-dkg-node-runs-on-a-dedicated-host.md) and [0039](0039-one-credential-per-environment.md) name it; only Pinata is a current choice (ADR sweep, user's choice).
