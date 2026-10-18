@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import { readPaperText } from "./paper-text.ts";
-import { pdfOf } from "./test-pdf.ts";
+import { paperTextOf, readPaperText } from "./paper-text.ts";
+import { pdfOf, xmpOf } from "./test-pdf.ts";
 
 const CID = "bafkreigh2akiscaildcqabsyg3dfr6chu3fgpregiymsck7e7aqa4s52zy";
 const SENTENCE = "Patients were randomly assigned to citicoline or placebo in a one to one ratio.";
+const TITLE = "Citicoline after acute ischaemic stroke: a randomised trial";
 
-const PAPER_PDF = pdfOf(Array.from({ length: 12 }, () => SENTENCE));
+const LINES = Array.from({ length: 12 }, () => SENTENCE);
+const PAPER_PDF = pdfOf(LINES);
 
 function read(body: Uint8Array | string, status = 200, maxChars = 150_000) {
   const fetch = vi.fn(
@@ -62,6 +64,29 @@ describe("readPaperText", () => {
 
   it("finds no text in a PDF without a text layer, such as a scan", async () => {
     expect(await read(pdfOf([])).result).toEqual({ ok: false, reason: "no-text" });
+  });
+
+  it.each([
+    ["its info dictionary's title", { title: TITLE }],
+    ["its XMP title, when the info dictionary has none", { xmp: xmpOf(TITLE) }],
+    ["its info dictionary's title before its XMP one", { title: TITLE, xmp: xmpOf("Other") }],
+  ])("returns the title the PDF stores, %s, beside the text", async (_, metadata) => {
+    const answer = await paperTextOf(pdfOf(LINES, metadata), 150_000);
+
+    expect(answer).toMatchObject({ ok: true, storedTitle: TITLE });
+    expect(answer.ok && answer.paper.text).toContain(SENTENCE);
+  });
+
+  it.each([
+    ["stores no title", {}],
+    ["stores a blank one", { title: "  " }],
+    ["holds metadata that does not parse", { xmp: "<x:xmpmeta><rdf:RDF><dc:title>" }],
+  ])("still gives the text, with no stored title, for a PDF that %s", async (_, metadata) => {
+    const answer = await paperTextOf(pdfOf(LINES, metadata), 150_000);
+
+    expect(answer.ok).toBe(true);
+    expect(answer).not.toHaveProperty("storedTitle");
+    expect(answer.ok && answer.paper.text).toContain(SENTENCE);
   });
 
   it("is too-large for a file over maxBytes", async () => {

@@ -10,7 +10,16 @@ import { type FetchPdfOptions, fetchPdf } from "./fetch-pdf.ts";
  * may have given another file.
  */
 export type ReadPaperTextResult =
-  | { readonly ok: true; readonly paper: PaperText }
+  | {
+      readonly ok: true;
+      readonly paper: PaperText;
+      /**
+       * The title the PDF stores in its own metadata, when it holds one: its info dictionary's
+       * `Title`, else its XMP `dc:title`. The publish run completes GROBID's title with it
+       * (`completeTitle`); the rating run reads only `paper`.
+       */
+      readonly storedTitle?: string;
+    }
   | { readonly ok: false; readonly reason: "too-large" | "unreadable" | "no-text" }
   | {
       readonly ok: false;
@@ -46,20 +55,42 @@ export async function readPaperText(
 /**
  * A PDF's text for the scorer, and its opening for the publish run's field check: each
  * page's text extracted with unpdf, then prepared with `preparePaperText` and fitted to
- * `maxChars`. `unreadable` for a PDF that does not parse, `no-text` for one with no text
- * layer. Never throws.
+ * `maxChars`, with the title the PDF stores (`storedTitle`) when it holds one. `unreadable`
+ * for a PDF that does not parse, `no-text` for one with no text layer; metadata that does not
+ * parse only leaves out the stored title. Never throws.
  */
 export async function paperTextOf(
   bytes: Uint8Array,
   maxChars: number,
 ): Promise<ReadPaperTextResult> {
   let pages: string[];
+  let storedTitle: string | undefined;
   try {
     const document = await getDocumentProxy(bytes);
+    storedTitle = await storedTitleOf(document);
     pages = (await extractText(document, { mergePages: false })).text;
   } catch {
     return { ok: false, reason: "unreadable" };
   }
   const prepared = preparePaperText(pages, maxChars);
-  return prepared.ok ? prepared : { ok: false, reason: "no-text" };
+  if (!prepared.ok) return { ok: false, reason: "no-text" };
+  return storedTitle === undefined ? prepared : { ...prepared, storedTitle };
+}
+
+/**
+ * The title `document` stores: its info dictionary's `Title`, else its XMP `dc:title`, or
+ * `undefined` when it holds neither, a blank one, or metadata that does not parse.
+ */
+async function storedTitleOf(
+  document: Awaited<ReturnType<typeof getDocumentProxy>>,
+): Promise<string | undefined> {
+  try {
+    const { info, metadata } = await document.getMetadata();
+    const titles = [(info as { Title?: unknown }).Title, metadata?.get("dc:title")];
+    return titles.find(
+      (title): title is string => typeof title === "string" && title.trim() !== "",
+    );
+  } catch {
+    return undefined;
+  }
 }
