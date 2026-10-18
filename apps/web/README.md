@@ -41,7 +41,7 @@ points the optional `@x402/*` packages, reached through wagmi's connectors, at
 | `/papers/<cid>/ratings/<requestId>` | One rating: where it stands until it is scored, then its score and every check behind it, or why it was cancelled (below), under "Papers / <title> / Rating" breadcrumbs. `?new=1`, from the Rate button, follows a request the chain doesn't show yet for 2 minutes |
 | `/api/ratings/<requestId>` | The same as JSON (`RatingView`), never cached, for the rating page to poll; not-found for an id that is not `0x` + 64 hex digits, or where no contract takes ratings |
 | `/method` | How the reproducibility readiness score works: how a paper is scored, the checklist for each kind of study (`STUDY_TYPES` from `@verisci/core`, with each one's number of checks), the scorer's model (`RATING_SETTINGS.model`) and the PDF it reads from IPFS by its CID, what the score leaves out, where it is recorded (the score on Base, the answers in the rating's own Knowledge Asset), and the three phases |
-| `/about` | Why VeriSci exists (the reproducibility crisis, and AI agents that build on papers they can't weigh), the OriginTrail DKG's two layers, the paper's PDF stored off-chain on IPFS at an address hashed from its content, papers and ratings as Knowledge Assets that VeriSci's node mints and holds, what comes next (the root README's roadmap, each step with its status and why), who builds VeriSci (its maintainer, the code on GitHub, a LinkedIn profile, from `SITE`), testnets until mainnet, and how it differs from the 2020 SciFact model of the same name |
+| `/about` | Why VeriSci exists (the reproducibility crisis, and AI agents that build on papers they can't weigh), the OriginTrail DKG's two layers, the paper's PDF stored off-chain on IPFS at an address hashed from its content, papers and ratings as Knowledge Assets that VeriSci's node mints and holds, what comes next (the root README's roadmap, each step with its status and why), who builds VeriSci (its maintainer, the code on GitHub, a LinkedIn profile, from `SITE`), testnets until mainnet, how it differs from the 2020 SciFact model of the same name, and that visits are counted with Vercel Web Analytics, which sets no cookies (ADR 0041) |
 | `/robots.txt`, `/sitemap.xml` | Production's crawling rules and every page and paper to index; elsewhere, every crawler kept out and an empty sitemap (below) |
 | `/opengraph-image`, `/papers/<cid>/opengraph-image`, `/papers/<cid>/ratings/<request id>/opengraph-image` | The 1200 × 630 images a shared link shows: the site's, a paper's, and a rating's, which is the site's (below) |
 | `/api/inngest` | Serves the Inngest functions: the publish function and the failure alerts, plus the rating, oracle, reconciler and health functions where the oracle key is set |
@@ -332,18 +332,21 @@ rules, pure and unit-tested; the pages and route files call them.
 - **The wallet loads only when it's used.** `components/wallet/wallet-runtime.ts` is the only
   module that imports AppKit and wagmi (`components/wallet/imports.test.ts` fails on any
   other), and `providers.tsx` reaches it through `import()`. A page carries none of AppKit,
-  WalletConnect or Coinbase's SDK (about 1 MB) and calls none of their servers until a visitor
-  clicks Connect, publishes or rates; the download starts when the pointer, focus or a touch
-  reaches a wallet button. AppKit's vanilla set-up and wagmi's actions (`wagmi/actions`) on the
-  adapter's config need no React provider.
+  WalletConnect or Coinbase's SDK (about 1 MB) and calls none of their servers until the
+  wallet loads: when the pointer, focus or a touch reaches a wallet button, or on a click on
+  Connect, publish or Rate. Loading it fetches AppKit's settings from Reown, which a wallet
+  action waits for up to 8 seconds, and sends Reown AppKit's start-up event (ADR 0041).
+  Coinbase's two sign-ins are the runtime's own connectors, with their SDKs' analytics off.
+  AppKit's vanilla set-up and wagmi's actions (`wagmi/actions`) on the adapter's config need
+  no React provider.
 - **A returning visitor** keeps their address in the header. AppKit stores
   `@appkit/connection_status` as `connected`; `WALLET_SESSION_SCRIPT` (`lib/wallet/session.ts`,
   in `<head>`) then marks `<html data-wallet="restoring">` before the first paint, so whatever
   offers to connect (`data-wallet-connect`) keeps its size and shows nothing (`globals.css`),
-  and the wallet loads once the page is idle (`requestIdleCallback`, or after 2 seconds).
+  and the wallet loads once the page is idle (`requestIdleCallback`, within 2 seconds).
 - `useWallet()` gives a component the wallet's status (`lib/wallet/store.ts`: `idle`,
   `loading`, `restoring`, `connected`, `disconnected`, `failed`), its account and runtime, and
-  `load` and `preload`. A download that fails leaves "Retry wallet" in the header, and the
+  `load` and `preload`. A load that fails leaves "Retry wallet" in the header, and the
   publish form and the Rate button say "The wallet couldn't load. Check your connection and
   try again."; a click tries again.
 - `@verisci/core` declares `sideEffects: false`, so a page using one of its helpers carries

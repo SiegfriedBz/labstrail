@@ -84,7 +84,7 @@ function keyframes(name: string): string {
 }
 
 describe("globals.css's motion", () => {
-  it("moves the hero up as it enters without fading it, so its heading can be the largest paint", () => {
+  it("moves the hero up as it enters without fading it, so its text can be the largest paint", () => {
     const enter = keyframes("enter");
 
     expect(enter).toContain("transform");

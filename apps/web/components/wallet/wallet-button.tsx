@@ -9,8 +9,8 @@ const BUTTON =
   "inline-flex h-9 min-w-9 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-line-strong bg-surface-strong px-2 text-sm font-medium text-ink sm:px-3 transition hover:border-accent/40 hover:bg-accent-soft active:scale-[0.98] disabled:cursor-wait";
 
 /**
- * The wallet button. Before the wallet loads it offers Connect, starting the download when the
- * pointer, focus or a touch reaches it, and opens AppKit's window on a click once loaded. While
+ * The wallet button. Before the wallet loads it offers Connect, starting to load the wallet when
+ * the pointer, focus or a touch reaches it, and opens AppKit's window on a click once loaded. While
  * a stored session comes back it is a placeholder of the same size; once connected it shows
  * the address in short form and opens AppKit's account window. On a phone it is a wallet icon
  * (with a dot once connected), so the header keeps one line.

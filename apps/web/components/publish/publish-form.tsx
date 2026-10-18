@@ -30,7 +30,7 @@ const PHASE_TEXT: Record<Phase, string> = {
 
 /**
  * The publish form, or a note when the wallet window is not set up on this server. Before the
- * wallet loads it asks to connect, starting the download when the pointer or focus reaches
+ * wallet loads it asks to connect, starting to load the wallet when the pointer or focus reaches
  * Connect; while a stored session comes back it shows a skeleton of the drop zone; once
  * connected, the drop zone.
  */

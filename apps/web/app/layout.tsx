@@ -41,7 +41,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const { REOWN_PROJECT_ID } = env;
   const rating = ratingChainConfig(env);
   return (
-    // THEME_SCRIPT sets data-theme before the first paint, so React finds another value there.
+    // THEME_SCRIPT and WALLET_SESSION_SCRIPT set data-theme and data-wallet before the first
+    // paint, so React finds other values there.
     <html
       lang="en"
       data-theme="light"

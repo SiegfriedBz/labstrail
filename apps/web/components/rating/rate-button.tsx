@@ -38,7 +38,7 @@ type Phase = "idle" | "loading" | "sending" | "confirming";
 
 /**
  * Requests a rating from the visitor's wallet (`requestRating`), loading the wallet first when
- * the page hasn't yet (its download starts when the pointer, focus or a touch reaches the
+ * the page hasn't yet (it starts loading when the pointer, focus or a touch reaches the
  * button), then opens the rating's page, which follows it. Names a revert it knows, and says
  * when the wallet couldn't load, or the request is on chain but its receipt or, locally, its
  * announce did not come.
