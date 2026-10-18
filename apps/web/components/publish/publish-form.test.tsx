@@ -12,8 +12,9 @@ const runtime = {
 const load = vi.fn(async () => runtime);
 const preload = vi.fn();
 let wallet: Record<string, unknown> = { status: "idle" };
+let walletReady = true;
 vi.mock("../wallet/providers.tsx", () => ({
-  useWalletReady: () => true,
+  useWalletReady: () => walletReady,
   useWallet: () => ({ load, preload, ...wallet }),
 }));
 vi.mock("../../app/actions.ts", () => ({ requestUpload: vi.fn(), submitPaper: vi.fn() }));
@@ -58,6 +59,16 @@ describe("PublishForm", () => {
     cleanup();
     vi.clearAllMocks();
     wallet = { status: "idle" };
+    walletReady = true;
+  });
+
+  it("says publishing is off, with no Connect, when the wallet isn't set up on this server", () => {
+    walletReady = false;
+    render(<PublishForm {...SETTINGS} />);
+
+    expect(screen.getByText(/Wallet connection isn't set up on this server yet/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Connect wallet" })).toBeNull();
+    expect(load).not.toHaveBeenCalled();
   });
 
   it("before the wallet loads, asks to connect, and a click loads it and opens AppKit's window", async () => {
