@@ -152,7 +152,7 @@ edge`, testnet), Base Sepolia.
   A mint can also fail fast on quorum (`storage_ack_insufficient`,
   `CORE_TEMPORARILY_UNAVAILABLE`); retrying after a couple of minutes usually works
   ([ADR 0009](adr/0009-retries-are-spaced-with-step-sleep.md)). The DKG client answers it
-  `retry-later`, and a publish run that meets it on every attempt stops `network-refused`.
+  `retry-later`, and a publish run whose last attempt meets it stops `network-refused`.
 - **A new context graph waits for the cores' activation slots** (production's
   `verisci-prod`, 2026-10-18): the cores declined the mint of every attempt of its first
   publish run (`storage_ack_insufficient`, `CORE_TEMPORARILY_UNAVAILABLE … not active yet
