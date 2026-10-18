@@ -146,7 +146,8 @@ stateDiagram-v2
   as [ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md) names
   it), or a submission that failed its checks.
 - `failed` shows why the run stopped (`failureMessage`): Base, the PDF, the DKG node or
-  the mint not answering after every retry, or a problem on our side.
+  the mint not answering after every retry, OriginTrail's network not accepting the record
+  yet (`network-refused`), or a problem on our side.
 - `following`: the event started no run a minute after it was sent (its time is read from
   its ULID, `eventTime`). The publish function is a singleton per CID, so another run holds
   this PDF; the page follows the paper on the node and gives up (`not-found`) after
@@ -382,8 +383,10 @@ preview, and `develop`'s, at its stable branch URL, is staging.
   Preview), `DKG_CONTEXT_GRAPH` and `DKG_TOKEN` take one value per environment;
   `ORACLE_PRIVATE_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` and
   `ALCHEMY_WEBHOOK_SIGNING_KEY` go on Production and on Preview limited to the branch
-  `develop`, so feature previews never rate or post; every other variable takes one value
-  for both. System Environment Variables stay exposed: Inngest reads `VERCEL_GIT_COMMIT_REF`,
+  `develop`, so feature previews never rate or post; production refuses to start without
+  the oracle key or the two Telegram settings
+  ([ADR 0038](../../docs/adr/0038-alerts-go-to-one-telegram-chat.md)). Every other variable
+  takes one value for both. System Environment Variables stay exposed: Inngest reads `VERCEL_GIT_COMMIT_REF`,
   and the notifications' links `VERCEL_BRANCH_URL` and `VERCEL_PROJECT_PRODUCTION_URL`.
 - **Inngest's `develop` branch environment** has auto-archive off
   ([ADR 0005](../../docs/adr/0005-staging-and-production-are-isolated.md)).
