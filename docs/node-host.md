@@ -683,7 +683,7 @@ The first start writes `agent-key.bin`, `agent-keystore.json` and `auth.token` t
 ### 6. Back up the node
 
 Right after the first start, before the node owns anything: its agent address is part of
-every UAL it mints and of every graph id, so losing these files orphans both
+every UAL it mints and of every graph id, so losing these files orphans them
 ([ADR 0006](adr/0006-dkg-node-runs-on-a-dedicated-host.md)). The backup holds the six files
 that make the node; the graph data lives in its store (`~/.dkg/oxigraph-data`).
 
