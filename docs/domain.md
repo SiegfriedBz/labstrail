@@ -161,8 +161,13 @@ edge`, testnet), Base Sepolia.
   not host when it starts (`maxRehydratedContextGraphSubscriptions`), keeps the rest dormant,
   and fills freed slots every 30 s; for 10 minutes after its first decline it answers
   "temporarily unavailable" and asks its activator for a slot, then calls the subscription
-  dormant. Publishing the same PDF again later picks up where it stopped. Not yet known: how
-  long `verisci-prod` waits.
+  dormant. Publishing the same PDF again later picks up where it stopped. `verisci-prod` was
+  still dormant on 2026-10-19, with no answer from OriginTrail on
+  [OriginTrail/dkg#3357](https://github.com/OriginTrail/dkg/issues/3357), where another
+  publisher's older graph stayed dormant while a newly registered one published at once. A
+  new graph did the same here: `verisci-main-prod`, registered on 2026-10-19 (registry id
+  887), minted in its first publish run, and production moved to it
+  ([ADR 0005](adr/0005-staging-and-production-are-isolated.md)).
 - **The daemon has a single admin token:** one bearer token in `~/.dkg/auth.token`
   (written by `dkg init` on 10.0.16; on 10.0.22, 2026-10-09, by the first `dkg start`,
   with the agent key), valid for every graph on the node; there are no tokens scoped per
