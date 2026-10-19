@@ -20,6 +20,7 @@
     "@tanstack/react-table": "9.2.8",
     "@upstash/ratelimit": "2.2.0",
     "@upstash/redis": "1.39.0",
+    "@vercel/analytics": "2.0.1",
     "@verisci/contracts": "workspace:*",
     "@verisci/core": "workspace:*",
     "@verisci/dkg": "workspace:*",

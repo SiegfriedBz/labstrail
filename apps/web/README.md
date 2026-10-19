@@ -20,7 +20,9 @@ Architecture views: [`.omm/overall-architecture/web-app/`](../../.omm/overall-ar
 All five packages: `@verisci/env`, `@verisci/core`, `@verisci/dkg`,
 `@verisci/contracts`, `@verisci/workflows`. Each one must be listed in
 `transpilePackages` in `next.config.ts`. Also `inngest` (the `/api/inngest` route's `serve`
-handler); Reown AppKit, wagmi, viem and TanStack Query (the wallet); `@upstash/ratelimit`
+handler); Reown AppKit, wagmi's actions and viem (the wallet, loaded only when used;
+TanStack Query stays installed as wagmi's peer); `@vercel/analytics` (production's visit
+counts); `@upstash/ratelimit`
 and `@upstash/redis` (the limits); Zod (settings and run outputs); `@next/env` (loads the
 root env files in `next.config.ts`); TanStack Table (the papers table); Tailwind CSS, with
 `clsx` and `tailwind-merge` for shadcn's `cn` (`lib/utils.ts`); and Phosphor icons. `next.config.ts`
@@ -39,7 +41,7 @@ points the optional `@x402/*` packages, reached through wagmi's connectors, at
 | `/papers/<cid>/ratings/<requestId>` | One rating: where it stands until it is scored, then its score and every check behind it, or why it was cancelled (below), under "Papers / <title> / Rating" breadcrumbs. `?new=1`, from the Rate button, follows a request the chain doesn't show yet for 2 minutes |
 | `/api/ratings/<requestId>` | The same as JSON (`RatingView`), never cached, for the rating page to poll; not-found for an id that is not `0x` + 64 hex digits, or where no contract takes ratings |
 | `/method` | How the reproducibility readiness score works: how a paper is scored, the checklist for each kind of study (`STUDY_TYPES` from `@verisci/core`, with each one's number of checks), the scorer's model (`RATING_SETTINGS.model`) and the PDF it reads from IPFS by its CID, what the score leaves out, where it is recorded (the score on Base, the answers in the rating's own Knowledge Asset), and the three phases |
-| `/about` | Why VeriSci exists (the reproducibility crisis, and AI agents that build on papers they can't weigh), the OriginTrail DKG's two layers, the paper's PDF stored off-chain on IPFS at an address hashed from its content, papers and ratings as Knowledge Assets that VeriSci's node mints and holds, what comes next (the root README's roadmap, each step with its status and why), who builds VeriSci (its maintainer, the code on GitHub, a LinkedIn profile, from `SITE`), testnets until mainnet, and how it differs from the 2020 SciFact model of the same name |
+| `/about` | Why VeriSci exists (the reproducibility crisis, and AI agents that build on papers they can't weigh), the OriginTrail DKG's two layers, the paper's PDF stored off-chain on IPFS at an address hashed from its content, papers and ratings as Knowledge Assets that VeriSci's node mints and holds, what comes next (the root README's roadmap, each step with its status and why), who builds VeriSci (its maintainer, the code on GitHub, a LinkedIn profile, from `SITE`), testnets until mainnet, how it differs from the 2020 SciFact model of the same name, and that visits are counted with Vercel Web Analytics, which sets no cookies (ADR 0041) |
 | `/robots.txt`, `/sitemap.xml` | Production's crawling rules and every page and paper to index; elsewhere, every crawler kept out and an empty sitemap (below) |
 | `/opengraph-image`, `/papers/<cid>/opengraph-image`, `/papers/<cid>/ratings/<request id>/opengraph-image` | The 1200 × 630 images a shared link shows: the site's, a paper's, and a rating's, which is the site's (below) |
 | `/api/inngest` | Serves the Inngest functions: the publish function and the failure alerts, plus the rating, oracle, reconciler and health functions where the oracle key is set |
@@ -325,6 +327,43 @@ rules, pure and unit-tested; the pages and route files call them.
   `next/og` reads where it cannot read the site's WOFF2 fonts.
 - A papers list the node did not answer for, or answered unreadably, holds a `noindex`.
 
+## Speed and the wallet
+
+- **The wallet loads only when it's used.** `components/wallet/wallet-runtime.ts` is the only
+  module that imports AppKit and wagmi (`components/wallet/imports.test.ts` fails on any
+  other), and `providers.tsx` reaches it through `import()`. A page carries none of AppKit,
+  WalletConnect or Coinbase's SDK (about 1 MB) and calls none of their servers until the
+  wallet loads: when the pointer, focus or a touch reaches a wallet button, or on a click on
+  Connect, publish or Rate. Loading it fetches AppKit's settings from Reown, which a wallet
+  action waits for up to 8 seconds, and sends Reown AppKit's start-up event (ADR 0041).
+  Coinbase's two sign-ins are the runtime's own connectors, with their SDKs' analytics off.
+  AppKit's vanilla set-up and wagmi's actions (`wagmi/actions`) on the adapter's config need
+  no React provider.
+- **A returning visitor** keeps their address in the header. AppKit stores
+  `@appkit/connection_status` as `connected`; `WALLET_SESSION_SCRIPT` (`lib/wallet/session.ts`,
+  in `<head>`) then marks `<html data-wallet="restoring">` before the first paint, so whatever
+  offers to connect (`data-wallet-connect`) keeps its size and shows nothing (`globals.css`),
+  and the wallet loads once the page is idle (`requestIdleCallback`, within 2 seconds).
+- `useWallet()` gives a component the wallet's status (`lib/wallet/store.ts`: `idle`,
+  `loading`, `restoring`, `connected`, `disconnected`, `failed`), its account and runtime, and
+  `load` and `preload`. A load that fails leaves "Retry wallet" in the header, and the
+  publish form and the Rate button say "The wallet couldn't load. Check your connection and
+  try again."; a click tries again.
+- `@verisci/core` declares `sideEffects: false`, so a page using one of its helpers carries
+  none of its schemas (Zod).
+- `/papers` holds its results area at a minimum height, Sora shows only when it arrives in
+  time (`display: "optional"`), and the hero rises without fading, so no page shifts and the
+  hero's text can be the home page's largest paint.
+- **Measuring:** run Lighthouse on `pnpm --filter @verisci/web build` then `start`, in a fresh
+  private window, never on `dev`: dev serves unminified code, and Lighthouse's simulated LCP
+  counts every script requested before the first paint. On 2026-10-18 (mobile): every page
+  92-97 (67-74 before), 230-360 KB sent (1.0-1.2 MB before), blocking time 20-70 ms, no
+  layout shift.
+- **Visits** are counted on production only, with Vercel Web Analytics
+  (`components/site/site-analytics.tsx`, [ADR 0041](../../docs/adr/0041-production-counts-visits-without-cookies.md)):
+  pages, referrers, countries, devices, without cookies. It is switched on in the Vercel
+  project's Analytics tab.
+
 ## Code layout
 
 - `app/`: the pages, the route handlers and the server actions.
@@ -332,13 +371,14 @@ rules, pure and unit-tested; the pages and route files call them.
   flow's folder: `publish` (the upload, the publish form's steps, a paper's progress, the
   messages and the limits), `papers` (the list, its rating summaries and explorer links) and
   `rating` (the request flow, the rating chain, a rating's stage, its checks, the time since
-  the request and the messages) and `seo` (the site's address and metadata, crawling rules,
-  page metadata, structured data, the bot list and the share cards). Only helpers several
+  the request and the messages), `seo` (the site's address and metadata, crawling rules,
+  page metadata, structured data, the bot list and the share cards) and `wallet` (a stored
+  session, the loader and the wallet's state). Only helpers several
   areas share sit at its root: `web-env`, `server`, `site` (the name, title, description,
   definition, repo and maintainer the metadata, structured data, footer and wallet window
   read), `theme`, `shorten`, `utils` and `empty-module`.
 - `components/`, grouped by area: `site` (the shell every page shares: logo, header links,
-  theme button, footer, breadcrumbs, the structured data's script), `wallet` (the wallet providers and button),
+  theme button, footer, breadcrumbs, the structured data's script), `wallet` (the wallet's provider, its button, and the runtime it loads on use),
   `home` (the hero's demo and the latest papers), `papers` (the papers list), `paper` (one
   paper's page and its step chain, which the rating page and the demo reuse), `rating` (the
   Ratings section, the Rate button and the rating page), `publish`, and `ui`

@@ -91,6 +91,7 @@ In the order a request lives: requested, named, ingested, scored, fulfilled, and
 | [0034. Users connect a wallet, and anyone may publish](0034-users-connect-a-wallet-anyone-may-publish.md) | Reown AppKit with wagmi on Base Sepolia (Anvil too, locally); the wallet signs submissions and sends rating requests; no allowlist, no session |
 | [0035. Limits are the app's only state](0035-limits-are-the-apps-only-state.md) | The chain and the DKG hold the truth, IPFS the PDF files; today Upstash Redis counts upload URLs per connection and submissions per address |
 | [0040. Production is open to search engines and AI crawlers; other environments are closed](0040-production-is-open-to-crawlers.md) | Production is indexed now, testnet records included, by every crawler, AI training ones included; staging, previews and local keep crawlers out; only published papers, ratings with a recorded score and the site's pages are offered; a rating is a Review, never an aggregate rating; crawlers that run no JavaScript get the content in the HTML |
+| [0041. Production counts visits with Vercel Web Analytics, without cookies](0041-production-counts-visits-without-cookies.md) | Page views on production only (page, referrer, country, device, browser); no cookies, no consent banner, no custom events, no other tracker (the wallet's libraries with their analytics off; AppKit's two required events to Reown once the wallet is used); Hobby's free monthly events, one month of data |
 
 ## Folded ADRs
 

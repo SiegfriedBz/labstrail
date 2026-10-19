@@ -1,7 +1,7 @@
 created: 2026-10-12T05:42:57.668Z
-updated: 2026-10-18T13:50:20.356Z
-update_count: 10
-last_field: diagram
+updated: 2026-10-18T20:03:09.513Z
+update_count: 12
+last_field: description
 kind: nested-class
 title: lib
 children:
@@ -10,6 +10,7 @@ children:
   - publish
   - rating
   - seo
+  - wallet
 parentPath:
   - web-app
 prev_diagram: >
@@ -17,3 +18,6 @@ prev_diagram: >
       helpers["Shared Helpers\nlib/web-env.ts, server.ts, site.ts, theme.ts, shorten.ts, utils.ts"] -->|"server.ts builds the upload limits from web-env and"| publish["Publish Flow\nlib/publish/"]
       helpers -->|"web-env's local chain settings name the Anvil contract for"| rating["Rating Flow\nlib/rating/"]
       papers["Papers\nlib/papers/"] -->|"asks which contract takes ratings with"| rating
+      helpers -->|"SITE and web-env's Vercel addresses feed"| seo["Search and Sharing\nlib/seo/"]
+      publish -->|"a paper's view, which titles its page and card in"| seo
+      papers -->|"the PDF's IPFS link, for the structured data in"| seo

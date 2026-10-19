@@ -37,7 +37,10 @@ score. Deployed, a webhook starts each rating and a cron restarts a stuck one. T
 Everything runs on testnets. Production is open to search engines and AI search: each paper
 and rating has its own title and structured data, each paper its own share image, and
 `/method` explains the score ([`apps/web` → Search engines and AI search](apps/web/README.md#search-engines-and-ai-search),
-[ADR 0040](docs/adr/0040-production-is-open-to-crawlers.md)).
+[ADR 0040](docs/adr/0040-production-is-open-to-crawlers.md)). Pages load the wallet only when a visitor uses it or comes back connected, which keeps
+every page at 92-97 on Lighthouse mobile, and production counts visits without cookies
+([`apps/web` → Speed and the wallet](apps/web/README.md#speed-and-the-wallet),
+[ADR 0041](docs/adr/0041-production-counts-visits-without-cookies.md)).
 
 ## How it works
 

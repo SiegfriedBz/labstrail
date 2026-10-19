@@ -5,18 +5,22 @@ import { connection } from "next/server";
 import type { ReactNode } from "react";
 import { HeaderNav } from "../components/site/header-nav.tsx";
 import { Logo } from "../components/site/logo.tsx";
+import { SiteAnalytics } from "../components/site/site-analytics.tsx";
 import { SiteFooter } from "../components/site/site-footer.tsx";
 import { ThemeToggle } from "../components/site/theme-toggle.tsx";
-import { Providers } from "../components/wallet/providers.tsx";
+import { WalletProvider } from "../components/wallet/providers.tsx";
 import { WalletButton } from "../components/wallet/wallet-button.tsx";
 import { ratingChainConfig } from "../lib/rating/chain.ts";
 import { siteMetadata } from "../lib/seo/site-metadata.ts";
 import { SITE } from "../lib/site.ts";
 import { THEME_SCRIPT } from "../lib/theme.ts";
+import { WALLET_SESSION_SCRIPT } from "../lib/wallet/session.ts";
 import { createWebEnv } from "../lib/web-env.ts";
 import "./globals.css";
 
-const sans = Sora({ subsets: ["latin"], variable: "--font-sora" });
+// "optional": the size-adjusted fallback uses Arial, which Android lacks, so a late swap would
+// shift the page; a visitor whose font isn't there in time keeps the fallback for that view.
+const sans = Sora({ subsets: ["latin"], variable: "--font-sora", display: "optional" });
 const mono = Martian_Mono({ subsets: ["latin"], variable: "--font-martian" });
 
 /** The site's metadata, from this deployment's settings: its address, and whether crawlers may index it. */
@@ -27,7 +31,9 @@ export function generateMetadata(): Metadata {
 /**
  * The shell: header with the theme and wallet buttons, then the page. Rendered per request,
  * so the Reown project id is read from the server's settings, never inlined at build time.
- * The theme is set in `<head>` before the first paint (`THEME_SCRIPT`).
+ * The theme, and whether a stored wallet session is coming back, are set in `<head>` before
+ * the first paint (`THEME_SCRIPT`, `WALLET_SESSION_SCRIPT`). Production counts visits with
+ * Vercel Web Analytics (ADR 0041).
  */
 export default async function RootLayout({ children }: { children: ReactNode }) {
   await connection();
@@ -35,7 +41,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const { REOWN_PROJECT_ID } = env;
   const rating = ratingChainConfig(env);
   return (
-    // THEME_SCRIPT sets data-theme before the first paint, so React finds another value there.
+    // THEME_SCRIPT and WALLET_SESSION_SCRIPT set data-theme and data-wallet before the first
+    // paint, so React finds other values there.
     <html
       lang="en"
       data-theme="light"
@@ -45,6 +52,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       <head>
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: our own constant, which must run before the first paint */}
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: our own constant, which must run before the first paint */}
+        <script dangerouslySetInnerHTML={{ __html: WALLET_SESSION_SCRIPT }} />
       </head>
       <body className="relative min-h-svh overflow-x-clip font-sans antialiased">
         <div aria-hidden className="bench pointer-events-none absolute inset-x-0 top-0 h-[900px]" />
@@ -54,7 +63,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         >
           Skip to content
         </a>
-        <Providers projectId={REOWN_PROJECT_ID} localRpcUrl={rating?.rpcUrl}>
+        <WalletProvider projectId={REOWN_PROJECT_ID} localRpcUrl={rating?.rpcUrl}>
           <header className="sticky top-0 z-20 border-b border-line bg-page/70 backdrop-blur-xl">
             <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
               <Link href="/" aria-label={`${SITE.name} home`}>
@@ -73,7 +82,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           <SiteFooter
             ratingController={rating && { address: rating.contract, local: rating.local }}
           />
-        </Providers>
+        </WalletProvider>
+        <SiteAnalytics appEnv={env.APP_ENV} />
       </body>
     </html>
   );

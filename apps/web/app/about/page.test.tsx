@@ -93,6 +93,12 @@ describe("/about", () => {
     ).toBeTruthy();
   });
 
+  it("says visits are counted with Vercel Web Analytics, without cookies", () => {
+    render(<AboutPage />);
+
+    expect(screen.getByText(/Vercel Web Analytics, which sets no cookies/)).toBeTruthy();
+  });
+
   it("tells VeriSci apart from the 2020 SciFact model of the same name", () => {
     render(<AboutPage />);
 

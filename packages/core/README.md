@@ -7,6 +7,10 @@ Domain logic. Core does no IO: no `fetch`, no `node:*` imports and no other
 `pnpm check` enforces this: `packages/core/biome.json` turns `fetch`,
 `node:*` and `@verisci/*` into errors ("core does no IO").
 
+Its `package.json` declares `"sideEffects": false`: its modules only define functions and
+constants, so a bundler drops what a page doesn't use, and a web page that imports one
+helper carries none of core's Zod schemas (`apps/web/app/packages.test.ts` keeps the flag).
+
 Status: shared constants, UAL parsing, asset names, a Target KA's content and submission,
 the field check both runs make (its prompt and the check of its answer),
 reading a paper's record back (`paperRecordQuery`, `parsePaperRecord`), listing published
