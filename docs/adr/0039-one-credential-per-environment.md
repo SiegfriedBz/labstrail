@@ -18,6 +18,10 @@ The DKG daemon has a single admin token, valid for every graph on the node ([dom
 ## Consequences
 
 - The admin token is held only on the host and in the node's encrypted backups. Off the host it opens nothing, since Caddy accepts only the environments' credentials.
-- Every credential still reaches both graphs, since the daemon has no token per graph: the `-prod` guard stays ([0005](0005-staging-and-production-are-isolated.md)).
+- Every credential still reaches every graph on the node, since the daemon has no token per graph: the `-prod` guard stays ([0005](0005-staging-and-production-are-isolated.md)).
 - Rotating the admin token means updating Caddy's settings on the host as well.
 - The credentials live on the host and in each environment's settings, never in the repo.
+
+## History
+
+- 2026-10-19: corrected: every credential reaches every graph on the node, the retired `…/verisci-prod` included, not two ([0005](0005-staging-and-production-are-isolated.md)) (ADR sweep, user's choice).

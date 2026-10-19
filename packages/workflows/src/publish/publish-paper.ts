@@ -77,7 +77,7 @@ export type ReadPaperResult =
  * Why a publish run stopped without an outcome, carried in its error as
  * `publish-failed:<reason>: <detail>` so the paper's page can say it
  * ({@link publishFailureReason}). `network-refused` is the network's cores declining the mint
- * (the node's `retry-later`, such as a new graph waiting for the cores' activation,
+ * (the node's `retry-later`, such as a graph waiting for the cores' activation,
  * `docs/domain.md` → DKG). All but `setup` are worth publishing the same PDF again later;
  * `setup` is ours to fix.
  */

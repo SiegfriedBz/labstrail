@@ -17,9 +17,9 @@ other services can target it.
 Each environment has its own contract, context graph, webhook, oracle wallet, Inngest
 environment and upload-limit counters; the Vercel project, the Reown project, the pinning
 account, the Upstash database, the Alchemy RPC account, the Gemini key and the alerts chat
-are shared. The DKG node is shared: its publisher wallets and one admin token serve both
-graphs, so the dkg package's env module refuses the production graph outside production and
-requires it in production
+are shared. The DKG node is shared: its publisher wallets and one admin token serve every
+graph on it, so the dkg package's env module refuses the production graph outside
+production and requires it in production
 ([ADR 0005](docs/adr/0005-staging-and-production-are-isolated.md)). Each environment,
 developers' computers included, reaches the node through its own credential
 ([ADR 0039](docs/adr/0039-one-credential-per-environment.md)). Mainnet

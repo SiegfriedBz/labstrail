@@ -153,7 +153,7 @@ Retries ([ADR 0009](../../docs/adr/0009-retries-are-spaced-with-step-sleep.md)):
   stored ([ADR 0010](../../docs/adr/0010-pdf-to-target-ka-pipeline.md)); a mint not seen
   after 10 minutes starts a new attempt at once. Up to 5 attempts; the run then fails with
   the last attempt's reason: `network-refused` for a quorum failure (the network's cores
-  declining the mint, as for a new graph waiting for their activation, `docs/domain.md` →
+  declining the mint, as for a graph waiting for their activation, `docs/domain.md` →
   DKG), `node-unreachable` for the node, `paper-unreachable` for the gateway or GROBID,
   `mint-not-confirmed` for a mint not seen.
 - **check-field:** one more ask after 30 s, not 2 minutes: free-tier Gemini calls that

@@ -24,7 +24,7 @@ A step marked `to check` was not verified.
 | Names | `verisci-dkg.duckdns.org` (the DKG node's API) and `verisci-grobid.duckdns.org` (GROBID), both pointing at that address |
 | Login | `ssh -i ~/.ssh/id_ed25519_bz ubuntu@89.168.60.126`; `ubuntu` has passwordless `sudo` |
 | Node | DKG 10.0.22, role `edge`, agent address `0xD701ed157232ad5E14BC4134a8D10D64D86f13B3` |
-| Graphs | `verisci-staging` (registry id 625) and `verisci-prod` (registry id 816) |
+| Graphs | `verisci-staging` (registry id 625), `verisci-main-prod` (887, production's) and `verisci-prod` (816, retired) |
 | Inbound ports | 22 (SSH), 80 and 443 (Caddy) |
 
 ## How the parts connect
@@ -442,22 +442,25 @@ A rebuilt server skips this step: the graph stays registered on chain, and the k
 
 Created and registered like `verisci-staging` (step 8 of [Building a new
 node](#building-a-new-node)): open access and open publishing, a 100 TRAC deposit from the
-agent's wallet, plus gas.
+agent's wallet, plus gas. Then back up the node's keys ([step 10](#10-back-up-the-nodes-keys)),
+since `config.json` changed.
 
 ```bash
-dkg context-graph create verisci-prod --access-policy 0 --save
-dkg context-graph register 0xD701ed157232ad5E14BC4134a8D10D64D86f13B3/verisci-prod
+dkg context-graph create verisci-main-prod --access-policy 0 --save
+dkg context-graph register 0xD701ed157232ad5E14BC4134a8D10D64D86f13B3/verisci-main-prod
 ```
 
-| Graph | Full id | Registry id |
-| --- | --- | --- |
-| `verisci-staging` | `0xD701ed157232ad5E14BC4134a8D10D64D86f13B3/verisci-staging` | 625 |
-| `verisci-prod` | `0xD701ed157232ad5E14BC4134a8D10D64D86f13B3/verisci-prod` | 816 |
+| Graph | Full id | Registry id | Use |
+| --- | --- | --- | --- |
+| `verisci-staging` | `0xD701ed157232ad5E14BC4134a8D10D64D86f13B3/verisci-staging` | 625 | Staging, previews and local development |
+| `verisci-main-prod` | `0xD701ed157232ad5E14BC4134a8D10D64D86f13B3/verisci-main-prod` | 887 | Production, since 2026-10-19 |
+| `verisci-prod` | `0xD701ed157232ad5E14BC4134a8D10D64D86f13B3/verisci-prod` | 816 | Retired: OriginTrail's cores keep it dormant (`docs/domain.md` → DKG); it stays in `contextGraphs`, unused |
 
-On 2026-10-17 `verisci-prod` reached `finalized-chain` 10 seconds after registering.
+`verisci-prod` reached `finalized-chain` 10 seconds after registering, on 2026-10-17;
+`verisci-main-prod` at once, on 2026-10-19.
 
-Check: `/api/status` lists both graphs at `accepted finalized-chain`, and
-`~/.dkg/config.json`'s `contextGraphs` holds both full ids.
+Check: `/api/status` lists every graph above at `accepted finalized-chain`, and
+`~/.dkg/config.json`'s `contextGraphs` holds their full ids.
 
 ### 9. Reboot
 
@@ -466,7 +469,7 @@ sudo systemctl reboot
 ```
 
 Check, once SSH answers again: `systemctl is-active rpc-proxy dkg caddy docker` prints
-`active` four times, `docker ps` lists `grobid`, both graphs are back at `finalized-chain`,
+`active` four times, `docker ps` lists `grobid`, every graph is back at `finalized-chain`,
 and the checks in [The credentials](#the-credentials) pass.
 
 ### 10. Back up the node's keys
@@ -508,8 +511,8 @@ gpg -d ~/verisci-dkg-keys-YYYY-MM-DD.tar.gz.gpg 2>/dev/null | tar -tzf - | wc -l
 
 ## If the server is lost
 
-The node lives in its keys: its agent address is part of every UAL it minted and of both
-graph ids ([ADR 0006](adr/0006-dkg-node-runs-on-a-dedicated-host.md)). Another Ubuntu server
+The node lives in its keys: its agent address is part of every UAL it minted and of every
+graph id ([ADR 0006](adr/0006-dkg-node-runs-on-a-dedicated-host.md)). Another Ubuntu server
 takes over:
 
 1. Stop the old server's daemon and DuckDNS job if it can still be reached
@@ -680,7 +683,7 @@ The first start writes `agent-key.bin`, `agent-keystore.json` and `auth.token` t
 ### 6. Back up the node
 
 Right after the first start, before the node owns anything: its agent address is part of
-every UAL it mints and of every graph id, so losing these files orphans both
+every UAL it mints and of every graph id, so losing these files orphans them
 ([ADR 0006](adr/0006-dkg-node-runs-on-a-dedicated-host.md)). The backup holds the six files
 that make the node; the graph data lives in its store (`~/.dkg/oxigraph-data`).
 

@@ -4,6 +4,8 @@ import { contextGraphSchema, createDkgEnv } from "./dkg-env.ts";
 
 const AGENT = "0xD701ed157232ad5E14BC4134a8D10D64D86f13B3";
 const TOKEN = "secret-admin-token";
+/** Production's context graph since 2026-10-19 (ADR 0005). */
+const PRODUCTION_GRAPH = `${AGENT}/verisci-main-prod`;
 
 function runtimeEnv(overrides: Record<string, string | undefined> = {}) {
   return {
@@ -36,9 +38,11 @@ describe("createDkgEnv", () => {
   });
 
   it.each(["local", "staging"])("refuses a -prod graph when APP_ENV is %s", (appEnv) => {
-    const error = envError({ APP_ENV: appEnv, DKG_CONTEXT_GRAPH: `${AGENT}/verisci-prod` });
+    const error = envError({ APP_ENV: appEnv, DKG_CONTEXT_GRAPH: PRODUCTION_GRAPH });
 
-    expect(error.issues.map((issue) => issue.variable)).toEqual(["DKG_CONTEXT_GRAPH"]);
+    expect(error.issues).toEqual([
+      { variable: "DKG_CONTEXT_GRAPH", message: "a -prod graph needs APP_ENV=production" },
+    ]);
   });
 
   it("requires a -prod graph when APP_ENV is production", () => {
@@ -49,10 +53,10 @@ describe("createDkgEnv", () => {
 
   it("accepts a -prod graph when APP_ENV is production", () => {
     const env = createDkgEnv(
-      runtimeEnv({ APP_ENV: "production", DKG_CONTEXT_GRAPH: `${AGENT}/verisci-prod` }),
+      runtimeEnv({ APP_ENV: "production", DKG_CONTEXT_GRAPH: PRODUCTION_GRAPH }),
     );
 
-    expect(env.DKG_CONTEXT_GRAPH).toBe(`${AGENT}/verisci-prod`);
+    expect(env.DKG_CONTEXT_GRAPH).toBe(PRODUCTION_GRAPH);
   });
 
   it("refuses a bare graph name, which reads another, empty graph", () => {
@@ -86,11 +90,11 @@ describe("createDkgEnv", () => {
 describe("contextGraphSchema", () => {
   it.each([
     [false, `${AGENT}/verisci-staging`, true],
-    [false, `${AGENT}/verisci-prod`, false],
+    [false, PRODUCTION_GRAPH, false],
     [false, "verisci-staging", false],
     [false, `${AGENT.toLowerCase()}/verisci-staging`, false],
     [false, `0x${AGENT.slice(2).toUpperCase()}/verisci-staging`, false],
-    [true, `${AGENT}/verisci-prod`, true],
+    [true, PRODUCTION_GRAPH, true],
     [true, `${AGENT}/verisci-staging`, false],
   ])("in production %s, accepts %s: %s", (isProduction, id, accepted) => {
     expect(contextGraphSchema(isProduction).safeParse(id).success).toBe(accepted);
