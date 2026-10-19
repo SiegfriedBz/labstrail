@@ -153,7 +153,7 @@ edge`, testnet), Base Sepolia.
   `CORE_TEMPORARILY_UNAVAILABLE`); retrying after a couple of minutes usually works
   ([ADR 0009](adr/0009-retries-are-spaced-with-step-sleep.md)). The DKG client answers it
   `retry-later`, and a publish run whose last attempt meets it stops `network-refused`.
-- **A new context graph waits for the cores' activation slots** (production's
+- **A context graph can wait for the cores' activation slots, or stay dormant** (production's
   `verisci-prod`, 2026-10-18): the cores declined the mint of every attempt of its first
   publish run (`storage_ack_insufficient`, `CORE_TEMPORARILY_UNAVAILABLE … not active yet
   (activationCap)`). Read in the daemon's source (10.0.22, `dkg-agent-lifecycle.js`,
@@ -232,7 +232,7 @@ edge`, testnet), Base Sepolia.
   minted to the author, and the UAL stays the same across updates
   (docs.origintrail.io → Knowledge Assets).
 - **KA numbers are counted per author** and reserved at store time (the `reservedUal`).
-  Both our graphs publish as one author, and a stored asset that is never minted keeps
+  All our graphs publish as one author, and a stored asset that is never minted keeps
   its number, so each environment sees gaps in its numbering. Expected, not a bug.
 - **Authority resolution needs the node's local JSON-RPC proxy:** public Base Sepolia
   endpoints are not reliable enough for it.

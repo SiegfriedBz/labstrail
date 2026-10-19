@@ -511,8 +511,8 @@ gpg -d ~/verisci-dkg-keys-YYYY-MM-DD.tar.gz.gpg 2>/dev/null | tar -tzf - | wc -l
 
 ## If the server is lost
 
-The node lives in its keys: its agent address is part of every UAL it minted and of both
-graph ids ([ADR 0006](adr/0006-dkg-node-runs-on-a-dedicated-host.md)). Another Ubuntu server
+The node lives in its keys: its agent address is part of every UAL it minted and of every
+graph id ([ADR 0006](adr/0006-dkg-node-runs-on-a-dedicated-host.md)). Another Ubuntu server
 takes over:
 
 1. Stop the old server's daemon and DuckDNS job if it can still be reached
