@@ -55,6 +55,14 @@ describe("/papers", () => {
     expect(screen.queryByText(/Results for page/)).toBeNull();
   });
 
+  it("keeps a minimum height on the results area, so the footer doesn't move when they arrive", async () => {
+    listArrives = false;
+    await show();
+
+    const area = screen.getByLabelText("Loading papers").closest("[data-results]");
+    expect(area?.className).toMatch(/\bmin-h-/);
+  });
+
   it.each(["0", "01", "abc"])("answers 404 for ?page=%s before anything streams", async (page) => {
     await expect(show(page)).rejects.toThrow("NEXT_NOT_FOUND");
   });

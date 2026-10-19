@@ -1,9 +1,9 @@
 created: 2026-10-12T05:49:40.626Z
-updated: 2026-10-18T13:50:29.183Z
-update_count: 22
-last_field: todo
-git_commit: 07d91d4
-git_branch: feat/036-seo
+updated: 2026-10-18T20:03:35.036Z
+update_count: 23
+last_field: note
+git_commit: b7ef68b
+git_branch: feat/037-performance
 prev_diagram: >-
   graph LR
       home["Home\napp/page.tsx"] -->|"Publish a paper"| publish["Publish\napp/publish/page.tsx"]

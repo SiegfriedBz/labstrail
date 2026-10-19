@@ -18,17 +18,19 @@ Next.js 16 App Router app. See `README.md` here for scripts and status.
   ([ADR 0003](../../docs/adr/0003-inngest-functions-live-in-workflows.md)).
 - Components are grouped by area: `components/site` (the shell every page shares: logo,
   header links, theme button, footer, breadcrumbs, the structured data's script), `wallet`
-  (providers and button), `home`, `papers` (the list), `paper` (one paper's page), `rating`
-  (the Ratings section, the Rate button and the rating page), `publish`, and `ui` (shadcn
+  (the provider, the button and the runtime it loads on use), `home`, `papers` (the list),
+  `paper` (one paper's page), `rating` (the Ratings section, the Rate button and the rating
+  page), `publish`, and `ui` (shadcn
   primitives, restyled with `globals.css`'s tokens). A component another area reuses stays
   in its own area; a test sits next to its component.
 - Playwright end-to-end tests come in a later plan; until then, cover logic in unit tests.
   Put a flow's logic in `lib/` with its IO passed in (`publishFile`, `paperProgress`,
   `requestUploadUrl`), and keep components and `app/actions.ts` thin.
 - `lib/` is grouped by flow like `components/`: `lib/publish/`, `lib/papers/`,
-  `lib/rating/` and `lib/seo/` (metadata, crawling rules, structured data and share cards,
-  ADR 0040); only helpers several areas share (`web-env`, `server`, `site`, `theme`,
-  `shorten`, `utils`, `empty-module`) sit at its root. `lib/layout.test.ts` fails on a `.ts` or `.tsx` file
+  `lib/rating/`, `lib/seo/` (metadata, crawling rules, structured data and share cards,
+  ADR 0040) and `lib/wallet/` (a stored session, the loader, the wallet's state); only
+  helpers several areas share (`web-env`, `server`, `site`, `theme`, `shorten`, `utils`,
+  `empty-module`) sit at its root. `lib/layout.test.ts` fails on a `.ts` or `.tsx` file
   anywhere else, so a new flow adds its folder there.
 - Styling is Tailwind v4 with the tokens and classes in `app/globals.css` (`glass`,
   `signal-gradient`, `link`, `text-muted`, `text-accent`…): light (the default) and dark
@@ -41,9 +43,14 @@ Next.js 16 App Router app. See `README.md` here for scripts and status.
   inputs, `rounded-lg` small controls, `rounded-md` flags. Check every page in both themes
   at 360, 768 and 1280 px with no horizontal scroll. Page copy follows the
   `design-taste-frontend` and humanizer skills: plain words, no em dashes.
-- Wallet hooks (wagmi, AppKit) run only under `Providers` with a project id: render them
-  behind `useWalletReady()`. Never pass server-only values to a client component except as
-  plain props; client components never import `@verisci/workflows` at runtime (types only).
+- The wallet loads only when it is used: components reach it through `useWallet()` (its
+  status, account and runtime, and `load`/`preload`) behind `useWalletReady()`, never through
+  wagmi's or AppKit's hooks. Only `components/wallet/wallet-runtime.ts` imports `@reown/*` or
+  `wagmi` at runtime, reached through `import()`; `components/wallet/imports.test.ts` fails on
+  any other. Never pass server-only values to a client component except as plain props;
+  client components never import `@verisci/workflows` at runtime (types only).
+- Measure performance on a production build (`build`, then `start`) in a fresh private
+  window, never on `dev`.
 - Reads the page polls are route handlers, not server actions: Next runs server actions
   one at a time per client.
 - A page reads the node on the server, in an async component inside `Suspense` with a

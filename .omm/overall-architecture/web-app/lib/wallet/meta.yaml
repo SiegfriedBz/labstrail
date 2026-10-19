@@ -1,0 +1,10 @@
+created: 2026-10-18T20:03:09.917Z
+updated: 2026-10-18T20:03:09.917Z
+update_count: 1
+last_field: description
+kind: nested-class
+title: wallet
+children: []
+parentPath:
+  - web-app
+  - lib

@@ -27,4 +27,12 @@ describe("workspace packages", () => {
     expect(workspaces).toHaveLength(5);
     for (const name of workspaces) expect(config).toContain(`"${name}"`);
   });
+
+  it("include a core with no side effects, so a page using one helper carries none of its schemas", () => {
+    const core = JSON.parse(read("../../../packages/core/package.json")) as {
+      sideEffects?: boolean;
+    };
+
+    expect(core.sideEffects).toBe(false);
+  });
 });

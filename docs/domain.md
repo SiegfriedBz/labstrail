@@ -528,11 +528,18 @@ Observed on Vercel Hobby with Inngest Cloud, except where a fact cites the vendo
   `APP_ENV` (`globalEnv`); the functions read every variable from Vercel when they run.
 - **MetaMask warns on a new `*.vercel.app` domain,** in two ways. On `develop`'s branch URL
   (2026-10-17), a full page before connecting: "This site shows signs of phishing or
-  wallet-draining activity", from MetaMask's `eth-phishing-detect` blocklist, which takes
-  false-positive reports as GitHub issues. On production's `verisci.vercel.app` (2026-10-18),
-  a warning on every signature and transaction that the request may be a scam, from Blockaid's
-  security alerts, reported from the alert itself (See details → Report an issue). Reown's
-  allowed domains affect neither.
+  wallet-draining activity". On production's `verisci.vercel.app` (2026-10-18), a warning on
+  connecting and on every signature and transaction that the site may be a scam. Neither
+  domain was on MetaMask's `eth-phishing-detect` lists (its repo's list, the live list and its
+  recent changes) nor known to ChainPatrol (checked 2026-10-18), so the warnings come from
+  Blockaid's live scan. The alert offered no "Report an issue"; the report went through
+  Blockaid's form (https://report.blockaid.io/, "Mistake") on 2026-10-18, and
+  `eth-phishing-detect` closes reports of Blockaid's flags "not planned". Reown's allowed
+  domains affect neither.
+- **Vercel Web Analytics on the Hobby plan** (vercel.com/docs/analytics, 2026-10-18): free,
+  for any number of projects, 50,000 events a month shared by the account (collection pauses
+  past it, never billed), one month of data, a country panel; no cookies (a visitor is a
+  hash of the request, reset daily), bots left out ([ADR 0041](adr/0041-production-counts-visits-without-cookies.md)).
 - **Upstash's free plan allows one database** (2026-10-17), so staging and production share
   it, each counter named after its environment ([ADR 0005](adr/0005-staging-and-production-are-isolated.md)).
 - **A run past its time budget is cancelled, not failed** (Inngest docs, system events): Inngest
@@ -630,6 +637,33 @@ Observed on Next.js 16.3.8.
 - **Everything a `"use client"` file exports reaches a server component as a client
   reference**, not its value, so a string or constant the server needs lives in a plain
   module (`apps/web/components/paper/labels.ts`).
+- **Lighthouse's mobile run counts every script requested before the first paint toward
+  LCP** (Lighthouse 13.5, simulated 4G, 2026-10-18): with the wallet's chunks on every page,
+  the simulated LCP was 4.6-6.2 s while the observed one was about 140 ms. `next dev` serves
+  unminified development code (its LCP read 13.9 s), so performance is measured on
+  `next build` then `next start`, in a fresh private window.
+- **Turbopack keeps every module a workspace package's entry point re-exports** unless the
+  package declares `"sideEffects": false` (16.3.8, 2026-10-18): one `canonicalCid` import from
+  `@verisci/core` brought core's Zod schemas into a 490 KB client chunk (125 KB sent) until
+  core declared it; then the chunk left those pages.
+- **AppKit's vanilla `createAppKit` (`@reown/appkit`) builds the same `AppKit` class as the
+  React one** and needs no `WagmiProvider` (1.8.24, read in its source, 2026-10-18): its
+  window and wagmi's actions (`wagmi/actions`) share the `WagmiAdapter`'s config. On start it
+  restores the stored session itself (`syncExistingConnection`, `syncAdapterConnections`,
+  awaited by `ready()`), and it keeps `@appkit/connection_status` in `localStorage` as
+  `connected` or `disconnected`, which the web app reads to restore a returning visitor's
+  wallet (`apps/web/lib/wallet/session.ts`).
+- **What loading the wallet calls** (AppKit 1.8.24, `@base-org/account` 2.4.0,
+  `@coinbase/wallet-sdk` 4.3.6, read in their source and seen in a headless browser,
+  2026-10-18): AppKit fetches its project settings from `api.web3modal.org`, and always sends
+  Reown (`pulse.walletconnect.org`) its `INITIALIZE`, `CONNECT_SUCCESS` and
+  `SOCIAL_LOGIN_SUCCESS` events, whatever `features.analytics` says. `ready()` awaits those
+  settings with no timeout. Coinbase's two SDKs load Coinbase's analytics
+  (`cca-lite.coinbase.com`) unless `preference.telemetry` is `false`; AppKit's own Base Account
+  and Coinbase Wallet connectors set no preference, so the web app configures both connectors
+  itself: AppKit skips its Base Account connector when one is configured, and
+  `enableCoinbase: false` leaves its Coinbase Wallet one out (it also makes Coinbase's mobile
+  link always open the Coinbase app, which a phone without the extension does anyway).
 
 ## Tooling
 

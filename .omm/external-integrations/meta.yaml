@@ -1,9 +1,9 @@
 created: 2026-10-12T05:47:09.425Z
-updated: 2026-10-17T09:39:59.802Z
-update_count: 21
+updated: 2026-10-18T20:03:08.638Z
+update_count: 22
 last_field: diagram
-git_commit: f0c18a4
-git_branch: feat/032-node-server
+git_commit: b7ef68b
+git_branch: feat/037-performance
 children:
   - alchemy-notify
   - base-rpc
@@ -19,10 +19,11 @@ children:
   - telegram
   - upstash
   - vercel
+  - vercel-analytics
   - verisci
-prev_diagram: >-
+prev_diagram: >
   graph LR
-      verisci["VeriSci\napps/web/, packages/workflows/"] -->|"store, mint, SPARQL"| dkg-node["DKG Node\npackages/dkg/src/client.ts"]
+      verisci["VeriSci\napps/web/, packages/workflows/"] -->|"store, mint, SPARQL, status"| dkg-node["DKG Node\npackages/dkg/src/client.ts"]
       verisci -->|"paper header TEI"| grobid["GROBID\nworkflows/src/publish/grobid.ts"]
       verisci -->|"signed upload URLs, gateway reads"| pinata["Pinata\nworkflows/src/publish/pinata.ts, pdf/fetch-pdf.ts"]
       verisci -->|"signatures, requests, oracle transactions, balances"| base-rpc["Base Sepolia RPC\nviem in workflows and web"]
@@ -33,5 +34,9 @@ prev_diagram: >-
       verisci -->|"activity and alerts"| telegram["Telegram\nworkflows/src/alerts/notify.ts"]
       alchemy-notify["Alchemy Notify\nwebhook"] -->|"signed contract events, requests among them"| verisci
       vercel["Vercel\nhosting"] -->|"hosts the site and its functions"| verisci
+      oracle-cloud["Oracle Cloud\nnode server VM"] -->|"hosts the daemon"| dkg-node
+      oracle-cloud -->|"hosts GROBID"| grobid
+      duckdns["DuckDNS\nthe server's two names"] -->|"points both names at the server"| oracle-cloud
+      lets-encrypt["Let's Encrypt\ncertificates"] -->|"HTTPS certificates, through Caddy"| oracle-cloud
       classDef external fill:#585b70,stroke:#585b70,color:#cdd6f4
-      class dkg-node,grobid,pinata,base-rpc,gemini,inngest,upstash,reown,telegram,alchemy-notify,vercel external
+      class dkg-node,grobid,pinata,base-rpc,gemini,inngest,upstash,reown,telegram,alchemy-notify,vercel,oracle-cloud,duckdns,lets-encrypt external

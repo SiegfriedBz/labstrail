@@ -6,7 +6,8 @@ graph LR
     verisci -->|"a field check per new paper and per rating, a scoring request per attempt until answered"| gemini["Gemini API\nworkflows/src/gemini/gemini.ts"]
     verisci -->|"events, steps, run state"| inngest["Inngest\nworkflows/src/inngest.ts, site/runs.ts"]
     verisci -->|"rate-limit counters"| upstash["Upstash Redis\napps/web/lib/publish/limits.ts"]
-    verisci -->|"wallet connection"| reown["Reown AppKit\napps/web/components/wallet/"]
+    verisci -->|"wallet connection, loaded on use"| reown["Reown AppKit\napps/web/components/wallet/wallet-runtime.ts"]
+    verisci -->|"production's page views, no cookies"| vercel-analytics["Vercel Web Analytics\napps/web/components/site/site-analytics.tsx"]
     verisci -->|"activity and alerts"| telegram["Telegram\nworkflows/src/alerts/notify.ts"]
     alchemy-notify["Alchemy Notify\nwebhook"] -->|"signed contract events, requests among them"| verisci
     vercel["Vercel\nhosting"] -->|"hosts the site and its functions"| verisci
@@ -15,4 +16,4 @@ graph LR
     duckdns["DuckDNS\nthe server's two names"] -->|"points both names at the server"| oracle-cloud
     lets-encrypt["Let's Encrypt\ncertificates"] -->|"HTTPS certificates, through Caddy"| oracle-cloud
     classDef external fill:#585b70,stroke:#585b70,color:#cdd6f4
-    class dkg-node,grobid,pinata,base-rpc,gemini,inngest,upstash,reown,telegram,alchemy-notify,vercel,oracle-cloud,duckdns,lets-encrypt external
+    class dkg-node,grobid,pinata,base-rpc,gemini,inngest,upstash,reown,vercel-analytics,telegram,alchemy-notify,vercel,oracle-cloud,duckdns,lets-encrypt external

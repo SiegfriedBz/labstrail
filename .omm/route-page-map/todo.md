@@ -1,1 +1,0 @@
-- Load the wallet code only on the pages that use it (the Performance plan, carry-over).
