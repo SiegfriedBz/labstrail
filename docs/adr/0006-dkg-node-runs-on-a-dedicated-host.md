@@ -12,7 +12,7 @@ A DKG node is a long-lived peer-to-peer daemon, and GROBID (PDF parsing) is a lo
 - The DKG daemon, GROBID and a JSON-RPC proxy for the daemon run on their own host (a VM), their APIs bound to `127.0.0.1`.
 - Caddy is the only public HTTP entry: it terminates TLS and requires authentication on every route except `/api/status`, the health check, with one credential per environment ([0039](0039-one-credential-per-environment.md)).
 - One host serves every environment, developers' computers included ([0005](0005-staging-and-production-are-isolated.md)); a developer may also run GROBID on their own computer, since it keeps no state.
-- The node's keys and config (`~/.dkg`) are backed up off the host, encrypted: the node's agent address is part of every UAL it mints and of both context graph ids, so losing its keys orphans both graphs.
+- The node's keys and config (`~/.dkg`) are backed up off the host, encrypted: the node's agent address is part of every UAL it mints and of every context graph id, so losing its keys orphans every graph.
 
 ## Consequences
 
@@ -30,3 +30,4 @@ A DKG node is a long-lived peer-to-peer daemon, and GROBID (PDF parsing) is a lo
 - 2026-10-09: corrected: the node pays publishes from several publisher wallets, not one; each is funded and alerted on (DKG spike, [domain](../domain.md)).
 - 2026-10-17: the node moved from the developer's computer to its host, with the same agent address; developers' computers now reach it like the deployed environments, through Caddy with a credential of their own; a developer may still run GROBID locally (node server).
 - 2026-10-17: the RPC proxy falls back to the deployments' Alchemy RPC account, within a daily budget, so the daemon cannot use up the quota they share ([0005](0005-staging-and-production-are-isolated.md)) (ADR sweep).
+- 2026-10-19: corrected: the agent address is part of every graph id on the node, the retired `…/verisci-prod` included, not of two ([0005](0005-staging-and-production-are-isolated.md)) (ADR sweep, user's choice).

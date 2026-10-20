@@ -148,7 +148,7 @@ shows them in a browser.
 
 Each environment has its own context graph on the shared DKG node
 ([ADR 0005](docs/adr/0005-staging-and-production-are-isolated.md)): `verisci-staging` and
-`verisci-prod`. Our node publishes the ratings of every contract of an environment to that environment's
+`verisci-main-prod`. Our node publishes the ratings of every contract of an environment to that environment's
 graph, so a redeployed contract keeps the graph of the one it replaces; the old
 contract is paused and drained ([ADR 0023](docs/adr/0023-a-fix-is-a-redeploy-owner-powers-fixed.md)).
 Each contract's R-KA names are its own, because the request id hashes the chain

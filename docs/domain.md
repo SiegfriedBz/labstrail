@@ -153,7 +153,7 @@ edge`, testnet), Base Sepolia.
   `CORE_TEMPORARILY_UNAVAILABLE`); retrying after a couple of minutes usually works
   ([ADR 0009](adr/0009-retries-are-spaced-with-step-sleep.md)). The DKG client answers it
   `retry-later`, and a publish run whose last attempt meets it stops `network-refused`.
-- **A new context graph waits for the cores' activation slots** (production's
+- **A context graph can wait for the cores' activation slots, or stay dormant** (production's
   `verisci-prod`, 2026-10-18): the cores declined the mint of every attempt of its first
   publish run (`storage_ack_insufficient`, `CORE_TEMPORARILY_UNAVAILABLE … not active yet
   (activationCap)`). Read in the daemon's source (10.0.22, `dkg-agent-lifecycle.js`,
@@ -161,8 +161,13 @@ edge`, testnet), Base Sepolia.
   not host when it starts (`maxRehydratedContextGraphSubscriptions`), keeps the rest dormant,
   and fills freed slots every 30 s; for 10 minutes after its first decline it answers
   "temporarily unavailable" and asks its activator for a slot, then calls the subscription
-  dormant. Publishing the same PDF again later picks up where it stopped. Not yet known: how
-  long `verisci-prod` waits.
+  dormant. Publishing the same PDF again later picks up where it stopped. `verisci-prod` was
+  still dormant on 2026-10-19, with no answer from OriginTrail on
+  [OriginTrail/dkg#3357](https://github.com/OriginTrail/dkg/issues/3357), where another
+  publisher's older graph stayed dormant while a newly registered one published at once. A
+  new graph did the same here: `verisci-main-prod`, registered on 2026-10-19 (registry id
+  887), minted in its first publish run, and production moved to it
+  ([ADR 0005](adr/0005-staging-and-production-are-isolated.md)).
 - **The daemon has a single admin token:** one bearer token in `~/.dkg/auth.token`
   (written by `dkg init` on 10.0.16; on 10.0.22, 2026-10-09, by the first `dkg start`,
   with the agent key), valid for every graph on the node; there are no tokens scoped per
@@ -227,7 +232,7 @@ edge`, testnet), Base Sepolia.
   minted to the author, and the UAL stays the same across updates
   (docs.origintrail.io → Knowledge Assets).
 - **KA numbers are counted per author** and reserved at store time (the `reservedUal`).
-  Both our graphs publish as one author, and a stored asset that is never minted keeps
+  All our graphs publish as one author, and a stored asset that is never minted keeps
   its number, so each environment sees gaps in its numbering. Expected, not a bug.
 - **Authority resolution needs the node's local JSON-RPC proxy:** public Base Sepolia
   endpoints are not reliable enough for it.
