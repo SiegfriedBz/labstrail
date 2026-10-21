@@ -295,17 +295,27 @@ results improve. It needs `GEMINI_API_KEY` and `APP_ENV=local`, downloads each P
 robot check, is not kept: save the PDF there by hand), and writes the run's answers there
 after each paper. It never publishes, stores or rates anything.
 
+Three options measure how steady the scorer is:
+
+| Option | Effect |
+| --- | --- |
+| `--repeat <n>` | Scores each paper `n` times (2 to 10), then prints how far the runs agree: the runs classed outside the field or failed, each study type found and how often, the scores and their spread, and each check counted differently, compared across the runs of the most common study type. An **answer flip** is a check Gemini answered differently; a **quote flip** is one Gemini answered the same whose point a quote not found took in some runs. Writes every run's answers and the summary after each run |
+| `--pdf <path>` | Also scores a PDF on disk, named after its file, with no expectations: it prints the score and the checks that lost their point. May be given more than once |
+| `--thinking <low\|medium\|high>` | Asks for that thinking level in every scorer request; without it, the model's default (`medium` on `gemini-3.8-flash`) |
+
 `score-papers --field [id…]` runs only the publish run's field check instead: it reads each
 cached PDF as the publish run does (GROBID's header and the start of the text, so it also
 needs `GROBID_URL`, and `DKG_TOKEN` for the node server's GROBID), asks `checkField`, and
 prints the expected and the found field with Gemini's reason. Each paper costs one
-Flash-Lite request, which has its own daily limit.
+Flash-Lite request, which has its own daily limit. It takes none of the three options above.
 
-A scoring run costs one `gemini-3.8-flash` request per paper, and the free tier allows 20 of
-those a day per Google project (`docs/domain.md` → Gemini): a full run uses 14 of them. To try a change within a day, run
-only the papers it should fix (`score-papers <id> <id>`), then the whole set once more before
-keeping it. Google's terms forbid getting around the limit, so more keys or projects are not
-an option; a paid tier is.
+A scoring run costs one `gemini-3.8-flash` request per paper and run, and the free tier allows
+20 of those a day per Google project (`docs/domain.md` → Gemini), shared by every environment
+since one key serves them all: a full run uses 14 of them, and the script refuses a run that
+would make more than 20 before it sends any (retries after a failure come on top). To try a
+change within a day, run only the papers it should fix (`score-papers <id> <id>`), then the
+whole set once more before keeping it. Google's terms forbid getting around the limit, so more
+keys or projects are not an option; a paid tier is.
 
 ## The oracle function
 
@@ -645,7 +655,8 @@ stuck transaction are checked on `develop`; the unit tests cover every branch wi
 | `pnpm --filter @verisci/workflows rate-paper <target UAL> [--raw] [--no-event]` | Dev only, `APP_ENV=local`: requests a rating on the Anvil contract from a throwaway requester and sends `verisci/rating.requested` to the local dev server; `--no-event` sends nothing and prints the transaction |
 | `pnpm --filter @verisci/workflows post-webhook <tx hash> [--url <route>]` | Dev only, `APP_ENV=local`: posts a transaction's logs on Anvil to the webhook route as an Alchemy Notify delivery signed with `ALCHEMY_WEBHOOK_SIGNING_KEY` |
 | `pnpm --filter @verisci/workflows fund-local <address>` | Dev only, `APP_ENV=local`: gives the address 1 ETH on Anvil, so its wallet can request a rating from the paper page |
-| `pnpm --filter @verisci/workflows score-papers [--field] [id…]` | Dev only, `APP_ENV=local`: scores the reference papers with Gemini and compares each with what is expected, or with `--field` runs only the publish run's field check on them (Measuring the scorer above) |
+| `pnpm --filter @verisci/workflows score-papers [--repeat n] [--pdf path…] [--thinking level] [id…]` | Dev only, `APP_ENV=local`: scores the reference papers (and PDFs on disk) with Gemini and compares each with what is expected, or how far repeated runs agree; at most 20 scorer requests a run (Measuring the scorer above) |
+| `pnpm --filter @verisci/workflows score-papers --field [id…]` | Dev only, `APP_ENV=local`: runs only the publish run's field check on the reference papers |
 
 Ships TypeScript source (`src/index.ts`, `src/env.ts`), with no build step. The source is
 grouped by feature: `src/publish/`, `src/rating/`, `src/pdf/`, `src/gemini/`, `src/site/` and
