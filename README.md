@@ -35,7 +35,9 @@ published paper is listed at `/papers`, newest first, read a page at a time from
 Ratings work end to end locally, against a contract on Anvil: a published paper's page
 requests one from the visitor's wallet, each rating has a page that follows it to its score
 and then shows every check and quote behind it, and the papers list shows each paper's
-score. Deployed, a webhook starts each rating and a cron restarts a stuck one. The repo, its packages and the EIP-712 domain use the lowercase name `labstrail`.
+score. Deployed, a webhook starts each rating and a cron restarts a stuck one. The repo, its packages and the EIP-712 domain use the lowercase name `labstrail`; minted records,
+graph names, the Inngest app and the node server keep the first name, `verisci`
+([ADR 0042](docs/adr/0042-the-project-is-named-labstrail.md)).
 Everything runs on testnets. Production is open to search engines and AI search: each paper
 and rating has its own title and structured data, each paper its own share image, and
 `/method` explains the score ([`apps/web` → Search engines and AI search](apps/web/README.md#search-engines-and-ai-search),
