@@ -19,10 +19,15 @@ export const STUDY_TYPES = [
     label: "an observational study of people: cohort, case-control or cross-sectional",
     source: "STROBE",
   },
-  { id: "animal", label: "an experiment on live animals", source: "ARRIVE 2.0" },
+  {
+    id: "animal",
+    label: "an experiment on live vertebrates, such as mice, rats or fish, or on cephalopods",
+    source: "ARRIVE 2.0",
+  },
   {
     id: "lab",
-    label: "a laboratory study of cells, tissues, molecules or microbes",
+    label:
+      "a laboratory study of cells, tissues, molecules or microbes, or of invertebrates such as flies or worms",
     source: "MDAR",
   },
   {
@@ -112,6 +117,31 @@ export const CHECKS = {
 
 /** One of {@link CHECKS}' ids. */
 export type CheckId = keyof typeof CHECKS;
+
+/**
+ * What shown, partly and missing mean for the checks whose answers flipped between runs of one
+ * paper (`docs/domain.md` → Gemini), each judged by what another lab needs to repeat the work,
+ * and for blinding when it does not apply. The scorer's prompt adds each rule after its check's
+ * question; the pages show only the question ({@link CHECKS}).
+ */
+export const CHECK_RULES: Readonly<Partial<Record<CheckId, string>>> = {
+  limitations:
+    'Shown when it names at least one specific limitation of its own design, data or methods and what it means for the results; partly when it mentions limitations only in general terms, such as "more studies are needed"; missing when it states none',
+  reasoning:
+    "Shown when it says, for its main claims, how strong or consistent the evidence is, or where studies disagree; partly when it does so for only some claims, or only in passing; missing when it only lists findings",
+  "data-presentation":
+    "Shown when it states what the cited studies found for its main claims, with their results, numbers or figures; partly when it does so for only some of its main claims; missing when it cites studies without saying what they found",
+  "resources-identified":
+    "Shown when most key resources are identified so another lab could get the same ones: by supplier and catalogue number, RRID, stock centre number, or the paper that made them; partly when only some are, or only by name; missing when none are",
+  replicates:
+    "Shown when it gives the number of replicates for the main experiments and says whether they are biological or technical; partly when it gives the numbers without their kind, or for only some experiments; missing when it gives neither",
+  blinding:
+    "Shown when it says who was blinded and how, or states that no one was; partly when it says blinding was used without saying who or how; missing when it says nothing about blinding. It does not apply when no result depends on a person judging the samples, such as measurements read by an instrument",
+  "primary-outcome":
+    "Shown when it names one outcome as primary or main and says when it was measured; partly when it names the outcomes measured without saying which is primary, or without saying when; missing when it does neither",
+  "effect-estimates":
+    "Shown when its main results give each effect's size (a difference, ratio or change) with a confidence interval; partly when they give effect sizes or group means with only p-values or standard deviations; missing when they give only p-values or significance",
+};
 
 /**
  * A check of a study type's checklist: `required` checks always count; a `conditional` one

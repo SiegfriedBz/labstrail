@@ -63,6 +63,7 @@ export {
 export { type PaperMetadata, parseTeiHeader, type TeiResult } from "./publish/tei.ts";
 export { completeTitle } from "./publish/title.ts";
 export {
+  CHECK_RULES,
   CHECKS,
   type Check,
   type CheckId,

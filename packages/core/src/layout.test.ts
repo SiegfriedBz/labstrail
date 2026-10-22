@@ -25,6 +25,7 @@ describe("core's layout", () => {
       "BASE_SEPOLIA_CHAIN_ID",
       "CHECKS",
       "CHECK_ANSWERS",
+      "CHECK_RULES",
       "FIELDS",
       "FIELD_OUTPUT_SCHEMA",
       "FIELD_RULE",

@@ -72,7 +72,7 @@ describe("answerLabel", () => {
 describe("studyTypeLine", () => {
   it("names the kind of study and the checklist it was held to", () => {
     expect(studyTypeLine("animal")).toBe(
-      "Read as an experiment on live animals, against ARRIVE 2.0.",
+      "Read as an experiment on live vertebrates, such as mice, rats or fish, or on cephalopods, against ARRIVE 2.0.",
     );
   });
 

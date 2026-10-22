@@ -70,10 +70,10 @@ so an import of another `@verisci/*` package fails to typecheck.
 | `triplesFromBindings(bindings)` | The `Triple`s in the rows of a `SELECT ?s ?p ?o` |
 | `preparePaperText(pages, maxChars)`, `PaperText`, `PreparePaperResult` | A paper's text from its PDF's pages, cleaned and fitted to `maxChars` (the reference list left out first, then the end cut, marked `[…]`), or `no-text` for pages holding almost no letters |
 | `normalizeForQuote(text)`, `quoteTextOf(text)`, `QuoteText`, `quoteFound(paper, quote)` | The letters and digits a quote is matched on (lowercase, accents and ligatures undone, letters such as `ı` or `ß` folded), a paper's text prepared once for matching, and whether a quote is made of up to three passages of the paper in order, each long enough to show something, with only numbers or whole lines between them; a quote not found whole may leave out whole sentences, each gap marked by an ellipsis (`…`, `...`, `. . .`, bracketed or not), up to two: the part before ends a sentence and the part after starts one, a full stop counting only before a space and a capital or digit and never after an abbreviation (`et al.`, `Fig.`, `no.`) or an initial, so an ellipsis never removes words from inside a sentence the quote keeps |
-| `STUDY_TYPES`, `StudyType`, `CHECKS`, `CheckId`, `Check`, `checklistOf(type)` | The eight kinds of study the scorer tells apart, with the checklist each draws on, what each check asks, and a study type's checks in prompt order, each `required` or `conditional` |
+| `STUDY_TYPES`, `StudyType`, `CHECKS`, `CHECK_RULES`, `CheckId`, `Check`, `checklistOf(type)` | The eight kinds of study the scorer tells apart, with the checklist each draws on, what each check asks (the question the pages show), what `shown`, `partly` and `missing` mean for the checks that have a rule (the prompt only), and a study type's checks in prompt order, each `required` or `conditional` |
 | `scorerPrompt(paper)`, `SCORER_OUTPUT_SCHEMA` | The scorer's system and user text for a paper, one request per paper, and the JSON Schema its answer must match |
 | `parseScorerAnswer(text)`, `ScorerAnswer`, `FIELDS`, `Field`, `CHECK_ANSWERS`, `CheckAnswer`, `CheckResult` | The scorer's answer checked: the field (`life-sciences` or `outside`), the study type and a reason, and for a paper in the field an answer to every check of its study type (`shown`, `partly`, `missing` or `not-applicable`) with its quote, and a rationale. Checks of another study type are left out, a repeated check keeps its first answer, and a reason, quote or rationale over its limit (500, 300 and 2,000 characters) is cut at a word rather than refused |
-| `scoreChecks(paper, answer)`, `checklistScore(studyType, answers)`, `ScorerOutput`, `SCORER_PROMPT_VERSION` | The score code computes from the scorer's answer (`checklistScore` gives the score answers earn, before quotes are checked), with each check as it counted (and what the model claimed for a check it could not count), and the version of the prompt, checklists, scoring and quote matching, `3` |
+| `scoreChecks(paper, answer)`, `checklistScore(studyType, answers)`, `ScorerOutput`, `SCORER_PROMPT_VERSION` | The score code computes from the scorer's answer (`checklistScore` gives the score answers earn, before quotes are checked), with each check as it counted (and what the model claimed for a check it could not count), and the version of the prompt, checklists, scoring and quote matching, `4` |
 | `rKaQuads(rating)`, `RatingContent` | The `Triple`s of a rating's R-KA |
 | `ratingQuery(contextGraph, rKaUal)`, `parseRating(bindings)`, `RatingRecord` | The SPARQL reading a minted R-KA from its own graph, and the rating from its rows, or `undefined` when its target or phase-1 score is missing or out of range |
 
@@ -207,16 +207,21 @@ request id (Asset names above).
   across a line break, and collapses runs of spaces and blank lines. A text over
   the cap loses its reference list first, from a "References" heading to the next statement or
   methods heading, then is cut at a word boundary.
-- **The scorer's request:** `scorerPrompt` asks the model, in one request, for the paper's
-  field, `life-sciences` or `outside`, and its study type: `randomized-trial`,
-  `observational`, `animal`, `lab`, `systematic-review`, `narrative-review`, `computational`
-  or `other`. For a paper in the field, it then answers each check of that study type
+- **The scorer's request:** `scorerPrompt` asks the model, in one request, how completely the
+  paper reports what another lab needs to check and repeat its work: first its field,
+  `life-sciences` or `outside`, and its study type: `randomized-trial`, `observational`,
+  `animal` (live vertebrates or cephalopods), `lab` (cells, tissues, molecules, microbes or
+  invertebrates such as flies and worms), `systematic-review`, `narrative-review`,
+  `computational` or `other`. For a paper in the field, it then answers each check of that study type
   (`checklistOf`): the type's own, drawn from CONSORT 2025, STROBE, ARRIVE 2.0, MDAR,
   PRISMA 2020, SANRA or DOME and worded in our own words, then data and code availability,
   funding, competing interests, ethics and limitations. Each answer is `shown`, `partly`,
   `missing`, or `not-applicable` for a check marked as one that may not apply, with the
   passage that shows it; a statement that a check does not apply counts as `shown`. The
-  paper is untrusted text, so the prompt tells the model to treat it as data.
+  checks whose answers changed between runs of one paper (`docs/domain.md` → Gemini) carry a
+  rule in `CHECK_RULES` saying what each answer means, which the prompt adds after the
+  question and the model follows (version 4). The paper is untrusted text, so the prompt tells
+  the model to treat it as data.
 - **The score:** `scoreChecks` computes it
   ([ADR 0018](../../docs/adr/0018-phase-1-scorer-output-contract.md)): `shown` earns 1 point,
   `partly` half, `missing` none, and the score is `round(100 × points / applicable checks)`,

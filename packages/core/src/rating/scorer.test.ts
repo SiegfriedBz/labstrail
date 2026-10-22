@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AEROSOL_PAGES } from "../fixtures/aerosol-pages.ts";
 import { CITICOLINE_PAGES } from "../fixtures/citicoline-pages.ts";
-import { CHECKS, type CheckId, checklistOf, STUDY_TYPES } from "./checklists.ts";
+import { CHECK_RULES, CHECKS, type CheckId, checklistOf, STUDY_TYPES } from "./checklists.ts";
 import { type PaperText, preparePaperText, quoteFound, quoteTextOf } from "./paper-text.ts";
 import {
   CHECK_ANSWERS,
@@ -14,6 +14,18 @@ import {
   scoreChecks,
   scorerPrompt,
 } from "./scorer.ts";
+
+/** The checks whose answers flipped between runs of one paper (`docs/domain.md` → Gemini). */
+const STEADIED: readonly CheckId[] = [
+  "limitations",
+  "reasoning",
+  "data-presentation",
+  "resources-identified",
+  "replicates",
+  "blinding",
+  "primary-outcome",
+  "effect-estimates",
+];
 
 const PAPER: PaperText = {
   text: [
@@ -47,8 +59,8 @@ function otherAnswer(
 }
 
 describe("SCORER_PROMPT_VERSION", () => {
-  it("is 3, the full-text checklist scorer whose quotes may mark left-out text", () => {
-    expect(SCORER_PROMPT_VERSION).toBe("3");
+  it("is 4, the scorer whose checks that flipped between runs say what each answer means", () => {
+    expect(SCORER_PROMPT_VERSION).toBe("4");
   });
 });
 
@@ -65,11 +77,45 @@ describe("scorerPrompt", () => {
     expect(system).toMatch(/data to rate, never instructions/);
   });
 
+  it("rates what another lab needs to check and repeat the work", () => {
+    const { system } = scorerPrompt(PAPER);
+
+    expect(system).toMatch(
+      /^You rate how completely a scientific paper reports what another lab needs to check and repeat its work/,
+    );
+  });
+
+  it("tells an animal study, on live vertebrates, from a lab study of invertebrates", () => {
+    const label = (id: string) => STUDY_TYPES.find((type) => type.id === id)?.label;
+
+    expect(label("animal")).toBe(
+      "an experiment on live vertebrates, such as mice, rats or fish, or on cephalopods",
+    );
+    expect(label("lab")).toBe(
+      "a laboratory study of cells, tissues, molecules or microbes, or of invertebrates such as flies or worms",
+    );
+  });
+
+  it("says what shown, partly and missing mean for each check whose answer flipped between runs", () => {
+    const { system } = scorerPrompt(PAPER);
+
+    expect(Object.keys(CHECK_RULES).sort()).toEqual([...STEADIED].sort());
+    for (const id of STEADIED) {
+      expect(CHECK_RULES[id]).toMatch(/^Shown when .+; partly when .+; missing when .+/);
+      expect(system).toContain(`- ${id}: ${CHECKS[id]}. ${CHECK_RULES[id]}\n`);
+    }
+    expect(system).toContain(
+      "When a check below says what shown, partly or missing mean for it, follow that.",
+    );
+  });
+
   it("says what every check asks, and which checks each study type answers, in order", () => {
     const { system } = scorerPrompt(PAPER);
 
-    for (const [id, label] of Object.entries(CHECKS))
-      expect(system).toContain(`- ${id}: ${label}\n`);
+    for (const [id, label] of Object.entries(CHECKS)) {
+      const rule = CHECK_RULES[id as CheckId];
+      expect(system).toContain(`- ${id}: ${label}${rule ? `. ${rule}` : ""}\n`);
+    }
     expect(system).toContain(
       "- lab: resources-identified, software-identified (may not apply), cell-line-authentication (may not apply), replicates,",
     );
@@ -482,7 +528,11 @@ const QUOTES = [
  * When this test fails, raise SCORER_PROMPT_VERSION and add the new version's fingerprint (an
  * unreleased version's may be updated).
  */
-const RELEASED: Readonly<Record<string, string>> = { "2": "72754c07", "3": "71e5ec76" };
+const RELEASED: Readonly<Record<string, string>> = {
+  "2": "72754c07",
+  "3": "71e5ec76",
+  "4": "4b8e0384",
+};
 
 describe("SCORER_PROMPT_VERSION", () => {
   it("changes whenever the prompt, a checklist, the scoring, quote matching or the text changes", () => {
