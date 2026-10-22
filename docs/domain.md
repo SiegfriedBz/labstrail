@@ -424,6 +424,20 @@ score the same day (plan 021).
   100 s. Its answers carry a `thoughtSignature` beside the text, and some gave no
   `modelVersion`. On the free tier, some calls failed within seconds and succeeded when
   tried again 30 s later.
+- **`gemini-3.8-flash` takes a thinking level, and no longer a temperature** (Google's "What's
+  new in Gemini 3.8 Flash", read 2026-10-21): `generationConfig.thinkingConfig.thinkingLevel`
+  is `low`, `medium` (the default) or `high`, and `minimal` is an error on this model.
+  `temperature`, `top_p` and `top_k` are deprecated, to be removed from requests; Google Cloud's
+  developer guide for the model says the backend ignores them, and Google's Gemini 3 guide
+  warns that a temperature below 1.0 may cause looping or degraded answers. No `seed` is
+  documented for the model.
+- **The same paper scored again gets a different score** (scorer version 3, temperature 0 and
+  the default thinking level, 16 runs on 3 papers, 2026-10-17 to 22, staging's ratings
+  included): a fly genetics paper was classed `animal` in 2 runs of 6 and `lab` in 4, scoring
+  54 and 64 to 75 (a spread of 21); a review scored 73 to 86 (13) with one study type; a
+  trial 54 to 64 (10). Besides the study type, judgement checks such as `limitations` were
+  answered differently in about one run in five, and 2 points were lost to quotes shortened
+  against the prompt.
 - **The publish run's field check uses `gemini-3.5-flash-lite`,** free of charge on the
   pricing page (2026-10-11). Each model has its own daily quota (the 429 above names it
   `…PerModel-FreeTier`), so the field check leaves the scorer's 20 requests a day alone. On
