@@ -45,6 +45,20 @@ describe("parseScoreArgs", () => {
     });
   });
 
+  it("resolves a relative PDF path from the folder the command was typed in", () => {
+    expect(
+      parseScoreArgs(["--pdf", "papers/a.pdf", "--pdf", "/abs/b.pdf"], "/home/me/repo"),
+    ).toMatchObject({
+      ok: true,
+      args: {
+        pdfs: [
+          { name: "a", path: "/home/me/repo/papers/a.pdf" },
+          { name: "b", path: "/abs/b.pdf" },
+        ],
+      },
+    });
+  });
+
   it("refuses --pdf without a path", () => {
     expect(parseScoreArgs(["--pdf"])).toEqual({ ok: false, error: "--pdf takes a PDF's path" });
   });

@@ -300,7 +300,7 @@ Three options measure how steady the scorer is:
 | Option | Effect |
 | --- | --- |
 | `--repeat <n>` | Scores each paper `n` times (2 to 10), then prints how far the runs agree: the runs classed outside the field or failed, each study type found and how often, the scores and their spread, and each check counted differently, compared across the runs of the most common study type. An **answer flip** is a check Gemini answered differently; a **quote flip** is one Gemini answered the same whose point a quote not found took in some runs. Writes every run's answers and the summary after each run |
-| `--pdf <path>` | Also scores a PDF on disk, named after its file, with no expectations: it prints the score and the checks that lost their point. May be given more than once |
+| `--pdf <path>` | Also scores a PDF on disk, named after its file, with no expectations: it prints the score and the checks that lost their point. A relative path is read from the folder the command is typed in. May be given more than once |
 | `--thinking <low\|medium\|high>` | Asks for that thinking level in every scorer request; without it, the model's default (`medium` on `gemini-3.8-flash`) |
 
 `score-papers --field [id…]` runs only the publish run's field check instead: it reads each

@@ -1,5 +1,5 @@
 // Dev only: score-papers' arguments, and the request count it may spend.
-import { basename } from "node:path";
+import { basename, resolve } from "node:path";
 import { THINKING_LEVELS, type ThinkingLevel } from "../src/gemini/gemini.ts";
 
 /**
@@ -26,11 +26,13 @@ export interface ScoreArgs {
 
 /**
  * Reads score-papers' arguments: reference paper ids, `--repeat <2–10>`, `--pdf <path>` (any
- * number of times), `--thinking <low|medium|high>`, and `--field`, which takes none of the
- * scorer's options. Anything else is an error, with what to write instead.
+ * number of times, a relative path read from `cwd` when given), `--thinking <low|medium|high>`,
+ * and `--field`, which takes none of the scorer's options. Anything else is an error, with
+ * what to write instead.
  */
 export function parseScoreArgs(
   argv: readonly string[],
+  cwd?: string,
 ):
   | { readonly ok: true; readonly args: ScoreArgs }
   | { readonly ok: false; readonly error: string } {
@@ -54,7 +56,10 @@ export function parseScoreArgs(
     } else if (arg === "--pdf") {
       index++;
       if (!value || value.startsWith("--")) return { ok: false, error: "--pdf takes a PDF's path" };
-      pdfs.push({ name: basename(value).replace(/\.pdf$/i, ""), path: value });
+      pdfs.push({
+        name: basename(value).replace(/\.pdf$/i, ""),
+        path: cwd ? resolve(cwd, value) : value,
+      });
     } else if (arg === "--thinking") {
       index++;
       const level = THINKING_LEVELS.find((known) => known === value);

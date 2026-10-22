@@ -51,7 +51,8 @@ if (shared.APP_ENV !== "local") {
   console.error("score-papers runs only with APP_ENV=local");
   process.exit(1);
 }
-const parsed = parseScoreArgs(process.argv.slice(2));
+// pnpm runs the script in its workspace; INIT_CWD is where the command was typed.
+const parsed = parseScoreArgs(process.argv.slice(2), process.env.INIT_CWD ?? process.cwd());
 if (!parsed.ok) {
   console.error(parsed.error);
   process.exit(1);
