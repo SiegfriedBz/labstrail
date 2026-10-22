@@ -583,7 +583,7 @@ const QUOTES = [
 const RELEASED: Readonly<Record<string, string>> = {
   "2": "72754c07",
   "3": "71e5ec76",
-  "4": "c102dc9a",
+  "4": "75db2cf5",
 };
 
 describe("SCORER_PROMPT_VERSION", () => {
