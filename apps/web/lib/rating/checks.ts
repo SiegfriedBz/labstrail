@@ -61,8 +61,25 @@ export function answerLabel(answer: CheckAnswer): string {
   }
 }
 
-/** The kind of study the scorer read the paper as, and the checklist it held it to. */
-export function studyTypeLine(studyType: StudyType | undefined): string | undefined {
-  const type = STUDY_TYPES.find((entry) => entry.id === studyType);
-  return type && `Read as ${type.label}, against ${type.source}.`;
+/**
+ * The kinds of study the scorer read the paper as, and the checklists it held it to (none for
+ * `other`); `undefined` for a rating with no study type.
+ */
+export function studyTypeLine(studyTypes: readonly StudyType[] | undefined): string | undefined {
+  const types = STUDY_TYPES.filter((entry) => studyTypes?.includes(entry.id));
+  if (types.length === 0) return undefined;
+  const sources = types.map((type) => type.source).filter((source) => source !== "none");
+  const against = sources.length > 0 ? `, against ${listOf(sources)}` : "";
+  // The labels hold commas of their own, so the last one takes a comma before its "and".
+  return `Read as ${listOf(
+    types.map((type) => type.label),
+    ", and ",
+  )}${against}.`;
+}
+
+/** `["a", "b", "c"]` as `a, b and c`, or with `last` before the last item. */
+function listOf(items: readonly string[], last = " and "): string {
+  return items.length > 1
+    ? `${items.slice(0, -1).join(", ")}${last}${items.at(-1)}`
+    : items.join("");
 }

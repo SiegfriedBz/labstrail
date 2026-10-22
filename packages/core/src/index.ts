@@ -67,9 +67,12 @@ export {
   CHECKS,
   type Check,
   type CheckId,
+  checklistFor,
   checklistOf,
+  PRIMARY_STUDY_TYPES,
   STUDY_TYPES,
   type StudyType,
+  studyTypesOf,
 } from "./rating/checklists.ts";
 export {
   normalizeForQuote,

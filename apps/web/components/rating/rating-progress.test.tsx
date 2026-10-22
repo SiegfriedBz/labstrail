@@ -25,7 +25,7 @@ const SCORED: RatingView = {
     targetUal: UAL,
     score: 67,
     rationale: "Clear aims and references; no limitations section.",
-    studyType: "narrative-review",
+    studyTypes: ["narrative-review"],
     model: "gemini-3.8-flash",
     promptVersion: SCORER_PROMPT_VERSION,
     textShortened: true,

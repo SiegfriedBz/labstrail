@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { CHECKS, checklistOf, STUDY_TYPES, type StudyType } from "./checklists.ts";
+import {
+  CHECKS,
+  checklistFor,
+  checklistOf,
+  STUDY_TYPES,
+  type StudyType,
+  studyTypesOf,
+} from "./checklists.ts";
 
 const COMMON = [
   "data-availability",
@@ -185,5 +192,62 @@ describe("checklistOf", () => {
         ],
       }
     `);
+  });
+});
+
+describe("studyTypesOf", () => {
+  it("keeps each kind of study once, in STUDY_TYPES order", () => {
+    expect(studyTypesOf(["lab", "animal", "lab"])).toEqual(["animal", "lab"]);
+  });
+
+  it("combines the kinds of primary research, and keeps them over a review or other", () => {
+    expect(studyTypesOf(["computational", "randomized-trial", "observational"])).toEqual([
+      "randomized-trial",
+      "observational",
+      "computational",
+    ]);
+    expect(studyTypesOf(["narrative-review", "lab"])).toEqual(["lab"]);
+    expect(studyTypesOf(["other", "animal"])).toEqual(["animal"]);
+  });
+
+  it("keeps one review or other kind alone, the first in STUDY_TYPES order", () => {
+    expect(studyTypesOf(["narrative-review", "systematic-review"])).toEqual(["systematic-review"]);
+    expect(studyTypesOf(["other"])).toEqual(["other"]);
+  });
+
+  it("drops unknown ids, and gives none when no id is known", () => {
+    expect(studyTypesOf(["lab", "cohort"])).toEqual(["lab"]);
+    expect(studyTypesOf(["cohort"])).toEqual([]);
+    expect(studyTypesOf([])).toEqual([]);
+  });
+});
+
+describe("checklistFor", () => {
+  it("gives one kind's checklist as checklistOf does", () => {
+    for (const type of STUDY_TYPES) expect(checklistFor([type.id])).toEqual(checklistOf(type.id));
+  });
+
+  it("holds each check once: the first kind's own, the next kind's new ones, then the common checks", () => {
+    const ids = checklistFor(["animal", "lab"]).map((check) => check.id);
+    const own = (type: StudyType) =>
+      checklistOf(type)
+        .map((check) => check.id)
+        .filter((id) => !COMMON.includes(id));
+    const animal = own("animal");
+    const labOnly = own("lab").filter((id) => !animal.includes(id));
+    const common = checklistOf("animal")
+      .map((check) => check.id)
+      .filter((id) => COMMON.includes(id));
+
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toEqual([...animal, ...labOnly, ...common]);
+  });
+
+  it("requires a check that one kind requires and another may skip", () => {
+    const applies = (id: string) =>
+      checklistFor(["animal", "lab"]).find((check) => check.id === id)?.applies;
+
+    expect(checklistOf("lab").find((check) => check.id === "ethics")?.applies).toBe("conditional");
+    expect(applies("ethics")).toBe("required");
   });
 });

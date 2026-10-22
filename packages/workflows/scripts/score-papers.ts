@@ -97,7 +97,7 @@ interface Target {
 /** What the scorer gave for one paper: its classification, Gemini's answers and the score. */
 interface Found {
   readonly id: string;
-  /** The study type expected, or `outside`; none for a PDF on disk. */
+  /** The study types expected, joined with `+` (`animal+lab`), or `outside`; none for a PDF on disk. */
   readonly expected?: string;
   readonly found?: string;
   readonly range?: readonly [number, number];
@@ -168,7 +168,7 @@ function baseOf(target: Target) {
   if (!paper) return { id: target.id };
   return {
     id: paper.id,
-    expected: paper.field === "outside" ? "outside" : paper.studyType,
+    expected: paper.field === "outside" ? "outside" : paper.studyTypes.join("+"),
     ...(paper.expectedScore ? { range: paper.expectedScore } : {}),
   };
 }
@@ -187,7 +187,7 @@ async function score(target: Target): Promise<Found> {
   const { answer } = asked;
   if (answer.field === "outside") return { ...base, found: "outside", seconds, asked: answer };
   const output = scoreChecks(text.paper, answer);
-  return { ...base, found: answer.studyType, seconds, asked: answer, output };
+  return { ...base, found: answer.studyTypes.join("+"), seconds, asked: answer, output };
 }
 
 /** One run as {@link stabilityOf} compares it. */

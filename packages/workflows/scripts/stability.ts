@@ -1,5 +1,5 @@
 // Dev only: how far repeated scorer runs on one paper agree, for score-papers --repeat.
-import type { CheckAnswer, CheckId, ScorerOutput, StudyType } from "@verisci/core";
+import type { CheckAnswer, CheckId, ScorerOutput } from "@verisci/core";
 
 /** One scorer run on a paper: scored in the field, classed outside it, or failed. */
 export type ScoredRun =
@@ -28,10 +28,12 @@ export interface Stability {
   readonly fieldSteady: boolean;
   /** At least 2 runs scored, so there is something to compare. */
   readonly enough: boolean;
-  readonly studyTypes: Readonly<Partial<Record<StudyType, number>>>;
+  /** How many runs found each set of study types, written `animal+lab` ({@link kindOf}). */
+  readonly studyTypes: Readonly<Partial<Record<string, number>>>;
+  /** Every scored run found the same set of study types. */
   readonly studyTypeSteady: boolean;
-  /** The study type most runs found (the first found on a tie), whose runs checks compare. */
-  readonly studyType?: StudyType;
+  /** The set most runs found (the first found on a tie), whose runs the checks compare. */
+  readonly studyType?: string;
   /** Every scored run's score, in run order. */
   readonly scores: readonly number[];
   /** The highest score less the lowest, when {@link Stability.enough}. */
@@ -44,8 +46,8 @@ export interface Stability {
 
 /**
  * Summarises repeated runs of one paper: failed runs and runs classed outside the field are
- * counted and left out of the scores; the study types are counted; and the checks are compared
- * across the runs of the most common study type, each check counted differently listed as an
+ * counted and left out of the scores; each run's set of study types is counted; and the checks
+ * are compared across the runs of the most common set, each check counted differently listed as an
  * answer flip when Gemini's own answers differ, or as a quote flip when only the quote check
  * (`claimed`) made them differ.
  */
@@ -53,11 +55,11 @@ export function stabilityOf(runs: readonly ScoredRun[]): Stability {
   const outputs = runs.flatMap((run) => (run.kind === "scored" ? [run.output] : []));
   const outside = runs.filter((run) => run.kind === "outside").length;
   const failed = runs.filter((run) => run.kind === "failed").length;
-  const studyTypes = count(outputs.map((output) => output.studyType));
-  const studyType = mostCommon(outputs.map((output) => output.studyType));
+  const studyTypes = count(outputs.map(kindOf));
+  const studyType = mostCommon(outputs.map(kindOf));
   const scores = outputs.map((output) => output.score);
   const enough = outputs.length >= 2;
-  const compared = enough ? outputs.filter((output) => output.studyType === studyType) : [];
+  const compared = enough ? outputs.filter((output) => kindOf(output) === studyType) : [];
   const flips = flipsOf(compared);
   return {
     runs: runs.length,
@@ -75,7 +77,12 @@ export function stabilityOf(runs: readonly ScoredRun[]): Stability {
   };
 }
 
-/** Each check counted differently across `outputs`, all of one study type, in checklist order. */
+/** A run's study types as one key, such as `animal+lab`. */
+export function kindOf(output: ScorerOutput): string {
+  return output.studyTypes.join("+");
+}
+
+/** Each check counted differently across `outputs`, all of one set of study types, in order. */
 function flipsOf(outputs: readonly ScorerOutput[]): Flip[] {
   const [first] = outputs;
   if (!first) return [];

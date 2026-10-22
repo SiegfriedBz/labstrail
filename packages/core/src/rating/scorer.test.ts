@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { AEROSOL_PAGES } from "../fixtures/aerosol-pages.ts";
 import { CITICOLINE_PAGES } from "../fixtures/citicoline-pages.ts";
-import { CHECK_RULES, CHECKS, type CheckId, checklistOf, STUDY_TYPES } from "./checklists.ts";
+import {
+  CHECK_RULES,
+  CHECKS,
+  type CheckId,
+  checklistFor,
+  checklistOf,
+  STUDY_TYPES,
+} from "./checklists.ts";
 import { type PaperText, preparePaperText, quoteFound, quoteTextOf } from "./paper-text.ts";
 import {
   CHECK_ANSWERS,
@@ -47,7 +54,7 @@ function otherAnswer(
 ): ScorerAnswer {
   return {
     field: "life-sciences",
-    studyType: "other",
+    studyTypes: ["other"],
     reason: "A report of a clinical case.",
     rationale,
     checks: OTHER_IDS.map((id) => ({
@@ -89,10 +96,25 @@ describe("scorerPrompt", () => {
     const label = (id: string) => STUDY_TYPES.find((type) => type.id === id)?.label;
 
     expect(label("animal")).toBe(
-      "an experiment on live vertebrates, such as mice, rats or fish, or on cephalopods",
+      "an experiment on live vertebrates, such as mice, rats or zebrafish, or on cephalopods",
     );
     expect(label("lab")).toBe(
       "a laboratory study of cells, tissues, molecules or microbes, or of invertebrates such as flies or worms",
+    );
+  });
+
+  it("lets a paper report several kinds of primary research, each listed, reviews and other alone", () => {
+    const { system } = scorerPrompt(PAPER);
+
+    expect(system).toContain(
+      "A paper can report several of randomized-trial, observational, animal, lab and computational: list each one it reports work of.",
+    );
+    expect(system).toContain("systematic-review, narrative-review and other stand alone.");
+    expect(system).toContain(
+      "Measuring samples taken from the people or animals studied, or analysing the study's own data, is part of that study, not lab or computational work of its own.",
+    );
+    expect(system).toContain(
+      "answer every check of its study types, each check once, even when several study types list it",
     );
   });
 
@@ -151,10 +173,11 @@ describe("SCORER_OUTPUT_SCHEMA", () => {
   it("holds the model to the fields, study types, check ids and answers, field first", () => {
     const { properties, required } = SCORER_OUTPUT_SCHEMA;
 
-    expect(required).toEqual(["field", "studyType", "reason", "checks", "rationale"]);
+    expect(required).toEqual(["field", "studyTypes", "reason", "checks", "rationale"]);
     expect(Object.keys(properties)).toEqual(required);
     expect(properties.field.enum).toEqual(["life-sciences", "outside"]);
-    expect(properties.studyType.enum).toEqual(STUDY_TYPES.map((type) => type.id));
+    expect(properties.studyTypes.items.enum).toEqual(STUDY_TYPES.map((type) => type.id));
+    expect(properties.studyTypes.minItems).toBe(1);
     expect(properties.checks.items.properties.id.enum).toEqual(Object.keys(CHECKS));
     expect(properties.checks.items.properties.answer.enum).toEqual([...CHECK_ANSWERS]);
     expect(properties.checks.items.required).toEqual(["id", "answer", "quote"]);
@@ -164,7 +187,7 @@ describe("SCORER_OUTPUT_SCHEMA", () => {
 describe("parseScorerAnswer", () => {
   const valid = {
     field: "life-sciences",
-    studyType: "other",
+    studyTypes: ["other"],
     reason: "A report of a clinical case.",
     rationale: "It names its funding.",
     checks: OTHER_IDS.map((id) => ({
@@ -183,7 +206,7 @@ describe("parseScorerAnswer", () => {
     if (!result.ok) return;
     expect(result.answer).toMatchObject({
       field: "life-sciences",
-      studyType: "other",
+      studyTypes: ["other"],
       reason: "A report of a clinical case.",
       rationale: "It names its funding.",
     });
@@ -199,11 +222,39 @@ describe("parseScorerAnswer", () => {
     });
   });
 
+  it("accepts a paper reporting two kinds of work, with every check of both answered once", () => {
+    const ids = checklistFor(["animal", "lab"]).map((check) => check.id);
+    const result = parseScorerAnswer(
+      JSON.stringify({
+        ...valid,
+        studyTypes: ["lab", "animal"],
+        checks: ids.map((id) => ({ id, answer: "missing", quote: "" })),
+      }),
+    );
+
+    expect(result.ok && result.answer.studyTypes).toEqual(["animal", "lab"]);
+    expect(result.ok && result.answer.checks.map((check) => check.id)).toEqual(ids);
+  });
+
+  it("refuses an answer that leaves a check of one of its kinds unanswered", () => {
+    const ids = checklistOf("animal").map((check) => check.id);
+
+    expect(
+      parseScorerAnswer(
+        JSON.stringify({
+          ...valid,
+          studyTypes: ["animal", "lab"],
+          checks: ids.map((id) => ({ id, answer: "missing", quote: "" })),
+        }),
+      ),
+    ).toEqual({ ok: false });
+  });
+
   it("accepts a paper outside the field, leaving out its checks and rationale", () => {
     const outside = {
       ...valid,
       field: "outside",
-      studyType: "computational",
+      studyTypes: ["computational"],
       reason: "A machine translation model.",
       checks: [],
       rationale: "",
@@ -213,7 +264,7 @@ describe("parseScorerAnswer", () => {
       ok: true,
       answer: {
         field: "outside",
-        studyType: "computational",
+        studyTypes: ["computational"],
         reason: "A machine translation model.",
         checks: [],
         rationale: "",
@@ -279,7 +330,8 @@ describe("parseScorerAnswer", () => {
   it.each([
     ["not JSON", () => "shown"],
     ["an unknown field", () => ({ ...valid, field: "physics" })],
-    ["an unknown study type", () => ({ ...valid, studyType: "poem" })],
+    ["an unknown study type", () => ({ ...valid, studyTypes: ["poem"] })],
+    ["no study type", () => ({ ...valid, studyTypes: [] })],
     ["an empty reason", () => ({ ...valid, reason: " " })],
     ["a missing check", () => ({ ...valid, checks: valid.checks.slice(1) })],
     [
@@ -356,7 +408,7 @@ describe("scoreChecks", () => {
     const missing = ["code-availability", "conflicts", "limitations"];
     const answer: ScorerAnswer = {
       field: "life-sciences",
-      studyType: "lab",
+      studyTypes: ["lab"],
       reason: "Cells in culture.",
       rationale: "Mixed.",
       checks: checklistOf("lab").map(({ id }) => {
@@ -451,7 +503,7 @@ describe("scoreChecks", () => {
     const answer = otherAnswer({ funding });
     const result = scoreChecks(PAPER, { ...answer, checks: [...answer.checks].reverse() });
 
-    expect(result.studyType).toBe("other");
+    expect(result.studyTypes).toEqual(["other"]);
     expect(result.rationale).toBe("It reports its funding but not its methods.");
     expect(result.checks.map((check) => check.id)).toEqual(OTHER_IDS);
     expect(result.checks.find((check) => check.id === "statistics")).toEqual({
@@ -465,7 +517,7 @@ describe("checklistScore", () => {
   it("counts partly as half, leaves out a conditional check that does not apply, and rounds half up", () => {
     // other: 8 checks; 4 conditional ones do not apply; funding shown, methods partly: 1.5 / 4.
     expect(
-      checklistScore("other", {
+      checklistScore(["other"], {
         "methods-described": "partly",
         funding: "shown",
         statistics: "not-applicable",
@@ -478,7 +530,7 @@ describe("checklistScore", () => {
 
   it("counts a required check said not to apply, or with no answer, as missing", () => {
     // other: 8 checks, all applying; funding shown: 1 / 8.
-    expect(checklistScore("other", { funding: "shown", conflicts: "not-applicable" })).toBe(13);
+    expect(checklistScore(["other"], { funding: "shown", conflicts: "not-applicable" })).toBe(13);
   });
 });
 
@@ -531,7 +583,7 @@ const QUOTES = [
 const RELEASED: Readonly<Record<string, string>> = {
   "2": "72754c07",
   "3": "71e5ec76",
-  "4": "4b8e0384",
+  "4": "c102dc9a",
 };
 
 describe("SCORER_PROMPT_VERSION", () => {
@@ -545,7 +597,7 @@ describe("SCORER_PROMPT_VERSION", () => {
       ({ id: studyType }) =>
         scoreChecks(paper, {
           field: "life-sciences",
-          studyType,
+          studyTypes: [studyType],
           reason: "A fixed answer.",
           rationale: "A fixed answer.",
           checks: checklistOf(studyType).map((check, index) => ({

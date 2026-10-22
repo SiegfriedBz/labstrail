@@ -217,8 +217,8 @@ is left ([ADR 0007](../../docs/adr/0007-all-writes-converge.md)):
      a run: a paper `outside` cancels `invalid-target` before Flash is asked, even while Flash is
      down; a check that does not answer leaves the field to the scorer
      ([ADR 0037](../../docs/adr/0037-verisci-rates-life-science-and-health-papers.md)).
-   - **score-paper** asks Gemini, in one request, for the paper's field and study type and the
-     answer to each of that type's checks, with quotes; `scoreChecks` checks the quotes and
+   - **score-paper** asks Gemini, in one request, for the paper's field, the kinds of study it
+     reports and the answer to each of their checks, once, with quotes; `scoreChecks` checks the quotes and
      computes the score. A paper outside the life sciences and health cancels
      `invalid-target`, and so do two answers the check refuses: the same paper and prompt
      tend to give the same answer, and each answer uses one of the free tier's 20 requests a
@@ -271,7 +271,7 @@ a paper in the field with `scoreChecks`. A 429 is `rate-limited`; any other 4xx 
 `refused`; a 5xx, a network error or no answer within 240 s is `unreachable`; each failure
 Gemini answered carries its HTTP status (a bad key is 400, a key without access 401 or 403, a
 model Gemini no longer serves 404). No candidate, a blocked or unfinished answer, or text
-the check refuses (`parseScorerAnswer`: a check of the study type left unanswered, say) is
+the check refuses (`parseScorerAnswer`: a check of one of its study types left unanswered, say) is
 `invalid-output`; a quote, reason or rationale over its limit is cut, not refused. No failure
 carries the key.
 
@@ -279,15 +279,16 @@ carries the key.
 
 `scripts/reference-papers.json` holds 14 open-access papers: 12 in the life sciences and
 health, covering every study type, some well reported and some poorly, and 2 outside the
-field. For each in-field paper it records the answer a careful reader gives to each check,
+field. For each in-field paper it records its study types and the answer a careful reader
+gives to each of their checks,
 and a score range 10 points either side of the score those answers give; a test keeps it
 consistent with the checklists. The expectations were written before the scorer first read
 the papers, and change only on purpose.
 
 `pnpm --filter @verisci/workflows score-papers [id…]` scores them as a rating run would:
 the PDF's text, then one request to Gemini, asked again as a rating run would. It prints,
-for each paper, the study type found, the score against its range and, when the type is the
-expected one, each check answered otherwise than expected, with why an answer lost its point:
+for each paper, the study types found (written `animal+lab` for two), the score against its
+range and, when the types are the expected ones, each check answered otherwise than expected, with why an answer lost its point:
 its quote is not in the paper, it has none, or it says a check that always applies does not.
 Run it whenever a prompt, a checklist or the model changes, and keep the change only if the
 results improve. It needs `GEMINI_API_KEY` and `APP_ENV=local`, downloads each PDF once into
@@ -299,7 +300,7 @@ Three options measure how steady the scorer is:
 
 | Option | Effect |
 | --- | --- |
-| `--repeat <n>` | Scores each paper `n` times (2 to 10), then prints how far the runs agree: the runs classed outside the field or failed, each study type found and how often, the scores and their spread, and each check counted differently, compared across the runs of the most common study type. An **answer flip** is a check Gemini answered differently; a **quote flip** is one Gemini answered the same whose point a quote not found took in some runs. Writes every run's answers and the summary after each run |
+| `--repeat <n>` | Scores each paper `n` times (2 to 10), then prints how far the runs agree: the runs classed outside the field or failed, each set of study types found and how often, the scores and their spread, and each check counted differently, compared across the runs of the most common set. An **answer flip** is a check Gemini answered differently; a **quote flip** is one Gemini answered the same whose point a quote not found took in some runs. Writes every run's answers and the summary after each run |
 | `--pdf <path>` | Also scores a PDF on disk, named after its file, with no expectations: it prints the score and the checks that lost their point. A relative path is read from the folder the command is typed in. May be given more than once |
 | `--thinking <low\|medium\|high>` | Asks for that thinking level in every scorer request; without it, the model's default (`medium` on `gemini-3.8-flash`) |
 
@@ -551,7 +552,7 @@ wallet's signature check, an `eth_call` with no contract address, is sent on its
   when none holds it, `unavailable` when one did not answer and none holds it. A pending
   request carries its stage, read from its R-KA's state on the node (`scoring` with no asset
   yet, `saving` a draft, `minting` stored, `recording` minted, `unknown` when the node does
-  not answer). A fulfilled one carries its R-KA's record (study type, rationale, every check
+  not answer). A fulfilled one carries its R-KA's record (study types, rationale, every check
   with its answer and quote, and what the scorer claimed for a check that lost its point),
   read back from the node, and `gap` when the R-KA's score differs from the contract's; or
   `recordProblem`, as `readPaper` words it.

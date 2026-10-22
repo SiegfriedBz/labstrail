@@ -18,14 +18,14 @@ const paperSchema = z.discriminatedUnion("field", [
   z.object({
     ...common,
     field: z.literal("life-sciences"),
-    studyType: z.enum(STUDY_TYPE_IDS),
+    studyTypes: z.array(z.enum(STUDY_TYPE_IDS)).min(1),
     expectedScore: z.tuple([score, score]),
     expectedChecks: z.record(z.string(), z.enum(CHECK_ANSWERS)),
   }),
   z.object({
     ...common,
     field: z.literal("outside"),
-    studyType: z.null(),
+    studyTypes: z.null(),
     expectedScore: z.null(),
     expectedChecks: z.null(),
   }),

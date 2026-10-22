@@ -53,7 +53,7 @@ const PAPER: PaperText = {
 const OUTPUT: ScorerOutput = {
   score: 72,
   rationale: "The paper reports its sample size.",
-  studyType: "randomized-trial",
+  studyTypes: ["randomized-trial"],
   checks: [{ id: "sample-size", answer: "shown", quote: "We needed 60 patients for 80% power." }],
 };
 const MODEL = "gemini-3.8-flash-001";

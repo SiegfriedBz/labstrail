@@ -2,6 +2,7 @@ import {
   type CheckAnswer,
   type CheckId,
   type CheckResult,
+  checklistFor,
   checklistOf,
   type ScorerOutput,
   type StudyType,
@@ -23,7 +24,7 @@ function scored(
       ...(changed[check.id] ?? { answer: "shown", quote: "q" }),
     }),
   );
-  const output: ScorerOutput = { score, rationale: "r", studyType, checks };
+  const output: ScorerOutput = { score, rationale: "r", studyTypes: [studyType], checks };
   return { kind: "scored", output };
 }
 
@@ -66,6 +67,29 @@ describe("stabilityOf", () => {
       spread: 30,
       answerFlips: [],
       quoteFlips: [],
+    });
+  });
+
+  it("counts each set of study types as one, so a run that adds a kind is not steady", () => {
+    const mixed: ScoredRun = {
+      kind: "scored",
+      output: {
+        score: 60,
+        rationale: "r",
+        studyTypes: ["animal", "lab"],
+        checks: checklistFor(["animal", "lab"]).map((check) => ({
+          id: check.id,
+          answer: "shown",
+          quote: "q",
+        })),
+      },
+    };
+    const stability = stabilityOf([mixed, scored(70, "lab"), mixed]);
+
+    expect(stability).toMatchObject({
+      studyTypeSteady: false,
+      studyTypes: { "animal+lab": 2, lab: 1 },
+      studyType: "animal+lab",
     });
   });
 

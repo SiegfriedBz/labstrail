@@ -18,7 +18,8 @@ const STEPS = [
       <>
         The rating fetches the paper's PDF from IPFS by its CID, the one the submitter signed.{" "}
         <span className="font-mono text-ink">{RATING_SETTINGS.model}</span> reads its text and
-        decides which kind of study it is.
+        decides which kinds of study it reports. One paper can combine several, such as experiments
+        on mice and lab work on cells.
       </>
     ),
   },
@@ -43,7 +44,7 @@ const PHASES = [
     icon: Robot,
     name: "Reproducibility readiness",
     status: "live",
-    body: "The score on this page, from an AI model against the checklist for the paper's kind of study.",
+    body: "The score on this page, from an AI model against the checklists for the kinds of study the paper reports.",
   },
   {
     icon: UsersThree,
@@ -109,7 +110,8 @@ export default function MethodPage() {
             The checks are written in our own words from CONSORT 2025, STROBE, ARRIVE 2.0, MDAR,
             PRISMA 2020, SANRA and the DOME recommendations. How strictly each check applies to a
             kind of study follows the Rigor and Transparency Index (Menke and colleagues, iScience
-            2020).
+            2020). A paper that reports several kinds of primary research, such as an animal study
+            with lab work, answers the checks of each, every check once.
           </p>
         </div>
         <ul className="glass grid overflow-hidden rounded-2xl sm:grid-cols-2">

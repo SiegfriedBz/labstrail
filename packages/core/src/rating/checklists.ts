@@ -21,7 +21,7 @@ export const STUDY_TYPES = [
   },
   {
     id: "animal",
-    label: "an experiment on live vertebrates, such as mice, rats or fish, or on cephalopods",
+    label: "an experiment on live vertebrates, such as mice, rats or zebrafish, or on cephalopods",
     source: "ARRIVE 2.0",
   },
   {
@@ -288,3 +288,62 @@ export function checklistOf(type: StudyType): readonly Check[] {
     return { id, label: CHECKS[id], applies: conditional ? "conditional" : "required" };
   });
 }
+
+/**
+ * The kinds of primary research, which one paper may combine (a study of mice with lab work
+ * on cells, say); `systematic-review`, `narrative-review` and `other` stand alone.
+ */
+export const PRIMARY_STUDY_TYPES: readonly StudyType[] = [
+  "randomized-trial",
+  "observational",
+  "animal",
+  "lab",
+  "computational",
+];
+
+const ORDER: readonly StudyType[] = STUDY_TYPES.map((type) => type.id);
+
+/**
+ * The known kinds among `ids`, each once, in {@link STUDY_TYPES} order: every kind of primary
+ * research named, or, when none is, the first review or `other` kind. Unknown ids are left
+ * out; none known gives `[]`.
+ */
+export function studyTypesOf(ids: readonly string[]): StudyType[] {
+  const known = ORDER.filter((type) => ids.includes(type));
+  const primary = known.filter((type) => PRIMARY_STUDY_TYPES.includes(type));
+  if (primary.length > 0) return primary;
+  return known.slice(0, 1);
+}
+
+/**
+ * The checks a paper reporting the kinds of study `types` is held to, each once: each kind's
+ * own checks in turn, a check already listed kept in its place, then those every paper is
+ * asked; a check one kind requires is required, even where another kind lets it not apply.
+ * One kind gives {@link checklistOf}'s list.
+ */
+export function checklistFor(types: readonly StudyType[]): readonly Check[] {
+  const merged = new Map<CheckId, Check>();
+  for (const type of types) {
+    for (const check of checklistOf(type)) {
+      const seen = merged.get(check.id);
+      // Setting a key the map holds keeps its place, so a check stays where it first came.
+      if (!seen) merged.set(check.id, check);
+      else if (check.applies === "required") merged.set(check.id, { ...seen, applies: "required" });
+    }
+  }
+  const checks = [...merged.values()];
+  return [
+    ...checks.filter((check) => !COMMON_CHECKS.has(check.id)),
+    ...checks.filter((check) => COMMON_CHECKS.has(check.id)),
+  ];
+}
+
+/** The checks every paper is asked, which every checklist ends with. */
+const COMMON_CHECKS: ReadonlySet<CheckId> = new Set([
+  "ethics",
+  "data-availability",
+  "code-availability",
+  "funding",
+  "conflicts",
+  "limitations",
+]);

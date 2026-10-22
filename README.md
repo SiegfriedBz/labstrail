@@ -62,8 +62,8 @@ Built:
   account, the Upstash database, the Alchemy RPC account, the Gemini key and the alerts chat
   are shared ([ADR 0005](docs/adr/0005-staging-and-production-are-isolated.md)).
 - **A requested paper is rated.** A rating run reads the paper's text, has an LLM answer
-  the reporting checklist of its kind of study (a trial, an animal study, a review…) with
-  quotes, and computes the score from those answers, once: it measures whether the paper
+  the reporting checklists of the kinds of study it reports (a trial, an animal study, lab
+  work, a review…) with quotes, and computes the score from those answers, once: it measures whether the paper
   gives what others need to check and reproduce its work, not whether the work is right; our DKG node publishes the
   rating as its own Rating KA (R-KA), and the oracle records the score on the contract
   ([ADR 0011](docs/adr/0011-a-rating-is-a-separate-r-ka.md),
@@ -272,7 +272,7 @@ sequenceDiagram
       opt nothing stored
         R->>N: find the PDF the target links
         R->>R: read its text, then Flash-Lite checks its field
-        R->>R: one Gemini request gives its field, study type and checks, with quotes
+        R->>R: one Gemini request gives its field, study types and checks, with quotes
         Note over R,O: Outside the life sciences and health, no readable text,<br/>or two answers the check refuses: cancel(requestId, invalid target), and stop.
         R->>R: check the quotes against the paper, compute the score
         R->>N: store the R-KA

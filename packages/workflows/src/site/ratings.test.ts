@@ -42,7 +42,7 @@ function rKaRows(requestId: Hex, score: number) {
     output: {
       score,
       rationale: "Clear aims; no limitations section.",
-      studyType: "narrative-review",
+      studyTypes: ["narrative-review"],
       checks: [
         { id: "importance", answer: "shown", quote: "Nanomedicine applies nanotechnology." },
         {
@@ -377,7 +377,7 @@ describe("readRating", () => {
     expect(view.ok && view.gap).toBe(false);
     expect(view.ok && view.record).toMatchObject({
       score: 50,
-      studyType: "narrative-review",
+      studyTypes: ["narrative-review"],
       rationale: "Clear aims; no limitations section.",
       model: "gemini-3.8-flash",
       promptVersion: SCORER_PROMPT_VERSION,
