@@ -153,7 +153,14 @@ describe("scorerPrompt", () => {
     expect(system).toContain(
       "copied exactly from the paper, as one continuous passage with no word left out",
     );
+    expect(system).toContain('no "…" or "..."');
     expect(system).toContain("at most 300 characters");
+    expect(system).toContain(
+      "When the passage runs longer, copy it from its start and stop at 300 characters",
+    );
+    expect(system).toContain(
+      "From a table, copy one whole row, its label and every value in order.",
+    );
     expect(system).toContain('"Competing interests: None." rather than "None."');
     expect(system).toContain('"no new data were generated"');
   });
@@ -583,7 +590,7 @@ const QUOTES = [
 const RELEASED: Readonly<Record<string, string>> = {
   "2": "72754c07",
   "3": "71e5ec76",
-  "4": "75db2cf5",
+  "4": "f1f6ecec",
 };
 
 describe("SCORER_PROMPT_VERSION", () => {

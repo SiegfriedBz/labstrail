@@ -18,8 +18,9 @@ import { type PaperText, quoteFound, quoteTextOf } from "./paper-text.ts";
  * fingerprint test. Version 1 judged a paper's DKG record against eight signals; version 2
  * read the full text against a checklist; version 3 lets a quote's ellipsis mark left-out text;
  * version 4 rates what another lab needs to check and repeat the work, tells an animal study
- * (live vertebrates) from a lab study (which includes invertebrates), and says what each answer
- * means for the checks whose answers flipped between runs of one paper.
+ * (live vertebrates) from a lab study (which includes invertebrates), lets a paper report several
+ * kinds of study, says what each answer means for the checks whose answers flipped between runs
+ * of one paper, and says how to quote a long passage and a table row.
  */
 export const SCORER_PROMPT_VERSION = "4";
 
@@ -137,7 +138,7 @@ Then, for a paper in the field, answer every check of its study types, each chec
 - not-applicable: only for a check marked "(may not apply)", when the study has nothing to report for it.
 When a check below says what shown, partly or missing mean for it, follow that.
 A statement that something does not apply or was not done, such as "no new data were generated" or "the trial was open-label", counts as shown, with that statement as the quote.
-For shown and partly, quote the passage that shows it: copied exactly from the paper, as one continuous passage with no word left out and no "…", at most 300 characters. Quote a short statement with its heading, such as "Competing interests: None." rather than "None.". For missing and not-applicable, leave the quote empty.
+For shown and partly, quote the passage that shows it: copied exactly from the paper, as one continuous passage with no word left out and no "…" or "...", at most 300 characters. When the passage runs longer, copy it from its start and stop at 300 characters, never skipping ahead. From a table, copy one whole row, its label and every value in order. Quote a short statement with its heading, such as "Competing interests: None." rather than "None.". For missing and not-applicable, leave the quote empty.
 
 What each check asks:
 ${checks}

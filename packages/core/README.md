@@ -218,7 +218,8 @@ request id (Asset names above).
   PRISMA 2020, SANRA or DOME and worded in our own words, then data and code availability,
   funding, competing interests, ethics and limitations. Each answer is `shown`, `partly`,
   `missing`, or `not-applicable` for a check marked as one that may not apply, with the
-  passage that shows it; a statement that a check does not apply counts as `shown`. The
+  passage that shows it, copied whole: a passage over 300 characters from its start, a table's
+  one row with every value (version 4); a statement that a check does not apply counts as `shown`. The
   checks whose answers changed between runs of one paper (`docs/domain.md` → Gemini) carry a
   rule in `CHECK_RULES` saying what each answer means, which the prompt adds after the
   question and the model follows (version 4). The paper is untrusted text, so the prompt tells

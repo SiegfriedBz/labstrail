@@ -438,6 +438,11 @@ score the same day (plan 021).
   trial 54 to 64 (10). Besides the study type, judgement checks such as `limitations` were
   answered differently in about one run in five, and 2 points were lost to quotes shortened
   against the prompt.
+- **With version 4's check rules and kinds of study** (2026-10-23, 14 runs on the same 3
+  papers): the fly paper was `lab` in every run, 64 to 68 (4); the review 73 to 86 (13); the
+  trial 54 to 64 (10). Only `limitations` was still answered differently; every other point
+  that moved was lost to a quote not found: words cut from a sentence longer than the 300
+  characters asked, cells cut from a table row, and one word changed.
 - **The publish run's field check uses `gemini-3.5-flash-lite`,** free of charge on the
   pricing page (2026-10-11). Each model has its own daily quota (the 429 above names it
   `…PerModel-FreeTier`), so the field check leaves the scorer's 20 requests a day alone. On
@@ -448,7 +453,8 @@ score the same day (plan 021).
 - **`gemini-3.8-flash` shortens some quotes with "…" or "..." although the prompt forbids it**
   (2026-10-12: 3 quotes across the 11 reference papers scored, each skipping text between two
   real passages), which is why quote matching accepts an ellipsis that stands for whole
-  sentences.
+  sentences. On 2026-10-23 it did so inside a sentence longer than 300 characters, to fit
+  the limit, and inside a table row, which is why the prompt says how to quote both.
 
 ## Chain
 
