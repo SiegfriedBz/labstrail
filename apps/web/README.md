@@ -488,8 +488,8 @@ before its first deploy, and allow each deployed domain in the Reown project.
 ## Deploying
 
 Vercel builds the site from one project (`verisci`, Hobby): Root Directory `apps/web`, the
-Next.js preset, the install and build commands it detects (pnpm from `packageManager`, Node
-24.x from `engines`), and no `vercel.json`. Production tracks `main`; every other branch is a
+Next.js preset, the install and build commands it detects (pnpm, Node 24.x), and no
+`vercel.json`. Production tracks `main`; every other branch is a
 preview, and `develop`'s, at its stable branch URL, is staging.
 
 - **Deployment Protection** keeps previews private. Its Protection Bypass for Automation

@@ -5,8 +5,8 @@ workspaces import: the typed ABI, the deployed addresses of each environment, re
 rating request, of a paper's request ids and of the contract's oracle, and the calldata of
 the oracle's calls.
 
-Status: `RatingController` v2 is implemented and tested. Deployed addresses are
-recorded in `deployments/base-sepolia.json`.
+Status: `RatingController` is deployed for staging and production on Base Sepolia, each with
+two paused past contracts; the addresses are recorded in `deployments/base-sepolia.json`.
 
 Architecture views: [`.omm/overall-architecture/contracts/`](../../.omm/overall-architecture/contracts/), [`.omm/state-transitions/rating-request/`](../../.omm/state-transitions/rating-request/) (`pnpm exec omm view --port 4000` shows them; root README → Architecture).
 
@@ -92,7 +92,7 @@ Failures revert with custom errors. Every state change emits an event:
                          ▼
    ┌──────────────── Pending ────────────────┐
    │   in _pendingRequestIds  (reconciler)   │
-   │   in _requestIdsOf[UAL]  (UI)           │
+   │   in _requestIdsOf[hash(UAL)]  (UI)     │
    │   pendingCountOf[requester] + 1         │
    └─────────────────────────────────────────┘
         │ fulfilPhase1 (oracle)        │ cancelRequest (oracle)
@@ -222,8 +222,9 @@ repeat those of the one before.
   Base Sepolia, selected by `DEPLOY_ENV`.
 - `script/DeployRatingController.s.sol` deploys from that configuration. The
   account that signs the broadcast becomes the owner. The Foundry test suites
-  deploy through the same script, except tests that need the contract at a
-  chosen address, which use `deployCodeTo`.
+  deploy through the same script, except the constructor's own tests, which call
+  `new RatingController`, and tests that need the contract at a chosen address,
+  which use `deployCodeTo`.
 - `record-deployment` reads the run file written by `--broadcast`
   (`broadcast/DeployRatingController.s.sol/84532/run-latest.json`). The new
   contract becomes the environment's `current` deployment, and the previous

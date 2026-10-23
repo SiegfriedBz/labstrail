@@ -5,7 +5,8 @@ import { workflowsSchema } from "./workflows-env.ts";
 /**
  * The local chain's variables (ADR 0036): Anvil's URL and the RatingController deployed there.
  * Read only when `APP_ENV=local`, by the rating functions, the pages' rating calls
- * (`getRatingService`), and the `rate-paper` and `fund-local` dev scripts.
+ * (`getRatingService`), the webhook's intake (the contract), and the `rate-paper`, `fund-local`
+ * and `post-webhook` (the URL only) dev scripts.
  */
 export const localChainSchema = {
   LOCAL_CHAIN_RPC_URL: z.url(),

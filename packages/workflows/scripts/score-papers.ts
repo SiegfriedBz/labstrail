@@ -1,5 +1,5 @@
 // Dev only: scores the reference papers (reference-papers.json) as a rating run would, reading
-// each PDF's text and asking Gemini for its field, study type and checks in one request, and
+// each PDF's text and asking Gemini for its field, study types and checks in one request, and
 // prints how each compares with what is expected. It never publishes, stores or rates anything.
 // With --repeat, it scores each paper several times and prints how far the runs agree; with
 // --pdf, it also scores a PDF on disk, which has no expectations; with --thinking, each scorer
