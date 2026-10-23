@@ -23,17 +23,17 @@ what others need to reproduce its work, and grows through transparent human
 review and, later, wet-lab replication
 ([ADR 0012](docs/adr/0012-three-phases-settled-by-the-oracle.md)).
 
-Status: early. VeriSci is a rebuild of an earlier prototype,
-`desci-rating-dapp`, which ran both flows (publish a paper, rate it) end to end on
-Base Sepolia. This repo starts again from clean foundations (monorepo, tooling,
-CI), and its ADRs and domain facts record what the prototype taught us. The first
-user-facing feature is the upload page: connect a wallet, publish a PDF, follow it until it
-is minted, then verify its record (signature, token, UAL, CID) from the paper's page. Every
-published paper is listed at `/papers`, newest first, read a page at a time from the DKG.
-Ratings work end to end locally, against a contract on Anvil: a published paper's page
-requests one from the visitor's wallet, each rating has a page that follows it to its score
-and then shows every check and quote behind it, and the papers list shows each paper's
-score. Deployed, a webhook starts each rating and a cron restarts a stuck one. The repo, its packages and the EIP-712 domain keep the lowercase name `verisci`.
+Status: phase 1 is live on staging and production, on testnets (release `v0.7.0`,
+2026-10-20). VeriSci is a rebuild of an earlier prototype, `desci-rating-dapp`, which ran
+both flows (publish a paper, rate it) end to end on Base Sepolia. This repo starts again
+from clean foundations (monorepo, tooling, CI), and its ADRs and domain facts record what
+the prototype taught us. A visitor connects a wallet, publishes a PDF, follows it until it
+is minted, then verifies its record (signature, token, UAL, CID) from the paper's page.
+Every published paper is listed at `/papers`, newest first, read a page at a time from the
+DKG, with its latest score. A published paper's page requests a rating from the visitor's
+wallet, and each rating has a page that follows it to its score and then shows every check
+and quote behind it. Deployed, a webhook starts each rating and a cron restarts a stuck
+one; locally, ratings run against a contract on Anvil. The repo, its packages and the EIP-712 domain keep the lowercase name `verisci`.
 Everything runs on testnets. Production is open to search engines and AI search: each paper
 and rating has its own title and structured data, each paper its own share image, and
 `/method` explains the score ([`apps/web` → Search engines and AI search](apps/web/README.md#search-engines-and-ai-search),
@@ -134,7 +134,7 @@ plan records its decisions in an ADR.
 
 ## Architecture
 
-The diagrams below show the target design; the workspaces build it plan by plan.
+The diagrams below show phase 1 as built.
 
 Architecture views (overall architecture, the publish and rating pipelines, external
 integrations, state machines, routes) are in [`.omm/`](.omm/), written with

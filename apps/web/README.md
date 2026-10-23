@@ -248,7 +248,8 @@ stateDiagram-v2
   the scoring model is busy.
 - Scored (`components/rating/rating-detail.tsx`): the contract's score, flagged when the R-KA
   records another ([ADR 0014](../../docs/adr/0014-contract-owns-scores-dkg-owns-content.md));
-  the study type and the rationale; each check with its answer and quote, and for a check
+  the kinds of study it was read as, with their checklists ("Read as … , against …",
+  `lib/rating/checks.ts` → `studyTypeLine`), and the rationale; each check with its answer and quote, and for a check
   that lost its point what the scorer claimed and why it didn't count (`lib/rating/checks.ts`);
   whether the paper's text was shortened; the model and prompt version; and links to the R-KA
   and the contract (unlinked on Anvil).
