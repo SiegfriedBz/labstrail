@@ -13,7 +13,7 @@ const ANSWER_TONE = {
 
 /**
  * A scored rating: the contract's score (ADR 0014), flagged when its R-KA records another;
- * then the R-KA's content, read from the DKG: the study type, the rationale, each check with
+ * then the R-KA's content, read from the DKG: the kinds of study, the rationale, each check with
  * its answer and quote, and for a check that lost its point what the scorer claimed and why it
  * didn't count; where the R-KA and the request live.
  */

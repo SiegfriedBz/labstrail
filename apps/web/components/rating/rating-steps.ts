@@ -10,9 +10,9 @@ export const RATING_STEPS = [
     stage: "scoring",
     label: "Scored",
     detail:
-      "Checked against the reporting checklist for its kind of study, each answer backed by a quote",
+      "Checked against the reporting checklists for the kinds of study it reports, each answer backed by a quote",
     headline: "Reading the paper",
-    now: "The scoring model reads the paper's text. If the paper is outside the life sciences and health, the rating is cancelled here. Otherwise the model answers the checklist for its kind of study and quotes the passage behind each answer. Code checks every quote against the paper, then computes the score. When the model is busy, it's asked again every few minutes, which can take hours.",
+    now: "The scoring model reads the paper's text. If the paper is outside the life sciences and health, the rating is cancelled here. Otherwise the model answers the checklists for the kinds of study it reports and quotes the passage behind each answer. Code checks every quote against the paper, then computes the score. When the model is busy, it's asked again every few minutes, which can take hours.",
   },
   {
     stage: "saving",

@@ -25,7 +25,7 @@ const STEPS = [
   },
   {
     title: "It answers each check with a quote",
-    body: "For every check on that study's checklist, it answers shown, partly or missing, and quotes the passage it relied on.",
+    body: "For each check those kinds of study call for, it answers shown, partly or missing, and quotes the passage it relied on.",
   },
   {
     title: "Code counts the points",
