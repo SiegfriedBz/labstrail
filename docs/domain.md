@@ -443,6 +443,12 @@ score the same day (plan 021).
   trial 54 to 64 (10). Only `limitations` was still answered differently; every other point
   that moved was lost to a quote not found: words cut from a sentence longer than the 300
   characters asked, cells cut from a table row, and one word changed.
+- **With the quote rule added to version 4** (2026-10-24, 14 runs on the same 3 papers): no
+  quote was lost. The trial scored 64 in every run (0); the fly paper 68 to 75 (7), `blinding`
+  answered missing or not applicable (which takes the check out of the score) and
+  `limitations` partly or missing; the review 77 to 86 (9), `reasoning` and `limitations`
+  answered differently. What moves a score now is the judgement checks, within 10 points on
+  each paper.
 - **The publish run's field check uses `gemini-3.5-flash-lite`,** free of charge on the
   pricing page (2026-10-11). Each model has its own daily quota (the 429 above names it
   `…PerModel-FreeTier`), so the field check leaves the scorer's 20 requests a day alone. On
@@ -454,7 +460,8 @@ score the same day (plan 021).
   (2026-10-12: 3 quotes across the 11 reference papers scored, each skipping text between two
   real passages), which is why quote matching accepts an ellipsis that stands for whole
   sentences. On 2026-10-23 it did so inside a sentence longer than 300 characters, to fit
-  the limit, and inside a table row, which is why the prompt says how to quote both.
+  the limit, and inside a table row, which is why the prompt says how to quote both. With
+  that rule, on 2026-10-24, no quote was lost in 14 runs.
 
 ## Chain
 
