@@ -8,9 +8,9 @@ graph LR
     find-pdf -->|"a link that is not an IPFS CID"| cancel
     read-text -->|"the paper's text"| check-field["Check Field\nstep check-field-n"]
     read-text -->|"no text, too large, 4 bad reads"| cancel
-    check-field -->|"in the field, or no answer"| score-paper["Score Paper\nstep score-paper-n"]
+    check-field -->|"in the field, or no answer"| score-paper["Score Paper\nstep score-paper-v4-n"]
     check-field -->|"outside the field"| cancel
-    score-paper -->|"score, study type, checks"| store-mint["Store and Mint\nsteps store-n, mint-n, poll-n-k"]
+    score-paper -->|"score, study types, checks"| store-mint["Store and Mint\nsteps store-n, mint-n, poll-n-k"]
     score-paper -->|"outside the field, two refused answers"| cancel
     read-rka -->|"stored or draft"| store-mint
     store-mint -->|"minted R-KA"| read-score["Read Score\nstep read-score-n"]

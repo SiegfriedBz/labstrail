@@ -53,7 +53,7 @@ const PAPER: PaperText = {
 const OUTPUT: ScorerOutput = {
   score: 72,
   rationale: "The paper reports its sample size.",
-  studyType: "randomized-trial",
+  studyTypes: ["randomized-trial"],
   checks: [{ id: "sample-size", answer: "shown", quote: "We needed 60 patients for 80% power." }],
 };
 const MODEL = "gemini-3.8-flash-001";
@@ -375,7 +375,7 @@ describe("runRating: rating a paper", () => {
       "find-pdf-1",
       "read-paper-1",
       "check-field-1",
-      "score-paper-1",
+      "score-paper-v4-1",
       "store-1",
       "mint-1",
       "read-score-1",
@@ -474,7 +474,7 @@ describe("runRating: rating a paper", () => {
     expect(await run).toEqual({ state: "cancelled", reason: "invalid-target" });
     expect(oracleCalls).toEqual([cancel("invalid-target")]);
     expect(dkg.storeAsset).not.toHaveBeenCalled();
-    expect(log.slice(-3)).toEqual(["score-paper-1", "oracle cancel", "notify"]);
+    expect(log.slice(-3)).toEqual(["score-paper-v4-1", "oracle cancel", "notify"]);
   });
 
   it("cancels invalid-target a paper whose PDF holds no text, such as a scan, scoring nothing", async () => {
@@ -871,7 +871,7 @@ describe("runRating: retries", () => {
     expect(await run).toMatchObject({ state: "fulfilled" });
     expect(deps.score).toHaveBeenCalledTimes(2);
     expect(deps.readPaper).toHaveBeenCalledOnce();
-    expect(log).toContain("score-paper-2");
+    expect(log).toContain("score-paper-v4-2");
     expect(log).not.toContain("find-pdf-2");
     expect(log).not.toContain("read-paper-2");
   });
@@ -887,7 +887,7 @@ describe("runRating: retries", () => {
     expect(deps.score).toHaveBeenCalledOnce();
     expect(dkg.storeAsset).toHaveBeenCalledTimes(2);
     expect(log).toContain("store-2");
-    expect(log).not.toContain("score-paper-2");
+    expect(log).not.toContain("score-paper-v4-2");
   });
 
   it("retries a node that does not answer, then fails node-unreachable", async () => {

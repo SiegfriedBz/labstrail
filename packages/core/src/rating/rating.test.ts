@@ -24,7 +24,7 @@ const CID = "bafkreigh2akiscaildcqabsyg3dfr6chu3fgpregiymsck7e7aqa4s52zy";
 const OUTPUT: ScorerOutput = {
   score: 72,
   rationale: 'The paper states a "clear" claim\nand its methods.',
-  studyType: "randomized-trial",
+  studyTypes: ["randomized-trial"],
   checks: [
     { id: "sample-size", answer: "shown", quote: "We needed 60 patients for 80% power." },
     { id: "randomization", answer: "partly", quote: 'Patients were "randomly" assigned.' },
@@ -163,7 +163,7 @@ describe("rKaQuads", () => {
       '"false"^^<http://www.w3.org/2001/XMLSchema#boolean>',
     );
     has(PHASE_IRI, "urn:verisci:model", '"gemini-3.8-flash"');
-    has(PHASE_IRI, "urn:verisci:promptVersion", '"3"');
+    has(PHASE_IRI, "urn:verisci:promptVersion", `"${SCORER_PROMPT_VERSION}"`);
   });
 
   it("links one node per check, with its id, its answer and its quote when it has one", () => {
@@ -247,7 +247,7 @@ describe("ratingQuery and parseRating", () => {
       targetUal: OUR_UAL,
       score: 72,
       rationale: OUTPUT.rationale,
-      studyType: "randomized-trial",
+      studyTypes: ["randomized-trial"],
       checks: OUTPUT.checks,
       model: "gemini-3.8-flash",
       promptVersion: SCORER_PROMPT_VERSION,
@@ -323,8 +323,46 @@ describe("ratingQuery and parseRating", () => {
       checks: [],
       promptVersion: "1",
     });
-    expect(parseRating(rowsOf(v1))?.studyType).toBeUndefined();
+    expect(parseRating(rowsOf(v1))?.studyTypes).toBeUndefined();
     expect(parseRating(rowsOf(v1))?.textShortened).toBeUndefined();
+  });
+
+  it("writes one study type per kind of work, and reads them back in STUDY_TYPES order", () => {
+    const mixed: RatingContent = {
+      ...RATING,
+      output: {
+        score: 50,
+        rationale: "It names its mice but not its antibodies.",
+        studyTypes: ["animal", "lab"],
+        checks: [
+          { id: "subjects", answer: "shown", quote: "Male C57BL/6 mice, 8 weeks old." },
+          { id: "resources-identified", answer: "missing" },
+        ],
+      },
+    };
+    const triples = rKaQuads(mixed).filter((t) => t.predicate === "urn:verisci:studyType");
+
+    expect(triples.map((t) => t.object)).toEqual(['"animal"', '"lab"']);
+    expect(parseRating(rowsOf(rKaQuads(mixed)).reverse())).toMatchObject({
+      studyTypes: ["animal", "lab"],
+      checks: [
+        { id: "subjects", answer: "shown", quote: "Male C57BL/6 mice, 8 weeks old." },
+        { id: "resources-identified", answer: "missing" },
+      ],
+    });
+  });
+
+  it("reads a version 3 R-KA's one study type as a list of one", () => {
+    expect(parseRating(rowsOf(rKaQuads(RATING)))?.studyTypes).toEqual(["randomized-trial"]);
+  });
+
+  it("leaves out an unknown study type beside a known one", () => {
+    const rows = rowsOf(rKaQuads(RATING));
+    const extra = { ...rows.find((row) => row.p === "urn:verisci:studyType"), o: '"poem"' };
+
+    expect(parseRating([...rows, extra as (typeof rows)[number]])?.studyTypes).toEqual([
+      "randomized-trial",
+    ]);
   });
 
   it("reads an unknown study type as none, with no checks", () => {
@@ -333,7 +371,7 @@ describe("ratingQuery and parseRating", () => {
     );
 
     expect(parseRating(rows)).toMatchObject({ score: 72, checks: [] });
-    expect(parseRating(rows)?.studyType).toBeUndefined();
+    expect(parseRating(rows)?.studyTypes).toBeUndefined();
   });
 
   it.each([

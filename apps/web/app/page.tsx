@@ -55,7 +55,7 @@ const RATE: readonly Step[] = [
     icon: Robot,
     title: "Reproducibility readiness",
     live: true,
-    body: "An AI model checks the whole paper against the checklist for its kind of study: does it give what others need to reproduce the work? The score, from 0 to 100, goes on-chain. It doesn't say whether the results hold.",
+    body: "An AI model checks the whole paper against the checklists for the kinds of study it reports: does it give what others need to reproduce the work? The score, from 0 to 100, goes on-chain. It doesn't say whether the results hold.",
   },
   {
     icon: UsersThree,
