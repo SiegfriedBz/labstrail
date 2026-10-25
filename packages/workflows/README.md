@@ -266,10 +266,11 @@ request pending and alerts the maintainer; the reconciler restarts it (below).
 The scorer asks `gemini-3.8-flash` once per attempt until it gets an answer, at most 6 times
 a run, and each restart asks again, against the free tier's 20 a day (`docs/domain.md` →
 Gemini; [ADR 0018](../../docs/adr/0018-phase-1-scorer-output-contract.md)): `scorePaper` sends `scorerPrompt`, temperature 0 and
-`SCORER_OUTPUT_SCHEMA`, with no thinking level, so the model's default (`medium`), checks the
+`SCORER_OUTPUT_SCHEMA`, with no thinking level, so the model's default (`medium`; `high` took up
+to 210 s a request, `docs/domain.md` → Gemini), checks the
 answer with `parseScorerAnswer` (`askScorer`), then scores a paper in the field with
 `scoreChecks`. Google lists temperature as deprecated on `gemini-3.8-flash` and says its backend
-ignores it, and the model takes no seed, so the same paper scored again can get another score;
+ignores it, and documents no seed for the model, so the same paper scored again can get another score;
 `score-papers --repeat` measures how far (`docs/domain.md` → Gemini). A 429 is `rate-limited`; any other 4xx is
 `refused`; a 5xx, a network error or no answer within 240 s is `unreachable`; each failure
 Gemini answered carries its HTTP status (a bad key is 400, a key without access 401 or 403, a
