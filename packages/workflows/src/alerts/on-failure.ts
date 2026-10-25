@@ -27,7 +27,7 @@ const failureSchema = z.object({
  * prefix says why, cut at 300 characters; a cancel's error says nothing more than "function
  * cancelled". `undefined` for this function's own runs, so a failing alert never alerts again,
  * for a rating run that failed with a `rating-failed:<reason>:` its run reported as a
- * `⏳ Rating delayed` message (`DELAYED_FAILURES`), and for data that is not a failure.
+ * `⏳ Rating delayed` message (`delayedFailureOf`), and for data that is not a failure.
  */
 export function failureText(
   data: unknown,

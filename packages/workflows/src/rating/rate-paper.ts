@@ -128,14 +128,15 @@ const RATING_FAILURES: readonly RatingFailure[] = [
 ];
 
 /**
- * A {@link RatingFailure} that leaves the request pending for the reconciler to restart (ADR
+ * A {@link RatingFailure} that may leave the request pending for the reconciler to restart (ADR
  * 0020): every reason but `setup` and `rating-unreadable`, which are ours to fix.
  */
 export type DelayedFailure = Exclude<RatingFailure, "setup" | "rating-unreadable">;
 
 /**
  * The reasons a run gives up with while its request stays pending: the run sends a
- * `⏳ Rating delayed` message, and the failure alert stays silent (ADR 0038).
+ * `⏳ Rating delayed` message, and the failure alert stays silent (ADR 0038), save an
+ * `oracle-failed` that {@link delayedFailureOf} leaves to the alert.
  */
 export const DELAYED_FAILURES: readonly DelayedFailure[] = [
   "chain-unreachable",
@@ -286,8 +287,8 @@ export function ratingFailureReason(output: unknown): RatingFailure | undefined 
  * `pollsPerMint` polls is started again. A part of the score that came back (the link, the
  * text, the score) is never asked for again.
  *
- * A run that gives up while the request stays pending (a {@link DELAYED_FAILURES} reason)
- * first sends a `⏳ Rating delayed` message from a step of its own (`notify-delayed`), naming
+ * A run that gives up while the request stays pending ({@link delayedFailureOf}) first
+ * sends a `⏳ Rating delayed` message from a step of its own (`notify-delayed`), naming
  * the paper as far as it read it, then fails with its `rating-failed:<reason>:` error as is.
  */
 export async function runRating(
