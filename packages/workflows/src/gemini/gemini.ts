@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+/** How long Gemini 3.8 Flash thinks before it answers; `medium` is its default. */
+export const THINKING_LEVELS = ["low", "medium", "high"] as const;
+
+/** One of {@link THINKING_LEVELS}. */
+export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
+
 /** How a call reaches Gemini. */
 export interface GeminiOptions {
   /** A Gemini API key. Secret. */
@@ -9,6 +15,8 @@ export interface GeminiOptions {
   readonly fetch: typeof fetch;
   /** How long Gemini gets to answer. */
   readonly timeoutMs: number;
+  /** The thinking level to ask for; without one, the model's default. */
+  readonly thinkingLevel?: ThinkingLevel;
 }
 
 /**
@@ -47,7 +55,8 @@ const answer = z.object({
 
 /**
  * One `generateContent` call, shared by the scorer and the field check both runs make: the
- * prompt's system and user text, temperature 0, JSON output held to `schema`. Returns the
+ * prompt's system and user text, temperature 0, JSON output held to `schema`, and the
+ * thinking level when `options` gives one. Returns the
  * answer's text, leaving out thoughts, and the model version Gemini reports (the model asked
  * for when it reports none). An answer that did not finish with `STOP` is `invalid-output`.
  * Never throws; a failure carries neither the key nor Gemini's text.
@@ -71,6 +80,9 @@ export async function generate(
           temperature: 0,
           responseMimeType: "application/json",
           responseJsonSchema: schema,
+          ...(options.thinkingLevel
+            ? { thinkingConfig: { thinkingLevel: options.thinkingLevel } }
+            : {}),
         },
       }),
       signal: AbortSignal.timeout(options.timeoutMs),

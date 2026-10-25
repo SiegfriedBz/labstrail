@@ -1,10 +1,10 @@
-import { Flask, Robot, UsersThree } from "@phosphor-icons/react/dist/ssr";
 import {
   getRatingService,
   type PaperRatingSummary,
   type RatingSummary,
   summariseRatings,
-} from "@verisci/workflows";
+} from "@labstrail/workflows";
+import { Flask, Robot, UsersThree } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
 import { formatPublished } from "../../lib/papers/papers.ts";
 import { ratingChainConfig } from "../../lib/rating/chain.ts";
@@ -255,9 +255,9 @@ function Current({
             Not rated yet
           </p>
           <p className="max-w-[60ch] text-sm leading-relaxed text-muted">
-            An AI model checks the paper against the checklist for its kind of study, quoting the
-            paper for each answer, and the score is recorded on chain. It usually takes a few
-            minutes.
+            An AI model checks the paper against the checklists for the kinds of study it reports,
+            quoting the paper for each answer, and the score is recorded on chain. It usually takes
+            a few minutes.
           </p>
         </div>
       );

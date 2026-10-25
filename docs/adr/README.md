@@ -1,14 +1,14 @@
 # Architecture decision records
 
 Each file records one decision already taken: why, what, and what it costs. Plans cite
-them instead of re-arguing them. Facts about the systems VeriSci runs on (DKG, chain,
+them instead of re-arguing them. Facts about the systems LabsTrail runs on (DKG, chain,
 Inngest, Vercel, tooling) live in [`docs/domain.md`](../domain.md).
 
 An ADR states the decision and its reason. The mechanics (timeouts, fee bumps, reading
 lists in chunks, exact checks) belong in the plan that builds them, where code and tests
 confirm them.
 
-Groups follow reading order: what VeriSci covers, tools, environments, how writes behave,
+Groups follow reading order: what LabsTrail covers, tools, environments, how writes behave,
 then the publish flow before the rating flow that builds on it. Numbers follow the order
 decisions were taken, so a later ADR can sit in an earlier group.
 
@@ -16,7 +16,8 @@ decisions were taken, so a later ADR can sit in an earlier group.
 
 | ADR | Decision |
 | --- | --- |
-| [0037. VeriSci publishes and rates life-science and health papers](0037-verisci-rates-life-science-and-health-papers.md) | Biology, medicine and health research; publishing refuses a paper outside the field, and a request to rate one is cancelled |
+| [0037. LabsTrail publishes and rates life-science and health papers](0037-labstrail-rates-life-science-and-health-papers.md) | Biology, medicine and health research; publishing refuses a paper outside the field, and a request to rate one is cancelled |
+| [0042. The project is named LabsTrail](0042-the-project-is-named-labstrail.md) | LabsTrail, `labstrail` in code, at `labstrail.vercel.app`; names stored outside the repo (graph and asset names, `urn:verisci:`, the Inngest app id, the contracts until a redeploy, the node server's) keep "verisci" |
 
 ## Tools
 
@@ -49,7 +50,7 @@ How every store, mint and on-chain write behaves; both flows below rely on it.
 | --- | --- |
 | [0007. Every write converges: store, mint, fulfil and cancel](0007-all-writes-converge.md) | Each write reads state first and treats "already done" as success |
 | [0008. Mints are started, then polled in short steps](0008-mints-are-async-polled-in-short-steps.md) | A step starts the mint and stops listening before the time limit; the asset's state is polled, and no run waits for an earlier mint |
-| [0009. Retries are spaced with step.sleep](0009-retries-are-spaced-with-step-sleep.md) | Retries wait with `step.sleep`; each workflow sets its own values, starting from 2 minutes, 5 attempts, 45 minutes in all; the rating run waits up to 60 minutes over 6 attempts |
+| [0009. Retries are spaced with step.sleep](0009-retries-are-spaced-with-step-sleep.md) | Retries wait with `step.sleep`; each workflow sets its own values, starting from 2 minutes, 5 attempts, 45 minutes in all; the rating run waits 2 to 60 minutes between 6 attempts, about 2 hours in all |
 
 ## Publish flow
 
@@ -63,7 +64,7 @@ A PDF becomes a Target KA.
 
 | ADR | Decision |
 | --- | --- |
-| [0011. A rating is a separate R-KA, linked by schema:about](0011-a-rating-is-a-separate-r-ka.md) | Each rating is its own R-KA pointing at the paper; the paper is never modified; only papers verisci published, in its field, are rated |
+| [0011. A rating is a separate R-KA, linked by schema:about](0011-a-rating-is-a-separate-r-ka.md) | Each rating is its own R-KA pointing at the paper; the paper is never modified; only papers LabsTrail published, in its field, are rated |
 | [0012. Ratings evolve in three phases, each settled by the oracle](0012-three-phases-settled-by-the-oracle.md) | Machine score, human review by reviewers drawn with Chainlink VRF, wet-lab; the oracle records every phase's score |
 | [0013. A paper can have several ratings](0013-several-ratings-per-paper.md) | A rating is identified by its request id and its R-KA's UAL |
 | [0014. The contract owns scores, the DKG owns content](0014-contract-owns-scores-dkg-owns-content.md) | The UI shows the contract's score and flags a gap with the DKG |
@@ -79,7 +80,7 @@ In the order a request lives: requested, named, ingested, scored, fulfilled, and
 | [0015. Rating requests are free on testnet](0015-rating-requests-are-free-on-testnet.md) | Requesters pay only gas; a cap and a throttle bound spend until mainnet |
 | [0016. Asset names derive from the on-chain request id](0016-asset-names-derive-from-request-id.md) | Each phase-1 request has an on-chain id; any process computes the rating's name and its recovery from it alone |
 | [0017. Chain events are ingested at least once](0017-chain-events-are-ingested-at-least-once.md) | Signed webhooks, one event per request id, acked only after hand-off; the reconciler heals what is missed; locally the page announces its own request |
-| [0018. The phase-1 scorer has a fixed output contract](0018-phase-1-scorer-output-contract.md) | The scorer reads the paper's text and answers its study type's checks with quotes; code computes the score; it returns `{ score, rationale, studyType, checks }`, computed once and read back; Gemini, on its free tier |
+| [0018. The phase-1 scorer has a fixed output contract](0018-phase-1-scorer-output-contract.md) | The scorer reads the paper's text and answers the checks of every kind of study it reports, with quotes; code computes the score; it returns `{ score, rationale, studyTypes, checks }`, computed once and read back; Gemini, on its free tier |
 | [0019. Oracle transactions are serialized](0019-oracle-transactions-are-serialized.md) | One function sends every oracle transaction the backend sends, one at a time, checking receipts in later steps; only `main` and `develop` hold the oracle keys |
 | [0020. Stuck requests are recovered, and only the oracle cancels](0020-stuck-requests-recovered-only-oracle-cancels.md) | One run per request finishes what is left; a cron restarts stuck ones; only the oracle cancels |
 

@@ -6,7 +6,7 @@ import {
   type ScorerOutput,
   scoreChecks,
   scorerPrompt,
-} from "@verisci/core";
+} from "@labstrail/core";
 import { type GeminiFailureResult, type GeminiOptions, generate } from "../gemini/gemini.ts";
 
 /** The result of {@link askScorer}: Gemini's answer, checked, its quotes not yet checked. */
@@ -34,8 +34,8 @@ export type ScoreResult =
   | GeminiFailureResult;
 
 /**
- * Asks Gemini, in one request, for a paper's field and kind of study and, for a paper in the
- * field, the answer to each check of its study type, with quotes (ADRs 0018, 0037): the prompt
+ * Asks Gemini, in one request, for a paper's field and kinds of study and, for a paper in the
+ * field, the answer to each check of those kinds, with quotes (ADRs 0018, 0037): the prompt
  * from `scorerPrompt`, temperature 0, JSON output held to `SCORER_OUTPUT_SCHEMA` (the shared
  * `generate` call) and checked again with `parseScorerAnswer`. Returns the answer, its quotes
  * not yet checked against the paper, and the model version Gemini reports. Never throws; a

@@ -1,4 +1,4 @@
-import type { RatingRequestState, ReadRequestResult } from "@verisci/contracts";
+import type { RatingRequestState, ReadRequestResult } from "@labstrail/contracts";
 import {
   type PaperText,
   paperPdfQuery,
@@ -8,8 +8,8 @@ import {
   SCORER_PROMPT_VERSION,
   type ScorerOutput,
   type Triple,
-} from "@verisci/core";
-import type { AssetResult, DkgFailure, MintResult, QueryResult } from "@verisci/dkg";
+} from "@labstrail/core";
+import type { AssetResult, DkgFailure, MintResult, QueryResult } from "@labstrail/dkg";
 import { Inngest, NonRetriableError } from "inngest";
 import type { Hex } from "viem";
 import { describe, expect, it, vi } from "vitest";
@@ -39,7 +39,7 @@ const R_KA = `did:dkg:base:84532/${AGENT}/12`;
 const REQUEST_ID = `0x${"ab".repeat(32)}` as Hex;
 const NAME = `verisci-rka-${REQUEST_ID}`;
 const NOW = 1_800_000_000_000;
-const SITE = "https://verisci.example";
+const SITE = "https://labstrail.example";
 const YOUNG = NOW / 1000 - 60;
 const OLD = NOW / 1000 - 25 * 3600;
 const EVENT = { contract: CONTRACT, requestId: REQUEST_ID };
@@ -53,7 +53,7 @@ const PAPER: PaperText = {
 const OUTPUT: ScorerOutput = {
   score: 72,
   rationale: "The paper reports its sample size.",
-  studyType: "randomized-trial",
+  studyTypes: ["randomized-trial"],
   checks: [{ id: "sample-size", answer: "shown", quote: "We needed 60 patients for 80% power." }],
 };
 const MODEL = "gemini-3.8-flash-001";
@@ -375,7 +375,7 @@ describe("runRating: rating a paper", () => {
       "find-pdf-1",
       "read-paper-1",
       "check-field-1",
-      "score-paper-1",
+      "score-paper-v4-1",
       "store-1",
       "mint-1",
       "read-score-1",
@@ -474,7 +474,7 @@ describe("runRating: rating a paper", () => {
     expect(await run).toEqual({ state: "cancelled", reason: "invalid-target" });
     expect(oracleCalls).toEqual([cancel("invalid-target")]);
     expect(dkg.storeAsset).not.toHaveBeenCalled();
-    expect(log.slice(-3)).toEqual(["score-paper-1", "oracle cancel", "notify"]);
+    expect(log.slice(-3)).toEqual(["score-paper-v4-1", "oracle cancel", "notify"]);
   });
 
   it("cancels invalid-target a paper whose PDF holds no text, such as a scan, scoring nothing", async () => {
@@ -871,7 +871,7 @@ describe("runRating: retries", () => {
     expect(await run).toMatchObject({ state: "fulfilled" });
     expect(deps.score).toHaveBeenCalledTimes(2);
     expect(deps.readPaper).toHaveBeenCalledOnce();
-    expect(log).toContain("score-paper-2");
+    expect(log).toContain("score-paper-v4-2");
     expect(log).not.toContain("find-pdf-2");
     expect(log).not.toContain("read-paper-2");
   });
@@ -887,7 +887,7 @@ describe("runRating: retries", () => {
     expect(deps.score).toHaveBeenCalledOnce();
     expect(dkg.storeAsset).toHaveBeenCalledTimes(2);
     expect(log).toContain("store-2");
-    expect(log).not.toContain("score-paper-2");
+    expect(log).not.toContain("score-paper-v4-2");
   });
 
   it("retries a node that does not answer, then fails node-unreachable", async () => {
@@ -1023,16 +1023,16 @@ describe("loadRatingDeps", () => {
 });
 
 describe("createRatePaper", () => {
-  const inngest = new Inngest({ id: "verisci-test" });
+  const inngest = new Inngest({ id: "labstrail-test" });
   const oracleFn = inngest.createFunction({ id: "oracle-transaction" }, async () => null);
   const build = (throttle: boolean) =>
     createRatePaper(inngest, () => rate({}).deps, oracleFn, { throttle });
 
-  it("runs on verisci/rating.requested as a singleton per request id, skipping new runs", () => {
+  it("runs on labstrail/rating.requested as a singleton per request id, skipping new runs", () => {
     const fn = build(true);
 
     expect(fn.opts.id).toBe("rate-paper");
-    expect(fn.opts.triggers).toEqual([{ event: "verisci/rating.requested" }]);
+    expect(fn.opts.triggers).toEqual([{ event: "labstrail/rating.requested" }]);
     expect(fn.opts.singleton).toEqual({ key: "event.data.requestId", mode: "skip" });
     expect(fn.opts.timeouts).toEqual({ finish: "300m" });
   });

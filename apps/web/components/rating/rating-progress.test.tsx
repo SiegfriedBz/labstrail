@@ -1,6 +1,6 @@
+import { SCORER_PROMPT_VERSION } from "@labstrail/core";
+import type { RatingView } from "@labstrail/workflows";
 import { act, cleanup, render, screen, within } from "@testing-library/react";
-import { SCORER_PROMPT_VERSION } from "@verisci/core";
-import type { RatingView } from "@verisci/workflows";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RatingProgress } from "./rating-progress.tsx";
 
@@ -25,7 +25,7 @@ const SCORED: RatingView = {
     targetUal: UAL,
     score: 67,
     rationale: "Clear aims and references; no limitations section.",
-    studyType: "narrative-review",
+    studyTypes: ["narrative-review"],
     model: "gemini-3.8-flash",
     promptVersion: SCORER_PROMPT_VERSION,
     textShortened: true,
@@ -102,6 +102,17 @@ describe("RatingProgress", () => {
         .getAllByRole("link")
         .some((link) => link.getAttribute("href")?.endsWith(`/address/${CONTRACT}`)),
     ).toBe(true);
+  });
+
+  it("names an older rating's study type in the words of the version that scored it", () => {
+    show({
+      ...SCORED,
+      record: SCORED.record && { ...SCORED.record, studyTypes: ["animal"], promptVersion: "3" },
+    });
+
+    expect(
+      screen.getByText(/Read as an experiment on live animals, against ARRIVE 2\.0\./),
+    ).toBeTruthy();
   });
 
   it("shows the contract address without a link on Anvil", () => {
@@ -287,7 +298,7 @@ describe("RatingProgress", () => {
       "Recorded on-chain",
     ]);
     expect(screen.getAllByText(/OriginTrail's Knowledge Asset contracts/)).toHaveLength(2);
-    expect(screen.getByText(/VeriSci's RatingController contract/)).toBeTruthy();
+    expect(screen.getByText(/LabsTrail's RatingController contract/)).toBeTruthy();
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Minting the rating");
   });
 

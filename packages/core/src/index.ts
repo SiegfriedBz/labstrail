@@ -1,5 +1,5 @@
 /** Package name, imported by the web app's package test (`apps/web/app/packages.test.ts`). */
-export const coreName = "@verisci/core";
+export const coreName = "@labstrail/core";
 
 export {
   type AssetNameError,
@@ -50,7 +50,9 @@ export {
 export {
   canonicalContextGraph,
   MAX_PDF_BYTES,
+  PRE_RENAME_DOMAIN,
   SUBMISSION_DOMAIN,
+  type SubmissionDomain,
   type SubmissionMessage,
   submissionTypedData,
 } from "./publish/submission.ts";
@@ -63,12 +65,16 @@ export {
 export { type PaperMetadata, parseTeiHeader, type TeiResult } from "./publish/tei.ts";
 export { completeTitle } from "./publish/title.ts";
 export {
+  CHECK_RULES,
   CHECKS,
   type Check,
   type CheckId,
+  checklistFor,
   checklistOf,
+  PRIMARY_STUDY_TYPES,
   STUDY_TYPES,
   type StudyType,
+  studyTypesOf,
 } from "./rating/checklists.ts";
 export {
   normalizeForQuote,

@@ -6,7 +6,7 @@
     "url": "https://journals.plos.org/plosmedicine/article/file?id=10.1371/journal.pmed.1004440&type=printable",
     "licence": "CC BY 4.0",
     "field": "life-sciences",
-    "studyType": "randomized-trial",
+    "studyTypes": ["randomized-trial"],
     "expectedScore": [90, 100],
     "expectedChecks": {
       "sample-size": "shown",
@@ -34,7 +34,7 @@
     "url": "https://www.frontiersin.org/articles/10.3389/fphys.2018.01048/pdf",
     "licence": "CC BY 4.0",
     "field": "life-sciences",
-    "studyType": "randomized-trial",
+    "studyTypes": ["randomized-trial"],
     "expectedScore": [44, 64],
     "expectedChecks": {
       "sample-size": "missing",
@@ -62,7 +62,7 @@
     "url": "https://journals.plos.org/plosmedicine/article/file?id=10.1371/journal.pmed.1004337&type=printable",
     "licence": "CC BY 4.0",
     "field": "life-sciences",
-    "studyType": "observational",
+    "studyTypes": ["observational"],
     "expectedScore": [82, 100],
     "expectedChecks": {
       "design-setting": "shown",
@@ -89,7 +89,7 @@
     "url": "https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0036041&type=printable",
     "licence": "CC BY (PLOS, unversioned at publication)",
     "field": "life-sciences",
-    "studyType": "observational",
+    "studyTypes": ["observational"],
     "expectedScore": [44, 64],
     "expectedChecks": {
       "design-setting": "partly",
@@ -116,7 +116,7 @@
     "url": "https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0257034&type=printable",
     "licence": "CC BY 4.0",
     "field": "life-sciences",
-    "studyType": "animal",
+    "studyTypes": ["animal"],
     "expectedScore": [86, 100],
     "expectedChecks": {
       "subjects": "shown",
@@ -142,7 +142,7 @@
     "url": "https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0013201&type=printable",
     "licence": "CC BY (PLOS, unversioned at publication)",
     "field": "life-sciences",
-    "studyType": "animal",
+    "studyTypes": ["animal"],
     "expectedScore": [36, 56],
     "expectedChecks": {
       "subjects": "shown",
@@ -168,7 +168,7 @@
     "url": "https://cdn.elifesciences.org/articles/99373/elife-99373-v1.pdf",
     "licence": "CC BY 4.0",
     "field": "life-sciences",
-    "studyType": "lab",
+    "studyTypes": ["lab"],
     "expectedScore": [75, 95],
     "expectedChecks": {
       "resources-identified": "shown",
@@ -195,7 +195,7 @@
     "url": "https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0012644&type=printable",
     "licence": "CC BY (PLOS, unversioned at publication)",
     "field": "life-sciences",
-    "studyType": "lab",
+    "studyTypes": ["lab"],
     "expectedScore": [29, 49],
     "expectedChecks": {
       "resources-identified": "partly",
@@ -222,7 +222,7 @@
     "url": "https://journals.plos.org/plosmedicine/article/file?id=10.1371/journal.pmed.1004200&type=printable",
     "licence": "CC BY 4.0",
     "field": "life-sciences",
-    "studyType": "systematic-review",
+    "studyTypes": ["systematic-review"],
     "expectedScore": [90, 100],
     "expectedChecks": {
       "search": "shown",
@@ -248,7 +248,7 @@
     "url": "https://www.frontiersin.org/articles/10.3389/fphar.2023.1260921/pdf",
     "licence": "CC BY 4.0",
     "field": "life-sciences",
-    "studyType": "narrative-review",
+    "studyTypes": ["narrative-review"],
     "expectedScore": [73, 93],
     "expectedChecks": {
       "importance": "shown",
@@ -273,7 +273,7 @@
     "url": "https://arxiv.org/pdf/2101.07494",
     "licence": "CC BY 4.0",
     "field": "life-sciences",
-    "studyType": "computational",
+    "studyTypes": ["computational"],
     "expectedScore": [8, 28],
     "expectedChecks": {
       "data-source": "partly",
@@ -298,7 +298,7 @@
     "url": "https://jmedicalcasereports.biomedcentral.com/counter/pdf/10.1186/s13256-023-04279-0",
     "licence": "CC BY 4.0",
     "field": "life-sciences",
-    "studyType": "other",
+    "studyTypes": ["other"],
     "expectedScore": [90, 100],
     "expectedChecks": {
       "methods-described": "shown",
@@ -319,7 +319,7 @@
     "url": "https://arxiv.org/pdf/1706.03762",
     "licence": "arXiv non-exclusive distribution licence 1.0 (not CC BY; Google grants reuse of tables/figures for scholarly work)",
     "field": "outside",
-    "studyType": null,
+    "studyTypes": null,
     "expectedScore": null,
     "expectedChecks": null,
     "why": "Machine-learning architecture paper (machine translation); no life-science or health content."
@@ -331,7 +331,7 @@
     "url": "https://arxiv.org/pdf/1602.03837",
     "licence": "CC BY 4.0 (arXiv listing; the PRL version in the PDF states CC BY 3.0)",
     "field": "outside",
-    "studyType": null,
+    "studyTypes": null,
     "expectedScore": null,
     "expectedChecks": null,
     "why": "Astrophysics / general relativity detection paper (LIGO GW150914); no life-science or health content."

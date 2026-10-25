@@ -1,6 +1,6 @@
+import { checklistOf, STUDY_TYPES } from "@labstrail/core";
+import { RATING_SETTINGS } from "@labstrail/workflows";
 import { cleanup, render, screen } from "@testing-library/react";
-import { checklistOf, STUDY_TYPES } from "@verisci/core";
-import { RATING_SETTINGS } from "@verisci/workflows";
 import { afterEach, describe, expect, it } from "vitest";
 import { SITE } from "../../lib/site.ts";
 import MethodPage, { metadata } from "./page.tsx";
@@ -27,6 +27,13 @@ describe("/method", () => {
       expect(row).toContain(`${checklistOf(type.id).length} checks`);
       if (type.source !== "none") expect(row).toContain(type.source);
     }
+  });
+
+  it("says a paper can combine kinds of study and answers the checks of each, once", () => {
+    render(<MethodPage />);
+
+    expect(screen.getByText(/decides which kinds of study it reports/)).toBeTruthy();
+    expect(screen.getByText(/answers the checks of each, every check once/)).toBeTruthy();
   });
 
   it("names the model that scores and how its answers become the score", () => {

@@ -1,4 +1,4 @@
-import { submissionTypedData } from "@verisci/core";
+import { PRE_RENAME_DOMAIN, submissionTypedData } from "@labstrail/core";
 import { createPublicClient, custom } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
@@ -72,6 +72,29 @@ describe("verifySubmission", () => {
       ...(await signed()),
       submitter: privateKeyToAccount(generatePrivateKey()).address,
     };
+
+    expect(await verify(data, client(false).publicClient)).toEqual({
+      ok: false,
+      reason: "bad-signature",
+    });
+  });
+
+  it("accepts a signature under the labstrail domain", async () => {
+    const data = await signed();
+
+    expect(
+      submissionTypedData({ cid: CID, contextGraph: GRAPH, deadline: DEADLINE }).domain.name,
+    ).toBe("labstrail");
+    expect(await verify(data)).toMatchObject({ ok: true });
+  });
+
+  it("refuses a signature under the old verisci domain", async () => {
+    const typedData = submissionTypedData({ cid: CID, contextGraph: GRAPH, deadline: DEADLINE });
+    const signature = await submitter.signTypedData({
+      ...typedData,
+      domain: { ...typedData.domain, name: "verisci" },
+    });
+    const data = { ...(await signed()), signature };
 
     expect(await verify(data, client(false).publicClient)).toEqual({
       ok: false,
@@ -203,6 +226,19 @@ describe("signatureMatches", () => {
 
   it("accepts the submitter's signature, whatever the deadline", async () => {
     expect(await signatureMatches(await record(), client().publicClient)).toBe(true);
+  });
+
+  it("accepts a paper signed before the rename, under the verisci domain", async () => {
+    const message = { cid: CID, contextGraph: GRAPH, deadline: DEADLINE };
+    const signature = await submitter.signTypedData(
+      submissionTypedData(message, PRE_RENAME_DOMAIN),
+    );
+    const { publicClient, calls } = client();
+
+    expect(
+      await signatureMatches({ ...message, submitter: submitter.address, signature }, publicClient),
+    ).toBe(true);
+    expect(calls).toEqual([]);
   });
 
   it("refuses another address's signature when the chain says no", async () => {

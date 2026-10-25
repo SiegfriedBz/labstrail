@@ -1,15 +1,19 @@
 // Dev only: scores the reference papers (reference-papers.json) as a rating run would, reading
-// each PDF's text and asking Gemini for its field, study type and checks in one request, and
+// each PDF's text and asking Gemini for its field, study types and checks in one request, and
 // prints how each compares with what is expected. It never publishes, stores or rates anything.
-// With --field, it runs only the publish run's field check instead: GROBID's header and the
-// text's opening, then one Flash-Lite request per paper.
+// With --repeat, it scores each paper several times and prints how far the runs agree; with
+// --pdf, it also scores a PDF on disk, which has no expectations; with --thinking, each scorer
+// request asks for that thinking level. With --field, it runs only the publish run's field
+// check instead: GROBID's header and the text's opening, then one Flash-Lite request per paper.
 //
-//   pnpm --filter @verisci/workflows score-papers [--field] [id…]
+//   pnpm --filter @labstrail/workflows score-papers [--repeat n] [--pdf path…] [--thinking level] [id…]
+//   pnpm --filter @labstrail/workflows score-papers --field [id…]
 //
 // Reads GEMINI_API_KEY (and GROBID_URL with --field, with DKG_TOKEN as GROBID's credential on
-// the node server) from the root .env.local (packages/workflows README). Downloads each PDF
-// once into node_modules/.cache/verisci-reference/, and writes each run's answers there too,
-// after each paper, so a run that stops keeps the answers it paid for.
+// the node server) from the root .env.local (packages/workflows README). Refuses a run that
+// would spend more than the free tier's daily scorer requests. Downloads each PDF once into
+// node_modules/.cache/labstrail-reference/, and writes each run's answers there too, after each
+// paper (each run with --repeat), so a run that stops keeps the answers it paid for.
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { setTimeout as sleep } from "node:timers/promises";
 import {
@@ -18,8 +22,8 @@ import {
   type ScorerAnswer,
   type ScorerOutput,
   scoreChecks,
-} from "@verisci/core";
-import { createSharedEnv, defineEnv } from "@verisci/env";
+} from "@labstrail/core";
+import { createSharedEnv, defineEnv } from "@labstrail/env";
 import { z } from "zod";
 import type { GeminiFailureResult } from "../src/gemini/gemini.ts";
 import { paperTextOf } from "../src/pdf/paper-text.ts";
@@ -30,8 +34,10 @@ import { RATING_SETTINGS } from "../src/rating/rate-paper.ts";
 import { askScorer } from "../src/rating/scorer.ts";
 import { geminiSchema } from "../src/workflows-env.ts";
 import { type ReferencePaper, readReferencePapers } from "./reference-papers.ts";
+import { budgetError, parseScoreArgs } from "./score-args.ts";
+import { type ScoredRun, type Stability, stabilityOf } from "./stability.ts";
 
-const CACHE = new URL("../node_modules/.cache/verisci-reference/", import.meta.url);
+const CACHE = new URL("../node_modules/.cache/labstrail-reference/", import.meta.url);
 /**
  * Gemini's free tier answers a burst with 429s: wait between calls, and retry a few times. An
  * answer the check refuses is asked for again only as often as a rating run does.
@@ -45,13 +51,18 @@ if (shared.APP_ENV !== "local") {
   console.error("score-papers runs only with APP_ENV=local");
   process.exit(1);
 }
-const args = process.argv.slice(2);
-const fieldOnly = args.includes("--field");
+// pnpm runs the script in its workspace; INIT_CWD is where the command was typed.
+const parsed = parseScoreArgs(process.argv.slice(2), process.env.INIT_CWD ?? process.cwd());
+if (!parsed.ok) {
+  console.error(parsed.error);
+  process.exit(1);
+}
+const { args } = parsed;
 const env = defineEnv({
   extends: [shared],
   server: {
     ...geminiSchema,
-    GROBID_URL: fieldOnly ? z.url() : z.string().optional(),
+    GROBID_URL: args.field ? z.url() : z.string().optional(),
     DKG_TOKEN: z.string().optional(),
   },
   runtimeEnv: process.env,
@@ -60,24 +71,34 @@ const gemini = {
   apiKey: env.GEMINI_API_KEY,
   model: RATING_SETTINGS.model,
   fetch: (input: string | URL | Request, init?: RequestInit) => fetch(input, init),
+  ...(args.thinkingLevel ? { thinkingLevel: args.thinkingLevel } : {}),
 };
 
 const all = readReferencePapers(
   JSON.parse(await readFile(new URL("./reference-papers.json", import.meta.url), "utf8")),
 );
-const wanted = args.filter((arg) => arg !== "--field");
-const unknown = wanted.filter((id) => !all.some((paper) => paper.id === id));
+const unknown = args.ids.filter((id) => !all.some((paper) => paper.id === id));
 if (unknown.length > 0) {
   console.error(`Not in reference-papers.json: ${unknown.join(", ")}`);
   process.exit(1);
 }
-const papers = wanted.length > 0 ? all.filter((paper) => wanted.includes(paper.id)) : all;
+const chosen = args.ids.length > 0 || args.pdfs.length > 0;
+const papers = chosen ? all.filter((paper) => args.ids.includes(paper.id)) : all;
 await mkdir(CACHE, { recursive: true });
+
+/** A paper to score: a reference paper, with what is expected of it, or a PDF on disk. */
+interface Target {
+  readonly id: string;
+  readonly reference?: ReferencePaper;
+  /** The PDF, from the cache or the paper's URL, or from disk; or why not. */
+  readonly bytes: () => Promise<Uint8Array | string>;
+}
 
 /** What the scorer gave for one paper: its classification, Gemini's answers and the score. */
 interface Found {
   readonly id: string;
-  readonly expected: string;
+  /** The study types expected, joined with `+` (`animal+lab`), or `outside`; none for a PDF on disk. */
+  readonly expected?: string;
   readonly found?: string;
   readonly range?: readonly [number, number];
   /** Gemini's answer before its quotes were checked against the paper. */
@@ -89,36 +110,72 @@ interface Found {
 }
 
 const file = new URL(
-  `${fieldOnly ? "field" : "results"}-${new Date().toISOString().replaceAll(":", "-")}.json`,
+  `${args.field ? "field" : "results"}-${new Date().toISOString().replaceAll(":", "-")}.json`,
   CACHE,
 );
-if (fieldOnly) {
+if (args.field) {
   await checkFields(papers);
   process.exit(0);
 }
-const results: Found[] = [];
-for (const paper of papers) {
-  const result = await score(paper).catch(
-    (error: unknown): Found => ({ ...baseOf(paper), failure: `stopped: ${String(error)}` }),
-  );
-  results.push(result);
-  report(paper, result);
-  await writeFile(file, `${JSON.stringify(results, null, 2)}\n`);
+const targets: Target[] = [
+  ...papers.map((paper) => ({ id: paper.id, reference: paper, bytes: () => pdfBytes(paper) })),
+  ...args.pdfs.map((pdf) => ({ id: pdf.name, bytes: () => pdfOnDisk(pdf.path) })),
+];
+const tooMany = budgetError(targets.length, args.repeat);
+if (tooMany) {
+  console.error(tooMany);
+  process.exit(1);
 }
-summarize(results);
+console.log(
+  `Scoring ${targets.length} paper(s) × ${args.repeat} run(s) = ${targets.length * args.repeat} scorer request(s), thinking level ${args.thinkingLevel ?? "the model's default"}`,
+);
+if (args.repeat === 1) {
+  const results: Found[] = [];
+  for (const target of targets) {
+    const result = await scoreOrStop(target);
+    results.push(result);
+    report(target, result);
+    await writeFile(file, `${JSON.stringify(results, null, 2)}\n`);
+  }
+  summarize(results);
+} else {
+  const repeated: { id: string; runs: Found[]; stability: Stability }[] = [];
+  for (const target of targets) {
+    const entry = { id: target.id, runs: [] as Found[], stability: stabilityOf([]) };
+    repeated.push(entry);
+    for (let run = 1; run <= args.repeat; run++) {
+      const result = await scoreOrStop(target);
+      entry.runs.push(result);
+      entry.stability = stabilityOf(entry.runs.map(runOf));
+      console.log(`\nRun ${run} of ${args.repeat}`);
+      report(target, result);
+      await writeFile(file, `${JSON.stringify(repeated, null, 2)}\n`);
+    }
+    console.log(`\n${target.id}: ${args.repeat} runs`);
+    for (const line of describe(entry.stability)) console.log(`  ${line}`);
+  }
+}
 console.log(`\nAnswers written to ${file.pathname}`);
 
-function baseOf(paper: ReferencePaper) {
+function scoreOrStop(target: Target): Promise<Found> {
+  return score(target).catch(
+    (error: unknown): Found => ({ ...baseOf(target), failure: `stopped: ${String(error)}` }),
+  );
+}
+
+function baseOf(target: Target) {
+  const paper = target.reference;
+  if (!paper) return { id: target.id };
   return {
     id: paper.id,
-    expected: paper.field === "outside" ? "outside" : paper.studyType,
+    expected: paper.field === "outside" ? "outside" : paper.studyTypes.join("+"),
     ...(paper.expectedScore ? { range: paper.expectedScore } : {}),
   };
 }
 
-async function score(paper: ReferencePaper): Promise<Found> {
-  const base = baseOf(paper);
-  const text = await paperText(paper);
+async function score(target: Target): Promise<Found> {
+  const base = baseOf(target);
+  const text = await paperText(target);
   if (!text.ok) return { ...base, failure: text.failure };
 
   const started = Date.now();
@@ -126,11 +183,18 @@ async function score(paper: ReferencePaper): Promise<Found> {
     askScorer(text.paper, { ...gemini, timeoutMs: RATING_SETTINGS.scorerTimeoutMs }),
   );
   const seconds = Math.round((Date.now() - started) / 1000);
-  if (!asked.ok) return { ...base, seconds, failure: `scorer ${describe(asked)}` };
+  if (!asked.ok) return { ...base, seconds, failure: `scorer ${failureOf(asked)}` };
   const { answer } = asked;
   if (answer.field === "outside") return { ...base, found: "outside", seconds, asked: answer };
   const output = scoreChecks(text.paper, answer);
-  return { ...base, found: answer.studyType, seconds, asked: answer, output };
+  return { ...base, found: answer.studyTypes.join("+"), seconds, asked: answer, output };
+}
+
+/** One run as {@link stabilityOf} compares it. */
+function runOf(result: Found): ScoredRun {
+  if (result.output) return { kind: "scored", output: result.output };
+  if (result.found === "outside") return { kind: "outside" };
+  return { kind: "failed", failure: result.failure ?? "no answer" };
 }
 
 /** What the field check gave for one paper. */
@@ -200,15 +264,15 @@ async function checkOne(paper: ReferencePaper): Promise<FieldFound> {
       { ...gemini, model: PUBLISH_SETTINGS.fieldModel, timeoutMs: PUBLISH_SETTINGS.fieldTimeoutMs },
     ),
   );
-  if (!checked.ok) return { ...base, failure: `field check ${describe(checked)}` };
+  if (!checked.ok) return { ...base, failure: `field check ${failureOf(checked)}` };
   return { ...base, found: checked.field, reason: checked.reason };
 }
 
-/** The paper's text, as a rating run prepares it, from its PDF in the cache ({@link pdfBytes}). */
+/** The paper's text, as a rating run prepares it, from its PDF ({@link Target.bytes}). */
 async function paperText(
-  paper: ReferencePaper,
+  target: Target,
 ): Promise<{ ok: true; paper: PaperText } | { ok: false; failure: string }> {
-  const bytes = await pdfBytes(paper);
+  const bytes = await target.bytes();
   if (typeof bytes === "string") return { ok: false, failure: bytes };
   const text = await paperTextOf(bytes, RATING_SETTINGS.maxTextChars);
   if (text.ok) return text;
@@ -231,6 +295,16 @@ async function pdfBytes(paper: ReferencePaper): Promise<Uint8Array | string> {
   // unpdf takes the bytes over, so they are written to the cache before anything reads them.
   if (!cached) await writeFile(path, bytes);
   return bytes;
+}
+
+/** A PDF on disk, read again for each run since unpdf takes the bytes over, or why not. */
+async function pdfOnDisk(path: string): Promise<Uint8Array | string> {
+  const bytes = await readFile(path).then(
+    (file) => new Uint8Array(file),
+    () => undefined,
+  );
+  if (!bytes) return `no file at ${path}`;
+  return isPdf(bytes) ? bytes : `not a PDF: ${path}`;
 }
 
 /** The file at `url`, or why it did not come. */
@@ -262,34 +336,46 @@ async function withRetries<T extends { ok: true } | GeminiFailureResult>(call: (
   }
 }
 
-function describe(failure: GeminiFailureResult): string {
+function failureOf(failure: GeminiFailureResult): string {
   return failure.status === undefined
     ? failure.reason
     : `${failure.reason} (HTTP ${failure.status})`;
 }
 
 /**
- * One paper's line, then each check scored otherwise than expected or that lost Gemini's
- * answer, with why. Checks are compared only when the study type is the expected one.
+ * One paper's line, then, for a reference paper, each check scored otherwise than expected or
+ * that lost Gemini's answer, with why. Checks are compared only when the study type is the
+ * expected one.
  */
-function report(paper: ReferencePaper, result: Found): void {
+function report(target: Target, result: Found): void {
   const type =
-    result.found === result.expected
-      ? result.expected
+    result.expected === undefined || result.found === result.expected
+      ? (result.found ?? "?")
       : `${result.expected} → ${result.found ?? "?"}`;
-  const range = result.range ? `${result.range[0]}–${result.range[1]}` : "outside";
+  const range = result.range
+    ? `expected ${result.range[0]}–${result.range[1]} · `
+    : result.expected === "outside"
+      ? "expected outside · "
+      : "";
   const score = result.output?.score ?? "-";
   const took = result.seconds === undefined ? "" : ` · ${result.seconds} s`;
   console.log(
-    `\n${paper.id}\n  type ${type} · expected ${range} · score ${score} · ${verdict(result)}${took}`,
+    `\n${target.id}\n  type ${type} · ${range}score ${score} · ${verdict(result)}${took}`,
   );
-  if (!paper.expectedChecks || !result.output) return;
+  const expectedChecks = target.reference?.expectedChecks;
+  if (!result.output) return;
+  if (!expectedChecks) {
+    for (const check of result.output.checks) {
+      if (check.claimed) console.log(`  ${check.id}: scored ${check.answer}${note(check)}`);
+    }
+    return;
+  }
   if (result.found !== result.expected) {
     console.log("  checks not compared: another study type");
     return;
   }
   for (const check of result.output.checks) {
-    const expected = paper.expectedChecks[check.id] ?? "?";
+    const expected = expectedChecks[check.id] ?? "?";
     if (expected === check.answer && !check.claimed) continue;
     console.log(`  ${check.id}: expected ${expected}, scored ${check.answer}${note(check)}`);
   }
@@ -308,11 +394,43 @@ function note(check: CheckResult): string {
 
 function verdict(result: Found): string {
   if (result.failure) return `FAILED: ${result.failure}`;
+  if (result.expected === undefined) {
+    return result.found === "outside" ? "classed outside" : "no expectations";
+  }
   if (result.expected === "outside") {
     return result.found === "outside" ? "right" : "WRONG: scored in the field";
   }
   if (result.found === "outside") return "WRONG: classed outside";
   return inRange(result) ? "in range" : "OUT OF RANGE";
+}
+
+/** A paper's {@link Stability}, line by line. */
+function describe(stability: Stability): string[] {
+  const counts = (values: Readonly<Record<string, number | undefined>>) =>
+    Object.entries(values)
+      .map(([value, times]) => `${value} ×${times}`)
+      .join(", ");
+  const lines = [
+    `scored ${stability.scores.length} · outside ${stability.outside} · failed ${stability.failed}`,
+  ];
+  if (!stability.fieldSteady) lines.push("field NOT steady: some runs classed it outside");
+  if (!stability.enough) return [...lines, "not enough scored runs to compare"];
+  lines.push(
+    `study type ${counts(stability.studyTypes)}${stability.studyTypeSteady ? " (steady)" : ` (NOT steady; checks compared across the ${stability.studyType} runs)`}`,
+    `scores ${stability.scores.join(", ")} · spread ${stability.spread}`,
+  );
+  for (const flip of stability.answerFlips) {
+    lines.push(`answer flip ${flip.id}: ${counts(flip.counted)}`);
+  }
+  for (const flip of stability.quoteFlips) {
+    lines.push(
+      `quote flip ${flip.id}: counted ${counts(flip.counted)}, Gemini said ${counts(flip.said)}`,
+    );
+  }
+  if (stability.answerFlips.length + stability.quoteFlips.length === 0) {
+    lines.push("every check counted the same in every run");
+  }
+  return lines;
 }
 
 function clip(text: string): string {
@@ -324,9 +442,12 @@ function inRange(result: Found): boolean {
   return Boolean(range && output && output.score >= range[0] && output.score <= range[1]);
 }
 
+/** The run's totals over the reference papers it scored; PDFs on disk have none. */
 function summarize(found: readonly Found[]): void {
-  const inField = found.filter((result) => result.expected !== "outside");
-  const outside = found.filter((result) => result.expected === "outside");
+  const referenced = found.filter((result) => result.expected !== undefined);
+  if (referenced.length === 0) return;
+  const inField = referenced.filter((result) => result.expected !== "outside");
+  const outside = referenced.filter((result) => result.expected === "outside");
   const count = (list: readonly Found[], test: (result: Found) => boolean) =>
     list.filter(test).length;
   console.log("\nSummary");

@@ -1,17 +1,18 @@
-import { CheckCircle, Question, XCircle } from "@phosphor-icons/react/dist/ssr";
 import {
   knowledgeAssetToken,
+  PRE_RENAME_DOMAIN,
   parseUal,
   SUBMISSION_DOMAIN,
   submissionTypedData,
-} from "@verisci/core";
-import type { PublishedRecord } from "@verisci/workflows";
+} from "@labstrail/core";
+import type { PublishedRecord } from "@labstrail/workflows";
+import { CheckCircle, Question, XCircle } from "@phosphor-icons/react/dist/ssr";
 import type { ReactNode } from "react";
 import { addressUrl, assetTokenUrl, ipfsUrl } from "../../lib/papers/explorer.ts";
 import { CopyValue } from "./copy-value.tsx";
 import { VERIFY_GROUPS, VERIFY_INTRO, VERIFY_LABELS, VERIFY_TITLE } from "./labels.ts";
 
-/** The signature's EIP-712 domain and type, as `@verisci/core`'s `submissionTypedData` builds them. */
+/** The signature's EIP-712 domain and type, as `@labstrail/core`'s `submissionTypedData` builds them. */
 const EIP712_DOMAIN = `{ name: "${SUBMISSION_DOMAIN.name}", version: "${SUBMISSION_DOMAIN.version}", chainId: ${SUBMISSION_DOMAIN.chainId} }`;
 /** The type as EIP-712 encodes it (no spaces after commas), from the fields that are signed. */
 const EIP712_TYPE = `Submission(${submissionTypedData({ cid: "", contextGraph: "", deadline: 0n })
@@ -37,7 +38,7 @@ const CHECK = {
 } as const;
 
 /**
- * Everything anyone needs to check a published paper without trusting VeriSci, in two
+ * Everything anyone needs to check a published paper without trusting LabsTrail, in two
  * groups: the submission (who submitted it, their signature, checked when read, its deadline
  * and the context graph it was signed for), then the asset (who minted it, its ERC-721
  * token, the record's UAL and the PDF's CID), with how to check them.
@@ -51,7 +52,7 @@ export function VerifyPanel({
   record: PublishedRecord;
   ual: string;
   cid: string;
-  /** VeriSci's context graph id, canonical: the asset's graph, and part of what was signed. */
+  /** LabsTrail's context graph id, canonical: the asset's graph, and part of what was signed. */
   contextGraph: string;
 }) {
   const check = CHECK[record.signatureCheck];
@@ -112,9 +113,11 @@ export function VerifyPanel({
           <li>
             Check the signature. It's EIP-712 typed data with the domain{" "}
             <code className="font-mono text-xs text-ink">{EIP712_DOMAIN}</code> and the type{" "}
-            <code className="font-mono text-xs text-ink">{EIP712_TYPE}</code>. Any EIP-712 library
-            recovers the signer to compare with the submitter; a smart-contract wallet is checked on
-            chain with ERC-1271.
+            <code className="font-mono text-xs text-ink">{EIP712_TYPE}</code>. A paper published
+            before LabsTrail was renamed is signed with the name{" "}
+            <code className="font-mono text-xs text-ink">"{PRE_RENAME_DOMAIN.name}"</code> instead.
+            Any EIP-712 library recovers the signer to compare with the submitter; a smart-contract
+            wallet is checked on chain with ERC-1271.
           </li>
           <li>
             Download the PDF by its CID. An IPFS client checks every block against its hash, so a
@@ -123,7 +126,7 @@ export function VerifyPanel({
           </li>
           <li>
             Open the asset token on Basescan. It's an ERC-721 token in OriginTrail's
-            DKGKnowledgeAssets contract, minted to VeriSci's node, and its page shows when. The
+            DKGKnowledgeAssets contract, minted to LabsTrail's node, and its page shows when. The
             merkle root of the asset's statements is anchored with it, so any node can check that
             the content still matches.
           </li>

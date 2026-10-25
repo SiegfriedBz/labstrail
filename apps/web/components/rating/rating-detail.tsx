@@ -1,5 +1,5 @@
+import type { RatingView } from "@labstrail/workflows";
 import { Warning } from "@phosphor-icons/react";
-import type { RatingView } from "@verisci/workflows";
 import { addressUrl, assetTokenUrl } from "../../lib/papers/explorer.ts";
 import { answerLabel, type CheckRow, checkRows, studyTypeLine } from "../../lib/rating/checks.ts";
 import { CopyValue } from "../paper/copy-value.tsx";
@@ -13,7 +13,7 @@ const ANSWER_TONE = {
 
 /**
  * A scored rating: the contract's score (ADR 0014), flagged when its R-KA records another;
- * then the R-KA's content, read from the DKG: the study type, the rationale, each check with
+ * then the R-KA's content, read from the DKG: the kinds of study, the rationale, each check with
  * its answer and quote, and for a check that lost its point what the scorer claimed and why it
  * didn't count; where the R-KA and the request live.
  */
@@ -32,8 +32,10 @@ export function RatingDetail({
       <div className="grid content-start gap-6">
         {record ? (
           <>
-            {studyTypeLine(record.studyType) && (
-              <p className="text-sm text-muted">{studyTypeLine(record.studyType)}</p>
+            {studyTypeLine(record.studyTypes, record.promptVersion) && (
+              <p className="text-sm text-muted">
+                {studyTypeLine(record.studyTypes, record.promptVersion)}
+              </p>
             )}
             <p className="max-w-[65ch] leading-relaxed">{record.rationale}</p>
             {record.textShortened && (

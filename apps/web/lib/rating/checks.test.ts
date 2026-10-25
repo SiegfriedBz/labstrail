@@ -71,12 +71,40 @@ describe("answerLabel", () => {
 
 describe("studyTypeLine", () => {
   it("names the kind of study and the checklist it was held to", () => {
-    expect(studyTypeLine("animal")).toBe(
-      "Read as an experiment on live animals, against ARRIVE 2.0.",
+    expect(studyTypeLine(["animal"])).toBe(
+      "Read as an experiment on live vertebrates, such as mice, rats or zebrafish, or on cephalopods, against ARRIVE 2.0.",
+    );
+  });
+
+  it("names every kind of study a paper reports, and each checklist", () => {
+    expect(studyTypeLine(["animal", "lab"])).toBe(
+      "Read as an experiment on live vertebrates, such as mice, rats or zebrafish, or on cephalopods, and a laboratory study of cells, tissues, molecules or microbes, or of invertebrates such as flies or worms, against ARRIVE 2.0 and MDAR.",
+    );
+  });
+
+  it("names no checklist for a kind of study held to none", () => {
+    expect(studyTypeLine(["other"])).toBe(
+      "Read as any other kind, such as a case report, a qualitative study, a protocol or a diagnostic accuracy study.",
     );
   });
 
   it("says nothing for a rating with no study type", () => {
     expect(studyTypeLine(undefined)).toBeUndefined();
+    expect(studyTypeLine([])).toBeUndefined();
+  });
+
+  it("names an animal or lab study as a rating before version 4 meant it", () => {
+    expect(studyTypeLine(["animal"], "3")).toBe(
+      "Read as an experiment on live animals, against ARRIVE 2.0.",
+    );
+    expect(studyTypeLine(["lab"], "2")).toBe(
+      "Read as a laboratory study of cells, tissues, molecules or microbes, against MDAR.",
+    );
+    expect(studyTypeLine(["animal"], "")).toBe(
+      "Read as an experiment on live vertebrates, such as mice, rats or zebrafish, or on cephalopods, against ARRIVE 2.0.",
+    );
+    expect(studyTypeLine(["animal"], "4")).toBe(
+      "Read as an experiment on live vertebrates, such as mice, rats or zebrafish, or on cephalopods, against ARRIVE 2.0.",
+    );
   });
 });

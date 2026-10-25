@@ -1,4 +1,4 @@
-import { checklistOf, type PaperText, SCORER_OUTPUT_SCHEMA, scorerPrompt } from "@verisci/core";
+import { checklistOf, type PaperText, SCORER_OUTPUT_SCHEMA, scorerPrompt } from "@labstrail/core";
 import { describe, expect, it, vi } from "vitest";
 import { askScorer, scorePaper } from "./scorer.ts";
 
@@ -9,7 +9,7 @@ const PAPER: PaperText = {
 };
 const IN_FIELD = {
   field: "life-sciences",
-  studyType: "other",
+  studyTypes: ["other"],
   reason: "A case report of thyroiditis after a vaccine.",
   rationale: "It states its funding and little else.",
   checks: checklistOf("other").map(({ id }) => ({
@@ -20,7 +20,7 @@ const IN_FIELD = {
 };
 const OUTSIDE = {
   field: "outside",
-  studyType: "computational",
+  studyTypes: ["computational"],
   reason: "A machine translation model.",
   checks: [],
   rationale: "",
@@ -82,7 +82,7 @@ describe("scorePaper", () => {
       ok: true,
       field: "life-sciences",
       model: "gemini-3.8-flash-001",
-      output: { score: 13, studyType: "other", rationale: IN_FIELD.rationale },
+      output: { score: 13, studyTypes: ["other"], rationale: IN_FIELD.rationale },
     });
     expect(
       result.ok &&
