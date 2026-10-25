@@ -45,9 +45,10 @@ so an import of another `@labstrail/*` package fails to typecheck.
 | `canonicalCid(cid)` | A PDF's CID as CIDv1 base32, the spelling a submission signs, or `undefined` for anything an IPFS file upload would not produce; the browser runs it before asking for a signature |
 | `targetKaName(cid)` | The Target KA's asset name, `verisci-tka-<CIDv1 base32>`, or `{ ok: false, reason: "bad-cid" }`; returns a result for every input |
 | `AssetNameResult`, `AssetNameError` | The result of both, and why an input cannot be named |
-| `submissionTypedData(message)` | The EIP-712 typed data a submitter signs to publish a PDF, in the shape viem takes |
+| `submissionTypedData(message, domain?)` | The EIP-712 typed data a submitter signs to publish a PDF, in the shape viem takes, under `SUBMISSION_DOMAIN` unless another domain is given |
 | `canonicalContextGraph(id)` | A context graph id with its address in lowercase and its name unchanged: the one spelling a submission signs |
 | `SUBMISSION_DOMAIN`, `SubmissionMessage` | LabsTrail's EIP-712 domain, and the signed `{ cid, contextGraph, deadline }` |
+| `PRE_RENAME_DOMAIN`, `SubmissionDomain` | The domain papers published before the rename were signed under (`verisci`, ADR 0042), and the type of either domain |
 | `MAX_PDF_BYTES` | The largest PDF LabsTrail publishes and rates, 15 MB: read by the upload page, the publish run and the rating run |
 | `parseTeiHeader(xml)` | A paper's `PaperMetadata` (title, authors, abstract, DOI) from GROBID's TEI header, or `not-tei` or `no-title`; returns a result for every input |
 | `PaperMetadata`, `TeiResult` | The metadata read from a TEI header, and the result of `parseTeiHeader` |
