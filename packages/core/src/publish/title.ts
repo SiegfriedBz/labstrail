@@ -33,7 +33,8 @@ function comparable(title: string): { readonly text: string; readonly at: readon
  * can drop a title's first words and space a title differently (`docs/domain.md` → GROBID).
  * Takes `stored`, its whitespace collapsed, only when it is longer than GROBID's, at most 300
  * characters, and ends with GROBID's title at a word's start, or where GROBID's starts with a
- * hyphen or a dash, at which GROBID cut it ("CDK1-Cyclin B …" for "-Cyclin B …"). The two
+ * hyphen or a dash, at which GROBID cut it, the stored title's dash joined to the word before it
+ * ("CDK1-Cyclin B …" for "-Cyclin B …", not "Cell Genomics - Cyclin B …"). The two
  * compare with case, every whitespace and a final full stop aside, the words before the match
  * being the ones GROBID dropped. Those words, read with the stored title's own spacing, are a
  * journal's or a site's name when they hold a spaced dash or a bar, or end in an en or em dash
@@ -56,7 +57,7 @@ export function completeTitle(grobid: string, stored: string | undefined): strin
     return kept;
   }
   const dropped = whole.slice(0, candidate.at[candidate.text.length - end.length]);
-  const atWord =
-    LEADING_DASH.test(grobid) || !/[\p{L}\p{N}]/u.test(dropped.charAt(dropped.length - 1));
-  return atWord && !NAME_SEPARATOR.test(dropped) ? whole : kept;
+  const last = dropped.charAt(dropped.length - 1);
+  const atCut = LEADING_DASH.test(grobid) ? !/\s/u.test(last) : !/[\p{L}\p{N}]/u.test(last);
+  return atCut && !NAME_SEPARATOR.test(dropped) ? whole : kept;
 }

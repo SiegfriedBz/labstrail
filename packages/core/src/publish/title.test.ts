@@ -123,6 +123,17 @@ describe("completeTitle", () => {
   });
 
   it.each([
+    ["-Cyclin B controls entry", "Cell Genomics - Cyclin B controls entry"],
+    ["—Cyclin B controls entry", "Cell Genomics —Cyclin B controls entry"],
+    ["— Cyclin B controls entry", "Cell Genomics — Cyclin B controls entry"],
+  ])(
+    "keeps GROBID's cut at a dash the stored title spaces from the words before it (%s)",
+    (grobid, stored) => {
+      expect(completeTitle(grobid, stored)).toBe("Cyclin B controls entry");
+    },
+  );
+
+  it.each([
     ["no stored title", undefined],
     ["a stored title that does not end with it", "Another paper on mitosis"],
     ["a stored title no longer than it", "-Cyclin B controls entry"],

@@ -145,7 +145,8 @@ A Target KA describes a paper and who submitted it
   GROBID's only when it is longer, at most 300 characters, and ends with GROBID's title at a
   word's start, ignoring case, every whitespace (`B56 Par1 .T73T75` matches `B56Par1.T73T75`)
   and a final full stop. A GROBID title starting with a hyphen or a dash was cut at it, so the
-  stored title may end with it inside a word (`CDK1-Cyclin B …` for `-Cyclin B …`). Words
+  stored title may end with it inside a word (`CDK1-Cyclin B …` for `-Cyclin B …`), the dash
+  joined to the word before it (`Cell Genomics - Cyclin B …` leaves GROBID's). Words
   before it, read with the stored title's own spacing, holding a spaced dash or a bar, or
   ending in an en or em dash (`Cell Genomics - <title>`, `Cell Genomics—<title>`), are a
   journal's or a site's name and leave GROBID's, cut or whole, as does a file name, a
