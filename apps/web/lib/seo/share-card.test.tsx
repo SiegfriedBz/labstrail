@@ -161,6 +161,19 @@ describe("ShareCard", () => {
     expect(container.textContent).toContain("LabsTrail");
   });
 
+  it.each([
+    ["the site's card", undefined],
+    ["a paper's card", paperCard(record, 72)],
+  ])("draws the wordmark as Labs and an accented Trail on %s, never VeriSci", (_, paper) => {
+    const { container } = render(<ShareCard logo={LOGO} paper={paper} />);
+    const accented = container.querySelector("img + div > span:last-child");
+
+    expect(accented?.parentElement?.textContent).toBe("LabsTrail");
+    expect(accented?.textContent).toBe("Trail");
+    expect(accented?.getAttribute("style")).toContain("color");
+    expect(container.textContent).not.toMatch(/Veri|Sci\b/);
+  });
+
   it("shows a paper's title, authors and score", () => {
     const { container } = render(<ShareCard logo={LOGO} paper={paperCard(record, 72)} />);
 
