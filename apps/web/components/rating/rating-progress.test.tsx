@@ -104,6 +104,17 @@ describe("RatingProgress", () => {
     ).toBe(true);
   });
 
+  it("names an older rating's study type in the words of the version that scored it", () => {
+    show({
+      ...SCORED,
+      record: SCORED.record && { ...SCORED.record, studyTypes: ["animal"], promptVersion: "3" },
+    });
+
+    expect(
+      screen.getByText(/Read as an experiment on live animals, against ARRIVE 2\.0\./),
+    ).toBeTruthy();
+  });
+
   it("shows the contract address without a link on Anvil", () => {
     show(SCORED, true);
 

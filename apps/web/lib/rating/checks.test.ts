@@ -100,6 +100,9 @@ describe("studyTypeLine", () => {
     expect(studyTypeLine(["lab"], "2")).toBe(
       "Read as a laboratory study of cells, tissues, molecules or microbes, against MDAR.",
     );
+    expect(studyTypeLine(["animal"], "")).toBe(
+      "Read as an experiment on live vertebrates, such as mice, rats or zebrafish, or on cephalopods, against ARRIVE 2.0.",
+    );
     expect(studyTypeLine(["animal"], "4")).toBe(
       "Read as an experiment on live vertebrates, such as mice, rats or zebrafish, or on cephalopods, against ARRIVE 2.0.",
     );

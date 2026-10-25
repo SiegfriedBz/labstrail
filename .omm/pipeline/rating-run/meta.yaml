@@ -26,9 +26,9 @@ prev_diagram: >
       read-rka -->|"past 24 hours, not minted: expired"| cancel
       find-pdf -->|"ipfs:// CID"| read-text["Read Text\nstep read-paper-n"]
       find-pdf -->|"a link that is not an IPFS CID"| cancel
-      read-text -->|"the paper's text"| score-paper["Score Paper\nstep score-paper-v4-n"]
+      read-text -->|"the paper's text"| score-paper["Score Paper\nstep score-paper-n"]
       read-text -->|"no text, too large, 3 bad reads"| cancel
-      score-paper -->|"score, study types, checks"| store-mint["Store and Mint\nsteps store-n, mint-n, poll-n-k"]
+      score-paper -->|"score, study type, checks"| store-mint["Store and Mint\nsteps store-n, mint-n, poll-n-k"]
       score-paper -->|"outside the field"| cancel
       read-rka -->|"stored or draft"| store-mint
       store-mint -->|"minted R-KA"| read-score["Read Score\nstep read-score-n"]

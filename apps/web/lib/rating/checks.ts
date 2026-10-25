@@ -81,7 +81,7 @@ export function studyTypeLine(
 ): string | undefined {
   const types = STUDY_TYPES.filter((entry) => studyTypes?.includes(entry.id));
   if (types.length === 0) return undefined;
-  const beforeV4 = Number(promptVersion) < 4;
+  const beforeV4 = Boolean(promptVersion) && Number(promptVersion) < 4;
   const labels = types.map((type) => (beforeV4 && LABELS_BEFORE_V4[type.id]) || type.label);
   const sources = types.map((type) => type.source).filter((source) => source !== "none");
   const against = sources.length > 0 ? `, against ${listOf(sources)}` : "";

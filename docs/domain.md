@@ -433,8 +433,8 @@ score the same day (plan 021).
   documented for the model.
 - **Thinking `high` is too slow for a rating step** (2026-10-22, scorer version 3, 7 runs on
   the same 3 papers): the fly paper was `lab` in 4 of 4 runs, but the judgement checks still
-  flipped (spreads of 10 and 9 points), and requests took 141 to 210 s, one past the scorer's
-  240 s limit. The scorer sends no thinking level, so the model's default (`medium`).
+  flipped (spreads of 10 and 9 points), and answered requests took 74 to 210 s, one try ran past
+  the scorer's 240 s limit. The scorer sends no thinking level, so the model's default (`medium`).
 - **The same paper scored again gets a different score** (scorer version 3, temperature 0 and
   the default thinking level, 16 runs on 3 papers, 2026-10-17 to 22, staging's ratings
   included): a fly genetics paper was classed `animal` in 2 runs of 6 and `lab` in 4, scoring
