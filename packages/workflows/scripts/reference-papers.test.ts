@@ -57,6 +57,18 @@ describe("readReferencePapers", () => {
     expect(() => readReferencePapers([{ ...outside, expectedScore: [0, 10] }])).toThrow();
   });
 
+  it("refuses study types the scorer's answer would not read the same: out of order, twice, or a review beside primary research", () => {
+    const [paper] = IN_FIELD;
+    for (const studyTypes of [
+      ["lab", "animal"],
+      ["lab", "lab"],
+      ["lab", "narrative-review"],
+    ]) {
+      expect(() => readReferencePapers([{ ...paper, studyTypes }])).toThrow();
+    }
+    expect(() => readReferencePapers([{ ...paper, studyTypes: ["animal", "lab"] }])).not.toThrow();
+  });
+
   it("refuses a link that is not https", () => {
     expect(() =>
       readReferencePapers([{ ...PAPERS[0], url: "http://example.org/a.pdf" }]),
