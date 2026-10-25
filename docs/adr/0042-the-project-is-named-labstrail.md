@@ -9,7 +9,7 @@ The project was named VeriSci. A 2020 model for checking scientific claims, buil
 
 ## Decision
 
-- The project is named LabsTrail, and `labstrail` in lowercase for the repo, its packages (`@labstrail/*`), its Inngest events and the EIP-712 domain a submitter signs ([0010](0010-pdf-to-target-ka-pipeline.md)). Its one line: "LabsTrail: open, traceable ratings for life-science papers".
+- The project is named LabsTrail, and `labstrail` in lowercase for the repo, its packages (`@labstrail/*`), its Inngest events, the EIP-712 domain a submitter signs ([0010](0010-pdf-to-target-ka-pipeline.md)), the key that keeps a visitor's theme in their browser and the prefix of the rate-limit counters in Upstash ([0035](0035-limits-are-the-apps-only-state.md)). Its one line: "LabsTrail: open, traceable ratings for life-science papers".
 - Production's address is `labstrail.vercel.app`; `verisci.vercel.app` is removed.
 - Names stored or called outside the repo keep "verisci", so every record already minted and every running service keeps working:
   - the DKG context graphs' names ([0005](0005-staging-and-production-are-isolated.md)), the Knowledge Assets' names (`verisci-tka-`, `verisci-rka-`, [0016](0016-asset-names-derive-from-request-id.md)) and the predicates' namespace `urn:verisci:`
@@ -22,4 +22,5 @@ The project was named VeriSci. A 2020 model for checking scientific claims, buil
 - A reader meets "verisci" in a minted record, a graph name, the node's address or the Inngest dashboard; this ADR explains it.
 - Papers published before the rename were signed under the domain `verisci`, later ones under `labstrail`; each signature checks under its own name.
 - Links to the old address stop working; nothing had been shared before the rename.
+- Once, at the deploy of the rename, the daily rate limits start again from zero and each visitor's saved theme returns to the default.
 - The deployed contracts' NatSpec keeps the old name until a redeploy.

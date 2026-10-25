@@ -41,7 +41,7 @@ points the optional `@x402/*` packages, reached through wagmi's connectors, at
 | `/papers/<cid>/ratings/<requestId>` | One rating: where it stands until it is scored, then its score and every check behind it, or why it was cancelled (below), under "Papers / <title> / Rating" breadcrumbs. `?new=1`, from the Rate button, follows a request the chain doesn't show yet for 2 minutes |
 | `/api/ratings/<requestId>` | The same as JSON (`RatingView`), never cached, for the rating page to poll; not-found for an id that is not `0x` + 64 hex digits, or where no contract takes ratings |
 | `/method` | How the reproducibility readiness score works: how a paper is scored, that a paper can combine kinds of study and answers each check once, the checklist for each kind of study (`STUDY_TYPES` from `@labstrail/core`, with each one's number of checks), the scorer's model (`RATING_SETTINGS.model`) and the PDF it reads from IPFS by its CID, what the score leaves out, where it is recorded (the score on Base, the answers in the rating's own Knowledge Asset), and the three phases |
-| `/about` | Why LabsTrail exists (the reproducibility crisis, and AI agents that build on papers they can't weigh), the OriginTrail DKG's two layers, the paper's PDF stored off-chain on IPFS at an address hashed from its content, papers and ratings as Knowledge Assets that LabsTrail's node mints and holds, what comes next (the root README's roadmap, each step with its status and why), who builds LabsTrail (its maintainer, the code on GitHub, a LinkedIn profile, from `SITE`), testnets until mainnet, how it differs from the 2020 SciFact model of the same name, and that visits are counted with Vercel Web Analytics, which sets no cookies (ADR 0041) |
+| `/about` | Why LabsTrail exists (the reproducibility crisis, and AI agents that build on papers they can't weigh), the OriginTrail DKG's two layers, the paper's PDF stored off-chain on IPFS at an address hashed from its content, papers and ratings as Knowledge Assets that LabsTrail's node mints and holds, what comes next (the root README's roadmap, each step with its status and why), who builds LabsTrail (its maintainer, the code on GitHub, a LinkedIn profile, from `SITE`), testnets until mainnet, and that visits are counted with Vercel Web Analytics, which sets no cookies (ADR 0041) |
 | `/robots.txt`, `/sitemap.xml` | Production's crawling rules and every page and paper to index; elsewhere, every crawler kept out and an empty sitemap (below) |
 | `/opengraph-image`, `/papers/<cid>/opengraph-image`, `/papers/<cid>/ratings/<request id>/opengraph-image` | The 1200 × 630 images a shared link shows: the site's, a paper's, and a rating's, which is the site's (below) |
 | `/api/inngest` | Serves the Inngest functions: the publish function and the failure alerts, plus the rating, oracle, reconciler and health functions where the oracle key is set |
@@ -179,7 +179,8 @@ is minted to, which is our node and the UAL's author; the asset's ERC-721 token 
 OriginTrail's `DKGKnowledgeAssets`, `lib/papers/explorer.ts` → `assetTokenUrl`; the UAL; and the
 PDF's CID, linked through Pinata's public gateway, `ipfsUrl`, since ipfs.io no longer
 serves files). Addresses and the token link to Basescan. "How to check this record" gives
-the EIP-712 domain and type to check the signature with. A page that follows a paper to
+the EIP-712 domain and type to check the signature with, and the name `"verisci"` papers
+published before the rename were signed under (ADR 0042). A page that follows a paper to
 Published asks the server to render it again (`router.refresh`), so the Ratings section
 appears without a reload.
 

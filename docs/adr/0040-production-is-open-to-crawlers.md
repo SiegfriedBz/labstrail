@@ -5,7 +5,7 @@
 
 ## Context
 
-LabsTrail's records are public by design: anyone can read a paper's record and check its scores ([0010](0010-pdf-to-target-ka-pipeline.md), [0011](0011-a-rating-is-a-separate-r-ka.md), [0014](0014-contract-owns-scores-dkg-owns-content.md)). Until now no page told search engines or AI search what it holds, and a 2020 research model from AllenAI's SciFact work shares LabsTrail's name. Production still runs on testnets ([0015](0015-rating-requests-are-free-on-testnet.md)); staging and previews hold test papers in their own graph ([0005](0005-staging-and-production-are-isolated.md)).
+LabsTrail's records are public by design: anyone can read a paper's record and check its scores ([0010](0010-pdf-to-target-ka-pipeline.md), [0011](0011-a-rating-is-a-separate-r-ka.md), [0014](0014-contract-owns-scores-dkg-owns-content.md)). Until now no page told search engines or AI search what it holds, and a 2020 research model from AllenAI's SciFact work shared the project's name then, VeriSci. Production still runs on testnets ([0015](0015-rating-requests-are-free-on-testnet.md)); staging and previews hold test papers in their own graph ([0005](0005-staging-and-production-are-isolated.md)).
 
 ## Decision
 

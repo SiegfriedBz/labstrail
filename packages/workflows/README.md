@@ -92,7 +92,7 @@ upload page reads runs there, with no keys.
 | `RatingService`, `RatingSummary`, `RatingListResult`, `RatingView`, `RatingStage`, `AnnounceResult` | Their type and answers: one request as its contract holds it; a paper's requests, oldest first, or `unavailable`; one rating, with its stage on the node while pending or its R-KA's record once fulfilled; the local announce's result |
 | `PaperRatingSummary`, `summariseRatings(ratings)` | A paper's rating as the pages show it (`scored` with the latest score, `pending`, `cannot-rate`, `unrated`, or `unknown` when the chain did not answer), and the one rule, shared by the papers list and the paper page, that sums a paper's requests into it |
 | `getWebhookIntake()`, `WebhookIntake`, `WebhookStatus` | The Alchemy Notify webhook's intake for `apps/web`'s route, built on first use: `receive(rawBody, signature)` answers the status to send back (below) |
-| `PaperListResult`, `PaperSummary`, `SignatureCheck`, `QueryProblem` | What `listPapers` returns: a page of papers with the total, or why not (`unavailable`, `unreadable`); one listed paper; a signature check (`valid`, `invalid`, `unknown`) |
+| `PaperListResult`, `PaperSummary`, `SignatureCheck`, `QueryProblem` | What `listPapers` returns: a page of papers with the total, or why not (`unavailable`, `unreadable`); one listed paper; a signature check (`valid`, `invalid`, `unknown`), under the `labstrail` domain or, for a paper published before the rename, `verisci` (ADR 0042) |
 | `env` (from `@labstrail/workflows/env`); `createWorkflowsEnv(runtimeEnv)`, `WorkflowsEnv` (from either entry) | The validated settings, the function that builds them from a given object, and their type |
 
 ## Publishing a paper

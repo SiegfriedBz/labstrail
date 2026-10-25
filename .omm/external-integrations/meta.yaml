@@ -12,6 +12,7 @@ children:
   - gemini
   - grobid
   - inngest
+  - labstrail
   - lets-encrypt
   - oracle-cloud
   - pinata
@@ -20,7 +21,6 @@ children:
   - upstash
   - vercel
   - vercel-analytics
-  - LabsTrail
 prev_diagram: >
   graph LR
       labstrail["LabsTrail\napps/web/, packages/workflows/"] -->|"store, mint, SPARQL, status"| dkg-node["DKG Node\npackages/dkg/src/client.ts"]
@@ -32,8 +32,8 @@ prev_diagram: >
       labstrail -->|"rate-limit counters"| upstash["Upstash Redis\napps/web/lib/publish/limits.ts"]
       labstrail -->|"wallet connection"| reown["Reown AppKit\napps/web/components/wallet/"]
       labstrail -->|"activity and alerts"| telegram["Telegram\nworkflows/src/alerts/notify.ts"]
-      alchemy-notify["Alchemy Notify\nwebhook"] -->|"signed contract events, requests among them"| LabsTrail
-      vercel["Vercel\nhosting"] -->|"hosts the site and its functions"| LabsTrail
+      alchemy-notify["Alchemy Notify\nwebhook"] -->|"signed contract events, requests among them"| labstrail
+      vercel["Vercel\nhosting"] -->|"hosts the site and its functions"| labstrail
       oracle-cloud["Oracle Cloud\nnode server VM"] -->|"hosts the daemon"| dkg-node
       oracle-cloud -->|"hosts GROBID"| grobid
       duckdns["DuckDNS\nthe server's two names"] -->|"points both names at the server"| oracle-cloud

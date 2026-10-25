@@ -159,13 +159,16 @@ A Target KA describes a paper and who submitted it
 - **Submission:** `urn:verisci:submitter` (the lowercase address), `urn:verisci:signature`
   and `urn:verisci:deadline` record the EIP-712 signature over
   `Submission { string cid; string contextGraph; uint256 deadline }`, under the domain
-  `{ name: "labstrail", version: "1", chainId: 84532 }`.
+  `{ name: "labstrail", version: "1", chainId: 84532 }` (`SUBMISSION_DOMAIN`). Papers
+  published before the rename were signed under the name `"verisci"` (`PRE_RENAME_DOMAIN`,
+  ADR 0042).
 - **Checking who submitted a paper:** take the CID from `schema:url`, the context graph id
   the KA is in, and the deadline; rebuild the typed data with `submissionTypedData`, which
   writes the graph id's address in lowercase (`canonicalContextGraph`), the spelling every
-  submission signs; and
-  verify the signature against the submitter's address with any EIP-712 library (viem's
-  `verifyTypedData` also checks smart-contract wallets).
+  submission signs, under `SUBMISSION_DOMAIN` or, for a paper published before the rename,
+  `PRE_RENAME_DOMAIN` (its second argument); and verify the signature against the
+  submitter's address with any EIP-712 library (viem's `verifyTypedData` also checks
+  smart-contract wallets).
 - **Listing published papers:** `paperListQuery` reads the graph's `_meta` graph, where the
   node records each minted asset (`dkg:memoryLayer "VM"`), its UAL and the mint's date
   (`dkg:publishedAt`). It keeps only the Target KAs our node named and minted: the asset's
