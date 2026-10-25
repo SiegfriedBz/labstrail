@@ -1,7 +1,7 @@
-// The scorer's reference set: open-access papers with the study type, the answer to each check
+// The scorer's reference set: open-access papers with their study types, the answer to each check
 // and the score range a careful reader expects, written before the scorer first read them.
 // `score-papers` compares the scorer's answers with them (packages/workflows README).
-import { CHECK_ANSWERS, STUDY_TYPES, type StudyType } from "@labstrail/core";
+import { CHECK_ANSWERS, STUDY_TYPES, type StudyType, studyTypesOf } from "@labstrail/core";
 import { z } from "zod";
 
 const STUDY_TYPE_IDS = STUDY_TYPES.map((type) => type.id) as [StudyType, ...StudyType[]];
@@ -18,14 +18,20 @@ const paperSchema = z.discriminatedUnion("field", [
   z.object({
     ...common,
     field: z.literal("life-sciences"),
-    studyType: z.enum(STUDY_TYPE_IDS),
+    // As the scorer's answer is read (`studyTypesOf`), so the two compare as written.
+    studyTypes: z
+      .array(z.enum(STUDY_TYPE_IDS))
+      .min(1)
+      .refine((types) => studyTypesOf(types).join() === types.join(), {
+        message: "study types in STUDY_TYPES order, each once, no review beside primary research",
+      }),
     expectedScore: z.tuple([score, score]),
     expectedChecks: z.record(z.string(), z.enum(CHECK_ANSWERS)),
   }),
   z.object({
     ...common,
     field: z.literal("outside"),
-    studyType: z.null(),
+    studyTypes: z.null(),
     expectedScore: z.null(),
     expectedChecks: z.null(),
   }),

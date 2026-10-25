@@ -231,8 +231,8 @@ export function ratingFailureReason(output: unknown): RatingFailure | undefined 
  * 3. the R-KA is read: minted is fulfilled; stored is minted at once (ADR 0008); a draft is
  *    shared, then minted; missing is scored once, stored and minted. Scoring finds the paper's
  *    PDF link with its title and abstract (`find-pdf`), reads its text (`read-paper`), has
- *    Flash-Lite check its field (`check-field`), then Gemini classify it and answer its study
- *    type's checks in one request (`score-paper`), each done once per run; a paper outside the
+ *    Flash-Lite check its field (`check-field`), then Gemini name its kinds of study and answer
+ *    their checks in one request (`score-paper-v4`), each done once per run; a paper outside the
  *    field (ADR 0037), whose PDF link is not an IPFS CID, whose PDF holds no text (a scan) or is
  *    over the size limit, or for which Gemini gave two answers the check refused, is cancelled
  *    `invalid-target` before anything is stored (ADR 0011); a link or PDF that does not come is
@@ -530,7 +530,9 @@ async function score(
     // A check that did not answer leaves the field to the scorer, which decides it too.
     if (field.ok && field.field === "outside") return { kind: "invalid-target" };
   }
-  const scored = await step.run(`score-paper-${attempt}`, () => deps.score(paper));
+  // The id names the output's shape (`studyTypes` since version 4), so a run scored before the
+  // change never reads its old output as a new one.
+  const scored = await step.run(`score-paper-v4-${attempt}`, () => deps.score(paper));
   if (!scored.ok && scored.reason === "invalid-output") {
     run.unusable = (run.unusable ?? 0) + 1;
     if (run.unusable === RATING_SETTINGS.unusableAnswers) return { kind: "invalid-target" };

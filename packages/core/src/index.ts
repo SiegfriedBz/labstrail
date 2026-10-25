@@ -63,12 +63,16 @@ export {
 export { type PaperMetadata, parseTeiHeader, type TeiResult } from "./publish/tei.ts";
 export { completeTitle } from "./publish/title.ts";
 export {
+  CHECK_RULES,
   CHECKS,
   type Check,
   type CheckId,
+  checklistFor,
   checklistOf,
+  PRIMARY_STUDY_TYPES,
   STUDY_TYPES,
   type StudyType,
+  studyTypesOf,
 } from "./rating/checklists.ts";
 export {
   normalizeForQuote,

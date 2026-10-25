@@ -5,7 +5,7 @@
 
 ## Context
 
-A rating checks how completely a paper reports its work, against the reporting checklists written for its kind of study ([0018](0018-phase-1-scorer-output-contract.md)). Those checklists (CONSORT for trials, ARRIVE for animal research, MDAR for laboratory work, PRISMA for systematic reviews) exist for biology and medicine. A physics or computer-science paper answers none of their checks, so a score for it would say nothing. LabsTrail is a DeSci app for the life sciences.
+A rating checks how completely a paper reports its work, against the reporting checklists written for each kind of study it reports ([0018](0018-phase-1-scorer-output-contract.md)). Those checklists (CONSORT for trials, ARRIVE for animal research, MDAR for laboratory work, PRISMA for systematic reviews) exist for biology and medicine. A physics or computer-science paper answers none of their checks, so a score for it would say nothing. LabsTrail is a DeSci app for the life sciences.
 
 ## Decision
 
@@ -15,7 +15,7 @@ A rating checks how completely a paper reports its work, against the reporting c
 
 ## Consequences
 
-- Every rating holds a paper to the checks of its own kind of study, so scores compare like with like.
+- Every rating holds a paper to the checks of the kinds of study it reports, so a paper is scored on what its own work needs.
 - A model decides the field from the paper's text. A paper at the edge, such as an epidemic model or the chemistry of a drug, may be classed either way.
 - Papers published before the check, or while it could not answer, can be outside the field; a request to rate one is cancelled. The small model reads a paper's opening and the scorer all of it, so they can disagree on a paper at the edge: the scorer's "outside" then cancels a paper the small model let through.
 - The check sends a paper's title, abstract and the start of its text to Gemini's free tier, where Google may use them; the PDF is already public on IPFS by then, as for the scorer ([0018](0018-phase-1-scorer-output-contract.md)).
@@ -29,3 +29,4 @@ A rating checks how completely a paper reports its work, against the reporting c
 - 2026-10-16: the rating run checks the field with the small model before the scorer, so a paper outside it is cancelled while the scorer's model is down: paper /5 waited through five of its outages before its cancel (intake and recovery, user's choice).
 - 2026-10-16: corrected: at rating, either check's "outside" cancels the request; the small model's "in the field" lets the paper go on to the scorer, which reads the whole paper and has the last word (ADR sweep, user's choice).
 - 2026-10-22: the project renamed LabsTrail, and this file with it ([0042](0042-the-project-is-named-labstrail.md), user's choice).
+- 2026-10-24: a rating checks a paper against each kind of study it reports, as [0018](0018-phase-1-scorer-output-contract.md) has recorded since 2026-10-22 (ADR sweep, user's choice).

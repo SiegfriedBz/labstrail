@@ -4,7 +4,7 @@ import { canonicalCid } from "../assets/cid.ts";
 import { normalizeUal, parseUal } from "../assets/ual.ts";
 import { type QueryBinding, unquote } from "../papers/paper-record.ts";
 import { integer, literal, type Triple, VERISCI_NS } from "../publish/target-ka.ts";
-import { checklistOf, STUDY_TYPES, type StudyType } from "./checklists.ts";
+import { checklistFor, type StudyType, studyTypesOf } from "./checklists.ts";
 import { CHECK_ANSWERS, type CheckResult, type ScorerOutput } from "./scorer.ts";
 
 /** How a rating run treats a target UAL: `ours` is rated, `invalid` is cancelled. */
@@ -32,9 +32,12 @@ export interface RatingRecord {
   readonly targetUal: string;
   readonly score: number;
   readonly rationale: string;
-  /** Absent for a rating the v1 scorer made, which judged no study type. */
-  readonly studyType?: StudyType;
-  /** The study type's checks the R-KA holds, in checklist order; none for a v1 rating. */
+  /**
+   * The kinds of study the paper reports, in `STUDY_TYPES` order (one before version 4); absent
+   * for a rating the v1 scorer made, which judged no study type.
+   */
+  readonly studyTypes?: readonly StudyType[];
+  /** The checks of its study types the R-KA holds, in `checklistFor`'s order; none for v1. */
   readonly checks: readonly CheckResult[];
   readonly model: string;
   readonly promptVersion: string;
@@ -46,7 +49,6 @@ const SCHEMA = "http://schema.org/";
 const RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
 const MAX_SCORE = 100;
 const XSD_BOOLEAN = "http://www.w3.org/2001/XMLSchema#boolean";
-const STUDY_TYPE_IDS: ReadonlySet<string> = new Set(STUDY_TYPES.map((type) => type.id));
 const ANSWERS: ReadonlySet<string> = new Set(CHECK_ANSWERS);
 
 /**
@@ -130,7 +132,7 @@ export function triplesFromBindings(bindings: readonly QueryBinding[]): Triple[]
 /**
  * The triples of a rating's R-KA (ADRs 0011, 0012, 0018): a `schema:Review` of its target
  * (`schema:about`), with the request id and contract, and a `schema:Rating` node for phase 1
- * holding the score, its range, the rationale, the study type, the model, the prompt version and
+ * holding the score, its range, the rationale, each study type, the model, the prompt version and
  * whether the paper's text was shortened, and linking one node per check
  * (`…/phase/1/check/<id>`) with its id, its answer, its quote when it has one, and what the model
  * claimed when the score could not count it. Later phases add their own `…/phase/<n>` node to
@@ -154,7 +156,11 @@ export function rKaQuads(rating: RatingContent): Triple[] {
     { subject: phase, predicate: `${SCHEMA}worstRating`, object: integer(0) },
     { subject: phase, predicate: `${SCHEMA}bestRating`, object: integer(MAX_SCORE) },
     { subject: phase, predicate: `${SCHEMA}ratingExplanation`, object: literal(output.rationale) },
-    { subject: phase, predicate: `${VERISCI_NS}studyType`, object: literal(output.studyType) },
+    ...output.studyTypes.map((type) => ({
+      subject: phase,
+      predicate: `${VERISCI_NS}studyType`,
+      object: literal(type),
+    })),
     { subject: phase, predicate: `${VERISCI_NS}model`, object: literal(rating.model) },
     {
       subject: phase,
@@ -190,11 +196,12 @@ function ratingIri(requestId: string): string {
 
 /**
  * A rating from the rows of {@link ratingQuery}, or `undefined` when its review, target or
- * phase-1 score is missing, or the score is not an integer from 0 to 100. The checks come in
- * the study type's checklist order; a check with an unknown id or answer, or none of the study
- * type's, is left out, as is a claimed answer that is not one of the answers. A v1 R-KA, or one
- * with an unknown study type, gives no study type and no checks; a v1 R-KA says nothing about
- * its text being shortened. Pure: reads only the rows.
+ * phase-1 score is missing, or the score is not an integer from 0 to 100. Its study types are
+ * kept as `studyTypesOf` keeps them (an R-KA before version 4 holds one), unknown ones left
+ * out. The checks come in `checklistFor`'s order for those types; a check with an unknown id or
+ * answer, or of none of its study types, is left out, as is a claimed answer that is not one of
+ * the answers. A v1 R-KA, or one with no known study type, gives no study types and no checks;
+ * a v1 R-KA says nothing about its text being shortened. Pure: reads only the rows.
  */
 export function parseRating(bindings: readonly QueryBinding[]): RatingRecord | undefined {
   const triples = triplesFromBindings(bindings);
@@ -217,17 +224,15 @@ export function parseRating(bindings: readonly QueryBinding[]): RatingRecord | u
   if (!targetUal || score === undefined || !/^\d{1,3}$/.test(score)) return undefined;
   if (Number(score) > MAX_SCORE) return undefined;
 
-  const type = text(phase, `${VERISCI_NS}studyType`);
-  const studyType =
-    type !== undefined && STUDY_TYPE_IDS.has(type) ? (type as StudyType) : undefined;
-  const checks = studyType ? readChecks(phase, studyType, objects, text) : [];
+  const studyTypes = studyTypesOf(objects(phase, `${VERISCI_NS}studyType`).map(unquote));
+  const checks = studyTypes.length > 0 ? readChecks(phase, studyTypes, objects, text) : [];
   const shortened = text(phase, `${VERISCI_NS}textShortened`);
   return {
     requestId: text(review, `${VERISCI_NS}requestId`) ?? "",
     targetUal,
     score: Number(score),
     rationale: text(phase, `${SCHEMA}ratingExplanation`) ?? "",
-    ...(studyType ? { studyType } : {}),
+    ...(studyTypes.length > 0 ? { studyTypes } : {}),
     checks,
     model: text(phase, `${VERISCI_NS}model`) ?? "",
     promptVersion: text(phase, `${VERISCI_NS}promptVersion`) ?? "",
@@ -237,10 +242,10 @@ export function parseRating(bindings: readonly QueryBinding[]): RatingRecord | u
   };
 }
 
-/** The phase node's checks that belong to `studyType`'s checklist, in its order. */
+/** The phase node's checks that belong to its study types' checks (`checklistFor`), in order. */
 function readChecks(
   phase: string,
-  studyType: StudyType,
+  studyTypes: readonly StudyType[],
   objects: (subject: string, predicate: string) => string[],
   text: (subject: string, predicate: string) => string | undefined,
 ): CheckResult[] {
@@ -266,7 +271,7 @@ function readChecks(
       ...(claimed ? { claimed } : {}),
     });
   }
-  return checklistOf(studyType).flatMap((check) => {
+  return checklistFor(studyTypes).flatMap((check) => {
     const result = found.get(check.id);
     return result ? [result] : [];
   });

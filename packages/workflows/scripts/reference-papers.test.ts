@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { checklistOf, checklistScore, STUDY_TYPES } from "@labstrail/core";
+import { checklistFor, checklistScore, STUDY_TYPES } from "@labstrail/core";
 import { describe, expect, it } from "vitest";
 import { readReferencePapers } from "./reference-papers.ts";
 
@@ -16,15 +16,15 @@ describe("reference-papers.json", () => {
   });
 
   it("covers every study type", () => {
-    const types = new Set(IN_FIELD.map((paper) => paper.studyType));
+    const types = new Set(IN_FIELD.flatMap((paper) => paper.studyTypes));
 
     expect([...types].sort()).toEqual(STUDY_TYPES.map((type) => type.id).sort());
   });
 
   it.each(IN_FIELD.map((paper) => [paper.id, paper]))(
-    "answers exactly the checks of %s's study type, not-applicable only where a check may not apply",
+    "answers exactly the checks of %s's study types, not-applicable only where a check may not apply",
     (_, paper) => {
-      const checklist = checklistOf(paper.studyType);
+      const checklist = checklistFor(paper.studyTypes);
 
       expect(Object.keys(paper.expectedChecks).sort()).toEqual(
         checklist.map((check) => check.id).sort(),
@@ -41,7 +41,7 @@ describe("reference-papers.json", () => {
     "expects for %s a range that holds the score its expected answers give",
     (_, paper) => {
       const [min, max] = paper.expectedScore;
-      const score = checklistScore(paper.studyType, paper.expectedChecks);
+      const score = checklistScore(paper.studyTypes, paper.expectedChecks);
 
       expect(min).toBeLessThanOrEqual(max);
       expect(score).toBeGreaterThanOrEqual(min);
@@ -55,6 +55,18 @@ describe("readReferencePapers", () => {
     const [outside] = PAPERS.filter((paper) => paper.field === "outside");
 
     expect(() => readReferencePapers([{ ...outside, expectedScore: [0, 10] }])).toThrow();
+  });
+
+  it("refuses study types the scorer's answer would not read the same: out of order, twice, or a review beside primary research", () => {
+    const [paper] = IN_FIELD;
+    for (const studyTypes of [
+      ["lab", "animal"],
+      ["lab", "lab"],
+      ["lab", "narrative-review"],
+    ]) {
+      expect(() => readReferencePapers([{ ...paper, studyTypes }])).toThrow();
+    }
+    expect(() => readReferencePapers([{ ...paper, studyTypes: ["animal", "lab"] }])).not.toThrow();
   });
 
   it("refuses a link that is not https", () => {

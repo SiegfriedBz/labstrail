@@ -1,1 +1,1 @@
-Steps store-<n>, mint-<n>, wait-<n>-<k> and poll-<n>-<k>: store the R-KA's triples (score, rationale, model, prompt version, study type, each check with its answer and quote, a schema:about link to the paper), mint it and poll until it is minted, as the publish run does (ADR 0008).
+Steps store-<n>, mint-<n>, wait-<n>-<k> and poll-<n>-<k>: store the R-KA's triples (score, rationale, model, prompt version, each study type, each check with its answer and quote, a schema:about link to the paper), mint it and poll until it is minted, as the publish run does (ADR 0008).

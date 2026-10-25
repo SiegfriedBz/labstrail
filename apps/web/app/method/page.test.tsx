@@ -29,6 +29,13 @@ describe("/method", () => {
     }
   });
 
+  it("says a paper can combine kinds of study and answers the checks of each, once", () => {
+    render(<MethodPage />);
+
+    expect(screen.getByText(/decides which kinds of study it reports/)).toBeTruthy();
+    expect(screen.getByText(/answers the checks of each, every check once/)).toBeTruthy();
+  });
+
   it("names the model that scores and how its answers become the score", () => {
     render(<MethodPage />);
 

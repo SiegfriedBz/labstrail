@@ -25,17 +25,17 @@ what others need to reproduce its work, and grows through transparent human
 review and, later, wet-lab replication
 ([ADR 0012](docs/adr/0012-three-phases-settled-by-the-oracle.md)).
 
-Status: early. LabsTrail is a rebuild of an earlier prototype,
-`desci-rating-dapp`, which ran both flows (publish a paper, rate it) end to end on
-Base Sepolia. This repo starts again from clean foundations (monorepo, tooling,
-CI), and its ADRs and domain facts record what the prototype taught us. The first
-user-facing feature is the upload page: connect a wallet, publish a PDF, follow it until it
-is minted, then verify its record (signature, token, UAL, CID) from the paper's page. Every
-published paper is listed at `/papers`, newest first, read a page at a time from the DKG.
-Ratings work end to end locally, against a contract on Anvil: a published paper's page
-requests one from the visitor's wallet, each rating has a page that follows it to its score
-and then shows every check and quote behind it, and the papers list shows each paper's
-score. Deployed, a webhook starts each rating and a cron restarts a stuck one. The repo, its packages and the EIP-712 domain use the lowercase name `labstrail`; minted records,
+Status: phase 1 is live on staging and production, on testnets (release `v0.7.0`,
+2026-10-20). LabsTrail is a rebuild of an earlier prototype, `desci-rating-dapp`, which ran
+both flows (publish a paper, rate it) end to end on Base Sepolia. This repo starts again
+from clean foundations (monorepo, tooling, CI), and its ADRs and domain facts record what
+the prototype taught us. A visitor connects a wallet, publishes a PDF, follows it until it
+is minted, then verifies its record (signature, token, UAL, CID) from the paper's page.
+Every published paper is listed at `/papers`, newest first, read a page at a time from the
+DKG, with its latest score. A published paper's page requests a rating from the visitor's
+wallet, and each rating has a page that follows it to its score and then shows every check
+and quote behind it. Deployed, a webhook starts each rating and a cron restarts a stuck
+one; locally, ratings run against a contract on Anvil. The repo, its packages and the EIP-712 domain use the lowercase name `labstrail`; minted records,
 graph names, the Inngest app and the node server keep the first name, `verisci`
 ([ADR 0042](docs/adr/0042-the-project-is-named-labstrail.md)).
 Everything runs on testnets. Production is open to search engines and AI search: each paper
@@ -66,8 +66,8 @@ Built:
   account, the Upstash database, the Alchemy RPC account, the Gemini key and the alerts chat
   are shared ([ADR 0005](docs/adr/0005-staging-and-production-are-isolated.md)).
 - **A requested paper is rated.** A rating run reads the paper's text, has an LLM answer
-  the reporting checklist of its kind of study (a trial, an animal study, a review…) with
-  quotes, and computes the score from those answers, once: it measures whether the paper
+  the reporting checklists of the kinds of study it reports (a trial, an animal study, lab
+  work, a review…) with quotes, and computes the score from those answers, once: it measures whether the paper
   gives what others need to check and reproduce its work, not whether the work is right; our DKG node publishes the
   rating as its own Rating KA (R-KA), and the oracle records the score on the contract
   ([ADR 0011](docs/adr/0011-a-rating-is-a-separate-r-ka.md),
@@ -138,7 +138,7 @@ plan records its decisions in an ADR.
 
 ## Architecture
 
-The diagrams below show the target design; the workspaces build it plan by plan.
+The diagrams below show phase 1 as built.
 
 Architecture views (overall architecture, the publish and rating pipelines, external
 integrations, state machines, routes) are in [`.omm/`](.omm/), written with
@@ -276,7 +276,7 @@ sequenceDiagram
       opt nothing stored
         R->>N: find the PDF the target links
         R->>R: read its text, then Flash-Lite checks its field
-        R->>R: one Gemini request gives its field, study type and checks, with quotes
+        R->>R: one Gemini request gives its field, study types and checks, with quotes
         Note over R,O: Outside the life sciences and health, no readable text,<br/>or two answers the check refuses: cancel(requestId, invalid target), and stop.
         R->>R: check the quotes against the paper, compute the score
         R->>N: store the R-KA

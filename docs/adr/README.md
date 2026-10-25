@@ -50,7 +50,7 @@ How every store, mint and on-chain write behaves; both flows below rely on it.
 | --- | --- |
 | [0007. Every write converges: store, mint, fulfil and cancel](0007-all-writes-converge.md) | Each write reads state first and treats "already done" as success |
 | [0008. Mints are started, then polled in short steps](0008-mints-are-async-polled-in-short-steps.md) | A step starts the mint and stops listening before the time limit; the asset's state is polled, and no run waits for an earlier mint |
-| [0009. Retries are spaced with step.sleep](0009-retries-are-spaced-with-step-sleep.md) | Retries wait with `step.sleep`; each workflow sets its own values, starting from 2 minutes, 5 attempts, 45 minutes in all; the rating run waits up to 60 minutes over 6 attempts |
+| [0009. Retries are spaced with step.sleep](0009-retries-are-spaced-with-step-sleep.md) | Retries wait with `step.sleep`; each workflow sets its own values, starting from 2 minutes, 5 attempts, 45 minutes in all; the rating run waits 2 to 60 minutes between 6 attempts, about 2 hours in all |
 
 ## Publish flow
 
@@ -80,7 +80,7 @@ In the order a request lives: requested, named, ingested, scored, fulfilled, and
 | [0015. Rating requests are free on testnet](0015-rating-requests-are-free-on-testnet.md) | Requesters pay only gas; a cap and a throttle bound spend until mainnet |
 | [0016. Asset names derive from the on-chain request id](0016-asset-names-derive-from-request-id.md) | Each phase-1 request has an on-chain id; any process computes the rating's name and its recovery from it alone |
 | [0017. Chain events are ingested at least once](0017-chain-events-are-ingested-at-least-once.md) | Signed webhooks, one event per request id, acked only after hand-off; the reconciler heals what is missed; locally the page announces its own request |
-| [0018. The phase-1 scorer has a fixed output contract](0018-phase-1-scorer-output-contract.md) | The scorer reads the paper's text and answers its study type's checks with quotes; code computes the score; it returns `{ score, rationale, studyType, checks }`, computed once and read back; Gemini, on its free tier |
+| [0018. The phase-1 scorer has a fixed output contract](0018-phase-1-scorer-output-contract.md) | The scorer reads the paper's text and answers the checks of every kind of study it reports, with quotes; code computes the score; it returns `{ score, rationale, studyTypes, checks }`, computed once and read back; Gemini, on its free tier |
 | [0019. Oracle transactions are serialized](0019-oracle-transactions-are-serialized.md) | One function sends every oracle transaction the backend sends, one at a time, checking receipts in later steps; only `main` and `develop` hold the oracle keys |
 | [0020. Stuck requests are recovered, and only the oracle cancels](0020-stuck-requests-recovered-only-oracle-cancels.md) | One run per request finishes what is left; a cron restarts stuck ones; only the oracle cancels |
 
