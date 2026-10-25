@@ -121,7 +121,8 @@ starts nothing. Its steps:
    so every published paper can be rated. GROBID's 401 and 403 fail the run; 408 and 429 are
    retried. A DOI is kept only if it looks like one. The title is GROBID's, completed from the
    title the PDF stores in its own metadata (its info dictionary's `Title`, else its XMP
-   `dc:title` when that holds one version) when GROBID dropped its first words: core's
+   `dc:title` when that holds one version) when GROBID dropped its first words or spaced it
+   differently: core's
    `completeTitle` takes the stored one only when it ends with GROBID's, after words that are
    not a journal's name (`packages/core` → Target KAs).
 4. **check-field**: asks `gemini-3.5-flash-lite` (`fieldModel`, free tier) whether the paper
