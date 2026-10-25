@@ -449,6 +449,9 @@ score the same day (plan 021).
   `limitations` partly or missing; the review 77 to 86 (9), `reasoning` and `limitations`
   answered differently. What moves a score now is the judgement checks, within 10 points on
   each paper.
+- **The reference set with version 4** (2026-10-25): the 12 papers in the field each got their
+  expected study type and a score in their range (version 3: 8 of 11), and both papers from
+  other fields were classed outside.
 - **The publish run's field check uses `gemini-3.5-flash-lite`,** free of charge on the
   pricing page (2026-10-11). Each model has its own daily quota (the 429 above names it
   `…PerModel-FreeTier`), so the field check leaves the scorer's 20 requests a day alone. On
@@ -461,7 +464,9 @@ score the same day (plan 021).
   real passages), which is why quote matching accepts an ellipsis that stands for whole
   sentences. On 2026-10-23 it did so inside a sentence longer than 300 characters, to fit
   the limit, and inside a table row, which is why the prompt says how to quote both. With
-  that rule, on 2026-10-24, no quote was lost in 14 runs.
+  that rule, no quote was lost in the 14 runs of 2026-10-24; on the 12 reference papers of
+  2026-10-25, 2 quotes still skipped part of a sentence with "...", and one rebuilt a table
+  row in the order the page shows, where the PDF's text has part of it on the next line.
 
 ## Chain
 
