@@ -44,8 +44,8 @@ Inngest workflows that combine `core` logic with the `dkg` and `contracts` adapt
   `read-paper-1-wait`); the rating run's fake steps fail a run that uses one twice. Every wait is a
   `step.sleep`, never a sleep inside a step. Each notification is sent from a step of its own
   (`notify`, `alert-orphan`, `alert-fee-cap`), never from the function body, which replays. A step whose result changes shape gets a new id
-  (`score-paper-1` replaced `score-1`), so a run already going never reads an old result as a
-  new one.
+  (`score-paper-1` replaced `score-1`, then `score-paper-v4-1` when the scorer's output gave
+  `studyTypes`), so a run already going never reads an old result as a new one.
 - Adapters return typed results and never throw for an expected failure, as ADR 0021
   asks of server reads. A run throws `NonRetriableError` only when its settings or
   its invocation's data are invalid (`loadDeps`, `loadRatingDeps`, the oracle's `setup`),
