@@ -1,5 +1,5 @@
 // Dev only: how far repeated scorer runs on one paper agree, for score-papers --repeat.
-import type { CheckAnswer, CheckId, ScorerOutput } from "@verisci/core";
+import type { CheckAnswer, CheckId, ScorerOutput } from "@labstrail/core";
 
 /** One scorer run on a paper: scored in the field, classed outside it, or failed. */
 export type ScoredRun =

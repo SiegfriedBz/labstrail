@@ -1,5 +1,5 @@
+import type { PublishedRecord } from "@labstrail/workflows";
 import { cleanup, render, screen, within } from "@testing-library/react";
-import type { PublishedRecord } from "@verisci/workflows";
 import { afterEach, describe, expect, it } from "vitest";
 import { VERIFY_GROUPS, VERIFY_LABELS } from "./labels.ts";
 import { VerifyPanel } from "./verify-panel.tsx";
@@ -27,6 +27,15 @@ describe("VerifyPanel", () => {
 
     const type = screen.getByText(/^Submission\(/).textContent ?? "";
     expect(type).toBe("Submission(string cid,string contextGraph,uint256 deadline)");
+  });
+
+  it("names the domain, and the one papers published before the rename were signed under", () => {
+    render(
+      <VerifyPanel record={RECORD} ual={UAL} cid={CID} contextGraph="0xd701/verisci-staging" />,
+    );
+
+    expect(screen.getByText('{ name: "labstrail", version: "1", chainId: 84532 }')).toBeTruthy();
+    expect(screen.getByText('"verisci"')).toBeTruthy();
   });
 
   it("groups its fields under the submission and the asset, in their order", () => {

@@ -6,7 +6,7 @@ import {
   checklistOf,
   type ScorerOutput,
   type StudyType,
-} from "@verisci/core";
+} from "@labstrail/core";
 import { describe, expect, it } from "vitest";
 import { type ScoredRun, stabilityOf } from "./stability.ts";
 

@@ -1,7 +1,7 @@
 import { BASE_SEPOLIA_CHAIN_ID } from "../assets/chains.ts";
 
 /**
- * The largest PDF verisci publishes and rates: 15 MB. A paper published before the limit was
+ * The largest PDF LabsTrail publishes and rates: 15 MB. A paper published before the limit was
  * lowered from 30 MB, and over it, is cancelled when someone asks to rate it (ADR 0011). The
  * scorer's reference papers weigh 0.4 to 12.4 MB.
  */
@@ -21,14 +21,23 @@ export interface SubmissionMessage {
 }
 
 /**
- * verisci's EIP-712 domain: no `verifyingContract`, since a submission calls no contract
+ * LabsTrail's EIP-712 domain: no `verifyingContract`, since a submission calls no contract
  * (ADR 0010).
  */
 export const SUBMISSION_DOMAIN = {
-  name: "verisci",
+  name: "labstrail",
   version: "1",
   chainId: BASE_SEPOLIA_CHAIN_ID,
 } as const;
+
+/**
+ * The domain papers published before the rename were signed under (ADR 0042). Their
+ * signatures still check under it; new submissions sign under {@link SUBMISSION_DOMAIN}.
+ */
+export const PRE_RENAME_DOMAIN = { ...SUBMISSION_DOMAIN, name: "verisci" } as const;
+
+/** An EIP-712 domain a submission is signed under. */
+export type SubmissionDomain = typeof SUBMISSION_DOMAIN | typeof PRE_RENAME_DOMAIN;
 
 const SUBMISSION_TYPES = {
   Submission: [
@@ -40,12 +49,16 @@ const SUBMISSION_TYPES = {
 
 /**
  * The EIP-712 typed data a submitter signs for `message`, in the shape viem's
- * `signTypedData` and `verifyTypedData` take. The graph id's address is written in
- * lowercase, so every casing of one graph signs one message.
+ * `signTypedData` and `verifyTypedData` take, under `domain` ({@link SUBMISSION_DOMAIN}
+ * unless given). The graph id's address is written in lowercase, so every casing of one
+ * graph signs one message.
  */
-export function submissionTypedData(message: SubmissionMessage) {
+export function submissionTypedData(
+  message: SubmissionMessage,
+  domain: SubmissionDomain = SUBMISSION_DOMAIN,
+) {
   return {
-    domain: SUBMISSION_DOMAIN,
+    domain,
     types: SUBMISSION_TYPES,
     primaryType: "Submission",
     message: {

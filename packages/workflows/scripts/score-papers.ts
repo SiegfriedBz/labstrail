@@ -6,13 +6,13 @@
 // request asks for that thinking level. With --field, it runs only the publish run's field
 // check instead: GROBID's header and the text's opening, then one Flash-Lite request per paper.
 //
-//   pnpm --filter @verisci/workflows score-papers [--repeat n] [--pdf path…] [--thinking level] [id…]
-//   pnpm --filter @verisci/workflows score-papers --field [id…]
+//   pnpm --filter @labstrail/workflows score-papers [--repeat n] [--pdf path…] [--thinking level] [id…]
+//   pnpm --filter @labstrail/workflows score-papers --field [id…]
 //
 // Reads GEMINI_API_KEY (and GROBID_URL with --field, with DKG_TOKEN as GROBID's credential on
 // the node server) from the root .env.local (packages/workflows README). Refuses a run that
 // would spend more than the free tier's daily scorer requests. Downloads each PDF once into
-// node_modules/.cache/verisci-reference/, and writes each run's answers there too, after each
+// node_modules/.cache/labstrail-reference/, and writes each run's answers there too, after each
 // paper (each run with --repeat), so a run that stops keeps the answers it paid for.
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -22,8 +22,8 @@ import {
   type ScorerAnswer,
   type ScorerOutput,
   scoreChecks,
-} from "@verisci/core";
-import { createSharedEnv, defineEnv } from "@verisci/env";
+} from "@labstrail/core";
+import { createSharedEnv, defineEnv } from "@labstrail/env";
 import { z } from "zod";
 import type { GeminiFailureResult } from "../src/gemini/gemini.ts";
 import { paperTextOf } from "../src/pdf/paper-text.ts";
@@ -37,7 +37,7 @@ import { type ReferencePaper, readReferencePapers } from "./reference-papers.ts"
 import { budgetError, parseScoreArgs } from "./score-args.ts";
 import { type ScoredRun, type Stability, stabilityOf } from "./stability.ts";
 
-const CACHE = new URL("../node_modules/.cache/verisci-reference/", import.meta.url);
+const CACHE = new URL("../node_modules/.cache/labstrail-reference/", import.meta.url);
 /**
  * Gemini's free tier answers a burst with 429s: wait between calls, and retry a few times. An
  * answer the check refuses is asked for again only as often as a rating run does.

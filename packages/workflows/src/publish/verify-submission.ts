@@ -1,4 +1,10 @@
-import { canonicalContextGraph, submissionTypedData, targetKaName } from "@verisci/core";
+import {
+  canonicalContextGraph,
+  PRE_RENAME_DOMAIN,
+  SUBMISSION_DOMAIN,
+  submissionTypedData,
+  targetKaName,
+} from "@labstrail/core";
 import {
   type Address,
   type Hex,
@@ -60,10 +66,10 @@ const eventData = z.object({
 });
 
 /**
- * Checks a `verisci/paper.submitted` event's data: the CID is canonical CIDv1 base32, the
+ * Checks a `labstrail/paper.submitted` event's data: the CID is canonical CIDv1 base32, the
  * context graph is this environment's, the deadline is ahead of `now` by at most a day
  * (further ahead is `malformed`), and the submitter
- * signed `{ cid, contextGraph, deadline }` under verisci's EIP-712 domain (ADR 0010).
+ * signed `{ cid, contextGraph, deadline }` under LabsTrail's EIP-712 domain (ADR 0010).
  *
  * An EOA signature is checked locally; any other is asked of the chain, so smart-contract
  * wallets verify too. Never throws for an expected failure.
@@ -113,8 +119,9 @@ type TypedData = ReturnType<typeof submissionTypedData>;
 /**
  * Whether `signature` is `submitter`'s over `{ cid, contextGraph, deadline }`, as a published
  * record carries them: the same check as {@link verifySubmission} without its deadline and
- * graph rules, since a record outlives its signature's deadline. `unreachable` when the chain
- * could not be asked about a smart-contract wallet.
+ * graph rules, since a record outlives its signature's deadline, and under either domain,
+ * since papers published before the rename were signed under `PRE_RENAME_DOMAIN` (ADR 0042).
+ * `unreachable` when the chain could not be asked about a smart-contract wallet.
  */
 export async function signatureMatches(
   signed: {
@@ -128,17 +135,20 @@ export async function signatureMatches(
 ): Promise<boolean | "unreachable"> {
   if (!/^0x[0-9a-fA-F]{40}$/.test(signed.submitter) || !/^0x[0-9a-fA-F]*$/.test(signed.signature))
     return false;
-  const typedData = submissionTypedData({
-    cid: signed.cid,
-    contextGraph: signed.contextGraph,
-    deadline: signed.deadline,
-  });
+  const message = { cid: signed.cid, contextGraph: signed.contextGraph, deadline: signed.deadline };
   const address = signed.submitter.toLowerCase() as Address;
   const signature = signed.signature as Hex;
-  const matches =
-    (await signedBy(address, typedData, signature)) ||
-    (await askChain(client, address, typedData, signature));
-  return typeof matches === "object" ? "unreachable" : matches;
+  const typedData = [SUBMISSION_DOMAIN, PRE_RENAME_DOMAIN].map((domain) =>
+    submissionTypedData(message, domain),
+  );
+  for (const data of typedData) if (await signedBy(address, data, signature)) return true;
+  let unreachable = false;
+  for (const data of typedData) {
+    const onChain = await askChain(client, address, data, signature);
+    if (onChain === true) return true;
+    if (typeof onChain === "object") unreachable = true;
+  }
+  return unreachable ? "unreachable" : false;
 }
 
 async function signedBy(address: Address, typedData: TypedData, signature: Hex): Promise<boolean> {
