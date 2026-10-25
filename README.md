@@ -87,7 +87,7 @@ Built:
   requests; that request's run finishes or cancels it
   ([ADR 0020](docs/adr/0020-stuck-requests-recovered-only-oracle-cancels.md)).
 - **The maintainer hears of it on Telegram:** every paper published, every rating settled
-  or delayed (with when it would be cancelled), a failed run, the DKG node down, wallets running low and requests pending too long
+  or delayed (with when it would be cancelled), a failed run that needs fixing, the DKG node down, wallets running low and requests pending too long
   ([ADR 0038](docs/adr/0038-alerts-go-to-one-telegram-chat.md)).
 
 Deployed on Vercel ([`apps/web` → Deploying](apps/web/README.md#deploying)): staging from

@@ -104,7 +104,7 @@ const DELAY_REASONS: Record<Exclude<DelayedFailure, "scorer-unavailable">, strin
  * 0038): `⏳ Rating delayed`, then why in plain words (from `failure`, and for the scorer from
  * the error's `detail`: a 429 is Gemini's daily limit, given with its next reset in Paris
  * time), that the reconciler retries it, and `cancelBy` in Paris time when the run read the
- * request; then the paper by its title (its UAL, else its request id) and a link to the
+ * request, or that the next retry cancels it once `cancelBy` is past; then the paper by its title (its UAL, else its request id) and a link to the
  * rating's page when the run found the paper's PDF.
  */
 export function delayedNotice(
@@ -118,8 +118,12 @@ export function delayedNotice(
   const hours = Math.round(RECONCILER_SETTINGS.thresholdMs / 3_600_000);
   const lines = [
     failure === "scorer-unavailable" ? scorerReason(detail, now) : DELAY_REASONS[failure],
-    `Still pending: retried automatically about every ${hours} hours`,
-    ...(cancelBy ? [`Cancelled if not rated by ${DAY_AND_TIME.format(cancelBy)}`] : []),
+    ...(cancelBy && cancelBy <= now
+      ? ["Past its maximum age: cancelled at the next retry"]
+      : [
+          `Still pending: retried automatically about every ${hours} hours`,
+          ...(cancelBy ? [`Cancelled if not rated by ${DAY_AND_TIME.format(cancelBy)}`] : []),
+        ]),
   ];
   const page = paper.cid ? `/papers/${paper.cid}/ratings/${paper.requestId}` : undefined;
   return {

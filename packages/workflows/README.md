@@ -264,8 +264,10 @@ does not serve the graph, and
 (`rating-unreadable`) on a minted R-KA whose score does not parse. A failed run leaves the
 request pending; the reconciler restarts it (below). A run that gives up with any reason but
 `setup` and `rating-unreadable` (`DELAYED_FAILURES`) first sends a `⏳ Rating delayed` message
-from a step of its own (**notify-delayed**), then fails with the same error; `setup` and
-`rating-unreadable` are left to the failure alert (Notifications and alerts, below).
+from a step of its own (**notify-delayed**), then fails with the same error, save an
+`oracle-failed` whose oracle stopped on `oracle-conflict` or `setup` (`delayedFailureOf`);
+those, `setup` and `rating-unreadable` are left to the failure alert (Notifications and
+alerts, below).
 
 The scorer asks `gemini-3.8-flash` once per attempt until it gets an answer, at most 6 times
 a run, and each restart asks again, against the free tier's 20 a day (`docs/domain.md` →
@@ -451,12 +453,14 @@ step of its own, so a replay never sends it twice.
   scored or cancelled (`⭐ Rated <score>/100`, `⚠️ Rating cancelled: <why>`, the rating run's
   **notify**), each with the paper's title and a link to its page (`publishedNotice`,
   `ratedNotice`, `siteUrlOf`).
-- **A rating delayed:** a rating run that gave up while its request stays pending sends
+- **A rating delayed:** a rating run that gave up on a cause that passes by itself, its
+  request still pending (`delayedFailureOf`), sends
   `⏳ Rating delayed` (**notify-delayed**, `delayedNotice`): why in plain words (Gemini's
   daily limit reached, with its next reset, midnight Pacific, in Paris time; Gemini not
   answering; the IPFS gateway, the chain, the DKG node, the mint or the oracle), "Still pending:
   retried automatically about every 4 hours" (the reconciler's threshold), and "Cancelled if
-  not rated by <day, time>" in Paris time (the request's time plus the 24-hour maximum age),
+  not rated by <day, time>" in Paris time (the request's time plus the 24-hour maximum age), or
+  "Past its maximum age: cancelled at the next retry" once that time is past,
   then the paper's title (its UAL, or the request's id when the chain never gave the request)
   and a link to the rating's page once the run found the paper's PDF. Each restart that gives
   up again sends another. It looks nothing up, since the node may be what is down.

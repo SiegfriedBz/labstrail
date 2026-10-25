@@ -1,6 +1,6 @@
 import type { Inngest } from "inngest";
 import { z } from "zod";
-import { isDelayedFailure, ratingFailureReason } from "../rating/rate-paper.ts";
+import { delayedFailureOf } from "../rating/rate-paper.ts";
 
 /** Inngest's event for a run that failed for good, after its retries. */
 export const FUNCTION_FAILED = "inngest/function.failed";
@@ -41,8 +41,7 @@ export function failureText(
   }
   const line = error?.message.split("\n", 1)[0] ?? "";
   if (function_id.endsWith("rate-paper") && line.startsWith("rating-failed:")) {
-    const reason = ratingFailureReason(line);
-    if (reason && isDelayedFailure(reason)) return undefined;
+    if (delayedFailureOf(line)) return undefined;
   }
   const reason = line.length > MAX_ERROR_CHARS ? `${line.slice(0, MAX_ERROR_CHARS)}…` : line;
   return `${function_id} failed (run ${run_id}): ${reason}`;

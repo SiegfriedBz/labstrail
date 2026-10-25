@@ -48,6 +48,11 @@ describe("failureText", () => {
       "rating-failed:rating-unreadable: x",
     ],
     ["another function's failure", "verisci-oracle", "rating-failed:scorer-unavailable: x"],
+    ...["oracle-conflict", "setup"].map((oracle) => [
+      `a rating run whose oracle stopped on ${oracle}`,
+      "verisci-rate-paper",
+      `rating-failed:oracle-failed: request 0x1: oracle-failed:${oracle}: x`,
+    ]),
     [
       "a rating run whose error holds a delayed reason later on",
       "verisci-rate-paper",

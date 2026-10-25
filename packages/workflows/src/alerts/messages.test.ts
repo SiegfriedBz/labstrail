@@ -115,6 +115,14 @@ describe("delayedNotice", () => {
     });
   });
 
+  it("says the next retry cancels a request already past its cancel time", () => {
+    const notice = delayedNotice("node-unreachable", "x", paper, NOW, NOW, SITE);
+
+    expect(notice.detail?.split("\n").slice(1)).toEqual([
+      "Past its maximum age: cancelled at the next retry",
+    ]);
+  });
+
   it.each([
     ["between the clock changes", "2026-10-26T10:00:00Z", "08:00"],
     ["in winter", "2026-11-10T10:00:00Z", "09:00"],

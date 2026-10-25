@@ -1043,6 +1043,21 @@ describe("runRating: a rating delayed, its request left pending", () => {
     },
   );
 
+  it.each(["oracle-conflict", "setup"])(
+    "sends no delayed message when the oracle stopped on %s, which is no wait",
+    async (oracle) => {
+      const { run, deps, log } = rate({
+        oracleAnswer: () => {
+          throw new Error(`oracle-failed:${oracle}: x`);
+        },
+      });
+
+      await expect(run).rejects.toThrow(/^rating-failed:oracle-failed: /);
+      expect(log).not.toContain("notify-delayed");
+      expect(deps.notify).not.toHaveBeenCalled();
+    },
+  );
+
   it("lists every reason a run may give up with but setup and rating-unreadable", () => {
     expect([...DELAYED_FAILURES].sort()).toEqual([
       "chain-unreachable",

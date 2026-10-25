@@ -153,6 +153,19 @@ export function isDelayedFailure(reason: RatingFailure): reason is DelayedFailur
 }
 
 /**
+ * The {@link DELAYED_FAILURES} reason a run's error `message` carries, or `undefined`: an
+ * `oracle-failed` whose oracle stopped on `oracle-conflict` or `setup` is no wait, the request
+ * being settled or the settings ours to fix, so it is left to the failure alert.
+ */
+export function delayedFailureOf(message: string): DelayedFailure | undefined {
+  const reason = ratingFailureReason(message);
+  if (!reason || !isDelayedFailure(reason)) return undefined;
+  return reason === "oracle-failed" && /oracle-failed:(?:oracle-conflict|setup): /.test(message)
+    ? undefined
+    : reason;
+}
+
+/**
  * How a rating run ends, unless it fails: the request fulfilled or cancelled, or skipped. An
  * `orphan` is an R-KA the contract will never record (ADR 0014): one stored, never minted,
  * when the run cancels the request expired, or one written for a request cancelled meanwhile
@@ -405,7 +418,7 @@ async function rateRequest(
 
 /**
  * Sends the `⏳ Rating delayed` message from its own step (`notify-delayed`) when `error` stops
- * the run with a {@link DELAYED_FAILURES} reason: the request's cancel time when the run read
+ * the run with a delay ({@link delayedFailureOf}): the request's cancel time when the run read
  * it, and the paper's CID and title when it found them, with no further lookup, since the node
  * may be what is down.
  */
@@ -416,8 +429,8 @@ async function notifyDelayed(
   deps: RatingDeps,
 ): Promise<void> {
   if (!(error instanceof NonRetriableError) || !requestId) return;
-  const failure = ratingFailureReason(error.message);
-  if (!failure || !isDelayedFailure(failure)) return;
+  const failure = delayedFailureOf(error.message);
+  if (!failure) return;
   const detail = error.message.slice(`rating-failed:${failure}: `.length);
   const cancelBy = request
     ? new Date(request.requestedAt * 1000 + RATING_SETTINGS.maxAgeMs)
