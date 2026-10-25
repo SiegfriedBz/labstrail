@@ -262,7 +262,10 @@ missing paper. It fails at once (`setup`) on missing or invalid settings, a node
 refuses our key, Gemini refusing the request (the detail names its status), or a node that
 does not serve the graph, and
 (`rating-unreadable`) on a minted R-KA whose score does not parse. A failed run leaves the
-request pending and alerts the maintainer; the reconciler restarts it (below).
+request pending; the reconciler restarts it (below). A run that gives up with any reason but
+`setup` and `rating-unreadable` (`DELAYED_FAILURES`) first sends a `⏳ Rating delayed` message
+from a step of its own (**notify-delayed**), then fails with the same error; `setup` and
+`rating-unreadable` are left to the failure alert (Notifications and alerts, below).
 
 The scorer asks `gemini-3.8-flash` once per attempt until it gets an answer, at most 6 times
 a run, and each restart asks again, against the free tier's 20 a day (`docs/domain.md` →
@@ -434,12 +437,12 @@ restarts runs: the run decides what is left (retry, cancel `invalid-target`, ful
 
 ## Notifications and alerts
 
-One `notify({ level, text, title, link })` (`createNotify`) tells the maintainer everything,
+One `notify({ level, text, detail, title, link })` (`createNotify`) tells the maintainer everything,
 in one Telegram chat for every environment
 ([ADR 0038](../../docs/adr/0038-alerts-go-to-one-telegram-chat.md)), in Telegram's HTML: a bold
 headline and the environment (`🚨 Alert · staging`, or activity's own headline, such as
-`⭐ Rated 91/100 · staging`), then the alert's text, or the paper's title in bold and a short
-link (`→ Open the rating`); every part is escaped. Without `TELEGRAM_BOT_TOKEN` and
+`⭐ Rated 91/100 · staging`), then the alert's text, any detail lines, the paper's title in
+bold and a short link (`→ Open the rating`); every part is escaped. Without `TELEGRAM_BOT_TOKEN` and
 `TELEGRAM_CHAT_ID` (anywhere but production, which requires them) it only logs the message, as one plain line (`[staging · alert] …`); a send that fails is
 logged `notify-unavailable: telegram: …` and never fails the run that sent it. Every send is a
 step of its own, so a replay never sends it twice.
@@ -448,9 +451,19 @@ step of its own, so a replay never sends it twice.
   scored or cancelled (`⭐ Rated <score>/100`, `⚠️ Rating cancelled: <why>`, the rating run's
   **notify**), each with the paper's title and a link to its page (`publishedNotice`,
   `ratedNotice`, `siteUrlOf`).
+- **A rating delayed:** a rating run that gave up while its request stays pending sends
+  `⏳ Rating delayed` (**notify-delayed**, `delayedNotice`): why in plain words (Gemini's
+  daily limit reached, with its next reset, midnight Pacific, in Paris time; Gemini not
+  answering; the IPFS gateway, the chain, the DKG node, the mint or the oracle), "Still pending:
+  retried automatically about every 4 hours" (the reconciler's threshold), and "Cancelled if
+  not rated by <day, time>" in Paris time (the request's time plus the 24-hour maximum age),
+  then the paper's title (its UAL, or the request's id when the chain never gave the request)
+  and a link to the rating's page once the run found the paper's PDF. Each restart that gives
+  up again sends another. It looks nothing up, since the node may be what is down.
 - **A failed or cancelled run:** `alert-on-failure`, on every function's
   `inngest/function.failed`, names the function, the run and the first line of its error,
-  whose `publish-failed:`, `rating-failed:` or `oracle-failed:` prefix says why; on
+  whose `publish-failed:`, `rating-failed:` or `oracle-failed:` prefix says why, except a
+  rating run's delayed failure, which sent its own message (`failureText` gives none); on
   `inngest/function.cancelled`, sent for a run past its time budget (`timeouts.finish`) or one
   cancelled by hand, it names the function and the run.
 - **The oracle and orphans:** an oracle without funds (**alert-no-funds**), a transaction at

@@ -1,6 +1,6 @@
 created: 2026-10-12T05:42:03.295Z
-updated: 2026-10-16T12:29:51.259Z
-update_count: 11
+updated: 2026-10-25T17:41:44.648Z
+update_count: 12
 last_field: diagram
 kind: nested-class
 title: workflows
@@ -27,6 +27,7 @@ prev_diagram: >-
       rating -->|"checks the field and scores the paper with"| gemini
       publish -->|"announces a minted paper with"| alerts
       rating -->|"announces settled ratings and alerts with"| alerts
+      alerts -->|"reads pending requests with"| rating
       scripts["Dev Scripts\nscripts/"] -->|"request and score ratings, fund a wallet, post a webhook delivery, with"| rating
       scripts -->|"publish a PDF, and run the field check on the reference set, with"| publish
       classDef entry fill:#89b4fa,stroke:#89b4fa,color:#1e1e2e

@@ -6,6 +6,8 @@ export interface Notice {
   readonly level: NotifyLevel;
   /** An alert's lines, or the headline of activity, its emoji first (`⭐ Rated 67/100`). */
   readonly text: string;
+  /** Plain lines under the headline (`Gemini is not answering`), one per line. */
+  readonly detail?: string | undefined;
   /** The paper the message is about, shown in bold under the headline. */
   readonly title?: string | undefined;
   /** A page to open, shown as its label (`Open the rating`). */
@@ -30,8 +32,9 @@ export type Notify = (notice: Notice) => Promise<void>;
 /**
  * Builds the one way the workflows tell the maintainer something (ADR 0038): a Telegram
  * `sendMessage` to one chat, in Telegram's HTML: a bold headline (`🚨 Alert` for an alert, the
- * notice's text for activity) and the environment, then an alert's text, or the paper's title
- * in bold, and the link as its label; everything the notice holds is escaped. Without a bot
+ * notice's text for activity) and the environment, then an alert's text, the notice's detail
+ * lines, the paper's title in bold, and the link as its label; everything the notice holds is
+ * escaped. Without a bot
  * token and chat (locally), it logs the message as one plain line
  * (`[staging · alert] …`) instead. A failed send is logged as `notify-unavailable: telegram: …`
  * and never thrown, so a notification never fails the run that sends it.
@@ -67,17 +70,22 @@ export function createNotify(options: NotifyOptions): Notify {
   };
 }
 
-/** A notice as one log line: `[staging · activity] 📄 Published: <title> <url>`. */
-function plainLine(appEnv: string, { level, text, title, link }: Notice): string {
-  return `[${appEnv} · ${level}] ${text}${title ? `: ${title}` : ""}${link ? ` ${link.url}` : ""}`;
+/**
+ * A notice as one log line: `[staging · activity] 📄 Published: <title> <url>`, its detail lines
+ * in brackets after the text (`⏳ Rating delayed (<line>; <line>): <title>`).
+ */
+function plainLine(appEnv: string, { level, text, detail, title, link }: Notice): string {
+  const lines = detail ? ` (${detail.split("\n").join("; ")})` : "";
+  return `[${appEnv} · ${level}] ${text}${lines}${title ? `: ${title}` : ""}${link ? ` ${link.url}` : ""}`;
 }
 
 /** A notice in Telegram's HTML, each part escaped so a title never breaks the formatting. */
-function telegramHtml(appEnv: string, { level, text, title, link }: Notice): string {
+function telegramHtml(appEnv: string, { level, text, detail, title, link }: Notice): string {
   const lines =
     level === "alert"
       ? [`<b>🚨 Alert</b> · ${escapeHtml(appEnv)}`, escapeHtml(text)]
       : [`<b>${escapeHtml(text)}</b> · ${escapeHtml(appEnv)}`];
+  if (detail) lines.push(escapeHtml(detail));
   if (title) lines.push(`<b>${escapeHtml(title)}</b>`);
   if (link) lines.push(`→ <a href="${escapeHtml(link.url)}">${escapeHtml(link.label)}</a>`);
   return lines.join("\n");

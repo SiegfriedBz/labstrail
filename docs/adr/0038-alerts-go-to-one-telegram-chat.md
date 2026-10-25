@@ -10,14 +10,14 @@ Ratings run unattended. A scorer outage, an oracle out of gas or stuck at its fe
 ## Decision
 
 - One way tells the maintainer everything: a single `notify()` posting to one Telegram chat, through a bot, for every environment. Each message names its environment and its kind: an alert, or which activity (a paper published, a rating settled or cancelled).
-- Alerts: a run that failed for good, an oracle without funds or at its fee cap, an R-KA the contract will never record, and, from a check every hour, the DKG node not answering or the environment's graph not finalized, the oracle's or a publisher wallet's balance under its threshold, and requests pending past the reconciler's reach.
-- Activity: each paper a run published, and each rating the oracle settled, with a link to its page.
+- Alerts are for what the maintainer must fix: a run that failed for good, but for a rating run that gave up while its request stays pending, an oracle without funds or at its fee cap, an R-KA the contract will never record, and, from a check every hour, the DKG node not answering or the environment's graph not finalized, the oracle's or a publisher wallet's balance under its threshold, and requests pending past the reconciler's reach.
+- Activity: each paper a run published, and each rating the oracle settled, with a link to its page. A rating run that gives up while its request stays pending sends a "⏳ Rating delayed" message instead of an alert: why in plain words, that the request is retried automatically, when it would be cancelled, and the paper.
 - Each message is sent once, from a step of its own; a send that fails is logged and never fails the run that sent it.
 - The bot's settings are required on production, which refuses to start without them, and optional elsewhere: a deployment without them, like a feature preview or a developer's computer, starts and only logs its messages ([0004](0004-env-variables-per-workspace-one-root-file.md)). `develop` holds them too.
 
 ## Consequences
 
-- The maintainer hears, on a phone and at no cost, of a low balance or a request pending too long within the hour, and of a scorer outage when the first run gives up on it, about 2 hours in with the rating run's waits ([0009](0009-retries-are-spaced-with-step-sleep.md)).
+- The maintainer hears, on a phone and at no cost, of a low balance or a request pending too long within the hour, and of a scorer outage when the first run gives up on it, about 2 hours in with the rating run's waits ([0009](0009-retries-are-spaced-with-step-sleep.md)), as a delayed rating rather than an alert. Each restart that gives up again sends another, about every 4 hours while the cause lasts ([0020](0020-stuck-requests-recovered-only-oracle-cancels.md)); the request's cancel sends its own message.
 - Production never runs without its alerts. Staging and previews still start without the bot's settings, their messages reaching only their logs: setting them is part of deploying `develop`.
 - One chat mixes environments and kinds; each message's headline tells them apart. Activity grows with requests, bounded by the throttle ([0015](0015-rating-requests-are-free-on-testnet.md)).
 - Telegram sees the messages: paper titles, addresses, request ids and error text, never a key.
@@ -31,3 +31,4 @@ Ratings run unattended. A scorer outage, an oracle out of gas or stuck at its fe
 - 2026-10-17: a message names its kind by its headline (an alert, or the activity itself) rather than by the word "activity", so the chat reads at a glance (first deploy, user's choice).
 - 2026-10-17: corrected: the hourly check keeps no state ([0035](0035-limits-are-the-apps-only-state.md)), so it alerts on a problem every hour it lasts, from each environment that runs it, rather than once (ADR sweep).
 - 2026-10-18: the bot's settings are required on production, which refuses to start without them, since production's first day ran without them and a failed publish's alert reached only its logs; still optional elsewhere ([0004](0004-env-variables-per-workspace-one-root-file.md)) (publish fixes, user's choice).
+- 2026-10-25: alerts are for failures the maintainer must fix; a rating run that gives up while its request stays pending sends a "⏳ Rating delayed" activity message instead, naming the paper and when the request would be cancelled, since production's first such alert read like a lost rating (post-rename fixes, user's choice).

@@ -15,12 +15,54 @@ describe("failureText", () => {
       failureText(
         failed(
           "verisci-rate-paper",
-          "rating-failed:scorer-unavailable: verisci-rka-0xab gave up after 6 attempts: scorer unreachable (HTTP 503)",
+          "rating-failed:setup: verisci-rka-0xab: Gemini refused the request (HTTP 403): check GEMINI_API_KEY and the model",
         ),
       ),
     ).toBe(
-      "verisci-rate-paper failed (run 01JRUN): rating-failed:scorer-unavailable: verisci-rka-0xab gave up after 6 attempts: scorer unreachable (HTTP 503)",
+      "verisci-rate-paper failed (run 01JRUN): rating-failed:setup: verisci-rka-0xab: Gemini refused the request (HTTP 403): check GEMINI_API_KEY and the model",
     );
+  });
+
+  it.each([
+    "scorer-unavailable",
+    "paper-unreachable",
+    "paper-unreadable",
+    "chain-unreachable",
+    "node-unreachable",
+    "mint-not-confirmed",
+    "oracle-failed",
+  ])(
+    "is undefined for a rating run that failed %s, whose run sent its delayed message",
+    (reason) => {
+      expect(
+        failureText(failed("verisci-rate-paper", `rating-failed:${reason}: x gave up\nstack`)),
+      ).toBeUndefined();
+    },
+  );
+
+  it.each([
+    ["a rating run that failed setup", "verisci-rate-paper", "rating-failed:setup: x"],
+    [
+      "a rating run that failed rating-unreadable",
+      "verisci-rate-paper",
+      "rating-failed:rating-unreadable: x",
+    ],
+    ["another function's failure", "verisci-oracle", "rating-failed:scorer-unavailable: x"],
+    [
+      "a rating run whose error holds a delayed reason later on",
+      "verisci-rate-paper",
+      "boom: rating-failed:scorer-unavailable: x",
+    ],
+  ])("still alerts on %s", (_, functionId, message) => {
+    expect(failureText(failed(functionId, message))).toBe(
+      `${functionId} failed (run 01JRUN): ${message}`,
+    );
+  });
+
+  it("still alerts on a cancelled rating run", () => {
+    expect(
+      failureText(failed("verisci-rate-paper", "rating-failed:scorer-unavailable: x"), "cancelled"),
+    ).toBe("verisci-rate-paper cancelled (run 01JRUN): past its time budget, or by hand");
   });
 
   it("keeps the error's first line, at most 300 characters", () => {
@@ -119,6 +161,26 @@ describe("alertOnFailure", () => {
     expect(alert).toHaveBeenCalledExactlyOnceWith(
       "verisci-rate-paper cancelled (run 01JRUN): past its time budget, or by hand",
     );
+  });
+
+  it("sends nothing for a rating run that gave up while its request stays pending", async () => {
+    const { log, alert, step } = setup();
+
+    expect(
+      await alertOnFailure(
+        {
+          name: "inngest/function.failed",
+          data: failed(
+            "verisci-rate-paper",
+            "rating-failed:scorer-unavailable: verisci-rka-0xab gave up after 6 attempts: scorer rate-limited (HTTP 429)",
+          ),
+        },
+        step,
+        alert,
+      ),
+    ).toEqual({ alerted: false });
+    expect(log).toEqual([]);
+    expect(alert).not.toHaveBeenCalled();
   });
 
   it("sends nothing for its own failure, so a failing alert never alerts again", async () => {
