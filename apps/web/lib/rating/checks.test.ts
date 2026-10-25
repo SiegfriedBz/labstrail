@@ -92,4 +92,16 @@ describe("studyTypeLine", () => {
     expect(studyTypeLine(undefined)).toBeUndefined();
     expect(studyTypeLine([])).toBeUndefined();
   });
+
+  it("names an animal or lab study as a rating before version 4 meant it", () => {
+    expect(studyTypeLine(["animal"], "3")).toBe(
+      "Read as an experiment on live animals, against ARRIVE 2.0.",
+    );
+    expect(studyTypeLine(["lab"], "2")).toBe(
+      "Read as a laboratory study of cells, tissues, molecules or microbes, against MDAR.",
+    );
+    expect(studyTypeLine(["animal"], "4")).toBe(
+      "Read as an experiment on live vertebrates, such as mice, rats or zebrafish, or on cephalopods, against ARRIVE 2.0.",
+    );
+  });
 });

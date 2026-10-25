@@ -32,8 +32,10 @@ export function RatingDetail({
       <div className="grid content-start gap-6">
         {record ? (
           <>
-            {studyTypeLine(record.studyTypes) && (
-              <p className="text-sm text-muted">{studyTypeLine(record.studyTypes)}</p>
+            {studyTypeLine(record.studyTypes, record.promptVersion) && (
+              <p className="text-sm text-muted">
+                {studyTypeLine(record.studyTypes, record.promptVersion)}
+              </p>
             )}
             <p className="max-w-[65ch] leading-relaxed">{record.rationale}</p>
             {record.textShortened && (

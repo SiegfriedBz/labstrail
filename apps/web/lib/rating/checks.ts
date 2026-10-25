@@ -62,19 +62,31 @@ export function answerLabel(answer: CheckAnswer): string {
 }
 
 /**
- * The kinds of study the scorer read the paper as, and the checklists it held it to (none for
- * `other`); `undefined` for a rating with no study type.
+ * The animal and lab labels before scorer version 4, which moved invertebrates from `animal`
+ * to `lab`: a rating keeps the meaning it was scored with.
  */
-export function studyTypeLine(studyTypes: readonly StudyType[] | undefined): string | undefined {
+const LABELS_BEFORE_V4: Readonly<Partial<Record<StudyType, string>>> = {
+  animal: "an experiment on live animals",
+  lab: "a laboratory study of cells, tissues, molecules or microbes",
+};
+
+/**
+ * The kinds of study the scorer read the paper as, and the checklists it held it to (none for
+ * `other`), in the words of the scorer version that rated it (`promptVersion`; today's without
+ * one); `undefined` for a rating with no study type.
+ */
+export function studyTypeLine(
+  studyTypes: readonly StudyType[] | undefined,
+  promptVersion?: string,
+): string | undefined {
   const types = STUDY_TYPES.filter((entry) => studyTypes?.includes(entry.id));
   if (types.length === 0) return undefined;
+  const beforeV4 = Number(promptVersion) < 4;
+  const labels = types.map((type) => (beforeV4 && LABELS_BEFORE_V4[type.id]) || type.label);
   const sources = types.map((type) => type.source).filter((source) => source !== "none");
   const against = sources.length > 0 ? `, against ${listOf(sources)}` : "";
   // The labels hold commas of their own, so the last one takes a comma before its "and".
-  return `Read as ${listOf(
-    types.map((type) => type.label),
-    ", and ",
-  )}${against}.`;
+  return `Read as ${listOf(labels, ", and ")}${against}.`;
 }
 
 /** `["a", "b", "c"]` as `a, b and c`, or with `last` before the last item. */
