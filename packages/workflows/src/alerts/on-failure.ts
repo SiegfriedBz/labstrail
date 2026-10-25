@@ -1,5 +1,6 @@
 import type { Inngest } from "inngest";
 import { z } from "zod";
+import { delayedFailureOf } from "../rating/rate-paper.ts";
 
 /** Inngest's event for a run that failed for good, after its retries. */
 export const FUNCTION_FAILED = "inngest/function.failed";
@@ -25,7 +26,8 @@ const failureSchema = z.object({
  * the first line of the error, whose `publish-failed:` / `rating-failed:` / `oracle-failed:`
  * prefix says why, cut at 300 characters; a cancel's error says nothing more than "function
  * cancelled". `undefined` for this function's own runs, so a failing alert never alerts again,
- * and for data that is not a failure.
+ * for a rating run that failed with a `rating-failed:<reason>:` its run reported as a
+ * `⏳ Rating delayed` message (`delayedFailureOf`), and for data that is not a failure.
  */
 export function failureText(
   data: unknown,
@@ -38,6 +40,9 @@ export function failureText(
     return `${function_id} cancelled (run ${run_id}): past its time budget, or by hand`;
   }
   const line = error?.message.split("\n", 1)[0] ?? "";
+  if (function_id.endsWith("rate-paper") && line.startsWith("rating-failed:")) {
+    if (delayedFailureOf(line)) return undefined;
+  }
   const reason = line.length > MAX_ERROR_CHARS ? `${line.slice(0, MAX_ERROR_CHARS)}…` : line;
   return `${function_id} failed (run ${run_id}): ${reason}`;
 }
@@ -45,8 +50,9 @@ export function failureText(
 /**
  * The `alert-on-failure` Inngest function: on every function's `inngest/function.failed` and
  * `inngest/function.cancelled`, sends the maintainer one alert from a step (`alert`, never
- * throwing). A run that stops because a service is down, a scorer outage included, or that
- * runs past its time budget, is how the maintainer hears of it.
+ * throwing). A run that stops on a failure the maintainer must fix, or that runs past its time
+ * budget, is how the maintainer hears of it; a rating run that gave up while its request stays
+ * pending sent its own `⏳ Rating delayed` message instead.
  */
 export function createFailureAlerts(inngest: Inngest.Any, alert: (text: string) => Promise<void>) {
   return inngest.createFunction(

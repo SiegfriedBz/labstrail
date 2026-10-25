@@ -140,15 +140,19 @@ A Target KA describes a paper and who submitted it
   `3´ UTR`). A header with no title is refused, and so is XML with any parse error
   (`not-tei`), without printing anything.
 - **The title** is GROBID's, completed by `completeTitle` from the title the PDF stores in its
-  own metadata, since GROBID's header model can drop a title's first words (`docs/domain.md` →
-  GROBID): the stored title, its whitespace collapsed, replaces GROBID's only when it is
-  longer, at most 300 characters, and ends with GROBID's title at a word's start, ignoring
-  case, whitespace and a final full stop. Words before it holding a spaced dash or a bar, or
+  own metadata, since GROBID's header model can drop a title's first words and space a title
+  differently (`docs/domain.md` → GROBID): the stored title, its whitespace collapsed, replaces
+  GROBID's only when it is longer, at most 300 characters, and ends with GROBID's title at a
+  word's start, ignoring case, every whitespace (`B56 Par1 .T73T75` matches `B56Par1.T73T75`)
+  and a final full stop. A GROBID title starting with a hyphen or a dash was cut at it, so the
+  stored title may end with it inside a word (`CDK1-Cyclin B …` for `-Cyclin B …`), the dash
+  joined to the word before it (`Cell Genomics - Cyclin B …` leaves GROBID's). Words
+  before it, read with the stored title's own spacing, holding a spaced dash or a bar, or
   ending in an en or em dash (`Cell Genomics - <title>`, `Cell Genomics—<title>`), are a
   journal's or a site's name and leave GROBID's, cut or whole, as does a file name, a
   journal's name or another paper's title stored on its own; a colon, a full stop or a dash
   between two words still completes it (`Neuroprotection: <title>`, `E. coli …`,
-  `Dose–response …`, `Long-term …`).
+  `Dose–response …`, `Long-term …`). GROBID's title, when kept, loses a leading hyphen or dash.
 - **Triples:** the subject is `urn:verisci:paper:<cid>`, typed `schema:ScholarlyArticle`,
   with `schema:name`, `schema:url` (`ipfs://<cid>`), `schema:abstract`, `schema:sameAs`
   (`https://doi.org/<doi>`), and one `schema:author` node per author,

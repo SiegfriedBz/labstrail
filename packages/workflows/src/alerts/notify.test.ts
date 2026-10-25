@@ -51,6 +51,39 @@ describe("createNotify", () => {
     );
   });
 
+  it("shows a notice's detail lines under the headline, escaped, for either level", async () => {
+    const { notify, fetch } = setup();
+
+    await notify({
+      level: "activity",
+      text: "⏳ Rating delayed",
+      detail: "Gemini is not answering\nCancelled if not rated by <26 Oct>",
+      title: "A paper",
+    });
+    await notify({ level: "alert", text: "x", detail: "a & b" });
+
+    const texts = fetch.mock.calls.map((call) => JSON.parse(String(call[1]?.body)).text);
+    expect(texts[0]).toBe(
+      "<b>⏳ Rating delayed</b> · staging\nGemini is not answering\nCancelled if not rated by &lt;26 Oct&gt;\n<b>A paper</b>",
+    );
+    expect(texts[1]).toBe("<b>🚨 Alert</b> · staging\nx\na &amp; b");
+  });
+
+  it("logs a notice's detail in its one plain line when Telegram isn't set up", async () => {
+    const { notify, logger } = setup({ botToken: undefined, chatId: undefined });
+
+    await notify({
+      level: "activity",
+      text: "⏳ Rating delayed",
+      detail: "Gemini is not answering\nStill pending",
+      title: "A paper",
+    });
+
+    expect(logger.info).toHaveBeenCalledWith(
+      "notify: [staging · activity] ⏳ Rating delayed (Gemini is not answering; Still pending): A paper",
+    );
+  });
+
   it("leaves the link line out of activity with no link", async () => {
     const { notify, fetch } = setup();
 

@@ -353,6 +353,14 @@ Observed on `lfoppiano/grobid:0.9.1-crf`, 2026-10-09, except where a fact cites 
   completes GROBID's title from it (`completeTitle`, `packages/core` → Target KAs). The paper
   published on staging that day keeps the cut title
   ([ADR 0010](adr/0010-pdf-to-target-ka-pipeline.md)).
+- **The header model can cut a title at a hyphen and space it differently** (2026-10-25): it
+  read "CDK1-Cyclin B mediated phosphorylation of PP2A-B56 on B56Par1.T73T75 controls mitotic
+  entry timing and Schizosaccharomyces pombe cell size" (Open Biology 16: 260089) as "-Cyclin B
+  mediated … on B56 Par1 .T73T75 controls …", dropping "CDK1" before the hyphen and adding
+  spaces inside "B56Par1.T73T75". The PDF's info dictionary held the whole title, so
+  `completeTitle` compares the two with every whitespace removed and takes a GROBID title that
+  starts with a hyphen as cut there. The paper published on production that day keeps the cut
+  title.
 - **The header can give an accent apart from its letter** (2026-10-12): a cohort study's TEI
   listed "Montserrat Rodrı ´guez-Ayala" and "Bele ´n Moreno-Franco", the accent as a spacing
   `´` (U+00B4) after its letter, often after a space, and the `i` as a dotless `ı` (U+0131), the
