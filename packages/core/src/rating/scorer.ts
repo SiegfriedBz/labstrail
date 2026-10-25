@@ -251,7 +251,7 @@ export function clip(text: string, max: number): string {
  * `missing`. A `shown` or `partly` answer counts as `missing` unless its quote is found in the
  * paper's text ({@link quoteFound}), so every point rests on a passage the paper holds. A check
  * the score could not count keeps what the model answered as `claimed`. The output lists every
- * check of the study type in checklist order.
+ * check of its study types, in {@link checklistFor} order.
  */
 export function scoreChecks(paper: PaperText, answer: ScorerAnswer): ScorerOutput {
   const text = quoteTextOf(paper.text);

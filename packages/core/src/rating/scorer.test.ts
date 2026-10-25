@@ -8,6 +8,8 @@ import {
   checklistFor,
   checklistOf,
   STUDY_TYPES,
+  type StudyType,
+  studyTypesOf,
 } from "./checklists.ts";
 import { type PaperText, preparePaperText, quoteFound, quoteTextOf } from "./paper-text.ts";
 import {
@@ -506,6 +508,34 @@ describe("scoreChecks", () => {
     });
   });
 
+  it("scores a paper reporting two kinds over both checklists, each check once", () => {
+    // animal + lab: 18 checks; sex-variable (conditional) does not apply, blinding (required by
+    // animal) counts as missing: funding shown, replicates partly, 1.5 / 17.
+    const answer: ScorerAnswer = {
+      field: "life-sciences",
+      studyTypes: ["animal", "lab"],
+      reason: "Mice and cells.",
+      rationale: "Mixed.",
+      checks: [
+        { id: "funding", answer: "shown", quote: "Funding: none." },
+        { id: "replicates", answer: "partly", quote: "Outcome assessors were blinded" },
+        { id: "blinding", answer: "not-applicable" },
+        { id: "sex-variable", answer: "not-applicable" },
+      ],
+    };
+    const result = scoreChecks(PAPER, answer);
+
+    expect(result.checks.map((check) => check.id)).toEqual(
+      checklistFor(["animal", "lab"]).map((check) => check.id),
+    );
+    expect(result.checks.find((check) => check.id === "blinding")).toEqual({
+      id: "blinding",
+      answer: "missing",
+      claimed: { answer: "not-applicable" },
+    });
+    expect(result.score).toBe(9);
+  });
+
   it("keeps the study type, the rationale and the checks in checklist order", () => {
     const answer = otherAnswer({ funding });
     const result = scoreChecks(PAPER, { ...answer, checks: [...answer.checks].reverse() });
@@ -538,6 +568,20 @@ describe("checklistScore", () => {
   it("counts a required check said not to apply, or with no answer, as missing", () => {
     // other: 8 checks, all applying; funding shown: 1 / 8.
     expect(checklistScore(["other"], { funding: "shown", conflicts: "not-applicable" })).toBe(13);
+  });
+
+  it("scores two kinds over their merged checklist, where a check either kind requires applies", () => {
+    const answers = {
+      funding: "shown",
+      replicates: "partly",
+      blinding: "not-applicable",
+      "sex-variable": "not-applicable",
+    } as const;
+
+    // lab: 14 checks, blinding and sex-variable conditional: 1.5 / 12.
+    expect(checklistScore(["lab"], answers)).toBe(13);
+    // animal + lab: 18 checks, blinding required by animal: 1.5 / 17.
+    expect(checklistScore(["animal", "lab"], answers)).toBe(9);
   });
 });
 
@@ -580,9 +624,25 @@ const QUOTES = [
   "Assessors were blinded as described by Smith et al. … Allocation was concealed centrally.",
 ];
 
+/** Kinds a paper can report together, scored over their merged checklist in the fingerprint. */
+const COMBINED_TYPES: readonly (readonly StudyType[])[] = [
+  ["animal", "lab"],
+  ["randomized-trial", "observational"],
+  ["observational", "computational"],
+  ["randomized-trial", "animal", "lab"],
+];
+/** Kinds as the model may list them, read into a paper's study types in the fingerprint. */
+const KIND_LISTS: readonly (readonly string[])[] = [
+  ["lab", "animal"],
+  ["narrative-review", "lab"],
+  ["systematic-review", "narrative-review"],
+  ["other", "unknown"],
+];
+
 /**
  * The fingerprint of each released prompt version: its prompt (system, which lists every
- * checklist, and user), the scores a fixed set of answers gets, which of fixed quotes are found,
+ * checklist, and user), the scores a fixed set of answers gets, for one kind and for kinds
+ * reported together, which kinds a list reads as, which of fixed quotes are found,
  * and the text two real papers' pages are prepared into, one cut to fit. A version is released once it is merged into `develop`; never change a released one.
  * When this test fails, raise SCORER_PROMPT_VERSION and add the new version's fingerprint (an
  * unreleased version's may be updated).
@@ -590,7 +650,7 @@ const QUOTES = [
 const RELEASED: Readonly<Record<string, string>> = {
   "2": "72754c07",
   "3": "71e5ec76",
-  "4": "f1f6ecec",
+  "4": "1b5f71b2",
 };
 
 describe("SCORER_PROMPT_VERSION", () => {
@@ -614,6 +674,18 @@ describe("SCORER_PROMPT_VERSION", () => {
           })),
         }).score,
     );
+    const combined = COMBINED_TYPES.map((studyTypes) =>
+      checklistScore(
+        studyTypes,
+        Object.fromEntries(
+          checklistFor(studyTypes).map((check, index) => [
+            check.id,
+            answers[index % answers.length] ?? "missing",
+          ]),
+        ),
+      ),
+    );
+    const kinds = KIND_LISTS.map((ids) => studyTypesOf(ids).join("+"));
     const { system } = scorerPrompt(paper);
     const { user } = scorerPrompt({ text: "A paper.", shortened: true });
     const quotes = quoteTextOf(QUOTE_TEXT);
@@ -627,7 +699,17 @@ describe("SCORER_PROMPT_VERSION", () => {
 
     expect(found).toEqual([1, 0, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0]);
     expect(
-      fingerprint([system, user, scores.join(","), found.join(""), ...prepared].join("\n")),
+      fingerprint(
+        [
+          system,
+          user,
+          scores.join(","),
+          combined.join(","),
+          kinds.join(","),
+          found.join(""),
+          ...prepared,
+        ].join("\n"),
+      ),
     ).toBe(RELEASED[SCORER_PROMPT_VERSION]);
   });
 });

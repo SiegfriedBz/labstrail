@@ -253,8 +253,9 @@ request id (Asset names above).
   ([ADR 0012](../../docs/adr/0012-three-phases-settled-by-the-oracle.md)).
 - **The version:** `SCORER_PROMPT_VERSION` names the prompt, the checklists, the scoring, quote
   matching and the paper's text preparation together, and every R-KA records it with the model.
-  A test fingerprints the prompt (system and user), the scores of fixed answers, which of fixed
-  quotes are found and the text two real papers' pages give, so a change that alters any of
+  A test fingerprints the prompt (system and user), the scores of fixed answers for one kind of
+  study and for kinds reported together, the kinds fixed lists read as, which of fixed quotes
+  are found and the text two real papers' pages give, so a change that alters any of
   them fails until the version is raised; a version merged into `develop` is never changed
   again.
 - **Reading back:** `ratingQuery` and `parseRating` read the score from the minted R-KA, so
