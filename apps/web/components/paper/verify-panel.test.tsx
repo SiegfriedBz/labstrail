@@ -29,6 +29,15 @@ describe("VerifyPanel", () => {
     expect(type).toBe("Submission(string cid,string contextGraph,uint256 deadline)");
   });
 
+  it("names the domain, and the one papers published before the rename were signed under", () => {
+    render(
+      <VerifyPanel record={RECORD} ual={UAL} cid={CID} contextGraph="0xd701/verisci-staging" />,
+    );
+
+    expect(screen.getByText('{ name: "labstrail", version: "1", chainId: 84532 }')).toBeTruthy();
+    expect(screen.getByText('"verisci"')).toBeTruthy();
+  });
+
   it("groups its fields under the submission and the asset, in their order", () => {
     render(
       <VerifyPanel record={RECORD} ual={UAL} cid={CID} contextGraph="0xd701/verisci-staging" />,

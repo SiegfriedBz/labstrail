@@ -1,5 +1,6 @@
 import {
   knowledgeAssetToken,
+  PRE_RENAME_DOMAIN,
   parseUal,
   SUBMISSION_DOMAIN,
   submissionTypedData,
@@ -112,9 +113,11 @@ export function VerifyPanel({
           <li>
             Check the signature. It's EIP-712 typed data with the domain{" "}
             <code className="font-mono text-xs text-ink">{EIP712_DOMAIN}</code> and the type{" "}
-            <code className="font-mono text-xs text-ink">{EIP712_TYPE}</code>. Any EIP-712 library
-            recovers the signer to compare with the submitter; a smart-contract wallet is checked on
-            chain with ERC-1271.
+            <code className="font-mono text-xs text-ink">{EIP712_TYPE}</code>. A paper published
+            before LabsTrail was renamed is signed with the name{" "}
+            <code className="font-mono text-xs text-ink">"{PRE_RENAME_DOMAIN.name}"</code> instead.
+            Any EIP-712 library recovers the signer to compare with the submitter; a smart-contract
+            wallet is checked on chain with ERC-1271.
           </li>
           <li>
             Download the PDF by its CID. An IPFS client checks every block against its hash, so a

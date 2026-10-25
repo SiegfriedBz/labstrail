@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_PDF_BYTES, submissionTypedData } from "./submission.ts";
+import { MAX_PDF_BYTES, PRE_RENAME_DOMAIN, submissionTypedData } from "./submission.ts";
 
 describe("MAX_PDF_BYTES", () => {
   it("is 15 MB", () => {
@@ -26,6 +26,13 @@ describe("submissionTypedData", () => {
       primaryType: "Submission",
       message: { cid: CID, contextGraph: GRAPH, deadline: 1_800_000_000n },
     });
+  });
+
+  it("signs under the domain given, such as the name papers before the rename were signed under", () => {
+    expect(
+      submissionTypedData({ cid: CID, contextGraph: GRAPH, deadline: 1n }, PRE_RENAME_DOMAIN)
+        .domain,
+    ).toEqual({ name: "verisci", version: "1", chainId: 84532 });
   });
 
   it("writes the graph id's address in lowercase, so any casing signs one message", () => {

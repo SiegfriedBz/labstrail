@@ -31,6 +31,7 @@ describe("core's layout", () => {
       "FIELD_RULE",
       "MAX_PDF_BYTES",
       "ORIGINTRAIL_CONTRACTS",
+      "PRE_RENAME_DOMAIN",
       "PRIMARY_STUDY_TYPES",
       "SCORER_OUTPUT_SCHEMA",
       "SCORER_PROMPT_VERSION",
