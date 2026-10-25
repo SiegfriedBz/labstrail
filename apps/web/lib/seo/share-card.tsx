@@ -115,8 +115,8 @@ export function ShareCard({ logo, paper }: { logo: string; paper?: PaperCard | u
         {/* biome-ignore lint/performance/noImgElement: next/og draws plain img elements, not next/image */}
         <img src={logo} width={60} height={60} alt="" />
         <div style={{ display: "flex", fontSize: 38, fontWeight: 600 }}>
-          <span>Veri</span>
-          <span style={{ color: COLORS.accent }}>Sci</span>
+          <span>Labs</span>
+          <span style={{ color: COLORS.accent }}>Trail</span>
         </div>
       </div>
       {paper ? (

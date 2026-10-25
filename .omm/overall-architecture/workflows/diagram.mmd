@@ -10,7 +10,7 @@ graph LR
     rating -->|"checks the field and scores the paper with"| gemini
     publish -->|"announces a minted paper with"| alerts
     rating -->|"announces settled ratings and alerts with"| alerts
-    alerts -->|"reads pending requests with"| rating
+    alerts -->|"reads pending requests, delayed failures and the restart threshold with"| rating
     scripts["Dev Scripts\nscripts/"] -->|"request and score ratings, fund a wallet, post a webhook delivery, with"| rating
     scripts -->|"publish a PDF, and run the field check on the reference set, with"| publish
     classDef entry fill:#89b4fa,stroke:#89b4fa,color:#1e1e2e

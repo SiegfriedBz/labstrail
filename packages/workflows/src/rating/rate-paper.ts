@@ -19,7 +19,7 @@ import type { DkgClient, DkgFailure } from "@labstrail/dkg";
 import { type Inngest, type InngestFunction, NonRetriableError } from "inngest";
 import type { Hex } from "viem";
 import { z } from "zod";
-import { ratedNotice } from "../alerts/messages.ts";
+import { delayedNotice, ratedNotice } from "../alerts/messages.ts";
 import type { Notify } from "../alerts/notify.ts";
 import type { GeminiFailureResult } from "../gemini/gemini.ts";
 import type { ReadPaperTextResult } from "../pdf/paper-text.ts";
@@ -126,6 +126,45 @@ const RATING_FAILURES: readonly RatingFailure[] = [
   "rating-unreadable",
   "setup",
 ];
+
+/**
+ * A {@link RatingFailure} that may leave the request pending for the reconciler to restart (ADR
+ * 0020): every reason but `setup` and `rating-unreadable`, which are ours to fix.
+ */
+export type DelayedFailure = Exclude<RatingFailure, "setup" | "rating-unreadable">;
+
+/**
+ * The reasons a run gives up with while its request stays pending: the run sends a
+ * `⏳ Rating delayed` message, and the failure alert stays silent (ADR 0038), save an
+ * `oracle-failed` that {@link delayedFailureOf} leaves to the alert.
+ */
+export const DELAYED_FAILURES: readonly DelayedFailure[] = [
+  "chain-unreachable",
+  "node-unreachable",
+  "paper-unreachable",
+  "paper-unreadable",
+  "scorer-unavailable",
+  "mint-not-confirmed",
+  "oracle-failed",
+];
+
+/** Whether `reason` is one of {@link DELAYED_FAILURES}. */
+export function isDelayedFailure(reason: RatingFailure): reason is DelayedFailure {
+  return (DELAYED_FAILURES as readonly RatingFailure[]).includes(reason);
+}
+
+/**
+ * The {@link DELAYED_FAILURES} reason a run's error `message` carries, or `undefined`: an
+ * `oracle-failed` whose oracle stopped on `oracle-conflict` or `setup` is no wait, the request
+ * being settled or the settings ours to fix, so it is left to the failure alert.
+ */
+export function delayedFailureOf(message: string): DelayedFailure | undefined {
+  const reason = ratingFailureReason(message);
+  if (!reason || !isDelayedFailure(reason)) return undefined;
+  return reason === "oracle-failed" && /oracle-failed:(?:oracle-conflict|setup): /.test(message)
+    ? undefined
+    : reason;
+}
 
 /**
  * How a rating run ends, unless it fails: the request fulfilled or cancelled, or skipped. An
@@ -247,6 +286,10 @@ export function ratingFailureReason(output: unknown): RatingFailure | undefined 
  * the next of `retryWaits` and starts a new attempt from the R-KA's read (ADR 0009); a mint not seen after
  * `pollsPerMint` polls is started again. A part of the score that came back (the link, the
  * text, the score) is never asked for again.
+ *
+ * A run that gives up while the request stays pending ({@link delayedFailureOf}) first
+ * sends a `⏳ Rating delayed` message from a step of its own (`notify-delayed`), naming
+ * the paper as far as it read it, then fails with its `rating-failed:<reason>:` error as is.
  */
 export async function runRating(
   data: unknown,
@@ -254,14 +297,40 @@ export async function runRating(
   deps: RatingDeps,
   logger: OracleLogger,
 ): Promise<RatingOutcome> {
+  const known: Known = {};
+  try {
+    return await rateRequest(data, step, deps, logger, known);
+  } catch (error) {
+    await notifyDelayed(error, known, step, deps);
+    throw error;
+  }
+}
+
+/** What a run has read so far, for the message of a run that gives up. */
+interface Known {
+  requestId?: Hex;
+  request?: RatingRequestState;
+  run?: RunContext;
+}
+
+/** {@link runRating}'s work, recording in `known` what it reads. */
+async function rateRequest(
+  data: unknown,
+  step: RatingSteps,
+  deps: RatingDeps,
+  logger: OracleLogger,
+  known: Known,
+): Promise<RatingOutcome> {
   const event = eventSchema.safeParse(data);
   if (!event.success) return { state: "skipped", reason: "bad-event" };
   const contract = event.data.contract as Hex;
   const requestId = event.data.requestId as Hex;
   if (!deps.contracts.includes(contract)) return { state: "skipped", reason: "unknown-contract" };
+  known.requestId = requestId;
 
   const read = await readRequest(contract, requestId, step, deps);
   const { request } = read;
+  known.request = request;
   if (request.status !== "pending") return { state: "skipped", reason: "not-pending" };
   if (read.oracle !== deps.oracle) return { state: "skipped", reason: "not-our-oracle" };
 
@@ -317,6 +386,7 @@ export async function runRating(
     step,
     deps,
   };
+  known.run = run;
 
   let last: Attempt | undefined;
   for (let attempt = 1; attempt <= RATING_SETTINGS.attempts; attempt++) {
@@ -345,6 +415,44 @@ export async function runRating(
   const failure = last?.kind === "retry" ? last.failure : "mint-not-confirmed";
   const reason = last?.kind === "retry" ? last.reason : "mint not seen";
   throw stop(failure, `${name.name} gave up after ${RATING_SETTINGS.attempts} attempts: ${reason}`);
+}
+
+/**
+ * Sends the `⏳ Rating delayed` message from its own step (`notify-delayed`) when `error` stops
+ * the run with a delay ({@link delayedFailureOf}): the request's cancel time when the run read
+ * it, and the paper's CID and title when it found them, with no further lookup, since the node
+ * may be what is down.
+ */
+async function notifyDelayed(
+  error: unknown,
+  { requestId, request, run }: Known,
+  step: RatingSteps,
+  deps: RatingDeps,
+): Promise<void> {
+  if (!(error instanceof NonRetriableError) || !requestId) return;
+  const failure = delayedFailureOf(error.message);
+  if (!failure) return;
+  const detail = error.message.slice(`rating-failed:${failure}: `.length);
+  const cancelBy = request
+    ? new Date(request.requestedAt * 1000 + RATING_SETTINGS.maxAgeMs)
+    : undefined;
+  const paper = {
+    requestId,
+    targetUal: request?.targetUal,
+    cid: run?.cid,
+    title: run?.head?.title,
+  };
+  await step.run("notify-delayed", () => {
+    const notice = delayedNotice(
+      failure,
+      detail,
+      paper,
+      cancelBy,
+      new Date(deps.now()),
+      deps.siteUrl,
+    );
+    return deps.notify(notice).then(() => null);
+  });
 }
 
 /** The R-KA a run hands the oracle's answer: minted (a fulfil) or only stored (an expired cancel). */

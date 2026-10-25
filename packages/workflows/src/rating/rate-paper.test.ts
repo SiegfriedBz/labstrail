@@ -13,13 +13,14 @@ import type { AssetResult, DkgFailure, MintResult, QueryResult } from "@labstrai
 import { Inngest, NonRetriableError } from "inngest";
 import type { Hex } from "viem";
 import { describe, expect, it, vi } from "vitest";
-import type { Notice } from "../alerts/notify.ts";
+import { createNotify, type Notice } from "../alerts/notify.ts";
 import type { ReadPaperTextResult } from "../pdf/paper-text.ts";
 import type { FieldCheckResult } from "../publish/field-check.ts";
 import { PUBLISH_SETTINGS } from "../publish/publish-paper.ts";
 import type { OracleInput, OracleResult } from "./oracle.ts";
 import {
   createRatePaper,
+  DELAYED_FAILURES,
   loadRatingDeps,
   RATING_SETTINGS,
   type RatingDeps,
@@ -990,6 +991,160 @@ describe("runRating: failures that stop the run at once", () => {
     });
 
     await expect(run).rejects.toThrow(/^rating-failed:oracle-failed: /);
+  });
+});
+
+describe("runRating: a rating delayed, its request left pending", () => {
+  const PENDING = "Still pending: retried automatically about every 4 hours";
+  const CANCEL = "Cancelled if not rated by 16 Jan, 08:59";
+  const RATING_LINK = {
+    label: "Open the rating",
+    url: `${SITE}/papers/${CID}/ratings/${REQUEST_ID}`,
+  };
+
+  it.each([
+    [
+      "scorer-unavailable",
+      { scores: [{ ok: false, reason: "unreachable", status: 503 } as const] },
+    ],
+    ["paper-unreachable", { papers: [gatewayDown] }],
+    [
+      "paper-unreadable",
+      {
+        papers: [
+          ...Array.from({ length: RATING_SETTINGS.attempts }, () => gatewayDown),
+          { ok: false, reason: "unreadable" } as const,
+        ],
+      },
+    ],
+    ["chain-unreachable", { requests: [unreachable] }],
+    ["node-unreachable", { reads: [unreachable] }],
+    ["mint-not-confirmed", { reads: [stored], mints: [minting] }],
+    [
+      "oracle-failed",
+      {
+        oracleAnswer: () => {
+          throw new Error("oracle-failed:oracle-stuck: nothing settled in time");
+        },
+      },
+    ],
+  ] satisfies [string, Script][])(
+    "sends one delayed message from its own step, then fails %s as before",
+    async (reason, script) => {
+      const { run, deps, log } = rate(script);
+
+      await expect(run).rejects.toThrow(new RegExp(`^rating-failed:${reason}: `));
+      expect(log.at(-1)).toBe("notify-delayed");
+      expect(deps.notify).toHaveBeenCalledOnce();
+      expect(deps.notify.mock.calls[0]?.[0]).toMatchObject({
+        level: "activity",
+        text: "⏳ Rating delayed",
+      });
+    },
+  );
+
+  it.each(["oracle-conflict", "setup"])(
+    "sends no delayed message when the oracle stopped on %s, which is no wait",
+    async (oracle) => {
+      const { run, deps, log } = rate({
+        oracleAnswer: () => {
+          throw new Error(`oracle-failed:${oracle}: x`);
+        },
+      });
+
+      await expect(run).rejects.toThrow(/^rating-failed:oracle-failed: /);
+      expect(log).not.toContain("notify-delayed");
+      expect(deps.notify).not.toHaveBeenCalled();
+    },
+  );
+
+  it("lists every reason a run may give up with but setup and rating-unreadable", () => {
+    expect([...DELAYED_FAILURES].sort()).toEqual([
+      "chain-unreachable",
+      "mint-not-confirmed",
+      "node-unreachable",
+      "oracle-failed",
+      "paper-unreachable",
+      "paper-unreadable",
+      "scorer-unavailable",
+    ]);
+  });
+
+  it("says Gemini's limit is reached, when it resets, when the request is cancelled, and links the paper's rating", async () => {
+    const { run, deps } = rate({ scores: [{ ok: false, reason: "rate-limited", status: 429 }] });
+
+    await expect(run).rejects.toThrow(/^rating-failed:scorer-unavailable: .*\(HTTP 429\)/);
+    expect(deps.notify).toHaveBeenCalledExactlyOnceWith({
+      level: "activity",
+      text: "⏳ Rating delayed",
+      detail: [
+        "Gemini's request limit is reached; the daily limit resets at 09:00 Paris time",
+        PENDING,
+        CANCEL,
+      ].join("\n"),
+      title: "A trial",
+      link: RATING_LINK,
+    });
+  });
+
+  it("names the paper by its UAL, with no link, when the run gave up before finding its PDF", async () => {
+    const { run, deps } = rate({ found: [unreachable] });
+
+    await expect(run).rejects.toThrow(/^rating-failed:node-unreachable: /);
+    expect(deps.notify).toHaveBeenCalledExactlyOnceWith({
+      level: "activity",
+      text: "⏳ Rating delayed",
+      detail: `LabsTrail's DKG node is not answering\n${PENDING}\n${CANCEL}`,
+      title: TARGET,
+    });
+  });
+
+  it("names the request by its id, with no cancel time, when the chain never gave the request", async () => {
+    const { run, deps } = rate({ requests: [unreachable] });
+
+    await expect(run).rejects.toThrow(/^rating-failed:chain-unreachable: /);
+    expect(deps.notify).toHaveBeenCalledExactlyOnceWith({
+      level: "activity",
+      text: "⏳ Rating delayed",
+      detail: `The chain is not answering\n${PENDING}`,
+      title: `Request ${REQUEST_ID}`,
+    });
+  });
+
+  it.each([
+    ["setup", { scores: [{ ok: false, reason: "refused", status: 403 } as const] }],
+    [
+      "rating-unreadable",
+      { reads: [minted], ratingRows: [{ ok: true, bindings: [{ s: "x", p: "y", o: "z" }] }] },
+    ],
+  ] satisfies [string, Script][])(
+    "sends no delayed message when it fails %s, which the failure alert reports",
+    async (reason, script) => {
+      const { run, deps, log } = rate(script);
+
+      await expect(run).rejects.toThrow(new RegExp(`^rating-failed:${reason}: `));
+      expect(log).not.toContain("notify-delayed");
+      expect(deps.notify).not.toHaveBeenCalled();
+    },
+  );
+
+  it("logs a delayed message Telegram does not take, and still fails with its own error", async () => {
+    const logger = { info: vi.fn(), warn: vi.fn() };
+    const notify = createNotify({
+      appEnv: "production",
+      botToken: "123:token",
+      chatId: "-100",
+      fetch: async () => {
+        throw new Error("fetch failed");
+      },
+      timeoutMs: 1_000,
+      logger,
+    });
+    const { run, deps } = rate({ scores: [{ ok: false, reason: "unreachable", status: 503 }] });
+    deps.notify.mockImplementation(notify);
+
+    await expect(run).rejects.toThrow(/^rating-failed:scorer-unavailable: /);
+    expect(logger.warn).toHaveBeenCalledWith("notify-unavailable: telegram: fetch failed");
   });
 });
 

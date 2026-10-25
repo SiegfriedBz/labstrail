@@ -85,9 +85,67 @@ describe("completeTitle", () => {
     expect(completeTitle(CUT, `${"x".repeat(300 - CUT.length - 1)} ${CUT}`)).toHaveLength(300);
   });
 
+  describe("the Open Biology paper (2026-10-25), cut at a hyphen and spaced differently", () => {
+    const GROBID =
+      "-Cyclin B mediated phosphorylation of PP2A-B56 on B56 Par1 .T73T75 controls mitotic entry timing and Schizosaccharomyces pombe cell size";
+    const STORED =
+      "CDK1-Cyclin B mediated phosphorylation of PP2A-B56 on B56Par1.T73T75 controls mitotic entry timing and Schizosaccharomyces pombe cell size";
+
+    it("takes the PDF's stored title", () => {
+      expect(completeTitle(GROBID, STORED)).toBe(STORED);
+    });
+
+    it("keeps GROBID's, without its leading hyphen, when the words before it hold a journal's name", () => {
+      expect(completeTitle(GROBID, `Open Biology - ${STORED}`)).toBe(GROBID.slice(1));
+    });
+  });
+
+  it("ignores whitespace inside the titles, testing the dropped words with their own spacing", () => {
+    expect(completeTitle("on B56 Par1 .T73T75 controls", "Effect on B56Par1.T73T75 controls")).toBe(
+      "Effect on B56Par1.T73T75 controls",
+    );
+    expect(completeTitle("onB56Par1.T73T75 controls", "Effect on B56 Par1 .T73T75 controls")).toBe(
+      "Effect on B56 Par1 .T73T75 controls",
+    );
+    expect(
+      completeTitle("on B56 Par1 controls", "Cell Genomics - Effect on B56Par1 controls"),
+    ).toBe("on B56 Par1 controls");
+  });
+
+  it.each([
+    ["a hyphen", "-"],
+    ["an en dash", "–"],
+    ["an em dash", "—"],
+  ])("completes a title GROBID cut at %s after a word", (_, dash) => {
+    expect(
+      completeTitle(`${dash}Cyclin B controls entry`, `CDK1${dash}Cyclin B controls entry`),
+    ).toBe(`CDK1${dash}Cyclin B controls entry`);
+  });
+
+  it.each([
+    ["-Cyclin B controls entry", "Cell Genomics - Cyclin B controls entry"],
+    ["—Cyclin B controls entry", "Cell Genomics —Cyclin B controls entry"],
+    ["— Cyclin B controls entry", "Cell Genomics — Cyclin B controls entry"],
+  ])(
+    "keeps GROBID's cut at a dash the stored title spaces from the words before it (%s)",
+    (grobid, stored) => {
+      expect(completeTitle(grobid, stored)).toBe("Cyclin B controls entry");
+    },
+  );
+
+  it.each([
+    ["no stored title", undefined],
+    ["a stored title that does not end with it", "Another paper on mitosis"],
+    ["a stored title no longer than it", "-Cyclin B controls entry"],
+  ])("drops GROBID's leading hyphen or dash when the PDF gives %s", (_, stored) => {
+    expect(completeTitle("-Cyclin B controls entry", stored)).toBe("Cyclin B controls entry");
+    expect(completeTitle("— Cyclin B controls entry", stored)).toBe("Cyclin B controls entry");
+  });
+
   it("keeps GROBID's when the PDF stores no title", () => {
     expect(completeTitle(CUT, undefined)).toBe(CUT);
     expect(completeTitle(CUT, "  ")).toBe(CUT);
     expect(completeTitle(".", FULL)).toBe(".");
+    expect(completeTitle("-", FULL)).toBe("-");
   });
 });
