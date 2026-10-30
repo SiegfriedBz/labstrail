@@ -25,8 +25,9 @@ what others need to reproduce its work, and grows through transparent human
 review and, later, wet-lab replication
 ([ADR 0012](docs/adr/0012-three-phases-settled-by-the-oracle.md)).
 
-Status: phase 1 is live on staging and production, on testnets (release `v0.7.0`,
-2026-10-20). LabsTrail is a rebuild of an earlier prototype, `desci-rating-dapp`, which ran
+Status: phase 1 is live on staging and production, on testnets (since release `v0.7.0`,
+2026-10-20; latest release `v0.8.1`, 2026-10-25). It is a one-person project under
+construction: [Known limitations](#known-limitations) lists what it does not do yet. LabsTrail is a rebuild of an earlier prototype, `desci-rating-dapp`, which ran
 both flows (publish a paper, rate it) end to end on Base Sepolia. This repo starts again
 from clean foundations (monorepo, tooling, CI), and its ADRs and domain facts record what
 the prototype taught us. A visitor connects a wallet, publishes a PDF, follows it until it
@@ -107,6 +108,28 @@ Terms:
 - A **context graph** is the DKG graph a KA lives in; each environment has its own.
 - The **submitter** is the wallet that signed a paper's submission; the **oracle** is
   LabsTrail's account that records rating results on the contract.
+
+## Known limitations
+
+- **Testnet only, and requests are free.** LabsTrail pays the oracle's gas, the DKG publish
+  and the LLM. The cap of 3 pending requests per address is easy to dodge with fresh
+  addresses, so a throttle of 3 rating runs an hour is the real bound
+  ([ADR 0015](docs/adr/0015-rating-requests-are-free-on-testnet.md)).
+- **The score measures reporting, not correctness.** It says whether a paper gives what
+  others need to check and repeat its work, not whether the work is right: a fabricated
+  paper that reports everything would score well. Fourteen reference papers catch
+  regressions in the scorer; they are far too few to call the score calibrated.
+- **Scores still move between ratings.** Gemini 3.8 Flash has no documented seed, and
+  temperature is deprecated for it, so judgement checks such as `limitations` can be
+  answered differently. With scorer version 4, 14 runs on 3 papers spread by 0, 7 and 9
+  points ([`docs/domain.md`](docs/domain.md)).
+- **One shared DKG node** on one free VM serves staging and production: an outage takes
+  both down, and the node's single admin token means staging's credential could in
+  principle write the production graph; a configuration guard covers that for now.
+- **Gemini's free tier** allows 20 scorer requests a day, shared by every environment.
+- **One hot oracle key** per environment, holding a few days of gas.
+- **One copy of each PDF**, on Pinata (roadmap item 4).
+- **No end-to-end tests yet**; the pages have component tests.
 
 ## Roadmap
 
